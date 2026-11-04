@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 from romset import IMAGES, compare, layout, load_snapshot, merge, split
+from test_programs import plant_programs
 
 TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
@@ -173,7 +174,12 @@ def tool(env: str, default: str) -> str | None:
     reason="vasm or 64tass not available",
 )
 def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
-    files = synthetic_set(42)
+    # random bytes, except a valid (random) program table, ADSP stream and GSP table at
+    # 0x017000-0x01EFD4, which tools/extract-programs parses
+    snapshot = load_snapshot("stunrun")
+    images = merge(snapshot, synthetic_set(42))
+    images["stunrun-68k"] = plant_programs(images["stunrun-68k"], 42)
+    files = split(snapshot, images)
     write_set(tmp_path / "archive" / "stunrun", files)
     work = tmp_path / "repo"
     work.mkdir()
@@ -198,6 +204,9 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "blob: 100.0% of 1511424 bytes" in r.stdout
+    blobs = {line.split()[0]: line.split() for line in r.stdout.splitlines() if line.strip()}
+    assert blobs["adsp_program"][1:4] == ["1702E", "8270", "../../build/adsp/program.bin"]
+    assert blobs["gsp_program"][1:4] == ["1907C", "24408", "../../build/gsp/program.bin"]
     # the merged blobs are kept (not deleted as intermediates of the pattern rules)
     assert sorted(p.name for p in (work / "build").glob("*.bin")) == sorted(
         f"{name}.bin" for name in IMAGES

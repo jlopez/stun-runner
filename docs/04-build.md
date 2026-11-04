@@ -1,6 +1,6 @@
 # The build: five images, five trees, 25 files
 
-**Date**: 2026-11-04 (milestone 1, leg M1a). How `make` turns the reference set into source trees and back into the 25 files of `stunrun`, byte for byte, without a ROM byte in the repository. The IDA databases are leg M1b (docs/05-ida.md); the code map (where the GSP and ADSP programs live) is M2 and will refine the partition below.
+**Date**: 2026-11-04 (milestone 1, leg M1a; M2 added the program extraction). How `make` turns the reference set into source trees and back into the 25 files of `stunrun`, byte for byte, without a ROM byte in the repository. The IDA databases are leg M1b (docs/05-ida.md); the code map (where the GSP and ADSP programs live) is M2 and will refine the partition below.
 
 ## 1. The pipeline
 
@@ -16,6 +16,12 @@ build/stunrun-*.out  + build/stunrun-*.lst  assembled images and their listings
   ▼
 build/roms/stunrun/<25 files>              tools/check-roms --dir + tools/bytecheck
 ```
+
+Since M2 the 68k image has one more step: `tools/extract-programs` cuts the ADSP and GSP
+programs out of `build/stunrun-68k.bin` into `build/adsp/program.bin` and
+`build/gsp/program.bin` (plus the unpacked oracle images `pm.bin` and `vram.bin`), and
+`asm/68k/stunrun.asm` incbins them under `adsp_program` and `gsp_program` between two slices of
+the image (docs/06-code-map.md section 3.4, which also holds the partition of the 768 KB).
 
 `make` (= `make all`) runs the three steps. The images are rebuilt only when the layout tools or the snapshot change (`make clean` re-reads the archive); the trees reassemble when their sources or blobs change; the split always runs (cheap, and make 3.81 on macOS compares whole-second mtimes, so a stamp could hide a reassembly in the same second).
 

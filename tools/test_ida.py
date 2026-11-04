@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from ida.code_map import CODE_MAP_68K, GAME_VECTORS
 from ida.memory_map import (
     DATABASES,
     IO_68K,
@@ -26,6 +27,7 @@ from ida.memory_map import (
     SEGMENTS_JSA,
     jsa_bank_base,
     setup_68k,
+    setup_68k_full,
     setup_jsa,
     vector_name_68k,
 )
@@ -195,6 +197,11 @@ def synthetic_68k() -> bytes:
         vectors[n] = 0x700  # the sixteen traps
     vectors[26] = 0x800000  # outside the ROM
     struct.pack_into(">64I", image, 0, *vectors)
+    game = [0] * 64
+    game[1] = 0x21000  # the game's reset
+    game[26] = 0x21100  # level 2
+    game[9] = game[10] = 0x21200  # trace and line A share a handler
+    struct.pack_into(">64I", image, GAME_VECTORS, *game)
     return bytes(image)
 
 
@@ -203,21 +210,59 @@ def test_setup_68k() -> None:
     names = {n.ea: n.name for n in snap.names}
     assert names[0x000] == "vec_reset_sp" and names[0x004] == "vec_reset_pc"
     assert names[0x068] == "vec_level2_adsp" and names[0x0FC] == "vec_reserved_63"
-    assert names[0x400] == "reset" and names[0x500] == "h_bus_error"
-    assert names[0x600] == "h_spurious_interrupt_etc" and names[0x700] == "h_trap_0_etc"
-    assert snap.functions == [0x400, 0x500, 0x600, 0x700]
+    assert names[0x400] == "boot_reset" and names[0x500] == "boot_bus_error"
+    assert names[0x600] == "boot_spurious_interrupt_etc" and names[0x700] == "boot_trap_0_etc"
+    assert names[0x20004] == "game_vec_reset_pc" and names[0x21000] == "game_reset"
+    assert names[0x21100] == "h_level2_adsp" and names[0x21200] == "h_trace_etc"
+    assert snap.functions == [0x400, 0x500, 0x600, 0x700, 0x21000, 0x21100, 0x21200]
     offsets = {d.ea for d in snap.data if d.offset}
-    assert offsets == {4, 8, 0x60, 0x7C} | {4 * n for n in range(32, 48)}
-    assert len(snap.data) == 64 and all(d.type == "dword" for d in snap.data)
+    boot = {4, 8, 0x60, 0x7C} | {4 * n for n in range(32, 48)}
+    assert offsets == boot | {GAME_VECTORS + 4 * n for n in (1, 9, 10, 26)}
+    assert len(snap.data) == 128 and all(d.type == "dword" for d in snap.data)
     assert (
         Comment(0x600, "function", "vectors: vec_spurious_interrupt, vec_level7_nmi")
         in snap.comments
+    )
+    assert (
+        Comment(0x21200, "function", "vectors: game_vec_trace, game_vec_line_a") in snap.comments
     )
     for ea, name, _ in IO_68K:
         assert names[ea] == name
         assert Comment(ea, "repeatable", _) in snap.comments
     with pytest.raises(ValueError):
         setup_68k(b"\0" * 100)
+
+
+def test_setup_68k_full_adds_the_code_map_once() -> None:
+    with pytest.raises(ValueError, match="handler comment"):
+        setup_68k_full(synthetic_68k())  # the handlers code_map comments are not targets here
+    snap = setup_68k_full(real_like_68k())
+    names = {n.ea: n.name for n in snap.names}
+    for entry in CODE_MAP_68K:
+        if entry.name:
+            assert names[entry.ea] == entry.name
+        if entry.kind == "function":
+            assert entry.ea in snap.functions
+    function_comments = [c.ea for c in snap.comments if c.kind == "function"]
+    assert len(function_comments) == len(set(function_comments))
+    reset = next(c.text for c in snap.comments if c.ea == 0x216 and c.kind == "function")
+    assert reset.startswith("vectors: vec_reset_pc\nBoot reset")
+
+
+def real_like_68k() -> bytes:
+    """Vector tables with the real targets (addresses, not ROM bytes: docs/05 and docs/06)."""
+    image = bytearray(0xC0000)
+    boot = [0] * 64
+    boot[1], boot[25], boot[26], boot[27] = 0x216, 0x7FA, 0x7F0, 0x7D6
+    boot[28], boot[29], boot[30] = 0x81C, 0x82C, 0x812
+    game = [0] * 64
+    game[1], game[2], game[3], game[4], game[5] = 0x212AE, 0x22954, 0x229B4, 0x229A4, 0x22994
+    game[6], game[7], game[8], game[9] = 0x22984, 0x22964, 0x22974, 0x229D4
+    game[26], game[27], game[28], game[29] = 0x213FE, 0x2143C, 0x23F24, 0x222DA
+    game[30], game[31] = 0x239FE, 0x229C4
+    struct.pack_into(">64I", image, 0, *boot)
+    struct.pack_into(">64I", image, GAME_VECTORS, *game)
+    return bytes(image)
 
 
 def test_vector_names() -> None:

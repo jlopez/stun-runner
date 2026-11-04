@@ -3,7 +3,7 @@ and 64tass 1.60 -L, as `make` writes them)."""
 
 from __future__ import annotations
 
-from listings import tass, vasm
+from listings import Blob, tass, tass_blobs, vasm, vasm_blobs
 
 VASM = """Sections:
 00: "org0001:0" (0-130)
@@ -99,3 +99,12 @@ def test_tass_logical_pc_column() -> None:
         ">1002\t3002\t01 02\t\t\t\t.byte 1,2\n"
     )
     assert tass(listing, 0x1004) == {"b.asm": {"instr": 2, "data": 2, "blob": 0, "fill": 0}}
+
+
+def test_blobs_are_named_by_label_and_file() -> None:
+    listing = VASM.replace("(0-130)", "(0-134)")
+    assert vasm_blobs(listing) == [Blob("asm/t/main.asm", "start", "../../build/x.bin", 0, 0x20)]
+    assert tass_blobs(TASS, 0x5A) == [
+        Blob("asm/t/t.asm", "bank0", "IMAGE", 0, 0x20),
+        Blob("asm/t/t.asm", "window", "IMAGE", 0x42, 0x18),
+    ]

@@ -4,6 +4,8 @@
 
 VASM   ?= vasmm68k_mot
 TASS   ?= 64tass
+UNIDASM ?= unidasm
+MAME   ?= mame
 PYTHON ?= uv run --frozen python
 SET    := stunrun
 BUILD  := build
@@ -26,7 +28,8 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
-.PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export
+.PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
+	dasm oracle pcwatch
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -42,11 +45,26 @@ $(BUILD)/%-68k.bin $(BUILD)/%-obj.bin $(BUILD)/%-oki.bin $(BUILD)/%-jsa.bin $(BU
 # Reached only through the pattern rule below, the blobs would be intermediate files make deletes.
 .SECONDARY: $(IMAGES:%=$(BUILD)/%.bin)
 
+# The ADSP and GSP programs, cut out of the 68k image (docs/06-code-map.md): the 68k tree incbins
+# build/{adsp,gsp}/program.bin; the same run writes the oracle images pm.bin and vram.bin and
+# their ranges (`make oracle`, `make dasm`). Two targets, one recipe: a pattern rule (stem
+# "program"), as above.
+PROGRAMS := $(BUILD)/adsp/program.bin $(BUILD)/gsp/program.bin
+PROGRAM_TOOLS := tools/extract-programs tools/programs.py
+
+$(BUILD)/adsp/%.bin $(BUILD)/gsp/%.bin: $(BUILD)/$(SET)-68k.bin $(PROGRAM_TOOLS)
+	$(PYTHON) tools/extract-programs --image $< --out $(BUILD)
+
+.SECONDARY: $(PROGRAMS)
+
+# image -> blobs it incbins besides its own image
+EXTRA_stunrun-68k := $(PROGRAMS)
+
 # The listing is a co-target of the assembly (a pattern rule with two targets is one recipe for
 # both, in every make version), so a missing or stale listing reassembles its image.
 ASM = $(if $(filter $(VASM_IMAGES),$*),$(VASM) $(VASMFLAGS),$(TASS) $(TASSFLAGS))
 
-$(BUILD)/%.out $(BUILD)/%.lst: $$(SRC_$$*) $(BUILD)/%.bin $$(wildcard $$(dir $$(SRC_$$*))*.asm)
+$(BUILD)/%.out $(BUILD)/%.lst: $$(SRC_$$*) $(BUILD)/%.bin $$(EXTRA_$$*) $$(wildcard $$(dir $$(SRC_$$*))*.asm)
 	$(ASM) -L $(BUILD)/$*.lst -o $(BUILD)/$*.out $<
 
 # Without the reference set (CI) there is nothing to build from or compare with: skip, exit 0.
@@ -64,8 +82,9 @@ coverage: all $(LISTINGS)
 test: selftest
 	$(PYTHON) -m pytest -q tools
 
-PYTOOLS := tools/romset.py tools/listings.py tools/test_*.py \
-	tools/check-roms tools/merge-roms tools/split-roms tools/bytecheck tools/coverage
+PYTOOLS := tools/romset.py tools/listings.py tools/programs.py tools/test_*.py \
+	tools/check-roms tools/merge-roms tools/split-roms tools/bytecheck tools/coverage \
+	tools/extract-programs tools/dasm-programs tools/annotate-listing
 
 lint:
 	uv run --frozen ruff check tools ida
@@ -82,6 +101,45 @@ ida: $(BUILD)/$(SET)-68k.bin $(BUILD)/$(SET)-jsa.bin
 
 ida-export:
 	$(PYTHON) -m ida.headless.export all
+
+# Re-apply the setup of ida/memory_map.py (and its code map, ida/code_map.py) over the databases
+# `make ida` made: the committed snapshot wins over the setup on create, so a renamed setup entry
+# needs this once, then `make ida-export`.
+ida-annotate:
+	$(PYTHON) -m ida.headless.annotate all
+
+# The GSP and ADSP programs as unidasm listings with the sidecars merged in (docs/06-code-map.md
+# section 6). The listings contain the program bytes: build output, never committed.
+dasm: $(PROGRAMS) tools/dasm-programs tools/annotate-listing data/adsp/annotations.json \
+		data/gsp/annotations.json
+	$(PYTHON) tools/dasm-programs --build $(BUILD) --unidasm $(UNIDASM)
+	$(PYTHON) tools/annotate-listing data/adsp/annotations.json $(BUILD)/adsp/program.lst \
+		$(BUILD)/adsp/program.annotated.lst
+	$(PYTHON) tools/annotate-listing data/gsp/annotations.json $(BUILD)/gsp/program.lst \
+		$(BUILD)/gsp/program.annotated.lst
+
+# The oracle (docs/06-code-map.md section 5): MAME runs the reference set (rompath from
+# ~/.mame/mame.ini) and tools/mame/dump.lua dumps GSP VRAM and ADSP program and data RAM after
+# ORACLE_FRAMES frames into build/mame/; `make test` then compares them with the extracted
+# images (tools/test_programs.py, which skips without the dumps). Needs MAME and the ROMs.
+ORACLE_FRAMES ?= 600
+MAME_FLAGS := -video none -sound none -nothrottle -autoboot_delay 0 -seconds_to_run 600
+
+oracle: $(PROGRAMS)
+	@mkdir -p $(BUILD)/mame
+	DUMP_DIR=$(BUILD)/mame/ DUMP_FRAMES=$(ORACLE_FRAMES) $(MAME) stunrun $(MAME_FLAGS) \
+		-autoboot_script tools/mame/dump.lua
+
+# Does the 68010 execute outside its ROM? Registerpoints on every instruction (needs -debug);
+# WATCH_PLAY=1 inserts a coin and starts a game. Writes build/mame/pcwatch.txt.
+WATCH_FRAMES ?= 3600
+WATCH_PLAY ?= 1
+
+pcwatch:
+	@mkdir -p $(BUILD)/mame
+	WATCH_DIR=$(BUILD)/mame/ WATCH_FRAMES=$(WATCH_FRAMES) WATCH_PLAY=$(WATCH_PLAY) $(MAME) stunrun \
+		-debug -debugger none $(MAME_FLAGS) -autoboot_script tools/mame/pcwatch.lua
+	@cat $(BUILD)/mame/pcwatch.txt
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms

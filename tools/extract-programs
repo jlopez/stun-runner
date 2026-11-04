@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Cut the ADSP and GSP programs out of the 68k image and unpack them as the loaders do (`make`).
+
+    tools/extract-programs                          # build/stunrun-68k.bin -> build/adsp, build/gsp
+    tools/extract-programs --image FILE --out DIR
+
+From the 68k image (tools/merge-roms), through the program table at 0x017000:
+
+- `<out>/adsp/program.bin`: the ADSP record stream, 68k 0x01702E-0x01907C, as is (what
+  asm/68k/stunrun.asm incbins under `adsp_program`);
+- `<out>/gsp/program.bin`: the GSP section table, 68k 0x01907C-0x01EFD4, as is (`gsp_program`);
+- `<out>/adsp/pm.bin` + `pm.ranges.json`: ADSP program RAM after the 68k loader at 0x02D2E0,
+  0x2000 words as 32-bit little-endian (top byte 0, zero where nothing is loaded), and the
+  loaded word ranges;
+- `<out>/gsp/vram.bin` + `vram.ranges.json`: GSP VRAM after the 68k loader at 0x02FDD0, a
+  sparse byte image of bit addresses FF800000-FFFFFFFF (16-bit words little-endian) written
+  only where loaded, and the loaded bit ranges.
+
+The record and section formats and the loaders' instruction addresses are in tools/programs.py.
+pm.bin and vram.bin are the oracle images that tools/test_programs.py compares with MAME's
+memory (`make oracle`) and that `make dasm` disassembles. All outputs are build artefacts
+(ROM bytes): never commit them. Exit status 1 when the image does not have the expected layout.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from programs import FormatError, adsp_pm_image, gsp_vram_image, locate  # noqa: E402
+
+
+def write(path: Path, data: bytes) -> None:
+    # Always written, so every output is newer than the image it comes from (make reruns this
+    # only when the image or the tools change, and then the 68k tree reassembles anyway).
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+
+
+def ranges_json(unit: str, base: int, ranges: list[tuple[int, int]]) -> bytes:
+    """{"unit", "image_base", "ranges": [[start, end), ...]} with hex strings, a range a line."""
+    rows = ",\n".join(f"  {json.dumps([f'{s:X}', f'{e:X}'])}" for s, e in ranges)
+    head = f'{{"unit": {json.dumps(unit)}, "image_base": "{base:X}",\n "ranges": [\n'
+    return (head + rows + "\n ]}\n").encode()
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    ap.add_argument("--image", type=Path, default=Path("build") / "stunrun-68k.bin")
+    ap.add_argument("--out", type=Path, default=Path("build"), help="output directory")
+    args = ap.parse_args()
+
+    image = args.image.read_bytes()
+    try:
+        progs = locate(image)
+        pm, pm_ranges = adsp_pm_image(progs.adsp)
+        vram, vram_ranges = gsp_vram_image(progs.gsp)
+    except FormatError as e:
+        print(f"FAIL {args.image}: {e}")
+        return 1
+    (a0, a1), (g0, g1) = progs.adsp_range, progs.gsp_range
+    write(args.out / "adsp" / "program.bin", image[a0:a1])
+    write(args.out / "gsp" / "program.bin", image[g0:g1])
+    write(args.out / "adsp" / "pm.bin", pm)
+    write(args.out / "adsp" / "pm.ranges.json", ranges_json("adsp word", 0, pm_ranges))
+    write(args.out / "gsp" / "vram.bin", vram)
+    write(args.out / "gsp" / "vram.ranges.json", ranges_json("gsp bit", 0xFF800000, vram_ranges))
+    words = sum(e - s for s, e in pm_ranges)
+    bits = sum(e - s for s, e in vram_ranges)
+    print(
+        f"adsp: {len(progs.adsp)} records at {a0:06X}-{a1:06X}, {words} words -> "
+        f"{args.out / 'adsp'}/"
+    )
+    print(
+        f"gsp: {len(progs.gsp)} sections at {g0:06X}-{g1:06X}, {bits // 8} bytes -> "
+        f"{args.out / 'gsp'}/"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

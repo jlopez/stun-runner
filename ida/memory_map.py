@@ -11,6 +11,7 @@ import struct
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from ida.code_map import CODE_MAP_68K, GAME_VECTORS, HANDLER_COMMENTS
 from ida.snapshot import Comment, DataItem, Name, Segment, Snapshot
 
 # --- 68010 (main board), docs/01 section 3 ----------------------------------------------------
@@ -193,7 +194,11 @@ def _io(table: list[tuple[int, str, str]]) -> tuple[list[Name], list[Comment]]:
 
 
 def _handlers(
-    targets: dict[int, list[str]], reset: str
+    targets: dict[int, list[str]],
+    reset: str,
+    prefix: str = "h_",
+    reset_name: str = "reset",
+    strip: str = "vec_",
 ) -> tuple[list[int], list[Name], list[Comment]]:
     """A function at each vector target; named after its vector, or after the range of vectors
     that share it, with a function comment that lists them."""
@@ -203,38 +208,95 @@ def _handlers(
     for ea, vectors in sorted(targets.items()):
         functions.append(ea)
         if reset in vectors:
-            name = "reset"
+            name = reset_name
         elif len(vectors) == 1:
-            name = "h_" + vectors[0].removeprefix("vec_")
+            name = prefix + vectors[0].removeprefix(strip)
         else:
-            name = "h_" + vectors[0].removeprefix("vec_") + "_etc"
+            name = prefix + vectors[0].removeprefix(strip) + "_etc"
         names.append(Name(ea, name))
         comments.append(Comment(ea, "function", "vectors: " + ", ".join(vectors)))
     return functions, names, comments
 
 
-def setup_68k(image: bytes) -> Snapshot:
-    if len(image) != ROM_68K_SIZE:
-        raise ValueError(f"68k image is {len(image)} bytes, expected {ROM_68K_SIZE}")
-    vectors = struct.unpack_from(f">{VECTOR_COUNT_68K}I", image, 0)
-    names, comments = _io(IO_68K)
+def _vector_table_68k(
+    image: bytes, base: int, prefix: str
+) -> tuple[list[Name], list[DataItem], dict[int, list[str]]]:
+    """The 64 named longs of a 68010 vector table at `base` and the ROM targets they reach."""
+    vectors = struct.unpack_from(f">{VECTOR_COUNT_68K}I", image, base)
+    names: list[Name] = []
     data: list[DataItem] = []
     targets: dict[int, list[str]] = {}
     for n, value in enumerate(vectors):
-        ea, name = 4 * n, vector_name_68k(n)
+        ea, name = base + 4 * n, prefix + vector_name_68k(n)
         in_rom = n > 0 and value != 0 and value < ROM_68K_SIZE and value % 2 == 0
         names.append(Name(ea, name))
         data.append(DataItem(ea, "dword", 1, in_rom))
         if in_rom:
             targets.setdefault(value, []).append(name)
-    functions, handler_names, handler_comments = _handlers(targets, "vec_reset_pc")
+    return names, data, targets
+
+
+def setup_68k(image: bytes) -> Snapshot:
+    """The memory map and both vector tables: the boot program's at 0 (handlers `boot_*`) and
+    the game's at GAME_VECTORS = 0x020000, which the boot code installs with movec A0,VBR at
+    0x000294 (vectors `game_vec_*`, handlers `h_*`, the reset target `game_reset`)."""
+    if len(image) != ROM_68K_SIZE:
+        raise ValueError(f"68k image is {len(image)} bytes, expected {ROM_68K_SIZE}")
+    names, comments = _io(IO_68K)
+    boot_names, data, boot_targets = _vector_table_68k(image, 0, "")
+    game_names, game_data, game_targets = _vector_table_68k(image, GAME_VECTORS, "game_")
+    functions, handler_names, handler_comments = _handlers(
+        boot_targets, "vec_reset_pc", "boot_", "boot_reset"
+    )
+    game_functions, game_handler_names, game_handler_comments = _handlers(
+        game_targets, "game_vec_reset_pc", "h_", "game_reset", "game_vec_"
+    )
     return Snapshot(
         "stunrun-68k",
         "68010",
         list(SEGMENTS_68K),
-        names + handler_names,
-        functions,
-        comments + handler_comments,
+        names + boot_names + game_names + handler_names + game_handler_names,
+        functions + game_functions,
+        comments + handler_comments + game_handler_comments,
+        data + game_data,
+    ).normalized()
+
+
+def setup_68k_full(image: bytes) -> Snapshot:
+    """setup_68k plus the code map of milestone 2 (ida/code_map.py). One function comment per
+    address: a code-map or handler comment is appended to the `vectors: ...` line."""
+    base = setup_68k(image)
+    function_comments = {c.ea: c.text for c in base.comments if c.kind == "function"}
+    other = [c for c in base.comments if c.kind != "function"]
+    names = {n.ea: n.name for n in base.names}
+    functions = set(base.functions)
+    data = list(base.data)
+
+    def add_function_comment(ea: int, text: str) -> None:
+        old = function_comments.get(ea)
+        function_comments[ea] = text if old is None else old + "\n" + text
+
+    for entry in CODE_MAP_68K:
+        if entry.name is not None:
+            names[entry.ea] = entry.name
+        if entry.kind == "function":
+            functions.add(entry.ea)
+            add_function_comment(entry.ea, entry.comment)
+        else:
+            other.append(Comment(entry.ea, "regular", entry.comment))
+    for ea, text in HANDLER_COMMENTS.items():
+        if ea not in functions:
+            raise ValueError(f"handler comment at {ea:06X} without a vector target there")
+        add_function_comment(ea, text)
+    data += [DataItem(ea, "dword", 1, True) for ea in (0x017000, 0x017004)]
+    data += [DataItem(ea, "dword", 1, False) for ea in (0x017008, 0x01700C)]
+    return Snapshot(
+        base.database,
+        base.processor,
+        base.segments,
+        [Name(ea, name) for ea, name in names.items()],
+        sorted(functions),
+        other + [Comment(ea, "function", t) for ea, t in function_comments.items()],
         data,
     ).normalized()
 
@@ -272,6 +334,6 @@ class DatabaseSpec:
 
 
 DATABASES = {
-    "68k": DatabaseSpec("stunrun-68k", "68010", setup_68k),
+    "68k": DatabaseSpec("stunrun-68k", "68010", setup_68k_full),
     "jsa": DatabaseSpec("stunrun-jsa", "M6502", setup_jsa),
 }

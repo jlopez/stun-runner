@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Merge a sidecar of names and comments into a unidasm listing (`make dasm`).
+
+    tools/annotate-listing data/gsp/annotations.json build/gsp/program.lst build/gsp/program.annotated.lst
+
+The GSP and ADSP programs stay blobs until M6, and IDA is not used for them (CLAUDE.md section
+5): their annotations live in a sidecar, `data/<program>/annotations.json`, keyed by address,
+with no byte of the program in it:
+
+    {"program": "adsp", "arch": "adsp21xx", "address_unit": "word",
+     "entries": [{"addr": "0004", "name": "reset", "comment": "..."}, ...]}
+
+`addr` is hex in the listing's address unit (ADSP program words, GSP bits). An entry with a
+`name` becomes a label line before the instruction, its `comment` a `;` block above the label;
+an entry with only a `comment` is appended to the instruction line. Every address must start a
+line of the listing (exit status 1 otherwise), so a sidecar cannot drift from the code.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+import textwrap
+from pathlib import Path
+from typing import Any
+
+LINE = re.compile(r"^([0-9a-f]+): ")
+
+
+def entries(sidecar: dict[str, Any]) -> dict[int, dict[str, str]]:
+    out: dict[int, dict[str, str]] = {}
+    for e in sidecar["entries"]:
+        addr = int(e["addr"], 16)
+        if addr in out:
+            raise ValueError(f"duplicate address {e['addr']}")
+        if not e.get("name") and not e.get("comment"):
+            raise ValueError(f"entry {e['addr']} has neither name nor comment")
+        out[addr] = e
+    return out
+
+
+def annotate(listing: str, table: dict[int, dict[str, str]]) -> tuple[str, list[int]]:
+    """The annotated listing and the sidecar addresses no listing line starts at."""
+    seen = set()
+    out = []
+    for line in listing.splitlines():
+        m = LINE.match(line)
+        e = table.get(int(m.group(1), 16)) if m else None
+        if m is None or e is None:
+            out.append(line)
+            continue
+        seen.add(int(m.group(1), 16))
+        if e.get("name"):
+            out.append("")
+            for text in e.get("comment", "").splitlines():
+                out += ["; " + w for w in textwrap.wrap(text, 96)] or [";"]
+            out.append(f"{e['name']}:")
+            out.append(line)
+        else:
+            out.append(f"{line:<60}; {e['comment']}")
+    return "\n".join(out) + "\n", sorted(set(table) - seen)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    ap.add_argument("sidecar", type=Path)
+    ap.add_argument("listing", type=Path)
+    ap.add_argument("out", type=Path)
+    args = ap.parse_args()
+    try:
+        table = entries(json.loads(args.sidecar.read_text()))
+    except (ValueError, KeyError) as e:
+        print(f"FAIL {args.sidecar}: {e}")
+        return 1
+    text, missing = annotate(args.listing.read_text(), table)
+    if missing:
+        print(
+            f"FAIL {args.sidecar}: {len(missing)} addresses start no line of {args.listing}: "
+            + ", ".join(f"{a:X}" for a in missing)
+        )
+        return 1
+    args.out.write_text(text)
+    names = sum(1 for e in table.values() if e.get("name"))
+    print(f"{args.out}: {names} names, {len(table) - names} line comments from {args.sidecar}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

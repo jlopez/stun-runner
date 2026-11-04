@@ -6,8 +6,9 @@
 Each listing is a vasm -L listing (detected by its "Sections:" header) or a 64tass -L listing
 (the image size then comes from the assembled file next to it, <listing stem>.out). Prints per
 source file and per image the bytes from instructions, data statements, incbin/.binary blobs and
-fills, the grand total and the blob share, and, last, one JSON line. Fails unless the total
-equals the set's size (tools/romsets/<set>.json, 1,511,424 bytes for stunrun) or --expect.
+fills, the grand total, every blob by label with the file it includes and its size, the blob
+share and, last, one JSON line. Fails unless the total equals the set's size
+(tools/romsets/<set>.json, 1,511,424 bytes for stunrun) or --expect.
 The blob share only goes down (CLAUDE.md section 2).
 """
 
@@ -19,15 +20,16 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from listings import CLASSES, Counts, tass, vasm  # noqa: E402
+from listings import CLASSES, Blob, Counts, tass, tass_blobs, vasm, vasm_blobs  # noqa: E402
 from romset import load_snapshot  # noqa: E402
 
 
-def tally(path: Path) -> Counts:
+def tally(path: Path) -> tuple[Counts, list[Blob]]:
     text = path.read_text(errors="replace")
     if text.startswith("Sections:"):
-        return vasm(text)
-    return tass(text, path.with_suffix(".out").stat().st_size)
+        return vasm(text), vasm_blobs(text)
+    size = path.with_suffix(".out").stat().st_size
+    return tass(text, size), tass_blobs(text, size)
 
 
 def row(name: str, c: dict[str, int]) -> str:
@@ -47,9 +49,11 @@ def main() -> int:
     grand = dict.fromkeys(CLASSES, 0)
     images: dict[str, dict[str, int]] = {}
     files: dict[str, dict[str, int]] = {}
+    blobs: list[Blob] = []
     print(f"{'file':<28}{'bytes':>9}" + "".join(f"{k:>9}" for k in CLASSES))
     for path in args.listings:
-        counts = tally(path)
+        counts, found = tally(path)
+        blobs += found
         image = dict.fromkeys(CLASSES, 0)
         for source, c in counts.items():
             print(row(source, c))
@@ -62,11 +66,24 @@ def main() -> int:
             grand[k] += image[k]
     n = sum(grand.values())
     print(row("total", grand))
+    print(f"\n{'blob':<20}{'address':>9}{'bytes':>9}  {'includes':<34}source")
+    for b in blobs:
+        print(f"{b.label or '-':<20}{b.address:>9X}{b.size:>9}  {b.target:<34}{b.file}")
     pct = 100.0 * grand["blob"] / n if n else 0.0
     print(f"blob: {pct:.1f}% of {n} bytes come from incbin/.binary")
     print(
         json.dumps(
-            {"total": n, **grand, "blob_pct": round(pct, 2), "images": images, "files": files}
+            {
+                "total": n,
+                **grand,
+                "blob_pct": round(pct, 2),
+                "images": images,
+                "files": files,
+                "blobs": [
+                    {"label": b.label, "includes": b.target, "source": b.file, "bytes": b.size}
+                    for b in blobs
+                ],
+            }
         )
     )
     if n != expect:

@@ -1,0 +1,30 @@
+{
+  "program": "gsp",
+  "arch": "tms34010",
+  "address_unit": "bit",
+  "listing": "build/gsp/program.lst (tools/dasm-programs)",
+  "entries": [
+    {"addr": "FFF40000", "name": "gsp_main", "comment": "First word of section 0 (.text, HYP). Called once by the reset entry (FFF59BD0); 29 of the 32 trap vectors point here too, and JAHI FFF40000 at FFF4A730/FFF4A7C0 restarts it. Programs the GSP I/O registers (C0000110, C0000150, C0000160, ...), then falls into the frame loop."},
+    {"addr": "FFF40DA0", "comment": "clears the two command-buffer flag words FFFCFC00 and FFF9FC00 (FFF40DF0, FFF40E30)"},
+    {"addr": "FFF40EA0", "comment": "HSTCTLL (C00000F0) |= 80h: sets INTOUT, the 68k's level-3 interrupt: the GSP is ready"},
+    {"addr": "FFF40ED0", "name": "main_loop", "comment": "Frame loop: waits until the frame counter FFF716A0 (incremented by the display interrupt, FFF41F80) reaches FFF77E80 (FFF40F50-FFF40F90), clears it, then polls the two command buffers."},
+    {"addr": "FFF41010", "name": "poll_command_buffers", "comment": "Idle loop FFF41010-FFF41160: a buffer is ready when its flag word reads FFFF, FFF9FC00 first (list at FFF9FC10), then FFFCFC00 (list at FFFCFC10). MAME's speedup sits here (init_stunrun: m_gsp_speedup_pc = FFF41070, handlers on writes to FFF9FC00 and FFFCFC00)."},
+    {"addr": "FFF41070", "comment": "the idle PC MAME's speedup checks (harddriv.cpp init_stunrun); A0 = flag word of buffer FFF9FC00"},
+    {"addr": "FFF411A0", "name": "process_command_buffer", "comment": "A5 = the ready list: stores it in FFF77F30 and runs the list (CALLA FFF58750, FFF58790, FFF4D940, FFF46E30, ...). The command format is M5d/M6."},
+    {"addr": "FFF41890", "name": "command_buffer_done", "comment": "Clears the buffer's flag word (FFF418A0), sets HSTCTLL INTOUT (FFF41910) to interrupt the 68k at level 3, and returns to main_loop (FFF41940)."},
+    {"addr": "FFF41910", "comment": "HSTCTLL (C00000F0) |= 80h: INTOUT, the 68k's level-3 interrupt (game handler 02143C acknowledges it)"},
+    {"addr": "FFF41C00", "name": "display_interrupt", "comment": "Trap vector 10 (DI, the display interrupt; FFFFFEA0 holds FFF41C00): reprograms the display registers (DPYSTRT, DPYCTL, ...) and increments the frame counter FFF716A0 (FFF41F50-FFF41F90)."},
+    {"addr": "FFF45FC0", "name": "trap29_delay", "comment": "Trap vector 29 (FFFFFC40 holds FFF45FC0): a busy wait of 80000h iterations, RETI."},
+    {"addr": "FFF46340", "comment": "writes FFF5C8F0, a variable in section 2: the one loaded word MAME's VRAM no longer holds (tools/programs.py GSP_RUNTIME_WORDS)"},
+    {"addr": "FFF479B0", "comment": "writes FFF5C8F0 (see FFF46340)"},
+    {"addr": "FFF59920", "name": "reset", "comment": "Reset entry: trap vector 0 at FFFFFFE0 holds FFF59920; the 68k never writes the PC, it releases HLT (02C1C4). A13 = A14 = FFF793D0 (HYP: C program stack), SP = FFF98790, then clears FFF6F580-FFF98BB0 (FFF59A20) and runs the section 1 records (FFF59B20) before calling gsp_main. The shape of TI's C start-up (boot.asm c_int00), HYP."},
+    {"addr": "FFF59A20", "name": "clear_bss", "comment": "Clears FFF6F580 (the end of the loaded image) up to FFF98BB0 (A11 to A12) in 32-bit fields, then the tail in bytes (FFF59AD0-FFF59B10). Covers the frame counter FFF716A0; the command buffers FFF9FC00/FFFCFC00 lie above it."},
+    {"addr": "FFF59B20", "comment": "A10 = FFF5A170, the start of section 1; if not FFFF, CALLA FFF59C70 processes it (HYP: TI C auto-initialisation records, .cinit)"},
+    {"addr": "FFF59BD0", "comment": "CALLA gsp_main"},
+    {"addr": "FFF59C30", "comment": "CALLA FFF59DD0 (HYP: exit) if gsp_main returns"},
+    {"addr": "FFF59C70", "name": "run_init_records", "comment": "Called with A10 = FFF5A170: walks the records of section 1 (HYP: TI C .cinit, each a length, a destination and the data)."},
+    {"addr": "FFF5A170", "name": "section1", "comment": "Section 1, FFF5A170-FFF5C8F0 (68k 01C4C0-01C9B0): read by run_init_records at start-up (HYP: .cinit records, not code; the disassembly here is noise)."},
+    {"addr": "FFF5C8F0", "name": "section2", "comment": "Section 2, FFF5C8F0-FFF6F580 (68k 01C9B8-01EF4C): initialised data (HYP: .data); its first word FFF5C8F0 is a variable the code writes (FFF46340, FFF479B0)."},
+    {"addr": "FFFFFC00", "name": "trap_vectors", "comment": "Section 3, FFFFFC00-FFFFFFFF: the 32 TMS34010 trap vectors, 32 bits each, vector n at FFFFFFE0 - 20h * n. 0 reset = FFF59920, 10 (DI) = FFF41C00, 29 = FFF45FC0, every other = FFF40000."}
+  ]
+}
