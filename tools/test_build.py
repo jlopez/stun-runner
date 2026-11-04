@@ -198,6 +198,17 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "blob: 100.0% of 1511424 bytes" in r.stdout
+    # the merged blobs are kept (not deleted as intermediates of the pattern rules)
+    assert sorted(p.name for p in (work / "build").glob("*.bin")) == sorted(
+        f"{name}.bin" for name in IMAGES
+    )
+    # a listing is a target: a missing one reassembles its image instead of crashing coverage
+    for name in ("stunrun-obj", "stunrun-jsa"):
+        (work / f"build/{name}.lst").unlink()
+    r = run(*make, "coverage", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "blob: 100.0% of 1511424 bytes" in r.stdout
+    assert (work / "build/stunrun-obj.lst").exists() and (work / "build/stunrun-jsa.lst").exists()
     # a planted difference in a blob reaches the built files and the report names the address
     image = work / "build/stunrun-68k.bin"
     data = bytearray(image.read_bytes())

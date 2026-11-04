@@ -39,11 +39,15 @@ all: $(OUTS) tools/split-roms $(ROMSET_TOOLS)
 $(BUILD)/%-68k.bin $(BUILD)/%-obj.bin $(BUILD)/%-oki.bin $(BUILD)/%-jsa.bin $(BUILD)/%-nvram.bin: tools/merge-roms $(ROMSET_TOOLS)
 	$(PYTHON) tools/merge-roms --set $(SET) --out $(BUILD)
 
-$(VASM_IMAGES:%=$(BUILD)/%.out): $(BUILD)/%.out: $$(SRC_%) $(BUILD)/%.bin $$(wildcard $$(dir $$(SRC_%))*.asm)
-	$(VASM) $(VASMFLAGS) -L $(BUILD)/$*.lst -o $@ $<
+# Reached only through the pattern rule below, the blobs would be intermediate files make deletes.
+.SECONDARY: $(IMAGES:%=$(BUILD)/%.bin)
 
-$(BUILD)/stunrun-jsa.out: $(SRC_stunrun-jsa) $(BUILD)/stunrun-jsa.bin $(wildcard asm/jsa/*.asm)
-	$(TASS) $(TASSFLAGS) -L $(BUILD)/stunrun-jsa.lst -o $@ $<
+# The listing is a co-target of the assembly (a pattern rule with two targets is one recipe for
+# both, in every make version), so a missing or stale listing reassembles its image.
+ASM = $(if $(filter $(VASM_IMAGES),$*),$(VASM) $(VASMFLAGS),$(TASS) $(TASSFLAGS))
+
+$(BUILD)/%.out $(BUILD)/%.lst: $$(SRC_$$*) $(BUILD)/%.bin $$(wildcard $$(dir $$(SRC_$$*))*.asm)
+	$(ASM) -L $(BUILD)/$*.lst -o $(BUILD)/$*.out $<
 
 # Without the reference set (CI) there is nothing to build from or compare with: skip, exit 0.
 check:
@@ -54,7 +58,7 @@ check:
 	$(PYTHON) tools/check-roms --set $(SET) --dir $(ROMDIR); hashes=$$?; \
 	$(PYTHON) tools/bytecheck --set $(SET) --built $(ROMDIR) && [ $$hashes -eq 0 ]
 
-coverage: all
+coverage: all $(LISTINGS)
 	$(PYTHON) tools/coverage --set $(SET) $(LISTINGS)
 
 test: selftest
