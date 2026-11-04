@@ -58,8 +58,8 @@ CODE_MAP_68K = [
     Entry(
         0x0002A0,
         "boot_select_self_test",
-        "Self-test switch on: PORT0 bit 0 (DIAGN jumper) picks the self-test entry, 008FEE "
-        "(set) or 00506C (clear).",
+        "Self-test switch on: PORT0 bit 0 (DIAGN jumper) picks the self-test entry, 00506C "
+        "(set, bne at 0002A8) or 008FEE (clear).",
         "label",
     ),
     Entry(0x000370, "boot_delay", "Busy wait, between the /GSPRES edges of boot_init_gsp."),
@@ -159,8 +159,9 @@ CODE_MAP_68K = [
     Entry(
         0x020100,
         "game_entries",
-        "Three jmp: game_entry_1 (021334), game_entry_2 (021378), game_entry_3 (0213B6). No "
-        "reference found in the ROM. HYP: entry points for development tools.",
+        "Three jmp: game_entry_1 (021334), game_entry_2 (021378), game_entry_3 (0213B6). Entered "
+        "by the boot self-test with VBR = 020000: 0010FC jmp (A1) = game_entry_1, 001130 jsr "
+        "(A1) = game_entry_3 (A1 + C), 008F1A jsr (A1) = game_entry_2 (A1 + 6).",
         "label",
     ),
     Entry(
@@ -309,7 +310,7 @@ CODE_MAP_68K = [
         "reload_gsp",
         "As the GSP half of init_coprocessors: init_gsp, clear_gsp_screen, a message, "
         "set_sr(2000), download_gsp_program or load_gsp_program(gsp_program_ptr) (02DCB0), "
-        "HSTCTL 7800 then 3800. Called from 02DCF2 and 04373C.",
+        "HSTCTL 7800 then 3800. Called from 02DCF0 and 04373A.",
     ),
     Entry(
         0x02FCC0,

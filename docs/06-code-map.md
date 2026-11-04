@@ -34,7 +34,8 @@ The 768 KB hold four programs:
 ```
 
 With the self-test switch on, 0x0002A0 reads PORT0 bit 0 (the DIAGN jumper,
-harddriv_m.cpp:201-217) and jumps to 0x008FEE or 0x00506C. `game_reset` (0x0212AE) clears RAM,
+harddriv_m.cpp:201-217) and jumps to 0x00506C when it is set (`bne` at 0x0002A8) or to
+0x008FEE when it is clear (0x0002AC). `game_reset` (0x0212AE) clears RAM,
 `clear_gsp_vram`, `clear_msp_ram`, 0x020702, then the main initialisation 0x024306, which calls
 `init_coprocessors` (0x02C0D2) at 0x0243AC. `soft_reset` (0x021286) starts with `stop #$2700`,
 so a fatal error waits for the watchdog with every interrupt but level 7 masked (HYP); the code
@@ -42,8 +43,13 @@ after it sets VBR = 0 and jumps through the boot vector table.
 
 0x020100 holds three `jmp` (`game_entries`) to `game_entry_1..3` (0x021334, 0x021378, 0x0213B6):
 reset variants that skip the warm-start check and call 0x02DCE0, 0x043718 or 0x03CE64 instead of
-the main initialisation. Nothing in the ROM references 0x020100 (searched as absolute longs and
-IDA cross-references); HYP: entry points for development tools.
+the main initialisation. The boot program's self-test calls them, each time after
+`boot_fill_gsp_vram` (0x000636) and with VBR set to 0x020000 first: the routine at 0x0010D2 loads
+A1 = 0x020100 (0x0010E6) and ends with `jmp (A1)` (0x0010FC, `game_entry_1`); the routine at
+0x0010FE adds 0xC (0x001114, 0x00111A) and calls `jsr (A1)` (0x001130, `game_entry_3`); the
+routine at 0x008EF2 adds 6 (0x008F08, 0x008F0E) and calls `jsr (A1)` (0x008F1A, `game_entry_2`).
+The longs at 0x000FA2 and 0x008D68 hold 0x0010D2 and 0x008EF2 (HYP: self-test menu tables).
+No IDA function covers 0x0010D2-0x001136 or 0x008EF2 yet (`sub_10BC` ends at 0x0010D2).
 
 ### 1.2 The two vector tables and their interrupt handlers (CODE)
 
@@ -140,14 +146,16 @@ first** (0x02FE68), then the high word (0x02FE6E); each write stores 16 bits at 
 and adds 0x10 (`host_w`, tms34010.cpp, HSTCTLH INCW). A 16-bit remainder writes the low word of
 one more long (0x02FE4A); any other remainder calls `soft_reset` (0x02FE40).
 
-| Section | 68k source (data) | GSP destination (bits) | Bytes | What |
+| Section | 68k source (data) | GSP destination (bits) | Destination bytes | What |
 |---|---|---|---|---|
-| 0 | 0x019088-0x01C4B8 (header 0x019080) | FFF40000-FFF5A170 | 13,360 | code (HYP `.text`): `gsp_main` FFF40000, the idle loop FFF41070, the reset entry FFF59920 |
+| 0 | 0x019088-0x01C4B8 (header 0x019080) | FFF40000-FFF5A170 | 13,358 | code (HYP `.text`): `gsp_main` FFF40000, the idle loop FFF41070, the reset entry FFF59920 |
 | 1 | 0x01C4C0-0x01C9B0 (header 0x01C4B8) | FFF5A170-FFF5C8F0 | 1,264 | read by the start-up at FFF59B20/FFF59C70 (HYP: TI C `.cinit` records) |
-| 2 | 0x01C9B8-0x01EF4C (header 0x01C9B0) | FFF5C8F0-FFF6F580 | 9,620 | initialised data (HYP `.data`) |
+| 2 | 0x01C9B8-0x01EF4C (header 0x01C9B0) | FFF5C8F0-FFF6F580 | 9,618 | initialised data (HYP `.data`) |
 | 3 | 0x01EF54-0x01EFD4 (header 0x01EF4C) | FFFFFC00-FFFFFFFF | 128 | the 32 trap vectors; vector 0 (reset, FFFFFFE0) = FFF59920 |
 
-The program occupies 24,368 bytes of VRAM. In this board's GSP map VRAM is 512 KB at FF800000,
+"Destination bytes" counts what VRAM receives. Sections 0 and 2 end with a 16-bit remainder:
+their 68k source spans are two bytes longer (13,360 and 9,620), because only the low word of
+their last long is written (0x02FE4A). The program occupies 24,368 bytes of VRAM. In this board's GSP map VRAM is 512 KB at FF800000,
 mirrored at FFC00000 (`multisync_gsp_map`, harddriv.cpp:628), so the program also appears at
 FFB40000. The 68k never writes the GSP's PC: after the load, `init_coprocessors` writes HSTCTL =
 7800 then 3800 (0x02C1C4, 0x02C1CC: HLT cleared, cache flushed once) and the GSP starts from its
@@ -224,15 +232,18 @@ watchpoint on the 68010 over 3,600 frames of attract mode and one game started a
 |---|---|---|---|---|
 | 0x020000 | 0x020100 | 256 | game vector table | installed by 0x000294 |
 | 0x020100 | 0x020112 | 18 | `game_entries`, three `jmp` | section 1.1 |
-| 0x020112 | 0x020419 | 775 | zero fill | |
-| 0x020419 | 0x020430 | 23 | game data | referenced from 0x0209AC, 0x020A88, 0x042324 |
-| 0x020430 | 0x046AEE | 157,374 | game code with data islands | first function `sub_20430`; 427 functions in pair S, 77 in pair T, the last `sub_46AC4` 0x046AC4-0x046AEE; an island 0x0436FE-0x046A00 holds data (32 references, e.g. 0x0439BC from 0x041F1C, 0x0461F0 from 0x02444E) |
+| 0x020112 | 0x020418 | 774 | zero fill | |
+| 0x020418 | 0x020430 | 24 | game data | read by 0x02079A and 0x020D30 (`sub.b $20418.l`), 0x02093E (word 0x02041A); referenced from 0x0209AC, 0x020A88, 0x042324 |
+| 0x020430 | 0x04397E | 144,718 | game code | first function `sub_20430`; with the code row 0x046A00-0x046AEE, 427 functions in pair S and 77 in pair T; the last before the island is `sub_43718` 0x043718-0x04397E (called by `game_entry_2` at 0x0213AA, and calls `reload_gsp` at 0x04373A); 0x0436FE-0x043718 is code IDA has not made a function (`link`, two `pea`, `jsr $2effe`, `unlk`, `rts`) |
+| 0x04397E | 0x046A00 | 12,418 | game data island | starts after the `rts` at 0x04397C; 32 references, e.g. 0x0439BC from 0x041F1C, 0x0461F0 from 0x02444E |
+| 0x046A00 | 0x046AEE | 238 | game code | from `sub_46A00` 0x046A00-0x046A20 to the last function, `sub_46AC4` 0x046AC4-0x046AEE |
 | 0x046AEE | 0x05CF86 | 91,288 | game data (68k consumer) | 724 references from code, the first 0x046AEE from 0x046A0C, the last 0x05C63C from 0x043720 |
 | 0x05CF86 | 0x060000 | 12,410 | zero fill | |
-| 0x060000 | 0x09F1C5 | 258,501 | packed GSP images, consumer `unpack_gsp_image` (0x0225E4), which streams them into HSTDATA | MAME read watch: every read of 0x060002-0x09F1C4 comes from 0x0225BC-0x02270A; no IDA reference into pairs U-V from code |
-| 0x09F1C5 | 0x0B10EB | 73,510 | consumer unknown | no read in the watched run, no code reference into 0x0A0000-0x0B10EB; HYP: more packed images (other levels) |
-| 0x0B10EB | 0x0BFE05 | 60,698 | zero fill | |
-| 0x0BFE05 | 0x0C0000 | 507 | a table read by game code | 14 references (0x0BFE08 from 0x02D7EC ... 0x0BFF14 from 0x02DB62); read watch: 0x0227A2, 0x024F20, 0x029C44, 0x02D780-0x02D7F2, 0x02DAA4, 0x040586 |
+| 0x060000 | 0x09F1C5 | 258,501 | packed GSP images, consumer `unpack_gsp_image` (0x0225E4), which streams them into HSTDATA | the image pointer table at 0x0BFE00: entries 1-46 point into this range (entry 1 = 0x060002); MAME read watch: every read of 0x060002-0x09F1C4 comes from 0x0225BC-0x02270A |
+| 0x09F1C5 | 0x0B10EB | 73,510 | packed GSP images, consumer `unpack_gsp_image` | reached through entries 47-57 and 65-68 of the image pointer table (entry 47 = 0x09F1C5, entry 68 = 0x0ADE80); not read in the watched run |
+| 0x0B10EB | 0x0BFE00 | 60,693 | zero fill | |
+| 0x0BFE00 | 0x0BFF18 | 280 | image pointer table, 70 longs: entry 0 = 0, entries 1-68 point into 0x060000-0x0B10EB in non-decreasing order except 58-64 (0x060000), entry 69 = 0 ends it | indexed from its base: `lea $bfe00` at 0x022798 (`movea.l (A0,D0.w),A0`), `addi.l #$bfe00` at 0x024AC4, 0x024F16 (then `jsr unpack_gsp_image`), 0x024F52, 0x024F8E, 0x029960, 0x029C5A, 0x02AFA4, 0x02DA9A, 0x02DC06; entry 1 read at 0x02D7D0; read watch: 0x0227A2, 0x024F20, 0x029C44, 0x02D780-0x02D7F2, 0x02DAA4, 0x040586 |
+| 0x0BFF18 | 0x0C0000 | 232 | zero fill | |
 
 Code ends at 0x046AEE: the last IDA function ends there, MAME's highest 68k PC is 0x046AEC
 (section 7), and the first data reference past it is to 0x046AEE itself. The zero runs inside
@@ -454,7 +465,10 @@ the CPUs (harddriv_m.cpp:595-601).
    routine 080B (M3).
 3. GSP sections 1 and 2: confirm the `.cinit` reading of section 1 by decoding FFF59C70 (M6), and
    the command-buffer format at FFF9FC10/FFFCFC10 and its writer (M5d).
-4. The packed image format of pairs U-V, and the consumer of 0x09F1C5-0x0B10EB (M5d, M5f).
+4. The packed image format of pairs U-V, and when the images of 0x09F1C5-0x0B10EB (table entries
+   47-68) are shown (M5d, M5f).
 5. The two longs at 0x017008, the word at 0x01702C, ADSP control lines 2 and 4, and 818040.
 6. Pair R against a Hard Drivin' set's 0x000000-0x01FFFF (section 4.4).
-7. The callers of `game_entries` and of `copy_adsp_dram_to_18000` (none found in the ROM).
+7. What the self-test routines that enter the game through `game_entries` (0x0010D2, 0x0010FE,
+   0x008EF2, section 1.1) are for, and the caller of `copy_adsp_dram_to_18000` (none found in the
+   ROM).
