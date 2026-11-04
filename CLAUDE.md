@@ -23,8 +23,9 @@ A complete source reverse-engineering of S.T.U.N. Runner (Atari Games, 1989, MAM
 2. `docs/01-hardware.md`: the boards, the ROM set, the three address spaces and the sound board, with the MAME references. Read it before touching any address.
 3. `docs/02-toolchain.md`: assemblers, disassemblers, MAME and the build check.
 4. `docs/03-plan.md`: milestones and acceptance checks; find the milestone your room is scoped to and do not cross into the next.
-5. Spindizzy's `CLAUDE.md` sections 5-7 and 12 and `docs/26-assembler-source.md`: the method (bottom-up, evidence standard, naming conventions), the partition-by-region wave pattern and the IDA sync.
-6. `~/.claude/notes/autonomous-parallel-delivery-process.md` when you coordinate a wave.
+5. `docs/04-build.md`: how `make`, `make check` and `make coverage` work, the five images and the tool versions.
+6. Spindizzy's `CLAUDE.md` sections 5-7 and 12 and `docs/26-assembler-source.md`: the method (bottom-up, evidence standard, naming conventions), the partition-by-region wave pattern and the IDA sync.
+7. `~/.claude/notes/autonomous-parallel-delivery-process.md` when you coordinate a wave.
 
 ## 4. Milestones (short list; checks in docs/03)
 
@@ -41,6 +42,10 @@ A complete source reverse-engineering of S.T.U.N. Runner (Atari Games, 1989, MAM
 
 - 2026-11-04 (Jesus): reference set `stunrun` rev 6; three tiers of source; IDA for 68k and 6502, sidecar annotation for the TMS34010 until justified otherwise; kickoff stays a single-session doc leg, the parallel process begins at M1/M2 in a new room; repository public; MAME installed from brew, unidasm to be built from source.
 - 2026-11-04 (finding): the brief's hardware list was wrong. Not atarig1: Hard Drivin' multisync hardware, no SLOOP, no RLE objects, no graphics ROMs; the tunnel is polygon geometry in the ADSP object ROMs (docs/01).
+- 2026-11-04 (M1a, coordinator): the build works on five images, one per address space: `stunrun-68k` (768 KB, the 200x/210x pairs interleaved, offset = 68010 address), `stunrun-obj` (384 KB object ROMs interleaved), `stunrun-oki` (256 KB), `stunrun-jsa` (64 KB) and `stunrun-nvram` (200e + 210e); `tools/merge-roms` makes them from the set by the snapshot's regions and offsets, each is a separate assembler output, and `tools/split-roms` cuts them into the 25 files (docs/04).
+- 2026-11-04 (M1a, coordinator): every one of the 25 files comes from an assembler listing (vasm for the 68k and data trees, 64tass for the 6502), so one coverage number covers the whole set; an `incbin`/`.binary` source is always a build artefact under `build/`, never the archive path.
+- 2026-11-04 (M1a): vasm pinned to 2.0f (`phoenix.owl.de/tags/vasm2_0f.tar.gz`, sha256 in docs/04); guards are `assert *=$addr,"msg"` in vasm and `.cerror` in 64tass; `make check` without the reference set prints `reference set absent, skipped` and exits 0 (CI), and `tools/bytecheck` reports offsets and counts, never byte values.
+- 2026-11-04 (M1a): `uv.lock` is committed as resolved from the canonical checkout (the idapro path is checkout-relative); the Makefile runs `uv run --frozen`, other worktrees use `UV_FROZEN=1`.
 
 ## 6. Repository conventions
 

@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Compare the built set with the reference set, file by file and byte by byte (`make check`).
+
+    tools/bytecheck                       # build/roms/stunrun against the archive
+    tools/bytecheck --built DIR --dir DIR
+
+Per differing file: the count of differing bytes and the first one, as a file offset and as an
+address in the space of the processor that reads it (68k byte address for the 200x/210x pairs,
+6502 address or bank for 10c, ADSP object-ROM word index for the object ROMs, OKI address for the
+ADPCM files, byte offset for the NVRAM images). Never prints byte values. Exit status 1 on any
+difference, 2 when the reference set is absent.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from romset import DEFAULT_ARCHIVE, REPO, compare, load_snapshot, read_set  # noqa: E402
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    ap.add_argument("--set", default="stunrun", help="MAME set name (default stunrun)")
+    ap.add_argument("--built", type=Path, help="built set (default build/roms/<set>)")
+    ap.add_argument("--dir", type=Path, help="reference directory (or zip stem)")
+    ap.add_argument("--archive", type=Path, default=DEFAULT_ARCHIVE, help="rompath")
+    args = ap.parse_args()
+
+    snapshot = load_snapshot(args.set)
+    built_dir = args.built if args.built else REPO / "build" / "roms" / args.set
+    location = args.dir if args.dir else args.archive / args.set
+    reference = read_set(location)
+    if reference is None:
+        print(f"SKIP {args.set}: reference set absent at {location}")
+        return 2
+    built = read_set(built_dir) or {}
+    report = compare(snapshot, built, reference)
+    n = len(snapshot["roms"])
+    if report:
+        print(f"FAIL bytecheck {built_dir}: {len(report)} problems over {n} files")
+        for line in report:
+            print("  " + line)
+        return 1
+    total = sum(r["size"] for r in snapshot["roms"])
+    print(f"OK bytecheck {built_dir}: {n} files, {total} bytes, 0 differences")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

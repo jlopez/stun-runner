@@ -9,8 +9,8 @@
 | MAME 0.289 | installed, `brew install mame` (this leg); `~/.mame/mame.ini` points `rompath` and every state directory at `~/archive/261104-stun-runner/` | oracle: runs the game, debugger, memory dumps, `-listroms` / `-listxml` for the hashes |
 | `unidasm` | **not in the brew bottle** | the only TMS34010 and ADSP-2100 disassembler around; build from MAME source (section 4) |
 | IDA Professional 9.1 | installed, `/Applications/IDA Professional 9.1.app`; processor modules `mc68k`, `m65`, `ad218x`; idalib headless works (Spindizzy `ida/headless`) | annotation database for the 68010 and the 6502; ADSP-2100 to be tried with `ad218x`; **no TMS34010 module** |
-| 64tass 1.60 | installed (`brew install tass64`) | 6502 assembler |
-| vasm | not installed; builds from source in a minute | 68000 assembler |
+| 64tass 1.60.3243 | installed (`brew install tass64`); CI uses Ubuntu's `64tass` package | 6502 assembler |
+| vasm 2.0f | built from source (`make CPU=m68k SYNTAX=mot`), `~/.local/bin/vasmm68k_mot`; pinned tarball `http://phoenix.owl.de/tags/vasm2_0f.tar.gz` (sha256 in docs/04 section 6), which CI builds and caches | 68000 assembler, and the assembler of the data-ROM trees |
 | Ghidra | installed (brew) | fallback disassembler; has no TMS340x0 or ADSP-21xx either |
 | uv, Python 3.13 | installed | tools, tests, converters, headless IDA |
 
@@ -24,7 +24,7 @@
 - **Flat output.** `-Fbin` writes the image directly; no linker, no object format. The byte-split into `200x`/`210x` files is a tool step (`tools/split-roms`), not an assembler feature.
 - **Syntax.** Motorola syntax with `dc.b/dc.w/dc.l`, `ds`, `even`, `incbin`, local labels (`.label` and `1$`), `rs` structures, macros and conditional assembly, which is the family Atari's own 1980s 68k sources used (verify against any surviving Atari listing before claiming more than "same family").
 - **Listing and symbols.** `-L` listing for the coverage check, `-Fvobj`/symbol dumps for the label check, like Spindizzy's `make coverage` and `make labels`.
-- **CI.** Not packaged by apt or brew; CI builds it from the tarball (cache it) or vendors the source. Pin the version in the Makefile and record it here.
+- **CI.** Not packaged by apt or brew; CI builds it from the pinned release tarball, verifies its sha256 and caches the binary (docs/04 section 6). Guards: vasm's Motorola syntax rejects `<>` in `if` (use `!=` or `assert *=$addr,"msg"`); `incbin "file",offset,length` resolves the path from the source file's directory (docs/04 section 3).
 
 Alternatives considered: asm68k (Sega-era, Windows binary, Wine; no), GNU as + ld (relaxation and a linker script for no gain), ASL/Macroassembler AS (capable, but its Motorola mode also optimises unless told per instruction).
 
@@ -60,7 +60,7 @@ This keeps `make check` green at every step: the image is byte-identical whether
 
 ## 5. The byte-identical build check
 
-`make` assembles the four programs and splits the result into the 25 files of the set under `build/roms/stunrun/`; `make check` compares each with the reference by SHA-1 and CRC-32 against `tools/romsets/stunrun.json` (the same hashes MAME lists), and on a mismatch reports per file the first differing offset and the count, with the address in the CPU's own space (68k byte address for `200x/210x` pairs, 6502 address for `10c`, ADSP word index for the object ROMs). Zero differences over all 25 files, or it is not done. `make coverage` reports per region file how many bytes come from instructions, from data statements, from `incbin` blobs and from fills, so the "blob" share is a number that must only go down. `make labels` checks that every IDA name is a label at its address. `make test` runs the converters' round trips (assets → bytes → assets, assemblers → unidasm → assemblers). The exact Makefile is the first milestone's deliverable (docs/03); this leg ships only `tools/check-roms`.
+`make` assembles the four programs and splits the result into the 25 files of the set under `build/roms/stunrun/`; `make check` compares each with the reference by SHA-1 and CRC-32 against `tools/romsets/stunrun.json` (the same hashes MAME lists), and on a mismatch reports per file the first differing offset and the count, with the address in the CPU's own space (68k byte address for `200x/210x` pairs, 6502 address for `10c`, ADSP word index for the object ROMs). Zero differences over all 25 files, or it is not done. `make coverage` reports per region file how many bytes come from instructions, from data statements, from `incbin` blobs and from fills, so the "blob" share is a number that must only go down. `make labels` checks that every IDA name is a label at its address. `make test` runs the converters' round trips (assets → bytes → assets, assemblers → unidasm → assemblers). The Makefile, the five images, the trees and the checks as built in milestone 1 are in docs/04-build.md.
 
 ## 6. Repository conventions carried over
 

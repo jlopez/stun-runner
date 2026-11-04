@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""Where the set's bytes come from, per source file (`make coverage`).
+
+    tools/coverage build/stunrun-68k.lst build/stunrun-obj.lst ... build/stunrun-jsa.lst
+
+Each listing is a vasm -L listing (detected by its "Sections:" header) or a 64tass -L listing
+(the image size then comes from the assembled file next to it, <listing stem>.out). Prints per
+source file and per image the bytes from instructions, data statements, incbin/.binary blobs and
+fills, the grand total and the blob share, and, last, one JSON line. Fails unless the total
+equals the set's size (tools/romsets/<set>.json, 1,511,424 bytes for stunrun) or --expect.
+The blob share only goes down (CLAUDE.md section 2).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from listings import CLASSES, Counts, tass, vasm  # noqa: E402
+from romset import load_snapshot  # noqa: E402
+
+
+def tally(path: Path) -> Counts:
+    text = path.read_text(errors="replace")
+    if text.startswith("Sections:"):
+        return vasm(text)
+    return tass(text, path.with_suffix(".out").stat().st_size)
+
+
+def row(name: str, c: dict[str, int]) -> str:
+    return f"{name:<28}{sum(c.values()):>9}" + "".join(f"{c[k]:>9}" for k in CLASSES)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    ap.add_argument("listings", nargs="+", type=Path)
+    ap.add_argument("--set", default="stunrun", help="MAME set whose size is the expected total")
+    ap.add_argument("--expect", type=int, help="expected total bytes (default: the set's size)")
+    args = ap.parse_args()
+    expect = args.expect
+    if expect is None:
+        expect = sum(r["size"] for r in load_snapshot(args.set)["roms"])
+
+    grand = dict.fromkeys(CLASSES, 0)
+    images: dict[str, dict[str, int]] = {}
+    files: dict[str, dict[str, int]] = {}
+    print(f"{'file':<28}{'bytes':>9}" + "".join(f"{k:>9}" for k in CLASSES))
+    for path in args.listings:
+        counts = tally(path)
+        image = dict.fromkeys(CLASSES, 0)
+        for source, c in counts.items():
+            print(row(source, c))
+            files[source] = c
+            for k in CLASSES:
+                image[k] += c[k]
+        print(row(f"= {path.stem}", image))
+        images[path.stem] = image
+        for k in CLASSES:
+            grand[k] += image[k]
+    n = sum(grand.values())
+    print(row("total", grand))
+    pct = 100.0 * grand["blob"] / n if n else 0.0
+    print(f"blob: {pct:.1f}% of {n} bytes come from incbin/.binary")
+    print(
+        json.dumps(
+            {"total": n, **grand, "blob_pct": round(pct, 2), "images": images, "files": files}
+        )
+    )
+    if n != expect:
+        print(f"FAIL: the listings account for {n} bytes, expected {expect}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

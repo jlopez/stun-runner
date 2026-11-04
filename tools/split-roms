@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""Cut the five assembled images into the set's files (`make`), the inverse of tools/merge-roms.
+
+    tools/split-roms                                   # build/stunrun-*.out -> build/roms/stunrun/
+    tools/split-roms --images DIR --suffix .bin --out DIR
+
+Reads <images>/<image><suffix> for each image of tools/romset.py and writes the files named in
+the snapshot to <out>. Exit status 1 when an image is missing or has the wrong size.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from romset import IMAGES, REPO, load_snapshot, split  # noqa: E402
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    ap.add_argument("--set", default="stunrun", help="MAME set name (default stunrun)")
+    ap.add_argument("--images", type=Path, default=REPO / "build", help="directory of the images")
+    ap.add_argument("--suffix", default=".out", help="image file suffix (default .out)")
+    ap.add_argument("--out", type=Path, help="output directory (default build/roms/<set>)")
+    args = ap.parse_args()
+
+    snapshot = load_snapshot(args.set)
+    out = args.out if args.out else REPO / "build" / "roms" / args.set
+    images = {}
+    for name in IMAGES:
+        path = args.images / f"{name}{args.suffix}"
+        if not path.is_file():
+            print(f"FAIL: no image {path}")
+            return 1
+        images[name] = path.read_bytes()
+    try:
+        files = split(snapshot, images)
+    except ValueError as e:
+        print(f"FAIL: {e}")
+        return 1
+    out.mkdir(parents=True, exist_ok=True)
+    for name, data in files.items():
+        (out / name).write_bytes(data)
+    print(f"{out}: {len(files)} files, {sum(len(d) for d in files.values())} bytes")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

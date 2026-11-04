@@ -1,0 +1,81 @@
+[project]
+name = "stun-runner"
+version = "0.1.0"
+description = "Tools for the S.T.U.N. Runner (Atari Games, 1989) source reconstruction"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+    "pytest>=8.0.0",
+]
+# Headless IDA (idalib) for ida/headless (milestone 1b): `uv sync --group ida`. Not a default
+# group: the path below exists only on a machine with IDA installed (CI runs with UV_FROZEN=1).
+ida = [
+    "idapro",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# No importable package yet; the editable install only puts the repo root on sys.path (for
+# `python -m ida.headless...`, milestone 1b). The tools in tools/ are scripts, not a package.
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.build]
+dev-mode-dirs = ["."]
+
+[tool.uv.sources]
+idapro = { path = "/Applications/IDA Professional 9.1.app/Contents/MacOS/idalib/python" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# The user-facing tools have no .py extension; lint them too.
+extend-include = [
+    "tools/check-roms",
+    "tools/merge-roms",
+    "tools/split-roms",
+    "tools/bytecheck",
+    "tools/coverage",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "tools"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+pythonpath = ["tools"]
+testpaths = ["tools"]

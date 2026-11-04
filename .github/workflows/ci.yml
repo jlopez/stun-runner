@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # The idapro source in [tool.uv.sources] is a local IDA install path that does not exist
+      # here; frozen installs from uv.lock without re-resolving it (the `ida` group is not a
+      # default group, so idapro itself is never installed).
+      UV_FROZEN: "1"
+      # vasm pinned: the release tarball the local build used (docs/04-build.md).
+      VASM_URL: http://phoenix.owl.de/tags/vasm2_0f.tar.gz
+      VASM_SHA256: c84b2de1cbb87831795fe64a85c5d9a7002a766e3a7c30b0a2d7d5e99d878f49
+    steps:
+      # LFS: the IDA databases (milestone 1b onwards).
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+      - run: sudo apt-get update && sudo apt-get install -y 64tass
+      - uses: actions/cache@v4
+        id: vasm
+        with:
+          path: ~/.local/vasm
+          key: vasm-${{ runner.os }}-${{ env.VASM_SHA256 }}
+      - name: Build vasm (m68k, Motorola syntax) from the pinned tarball
+        if: steps.vasm.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/vasm.tar.gz" "$VASM_URL"
+          echo "$VASM_SHA256  $RUNNER_TEMP/vasm.tar.gz" | sha256sum -c -
+          tar xzf "$RUNNER_TEMP/vasm.tar.gz" -C "$RUNNER_TEMP"
+          make -C "$RUNNER_TEMP/vasm" CPU=m68k SYNTAX=mot -j"$(nproc)"
+          mkdir -p ~/.local/vasm
+          cp "$RUNNER_TEMP/vasm/vasmm68k_mot" ~/.local/vasm/
+      - run: echo "$HOME/.local/vasm" >> "$GITHUB_PATH"
+      - run: vasmm68k_mot -v && 64tass --version
+      # setup-uv publishes only full-version tags since v8 (no floating v10).
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync
+      - run: uv run ruff check tools
+      - run: make lint
+      # check-roms selftest, then pytest: merge/split round trip, bytecheck and the coverage
+      # parser on synthetic data, and the whole `make all` on a synthetic set with vasm and 64tass.
+      - run: make test
+      # No ROMs here (CLAUDE.md section 2): prints "reference set absent, skipped" and exits 0.
+      - run: make check
