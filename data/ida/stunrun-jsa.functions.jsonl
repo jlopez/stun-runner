@@ -1,0 +1,29 @@
+{"start_ea": 16384, "end_ea": 16780, "name": "reset", "size": 396, "chunks": [], "xrefsTo": [], "xrefsFrom": ["sub_418C", "sub_41A9", "sub_41BD", "sub_4238", "sub_4371", "sub_5504"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 16780, "end_ea": 16809, "name": "sub_418C", "size": 29, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 16809, "end_ea": 16829, "name": "sub_41A9", "size": 20, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 16829, "end_ea": 16833, "name": "sub_41BD", "size": 4, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 16833, "end_ea": 16937, "name": "h_irq", "size": 104, "chunks": [], "xrefsTo": [], "xrefsFrom": ["reset", "sub_4229", "sub_59C0", "sub_5BC6", "sub_5CE8"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 16937, "end_ea": 16952, "name": "sub_4229", "size": 100, "chunks": [[20054, 20089], [20494, 20518], [20547, 20573]], "xrefsTo": ["h_irq"], "xrefsFrom": ["sub_4759", "sub_4E79"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 16952, "end_ea": 17112, "name": "sub_4238", "size": 160, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": ["sub_42D8", "sub_5026", "sub_585E", "sub_5BAC"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 17112, "end_ea": 17161, "name": "sub_42D8", "size": 49, "chunks": [], "xrefsTo": ["sub_4238"], "xrefsFrom": ["sub_431A"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 17178, "end_ea": 17212, "name": "sub_431A", "size": 34, "chunks": [], "xrefsTo": ["sub_42D8", "sub_433C", "sub_4759"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17212, "end_ea": 17265, "name": "sub_433C", "size": 53, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": ["sub_431A"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 17265, "end_ea": 17290, "name": "sub_4371", "size": 25, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 18265, "end_ea": 19649, "name": "sub_4759", "size": 1384, "chunks": [], "xrefsTo": ["sub_4229", "sub_4759", "sub_4E79"], "xrefsFrom": ["sub_431A", "sub_433C", "sub_4CC1", "sub_4D6C", "sub_505D", "sub_5585"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 19649, "end_ea": 19820, "name": "sub_4CC1", "size": 171, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": ["sub_51C7"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 19820, "end_ea": 20054, "name": "sub_4D6C", "size": 234, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20089, "end_ea": 20494, "name": "sub_4E79", "size": 405, "chunks": [], "xrefsTo": ["sub_4229"], "xrefsFrom": ["sub_4759", "sub_5026"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 20518, "end_ea": 20547, "name": "sub_5026", "size": 29, "chunks": [], "xrefsTo": ["sub_4238", "sub_4E79", "sub_559A", "sub_59C0", "sub_5B63"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20573, "end_ea": 20603, "name": "sub_505D", "size": 30, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20935, "end_ea": 20985, "name": "sub_51C7", "size": 173, "chunks": [[22344, 22467]], "xrefsTo": ["sub_4CC1"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 21764, "end_ea": 21774, "name": "sub_5504", "size": 10, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 21893, "end_ea": 21914, "name": "sub_5585", "size": 21, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": ["sub_559A"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 21914, "end_ea": 22075, "name": "sub_559A", "size": 161, "chunks": [], "xrefsTo": ["sub_59C0"], "xrefsFrom": ["sub_5026"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 22499, "end_ea": 22622, "name": "h_nmi", "size": 123, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 22622, "end_ea": 22633, "name": "sub_585E", "size": 11, "chunks": [], "xrefsTo": ["sub_4238"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 22976, "end_ea": 23395, "name": "sub_59C0", "size": 419, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": ["sub_5026", "sub_559A", "sub_5B63"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 23395, "end_ea": 23408, "name": "sub_5B63", "size": 13, "chunks": [], "xrefsTo": ["sub_59C0"], "xrefsFrom": ["sub_5026"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 23468, "end_ea": 23494, "name": "sub_5BAC", "size": 26, "chunks": [], "xrefsTo": ["sub_4238"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 23494, "end_ea": 23546, "name": "sub_5BC6", "size": 52, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": ["sub_5C87"], "leaf": false, "exploreLeaf": false}
+{"start_ea": 23687, "end_ea": 23736, "name": "sub_5C87", "size": 49, "chunks": [], "xrefsTo": ["sub_5BC6"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 23784, "end_ea": 23981, "name": "sub_5CE8", "size": 197, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}

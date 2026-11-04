@@ -21,8 +21,8 @@ ida = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# No importable package yet; the editable install only puts the repo root on sys.path (for
-# `python -m ida.headless...`, milestone 1b). The tools in tools/ are scripts, not a package.
+# No wheel contents; the editable install only puts the repo root on sys.path (for the `ida`
+# package: `python -m ida.headless...`, and its tests in tools/). The tools in tools/ are scripts.
 [tool.hatch.build.targets.wheel]
 bypass-selection = true
 
@@ -75,6 +75,14 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 strict_equality = true
+
+# idalib: `idapro` (no type information) and the IDA modules it puts on sys.path at run time.
+[[tool.mypy.overrides]]
+module = [
+    "idapro", "idautils", "ida_auto", "ida_bytes", "ida_fpro", "ida_funcs", "ida_ida",
+    "ida_loader", "ida_name", "ida_offset", "ida_segment",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["tools"]

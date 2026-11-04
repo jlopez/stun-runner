@@ -19,6 +19,7 @@ board. Four instruction sets, no graphics ROMs. Details with MAME references in
 | [`docs/02-toolchain.md`](docs/02-toolchain.md) | assemblers (vasm, 64tass, in-repo assemblers for the DSPs), IDA, MAME as oracle, the byte-identical check |
 | [`docs/03-plan.md`](docs/03-plan.md) | milestones M0-M7 with acceptance checks |
 | [`docs/04-build.md`](docs/04-build.md) | the build: five images, assembler trees, split, byte check, coverage, CI |
+| [`docs/05-ida.md`](docs/05-ida.md) | the IDA databases: made by `make ida`, never committed; annotation snapshots in `data/ida/` |
 
 ## ROMs
 
@@ -44,6 +45,14 @@ make coverage       # bytes per source file: instructions, data, incbin blobs, f
 make test           # tool self-tests on synthetic data (no ROMs needed)
 make lint           # ruff + mypy
 make clean
+```
+
+IDA (optional, needs IDA Professional 9.1 with idalib activated; [`docs/05-ida.md`](docs/05-ida.md)):
+
+```bash
+uv sync --group ida
+make ida            # data/stunrun-68k.i64, data/stunrun-jsa.i64 (gitignored: they contain the ROM bytes)
+make ida-export     # data/ida/*.json + *.functions.jsonl (commit these), build/ida/*.asm
 ```
 
 Without the reference set, `make check` prints `reference set absent, skipped` (this is what CI
