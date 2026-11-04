@@ -1,0 +1,208 @@
+{
+  "set": "stunrun",
+  "description": "S.T.U.N. Runner (rev 6)",
+  "sourcefile": "atari/harddriv.cpp",
+  "mame": "0.289 (unknown)",
+  "roms": [
+    {
+      "name": "136070-2102.200r",
+      "size": 65536,
+      "crc": "e0ed54d8",
+      "sha1": "15850568d8308b6499cbe55b5d8308041d906a29",
+      "region": "mainpcb:maincpu",
+      "offset": 0
+    },
+    {
+      "name": "136070-2101.210r",
+      "size": 65536,
+      "crc": "3008bcf8",
+      "sha1": "9d3a20b639969bab68441f76467ed60e395c10e3",
+      "region": "mainpcb:maincpu",
+      "offset": 1
+    },
+    {
+      "name": "136070-6104.200s",
+      "size": 65536,
+      "crc": "f469f91c",
+      "sha1": "488ea6251ff4028edaf00bb1ded74cefdc71a373",
+      "region": "mainpcb:maincpu",
+      "offset": 131072
+    },
+    {
+      "name": "136070-6103.210s",
+      "size": 65536,
+      "crc": "096aad68",
+      "sha1": "f83c9f61854dc9c1fa7dc668dbf99f4a4bbe79ca",
+      "region": "mainpcb:maincpu",
+      "offset": 131073
+    },
+    {
+      "name": "136070-6106.200t",
+      "size": 65536,
+      "crc": "b445bae5",
+      "sha1": "d530b535a47c4920c43852e7904080e6abf30098",
+      "region": "mainpcb:maincpu",
+      "offset": 262144
+    },
+    {
+      "name": "136070-6105.210t",
+      "size": 65536,
+      "crc": "42736c52",
+      "sha1": "42e0b451b172223cce9c43835363136146eeddba",
+      "region": "mainpcb:maincpu",
+      "offset": 262145
+    },
+    {
+      "name": "136070-2108.200u",
+      "size": 65536,
+      "crc": "0ce849aa",
+      "sha1": "19252caf180586cadced5c456a755dd954267688",
+      "region": "mainpcb:maincpu",
+      "offset": 393216
+    },
+    {
+      "name": "136070-2107.210u",
+      "size": 65536,
+      "crc": "19bc7495",
+      "sha1": "8a93bb8e0998b34c92dad263ea78972155c5b785",
+      "region": "mainpcb:maincpu",
+      "offset": 393217
+    },
+    {
+      "name": "136070-2110.200v",
+      "size": 65536,
+      "crc": "4f6d22c5",
+      "sha1": "fd28782593444f1607f322a2f1971ba8f3d14131",
+      "region": "mainpcb:maincpu",
+      "offset": 524288
+    },
+    {
+      "name": "136070-2109.210v",
+      "size": 65536,
+      "crc": "ac6d4d4a",
+      "sha1": "fef902700561bb789ff7462f30a438ee9138b472",
+      "region": "mainpcb:maincpu",
+      "offset": 524289
+    },
+    {
+      "name": "136070-2112.200w",
+      "size": 65536,
+      "crc": "3f896aaf",
+      "sha1": "817136ddc37566108de15f6bfedc6e0da13a2df2",
+      "region": "mainpcb:maincpu",
+      "offset": 655360
+    },
+    {
+      "name": "136070-2111.210w",
+      "size": 65536,
+      "crc": "47f010ad",
+      "sha1": "a2587ce1d01c78f1d757fb3e4512be9655d17f9c",
+      "region": "mainpcb:maincpu",
+      "offset": 655361
+    },
+    {
+      "name": "136070-2123.10c",
+      "size": 65536,
+      "crc": "121ab09a",
+      "sha1": "c26b8ddbcb011416e6ab695980d2cf37e672e973",
+      "region": "mainpcb:jsa:cpu",
+      "offset": 0
+    },
+    {
+      "name": "136070-2121.90h",
+      "size": 65536,
+      "crc": "0ebf8e58",
+      "sha1": "b6bf3e020b29a34ef3eaca6b5e1f17bb89fdc476",
+      "region": "mainpcb:user1",
+      "offset": 0
+    },
+    {
+      "name": "136070-2118.90k",
+      "size": 65536,
+      "crc": "fb98abaf",
+      "sha1": "6a141effee644f34634b57d1fe4c03f56981f966",
+      "region": "mainpcb:user1",
+      "offset": 1
+    },
+    {
+      "name": "136070-2122.10h",
+      "size": 65536,
+      "crc": "bd5380bd",
+      "sha1": "e1e2b3c9f9bfc988f0dcc9a9f520f51957e13a97",
+      "region": "mainpcb:user1",
+      "offset": 131072
+    },
+    {
+      "name": "136070-2119.10k",
+      "size": 65536,
+      "crc": "bde8bd31",
+      "sha1": "efb8878382adfe16ba590a28a949029749fc6a63",
+      "region": "mainpcb:user1",
+      "offset": 131073
+    },
+    {
+      "name": "136070-2120.9h",
+      "size": 65536,
+      "crc": "55a30976",
+      "sha1": "045a04d3d24e783a6a643cab08e8974ee5dc2128",
+      "region": "mainpcb:user1",
+      "offset": 262144
+    },
+    {
+      "name": "136070-2117.9k",
+      "size": 65536,
+      "crc": "d4a9696d",
+      "sha1": "574e5f3758ac2e18423ae350e8509aa135ca6da0",
+      "region": "mainpcb:user1",
+      "offset": 262145
+    },
+    {
+      "name": "136070-2124.1fh",
+      "size": 65536,
+      "crc": "4dc14fe8",
+      "sha1": "c7cc00715f6687ced9d69ec793d6e9d4bc1b5287",
+      "region": "mainpcb:jsa:oki1",
+      "offset": 0
+    },
+    {
+      "name": "136070-2125.1ef",
+      "size": 65536,
+      "crc": "cbdabbcc",
+      "sha1": "4d102a5677d96e68d27c1960dc3a237ae6751c2f",
+      "region": "mainpcb:jsa:oki1",
+      "offset": 65536
+    },
+    {
+      "name": "136070-2126.1de",
+      "size": 65536,
+      "crc": "b973d9d1",
+      "sha1": "a74a3c981497a9c5557f793d49381a9b776cb025",
+      "region": "mainpcb:jsa:oki1",
+      "offset": 131072
+    },
+    {
+      "name": "136070-2127.1cd",
+      "size": 65536,
+      "crc": "3e419f4e",
+      "sha1": "e382e047f02591a934a53e5fbf07cccf285abb29",
+      "region": "mainpcb:jsa:oki1",
+      "offset": 196608
+    },
+    {
+      "name": "stunrun.200e",
+      "size": 2048,
+      "crc": "f1e8ba9e",
+      "sha1": "605db3fdbaff4ba13729371ad0c4fbab3889378e",
+      "region": "mainpcb:200e",
+      "offset": 0
+    },
+    {
+      "name": "stunrun.210e",
+      "size": 2048,
+      "crc": "f1e8ba9e",
+      "sha1": "605db3fdbaff4ba13729371ad0c4fbab3889378e",
+      "region": "mainpcb:210e",
+      "offset": 0
+    }
+  ]
+}

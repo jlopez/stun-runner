@@ -1,0 +1,21 @@
+.DS_Store
+__pycache__
+*.pyc
+.venv
+.mypy_cache
+.ruff_cache
+.envrc
+
+# ROM content never enters the repository (CLAUDE.md section 2). The reference set lives in
+# ~/archive/261104-stun-runner/roms; these patterns catch a stray copy or a stray zip.
+roms/
+*.zip
+*.bin
+!tools/**/*.bin
+
+# build output (make) and MAME state
+build/
+nvram/
+cfg/
+snap/
+sta/
