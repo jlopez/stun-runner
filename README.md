@@ -20,6 +20,7 @@ board. Four instruction sets, no graphics ROMs. Details with MAME references in
 | [`docs/03-plan.md`](docs/03-plan.md) | milestones M0-M7 with acceptance checks |
 | [`docs/04-build.md`](docs/04-build.md) | the build: five images, assembler trees, split, byte check, coverage, CI |
 | [`docs/05-ida.md`](docs/05-ida.md) | the IDA databases: made by `make ida`, never committed; annotation snapshots in `data/ida/` |
+| [`docs/06-code-map.md`](docs/06-code-map.md) | the code map: boot and game programs, the GSP and ADSP programs and their loaders, the MAME proof, the partition of the 768 KB |
 
 ## ROMs
 
@@ -39,9 +40,10 @@ Needs `vasmm68k_mot` (vasm 2.0f, built from source: `make CPU=m68k SYNTAX=mot`),
 
 ```bash
 uv sync             # ruff, mypy, pytest (UV_FROZEN=1 outside the canonical checkout, docs/04 section 6)
-make                # merge the set into five images, assemble asm/*, split into build/roms/stunrun/
+make                # merge the set into five images, cut out the GSP/ADSP programs, assemble asm/*,
+                    # split into build/roms/stunrun/
 make check          # the 25 built files against MAME's hashes and byte for byte against the set
-make coverage       # bytes per source file: instructions, data, incbin blobs, fills (M1: 100% blob)
+make coverage       # bytes per source file: instructions, data, incbin blobs, fills; every blob by label
 make test           # tool self-tests on synthetic data (no ROMs needed)
 make lint           # ruff + mypy
 make clean
@@ -53,6 +55,17 @@ IDA (optional, needs IDA Professional 9.1 with idalib activated; [`docs/05-ida.m
 uv sync --group ida
 make ida            # data/stunrun-68k.i64, data/stunrun-jsa.i64 (gitignored: they contain the ROM bytes)
 make ida-export     # data/ida/*.json + *.functions.jsonl (commit these), build/ida/*.asm
+make ida-annotate   # re-apply ida/memory_map.py + ida/code_map.py over the databases, then ida-export
+```
+
+The GSP and ADSP programs (needs MAME's `unidasm` on PATH, and `mame` for the oracle;
+[`docs/06-code-map.md`](docs/06-code-map.md)):
+
+```bash
+make dasm           # build/{gsp,adsp}/program.lst and program.annotated.lst (sidecars data/*/annotations.json)
+make oracle         # MAME runs the set and dumps GSP VRAM, ADSP program/data RAM into build/mame/
+make test           # now also compares the extracted programs with those dumps (skips without them)
+make pcwatch        # MAME -debug: highest and lowest 68k PC over 3,600 frames (code in RAM?)
 ```
 
 Without the reference set, `make check` prints `reference set absent, skipped` (this is what CI

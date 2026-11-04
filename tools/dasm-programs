@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Disassemble the extracted GSP and ADSP programs with MAME's unidasm (`make dasm`).
+
+    tools/dasm-programs [--build DIR] [--unidasm PATH]
+
+Reads the oracle images and their ranges (tools/extract-programs) and writes
+`<build>/adsp/program.lst` (adsp21xx over build/adsp/pm.bin: 32-bit little-endian words, one
+run per contiguous loaded range, -basepc in words, -skip in bytes, -count in words) and
+`<build>/gsp/program.lst` (tms34010 over build/gsp/vram.bin, one run per section, -basepc in
+bits, -skip in bytes, -count in bits). The listings show the program bytes: build output, never
+committed. tools/annotate-listing merges the sidecars data/{adsp,gsp}/annotations.json into them.
+unidasm parses -basepc as hex and -skip/-count as decimal; a leading zero breaks -basepc.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from programs import GSP_VRAM_BASE, read_ranges  # noqa: E402
+
+
+def merged(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    out: list[tuple[int, int]] = []
+    for start, end in sorted(ranges):
+        if out and start <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], end))
+        else:
+            out.append((start, end))
+    return out
+
+
+def unidasm(tool: str, image: Path, arch: str, basepc: int, skip: int, count: int) -> str:
+    cmd = [tool, str(image), "-arch", arch, "-basepc", f"{basepc:x}"]
+    cmd += ["-skip", str(skip), "-count", str(count)]
+    r = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if r.returncode != 0:
+        raise SystemExit(f"{' '.join(cmd)} failed: {r.stderr.strip()}")
+    return r.stdout
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    ap.add_argument("--build", type=Path, default=Path("build"))
+    ap.add_argument("--unidasm", default="unidasm")
+    args = ap.parse_args()
+
+    adsp = args.build / "adsp"
+    ranges = merged(read_ranges(json.loads((adsp / "pm.ranges.json").read_text())))
+    parts = ["; ADSP-2100 program RAM as the 68k loader at 02D2E0 leaves it (unidasm adsp21xx)\n"]
+    for start, end in ranges:
+        parts.append(f"\n; PM {start:04X}-{end - 1:04X}\n")
+        parts.append(unidasm(args.unidasm, adsp / "pm.bin", "adsp21xx", start, 4 * start, end - start))
+    (adsp / "program.lst").write_text("".join(parts))
+
+    gsp = args.build / "gsp"
+    ranges = read_ranges(json.loads((gsp / "vram.ranges.json").read_text()))
+    parts = ["; TMS34010 program in VRAM as the 68k loader at 02FDD0 leaves it (unidasm tms34010)\n"]
+    for n, (start, end) in enumerate(ranges):
+        parts.append(f"\n; section {n}: {start:08X}-{end:08X}\n")
+        skip = (start - GSP_VRAM_BASE) // 8
+        parts.append(unidasm(args.unidasm, gsp / "vram.bin", "tms34010", start, skip, end - start))
+    (gsp / "program.lst").write_text("".join(parts))
+    print(f"{adsp / 'program.lst'}, {gsp / 'program.lst'}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -42,6 +42,9 @@ extend-include = [
     "tools/split-roms",
     "tools/bytecheck",
     "tools/coverage",
+    "tools/extract-programs",
+    "tools/dasm-programs",
+    "tools/annotate-listing",
 ]
 
 [tool.ruff.lint]

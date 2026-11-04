@@ -26,7 +26,7 @@ Hardware map from MAME, toolchain proposal, this plan, `CLAUDE.md`, ROM location
 - 68k: segment the 768 KB into code, 68k data, GSP program, ADSP program, and data consumed by each processor (identified by who copies it where). Record the partition.
 - Check for 68k code running from RAM; record the answer.
 
-**Check**: `make coverage` shows the GSP and ADSP programs as named blobs with their own files; the extracted blobs equal the MAME dumps byte for byte (a committed `tools/test_programs.py` reproduces the comparison from a `-debug` script or from saved dumps); docs/04 lists the partition with addresses.
+**Check**: `make coverage` shows the GSP and ADSP programs as named blobs with their own files; the extracted blobs equal the MAME dumps byte for byte (a committed `tools/test_programs.py` reproduces the comparison from a `-debug` script or from saved dumps); docs/06 lists the partition with addresses.
 
 ## M3. The object ROM format and the display list (the "what are the meshes" question)
 

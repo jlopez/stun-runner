@@ -110,7 +110,7 @@ The table (values are addresses; `make ida` reads them from the image):
 | 30 level 6 (DUART) | 0x000812 | `h_level6_duart` |
 | 32-47 TRAP #0-#15 | 0x010848 | `h_trap_0_etc` |
 
-A target shared by several vectors is named after the first with `_etc`; every target has a function comment listing its vectors. The functions are created from the highest address down: the exception handlers at 0x01076A-0x010848 share code, and creating them in ascending order let the first one swallow the next eight (IDA refused the later starts as inside it).
+M2 renamed the targets of this (the boot program's) table `boot_*` (`boot_reset`, `boot_level2_adsp`, ...) and added the game's table at 0x020000 with `game_vec_*` longs and `h_*` / `game_reset` targets (docs/06 section 1.2). A target shared by several vectors is named after the first with `_etc`; every target has a function comment listing its vectors. The functions are created from the highest address down: the exception handlers at 0x01076A-0x010848 share code, and creating them in ascending order let the first one swallow the next eight (IDA refused the later starts as inside it).
 
 ## 4. The 6502 database (`stunrun-jsa`) and the bank scheme
 
@@ -141,4 +141,4 @@ Finding: in rev 6, all four bank pages (file 0x0000-0x3FFF) are zero bytes, so t
 
 The 68k listing (`build/ida/stunrun-68k.asm`, 0x000000-0x0BFFFF only: the I/O and RAM segments would add millions of `ds.b 1` lines) has 697,862 lines; the 6502 one 76,410. In the 68k ROM, 39,610 heads are instructions after auto-analysis; memory operands reach `RAM` 3,134 times, `ROM` 2,442, `GSP` 462, `MAINIO` 207, `ZRAM` 107, `ADSP` 84, `LATCH` 62, `DUART` 1.
 
-Left for M2 (not analysed here): a few absolute operands fall outside every segment of docs/01's map: 0x0E0000-0x0E8000 (beyond the ROM, inside MAME's `0x000000-0x0FFFFF` ROM mapping; 16 operands), 0x400000 and 0x408000 (1 each), 0x840000 and 0x84C000 (1 each).
+Left for M2 (answered in docs/06 section 4.3): a few absolute operands fall outside every segment of docs/01's map: 0x0E0000-0x0E8000 (beyond the ROM, inside MAME's `0x000000-0x0FFFFF` ROM mapping; 16 operands), 0x400000 and 0x408000 (1 each), 0x840000 and 0x84C000 (1 each).

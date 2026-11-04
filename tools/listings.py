@@ -9,6 +9,9 @@ padding count for the statement that produced them. Classes:
     data   dc / dcb-free data statements: vasm dc.*, 64tass .byte .word .text .long ...
     blob   incbin / .binary
     fill   vasm ds.* dcb.* blk.*, 64tass .fill
+
+`vasm_blobs` / `tass_blobs` list each blob statement with the label before it and the file it
+includes, so that `make coverage` names the blobs (adsp_program, gsp_program, ...).
 """
 
 from __future__ import annotations
@@ -23,6 +26,10 @@ VASM_SECTION = re.compile(r'^([0-9A-F]{2}): "[^"]*" \(([0-9A-F]+)-([0-9A-F]+)\)$
 VASM_SOURCE = re.compile(r'^Source: "(.*)"$')
 VASM_STATEMENT = re.compile(r"^([0-9A-F]{2}):([0-9A-F]{8}) [^\t]*\t\s*\d+: (.*)$")
 VASM_CONTINUATION = re.compile(r"^[0-9A-F]{2}:[0-9A-F]{8} ")
+VASM_ANY = re.compile(r"^[^\t]*\t\s*\d+: (.*)$")
+VASM_LABEL = re.compile(r"^([A-Za-z_.][\w.]*):")
+VASM_INCBIN = re.compile(r'incbin\s+"([^"]+)"', re.I)
+TASS_BINARY = re.compile(r"^(?:([A-Za-z_][\w.]*)\s+)?\.binary\s+([^,;\s]+)")
 TASS_ADDRESS = re.compile(r"^[.>]([0-9a-f]{4,8})$")
 TASS_HEX = re.compile(r"^[0-9a-f]{2}( [0-9a-f]{2})*$")
 
@@ -63,27 +70,63 @@ class Statement:
     section: str
     address: int
     cls: str
+    label: str = ""  # the last label at or before the statement (blobs only)
+    target: str = ""  # the file a blob includes, as written in the source
+
+
+@dataclass(frozen=True)
+class Blob:
+    file: str  # the source file
+    label: str
+    target: str  # the included file, as written
+    address: int
+    size: int
 
 
 Counts = dict[str, dict[str, int]]
 
 
-def _attribute(statements: list[Statement], ends: dict[str, int]) -> Counts:
-    counts: Counts = defaultdict(lambda: dict.fromkeys(CLASSES, 0))
+def _spans(statements: list[Statement], ends: dict[str, int]) -> list[tuple[Statement, int]]:
+    out = []
     for i, s in enumerate(statements):
         nxt = next((t.address for t in statements[i + 1 :] if t.section == s.section), None)
         end = nxt if nxt is not None else ends[s.section]
         if end < s.address:
             raise ValueError(f"{s.file}: address goes backwards at ${s.address:X}")
-        counts[s.file][s.cls] += end - s.address
+        out.append((s, end - s.address))
+    return out
+
+
+def _attribute(statements: list[Statement], ends: dict[str, int]) -> Counts:
+    counts: Counts = defaultdict(lambda: dict.fromkeys(CLASSES, 0))
+    for s, size in _spans(statements, ends):
+        counts[s.file][s.cls] += size
     return dict(counts)
+
+
+def _blobs(statements: list[Statement], ends: dict[str, int]) -> list[Blob]:
+    return [
+        Blob(s.file, s.label, s.target, s.address, size)
+        for s, size in _spans(statements, ends)
+        if s.cls == "blob"
+    ]
 
 
 def vasm(listing: str) -> Counts:
     """Per source file and class, the bytes of a vasm -L listing."""
+    return _attribute(*_vasm_parse(listing))
+
+
+def vasm_blobs(listing: str) -> list[Blob]:
+    """The incbin statements of a vasm -L listing, with their labels, files and sizes."""
+    return _blobs(*_vasm_parse(listing))
+
+
+def _vasm_parse(listing: str) -> tuple[list[Statement], dict[str, int]]:
     lengths: dict[str, int] = {}
     statements: list[Statement] = []
     current = "?"
+    label = ""
     in_sections = False
     for line in listing.splitlines():
         if line == "Sections:":
@@ -100,20 +143,40 @@ def vasm(listing: str) -> Counts:
         if m:
             current = m.group(1)
             continue
+        m = VASM_ANY.match(line)
+        if m:
+            lm = VASM_LABEL.match(m.group(1))
+            if lm:
+                label = lm.group(1)
         m = VASM_STATEMENT.match(line)
         if m:
             cls = classify(m.group(3), VASM_DIRECTIVES)
-            statements.append(Statement(current, m.group(1), int(m.group(2), 16), cls))
+            target = ""
+            if cls == "blob":
+                im = VASM_INCBIN.search(_code(m.group(3)))
+                target = im.group(1) if im else "?"
+            statements.append(
+                Statement(current, m.group(1), int(m.group(2), 16), cls, label, target)
+            )
     # a section ends at its first address + its length (the header's range is section-relative)
     ends: dict[str, int] = {}
     for s in statements:
         if s.section not in ends:
             ends[s.section] = s.address + lengths[s.section]
-    return _attribute(statements, ends)
+    return statements, ends
 
 
 def tass(listing: str, image_size: int) -> Counts:
     """Per source file and class, the bytes of a 64tass -L listing of an image of image_size."""
+    return _attribute(*_tass_parse(listing, image_size))
+
+
+def tass_blobs(listing: str, image_size: int) -> list[Blob]:
+    """The .binary statements of a 64tass -L listing, with their labels, files and sizes."""
+    return _blobs(*_tass_parse(listing, image_size))
+
+
+def _tass_parse(listing: str, image_size: int) -> tuple[list[Statement], dict[str, int]]:
     statements: list[Statement] = []
     stack: list[str] = []
     for line in listing.splitlines():
@@ -134,5 +197,10 @@ def tass(listing: str, image_size: int) -> Counts:
         if not text:
             continue  # continuation of the previous statement's bytes
         cls = classify(" ".join(text), TASS_DIRECTIVES)  # label, monitor, source, comment
-        statements.append(Statement(stack[-1] if stack else "?", "", int(m.group(1), 16), cls))
-    return _attribute(statements, {"": image_size})
+        label = target = ""
+        if cls == "blob":
+            bm = TASS_BINARY.match(_code(" ".join(text)).strip())  # [label] .binary FILE, ...
+            label, target = (bm.group(1) or "", bm.group(2)) if bm else ("", "?")
+        file = stack[-1] if stack else "?"
+        statements.append(Statement(file, "", int(m.group(1), 16), cls, label, target))
+    return statements, {"": image_size}
