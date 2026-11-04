@@ -13,9 +13,9 @@ roms/
 *.bin
 !tools/**/*.bin
 
-# build output (make) and MAME state
+# build output (make) and MAME state (root only: asm/nvram/ is source)
 build/
-nvram/
-cfg/
-snap/
-sta/
+/nvram/
+/cfg/
+/snap/
+/sta/
