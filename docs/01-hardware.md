@@ -60,13 +60,13 @@ Eleven sets (`mame.lst`: `stunrun`, `stunrun0`, `stunrun2`, `stunrun2e`, `stunru
 | 604000-607FFF | W | **NWR latch**: address bits 0-2 pick the line, bit 3 is the value, data ignored. 0 CR2, 1 CR1, 2 LC1, 3 LC2, 4 ZP1, 5 ZP2 (NVRAM write protect), 6 /GSPRES (GSP reset), 7 /MSPRES | `hd68k_nwr_w` |
 | 608000-60BFFF | W | watchdog | |
 | 60C000-60FFFF | R | **port 0**: bit 0 DIAGN jumper, 1 /HSYNC, 2 /VSYNC, 3 EOC12, 4 EOC8 (ADC done), 5 self-test, 6 coin 2, 7 coin 1, 8-15 DIP SW1 (8…1) | `hd68k_port0_r`, `INPUT_PORTS_START(stunrun)` line 1084 |
-| 60C000-60FFFF | W | acknowledge the video interrupt (level 5) | `hd68k_irq_ack_w` |
+| 60C000-60FFFF | W | acknowledge the level-5 timer interrupt | `hd68k_irq_ack_w` |
 | 800000-807FFF | R/W | **ADSP program RAM**, 8K × 24-bit words seen as 32-bit pairs: even word = bits 31-16 (the top 8 bits unused), odd word = bits 15-0 | `hd68k_adsp_program_r/w` |
 | 808000-80BFFF | R/W | **ADSP data RAM**, 8K × 16-bit; a write to word 0x1FFF is the sync trigger (raises the ADSP's IRQ) | `hd68k_adsp_data_w` |
 | 810000-813FFF | R/W | **ADSP output buffer** (SOM), one of two 8K-word banks | `hd68k_adsp_buffer_r/w`, bank from control bit 3 |
 | 818000-81801F | W | **ADSP control**: bits 0-2 select, bit 3 value. 0, 1 LEDs; 3 output-buffer bank; 5 /BR; 6 /HALT; 7 reset | `hd68k_adsp_control_w` |
 | 818060-81807F | W | clear the ADSP interrupt (level 2) | `hd68k_adsp_irq_clear_w` |
-| 838000-83FFFF | R | ADSP interrupt state | `hd68k_adsp_irq_state_r` |
+| 838000-83FFFF | R | ADSP status: bit 0 low = ADSP interrupt pending, bit 1 low = XFLAG set, other bits 1 | `hd68k_adsp_irq_state_r` |
 | A00000-A7FFFF | W | **WR0 latch**, same bit scheme: 1-4 SEL1-SEL4 (which analogue latch WR1 targets), 6-7 coin counters | `hd68k_wr0_write` |
 | A80000-AFFFFF | R | buttons: bit 0 button 1, bit 1 button 2, bit 2 start | `hd68k_a80000_r`, port `a80000` |
 | A80000-AFFFFF | W | WR1: data high byte into the SEL1-4 register picked by WR0 ("shifter interface latch", lamps/outputs on this game) | `hd68k_wr1_write` |
@@ -79,7 +79,7 @@ Eleven sets (`mame.lst`: `stunrun`, `stunrun0`, `stunrun2`, `stunrun2e`, `stunru
 | FF4000-FF4FFF | R/W | **ZRAM**: 2 KB × 16, high byte = M48T02 at 200E, low byte = 2816 EEPROM at 210E, write-protected by ZP1/ZP2 | `hd68k_zram_r/w` |
 | FF8000-FFFFFF | R/W | 32 KB work RAM | |
 
-Interrupts (`update_interrupts`, `harddriv_m.cpp`): level 1 MSP (never here), **2 ADSP** (/GINT from the ADSP's special write 6), **3 GSP** (TMS34010 output interrupt), **4 sound** (JSA II, "/LINKIRQ on STUN Runner" in the source comment), **5 video** (vblank; `hd68k_irq_gen` also fires it at 32 MHz / 16⁴ / 2 ≈ 244 Hz, line 1465, cleared by the 60C000 write), 6 DUART. The 68010 vector table at 0x000000 in `200r/210r` is therefore the first thing to label.
+Interrupts (`update_interrupts`, `harddriv_m.cpp`): level 1 MSP (never here), **2 ADSP** (/GINT from the ADSP's special write 6), **3 GSP** (TMS34010 output interrupt), **4 sound** (JSA II, "/LINKIRQ on STUN Runner" in the source comment), **5 timer** (`hd68k_irq_gen`, a periodic interrupt at 32 MHz / 16⁴ / 2 ≈ 244 Hz, line 1465, cleared by the 60C000 write; the vblank itself sets `m_video_int_state`, which `update_interrupts` never reads, so the 68010 sees vertical sync only as /VSYNC in port 0 bit 2), 6 DUART. The 68010 vector table at 0x000000 in `200r/210r` is therefore the first thing to label.
 
 ## 4. The TMS34010 GSP
 
