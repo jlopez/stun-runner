@@ -141,13 +141,38 @@ SEGMENTS_JSA = [
     for n in range(JSA_BANKS)
 ]
 
-IO_JSA = [
-    (0x2000, "YM2151_REG", "YM2151 register select (write), status (read)"),
-    (0x2001, "YM2151_DATA", "YM2151 data"),
+# The read ports 2800-2806 are decoded with mirror mask 01F9 (docs/01 section 6): bits 0 and 3-8
+# are don't-cares, so each one answers throughout 2800-29FF. The rev 6 sound program reads them
+# only through the +8 mirrors (2808, 280A, 280C, 280E), so those get a name too (docs/05 section 4).
+JSA_READ_MIRROR_MASK = 0x01F9
+JSA_READ_MIRRORS_USED = (0x0008,)
+_IO_JSA_READ = [
     (0x2800, "OKI_READ", "OKI M6295 status (/RDV)"),
     (0x2802, "CMD_FROM_68K", "command byte from the 68010 (/RDP)"),
     (0x2804, "RDIO", "/RDIO: 7 self-test, 6 NMI state, 5 output buffer full, 1-0 coins"),
     (0x2806, "IRQ_ACK", "IRQ acknowledge (read or write)"),
+]
+
+
+def jsa_read_mirrors() -> list[tuple[int, str, str]]:
+    """The mirrors of the read ports that the code uses, named `<base>_M` (one used mirror)."""
+    out = []
+    for delta in JSA_READ_MIRRORS_USED:
+        if delta & ~JSA_READ_MIRROR_MASK or delta == 0:
+            raise ValueError(
+                f"{delta:#x} is not a mirror offset under mask {JSA_READ_MIRROR_MASK:#x}"
+            )
+        suffix = "_M" if len(JSA_READ_MIRRORS_USED) == 1 else f"_M{delta:X}"
+        for ea, name, text in _IO_JSA_READ:
+            out.append((ea + delta, name + suffix, f"{text}; mirror of {ea:04X} (mask 01F9)"))
+    return out
+
+
+IO_JSA = [
+    (0x2000, "YM2151_REG", "YM2151 register select (write), status (read)"),
+    (0x2001, "YM2151_DATA", "YM2151 data"),
+    *_IO_JSA_READ,
+    *jsa_read_mirrors(),
     (0x2A00, "OKI_WRITE", "OKI M6295 command (/WRV)"),
     (0x2A02, "RESP_TO_68K", "response byte to the 68010 (/WRP)"),
     (0x2A04, "WRIO", "/WRIO: 7-6 ROM bank for 3000-3FFF, 0 YM2151 reset (low), coin counters, LPF"),

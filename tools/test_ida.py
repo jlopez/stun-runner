@@ -21,6 +21,7 @@ from ida.memory_map import (
     DATABASES,
     IO_68K,
     IO_JSA,
+    JSA_READ_MIRROR_MASK,
     SEGMENTS_68K,
     SEGMENTS_JSA,
     jsa_bank_base,
@@ -254,6 +255,18 @@ def test_segments_do_not_overlap_and_labels_fall_inside(segments: list[Segment])
     for ea, _, _ in table:
         assert any(s.start <= ea < s.end for s in segments), hex(ea)
     assert len({name for _, name, _ in table}) == len(table)
+
+
+def test_jsa_read_port_mirrors_are_labelled() -> None:
+    # rev 6 reads the 2800-2806 ports only through 2808/280A/280C/280E (docs/05 section 4)
+    names = {ea: name for ea, name, _ in IO_JSA}
+    for base, used in [(0x2800, 0x2808), (0x2802, 0x280A), (0x2804, 0x280C), (0x2806, 0x280E)]:
+        assert names[used] == names[base] + "_M"
+        assert (used ^ base) & ~JSA_READ_MIRROR_MASK == 0
+    comments = {ea: text for ea, _, text in IO_JSA}
+    assert "mirror of 2802" in comments[0x280A] and "/RDP" in comments[0x280A]
+    # the write ports and the YM2151 are not mirrored here
+    assert 0x2A08 not in names and 0x2002 not in names
 
 
 def test_jsa_banks() -> None:

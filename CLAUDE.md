@@ -22,10 +22,11 @@ A complete source reverse-engineering of S.T.U.N. Runner (Atari Games, 1989, MAM
 1. This file.
 2. `docs/01-hardware.md`: the boards, the ROM set, the three address spaces and the sound board, with the MAME references. Read it before touching any address.
 3. `docs/02-toolchain.md`: assemblers, disassemblers, MAME and the build check.
-4. `docs/03-plan.md`: milestones and acceptance checks; find the milestone your room is scoped to and do not cross into the next. Then `docs/04-build.md` (the build) and `docs/05-ida.md` (the IDA databases, the snapshot rule) before touching either.
+4. `docs/03-plan.md`: milestones and acceptance checks; find the milestone your room is scoped to and do not cross into the next.
 5. `docs/04-build.md`: how `make`, `make check` and `make coverage` work, the five images and the tool versions.
-6. Spindizzy's `CLAUDE.md` sections 5-7 and 12 and `docs/26-assembler-source.md`: the method (bottom-up, evidence standard, naming conventions), the partition-by-region wave pattern and the IDA sync.
-7. `~/.claude/notes/autonomous-parallel-delivery-process.md` when you coordinate a wave.
+6. `docs/05-ida.md`: the IDA databases (built by `make ida`, never committed), the snapshot rule and the 6502 bank scheme.
+7. Spindizzy's `CLAUDE.md` sections 5-7 and 12 and `docs/26-assembler-source.md`: the method (bottom-up, evidence standard, naming conventions), the partition-by-region wave pattern and the IDA sync.
+8. `~/.claude/notes/autonomous-parallel-delivery-process.md` when you coordinate a wave.
 
 ## 4. Milestones (short list; checks in docs/03)
 
@@ -51,7 +52,7 @@ A complete source reverse-engineering of S.T.U.N. Runner (Atari Games, 1989, MAM
 
 ## 6. Repository conventions
 
-- Python with `uv`, `ruff` (line length 100), `mypy`; `uv run ruff check tools` before committing.
+- Python with `uv`, `ruff` (line length 100), `mypy`; `make lint` (ruff on `tools` and `ida`, mypy) before committing.
 - Branch per leg `feat/<yymmdd>-<slug>` or `fix/…`, PR against `main`, squash merge with a holistic message (never the concatenated default when a PR has several commits).
 - `docs/NN-<slug>.md` per leg for narrative and evidence; decisions in this file in the same PR.
 - IDA databases (`data/*.i64`) are build artefacts of `make ida`, gitignored, never committed. Annotate in IDA, then `make ida-export` and commit `data/ida/` (the snapshot is what the next `make ida` re-applies; an unexported annotation is lost). Other non-ROM binaries over a few hundred KB through Git LFS.
