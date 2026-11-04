@@ -19,3 +19,12 @@ build/
 /cfg/
 /snap/
 /sta/
+
+# IDA databases: build artefacts made by `make ida`, never committed (they embed the ROM bytes,
+# docs/05-ida.md). The repository commits their annotation snapshots, data/ida/*.json.
+data/*.i64
+data/*.id0
+*.id1
+*.id2
+*.nam
+*.til

@@ -1,6 +1,6 @@
 # The build: five images, five trees, 25 files
 
-**Date**: 2026-11-04 (milestone 1, leg M1a). How `make` turns the reference set into source trees and back into the 25 files of `stunrun`, byte for byte, without a ROM byte in the repository. The IDA databases are leg M1b; the code map (where the GSP and ADSP programs live) is M2 and will refine the partition below.
+**Date**: 2026-11-04 (milestone 1, leg M1a). How `make` turns the reference set into source trees and back into the 25 files of `stunrun`, byte for byte, without a ROM byte in the repository. The IDA databases are leg M1b (docs/05-ida.md); the code map (where the GSP and ADSP programs live) is M2 and will refine the partition below.
 
 ## 1. The pipeline
 
@@ -93,4 +93,4 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
 
 ## 7. CI
 
-`.github/workflows/ci.yml`, one job on `ubuntu-latest` (push to main, pull requests): checkout with LFS, apt `64tass`, vasm from the pinned tarball (sha256 verified, binary cached), `astral-sh/setup-uv@v10.2.0` with Python 3.13 and `UV_FROZEN=1`, `uv sync`, `uv run ruff check tools`, `make lint`, `make test` (including the synthetic `make all` through both assemblers) and `make check`, which prints `reference set absent, skipped` there.
+`.github/workflows/ci.yml`, one job on `ubuntu-latest` (push to main, pull requests): checkout with LFS, apt `64tass`, vasm from the pinned tarball (sha256 verified, binary cached), `astral-sh/setup-uv@v10.2.0` with Python 3.13 and `UV_FROZEN=1`, `uv sync`, `uv run ruff check tools ida`, `make lint`, `make test` (including the synthetic `make all` through both assemblers) and `make check`, which prints `reference set absent, skipped` there.

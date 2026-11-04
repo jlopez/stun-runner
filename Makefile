@@ -26,7 +26,7 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
-.PHONY: all check coverage test lint roms roms-refresh selftest clean
+.PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -68,8 +68,20 @@ PYTOOLS := tools/romset.py tools/listings.py tools/test_*.py \
 	tools/check-roms tools/merge-roms tools/split-roms tools/bytecheck tools/coverage
 
 lint:
-	uv run --frozen ruff check tools
+	uv run --frozen ruff check tools ida
 	uv run --frozen mypy --scripts-are-modules $(PYTOOLS)
+	uv run --frozen mypy -p ida
+
+# The IDA databases (docs/05-ida.md): build artefacts, never committed (they embed the ROM bytes).
+# They need idalib (`uv sync --group ida`, IDA installed and activated), so neither target is part
+# of `make test` or CI. `make ida` recreates both from the images and the committed snapshots
+# data/ida/*.json; `make ida-export` writes the snapshots and functions.jsonl back (commit them)
+# and the .asm listings to build/ida/ (never committed).
+ida: $(BUILD)/$(SET)-68k.bin $(BUILD)/$(SET)-jsa.bin
+	$(PYTHON) -m ida.headless.create all
+
+ida-export:
+	$(PYTHON) -m ida.headless.export all
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms

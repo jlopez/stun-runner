@@ -21,7 +21,7 @@ jobs:
       VASM_URL: http://phoenix.owl.de/tags/vasm2_0f.tar.gz
       VASM_SHA256: c84b2de1cbb87831795fe64a85c5d9a7002a766e3a7c30b0a2d7d5e99d878f49
     steps:
-      # LFS: the IDA databases (milestone 1b onwards).
+      # LFS: large non-ROM binaries, if any (the IDA databases are never committed).
       - uses: actions/checkout@v7
         with:
           lfs: true
@@ -48,10 +48,11 @@ jobs:
           python-version: "3.13"
           enable-cache: true
       - run: uv sync
-      - run: uv run ruff check tools
+      - run: uv run ruff check tools ida
       - run: make lint
       # check-roms selftest, then pytest: merge/split round trip, bytecheck and the coverage
-      # parser on synthetic data, and the whole `make all` on a synthetic set with vasm and 64tass.
+      # parser on synthetic data, the whole `make all` on a synthetic set with vasm and 64tass,
+      # and the IDA snapshot helpers (the idalib round trip skips: no IDA here).
       - run: make test
       # No ROMs here (CLAUDE.md section 2): prints "reference set absent, skipped" and exits 0.
       - run: make check

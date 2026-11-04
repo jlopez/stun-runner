@@ -14,7 +14,7 @@ Hardware map from MAME, toolchain proposal, this plan, `CLAUDE.md`, ROM location
 - vasm built and pinned; unidasm built; `uv sync`; idalib activated for this repo (Spindizzy recipe).
 - `tools/merge-roms` builds `build/stunrun-68k.bin` (768 KB, interleaved) and `tools/split-roms` reverses it; `tools/check-roms` accepts a build directory as well as the archive.
 - Makefile skeleton: `make` assembles a 68k tree that is one `incbin` per ROM pair plus the 6502 file and the data ROMs as blobs; `make check` passes trivially. This is the zero point of the coverage number.
-- IDA databases created: 68k (`data/stunrun-68k.i64`) and 6502 (`data/stunrun-jsa.i64`), auto-analysed, vector table and the memory-map addresses of docs/01 named as segments and I/O labels. Headless export works.
+- IDA databases created: 68k (`data/stunrun-68k.i64`) and 6502 (`data/stunrun-jsa.i64`), auto-analysed, vector table and the memory-map addresses of docs/01 named as segments and I/O labels. Headless export works. (M1b: the databases are build artefacts of `make ida`, never committed; the annotation snapshots `data/ida/*.json` are, docs/05-ida.md.)
 
 **Check**: `make check` green with 100% blob coverage; `uv run python -m ida.headless.export` writes `functions.jsonl` for both databases; CI runs `make check` with the reference hashes only (no ROMs in CI: the check compares hashes of files that are absent and must report "reference set absent, skipped" without failing, while the assemblers' own tests run).
 

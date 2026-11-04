@@ -24,8 +24,9 @@ A complete source reverse-engineering of S.T.U.N. Runner (Atari Games, 1989, MAM
 3. `docs/02-toolchain.md`: assemblers, disassemblers, MAME and the build check.
 4. `docs/03-plan.md`: milestones and acceptance checks; find the milestone your room is scoped to and do not cross into the next.
 5. `docs/04-build.md`: how `make`, `make check` and `make coverage` work, the five images and the tool versions.
-6. Spindizzy's `CLAUDE.md` sections 5-7 and 12 and `docs/26-assembler-source.md`: the method (bottom-up, evidence standard, naming conventions), the partition-by-region wave pattern and the IDA sync.
-7. `~/.claude/notes/autonomous-parallel-delivery-process.md` when you coordinate a wave.
+6. `docs/05-ida.md`: the IDA databases (built by `make ida`, never committed), the snapshot rule and the 6502 bank scheme.
+7. Spindizzy's `CLAUDE.md` sections 5-7 and 12 and `docs/26-assembler-source.md`: the method (bottom-up, evidence standard, naming conventions), the partition-by-region wave pattern and the IDA sync.
+8. `~/.claude/notes/autonomous-parallel-delivery-process.md` when you coordinate a wave.
 
 ## 4. Milestones (short list; checks in docs/03)
 
@@ -41,6 +42,8 @@ A complete source reverse-engineering of S.T.U.N. Runner (Atari Games, 1989, MAM
 ## 5. Decisions log
 
 - 2026-11-04 (Jesus): reference set `stunrun` rev 6; three tiers of source; IDA for 68k and 6502, sidecar annotation for the TMS34010 until justified otherwise; kickoff stays a single-session doc leg, the parallel process begins at M1/M2 in a new room; repository public; MAME installed from brew, unidasm to be built from source.
+- 2026-11-04 (coordinator, M1b, **pending Jesus**, card A1): the IDA databases are never committed, not even through LFS: an `.i64` embeds the ROM bytes and the repo is public (rule 2 wins over docs/02's kickoff plan). `make ida` builds them from `build/*.bin`; the repo commits per database an annotation snapshot `data/ida/<name>.json` and `functions.jsonl`, and create -> export reproduces them exactly (docs/05).
+- 2026-11-04 (M1b): the 68010 vector table is vectors 0-63 only (the reset PC, 0x216, lies in the user-vector area); 6502 bank n lives at linear `(n+1)<<16 | 0x3000` with base 0, because m65 resolves operands relative to a based segment and would break references to I/O and the fixed ROM (docs/05).
 - 2026-11-04 (finding): the brief's hardware list was wrong. Not atarig1: Hard Drivin' multisync hardware, no SLOOP, no RLE objects, no graphics ROMs; the tunnel is polygon geometry in the ADSP object ROMs (docs/01).
 - 2026-11-04 (M1a, coordinator): the build works on five images, one per address space: `stunrun-68k` (768 KB, the 200x/210x pairs interleaved, offset = 68010 address), `stunrun-obj` (384 KB object ROMs interleaved), `stunrun-oki` (256 KB), `stunrun-jsa` (64 KB) and `stunrun-nvram` (200e + 210e); `tools/merge-roms` makes them from the set by the snapshot's regions and offsets, each is a separate assembler output, and `tools/split-roms` cuts them into the 25 files (docs/04).
 - 2026-11-04 (M1a, coordinator): every one of the 25 files comes from an assembler listing (vasm for the 68k and data trees, 64tass for the 6502), so one coverage number covers the whole set; an `incbin`/`.binary` source is always a build artefact under `build/`, never the archive path.
@@ -49,8 +52,8 @@ A complete source reverse-engineering of S.T.U.N. Runner (Atari Games, 1989, MAM
 
 ## 6. Repository conventions
 
-- Python with `uv`, `ruff` (line length 100), `mypy`; `uv run ruff check tools` before committing.
+- Python with `uv`, `ruff` (line length 100), `mypy`; `make lint` (ruff on `tools` and `ida`, mypy) before committing.
 - Branch per leg `feat/<yymmdd>-<slug>` or `fix/…`, PR against `main`, squash merge with a holistic message (never the concatenated default when a PR has several commits).
 - `docs/NN-<slug>.md` per leg for narrative and evidence; decisions in this file in the same PR.
-- IDA databases (`*.i64`, packed, closed before committing) and other binaries over a few hundred KB through Git LFS.
+- IDA databases (`data/*.i64`) are build artefacts of `make ida`, gitignored, never committed. Annotate in IDA, then `make ida-export` and commit `data/ida/` (the snapshot is what the next `make ida` re-applies; an unexported annotation is lost). Other non-ROM binaries over a few hundred KB through Git LFS.
 - Commit trailers as the session's system reminder specifies.
