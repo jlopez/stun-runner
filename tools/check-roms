@@ -82,8 +82,10 @@ def read_set(location: Path) -> dict[str, bytes] | None:
         files = {p.name: p.read_bytes() for p in location.iterdir() if p.is_file() and not p.name.startswith(".")}
         if files:
             return files
-    zip_path = location.with_suffix(".zip")
-    if zip_path.is_file():
+    # <rompath>/<set>.zip (what MAME reads) or a zip dropped inside the set's folder
+    for zip_path in (location.with_suffix(".zip"), location / f"{location.name}.zip"):
+        if not zip_path.is_file():
+            continue
         with zipfile.ZipFile(zip_path) as z:
             return {Path(i.filename).name: z.read(i) for i in z.infolist() if not i.is_dir()}
     return None
