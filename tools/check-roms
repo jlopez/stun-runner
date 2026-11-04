@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""Verify a ROM set against the MAME-listed hashes, without MAME and without ROMs in the repo.
+
+    tools/check-roms                      # ~/archive/261104-stun-runner/roms/stunrun (or stunrun.zip)
+    tools/check-roms --dir build/roms/stunrun
+    tools/check-roms --set stunrunj       # another set's snapshot in tools/romsets/
+    tools/check-roms --refresh [--set X]  # rewrite tools/romsets/<set>.json from `mame -listxml`
+    tools/check-roms --selftest           # the checker against a synthetic set in a temp dir
+
+The expected hashes live in tools/romsets/<set>.json, a snapshot of MAME's own list (name, size,
+CRC-32, SHA-1, region, offset). The set is a directory of loose files or a zip next to it, both
+named after the MAME set. Exit status 1 on any missing, extra-but-named, truncated or mismatching
+file; 2 when the set location does not exist (so CI without ROMs can treat it as "skipped").
+
+Standard library only; no ROM byte is ever printed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import zipfile
+import zlib
+from pathlib import Path
+from xml.etree import ElementTree
+
+REPO = Path(__file__).resolve().parents[1]
+ROMSETS = REPO / "tools" / "romsets"
+DEFAULT_ARCHIVE = Path(os.environ.get("STUNRUN_ROMS", "~/archive/261104-stun-runner/roms")).expanduser()
+
+
+def hashes(data: bytes) -> tuple[str, str]:
+    return f"{zlib.crc32(data) & 0xFFFFFFFF:08x}", hashlib.sha1(data).hexdigest()
+
+
+def load_snapshot(set_name: str) -> dict:
+    path = ROMSETS / f"{set_name}.json"
+    if not path.exists():
+        sys.exit(f"no snapshot for set '{set_name}' at {path}; run tools/check-roms --refresh --set {set_name}")
+    return json.loads(path.read_text())
+
+
+def refresh(set_name: str) -> int:
+    """Rewrite the snapshot from `mame -listxml`. Needs MAME on PATH; never touches ROMs."""
+    xml = subprocess.run(["mame", "-listxml", set_name], check=True, capture_output=True, text=True).stdout
+    root = ElementTree.fromstring(xml)
+    machine = next(m for m in root.iter("machine") if m.get("name") == set_name)
+    roms = [
+        {
+            "name": r.get("name"),
+            "size": int(r.get("size")),
+            "crc": r.get("crc"),
+            "sha1": r.get("sha1"),
+            "region": r.get("region"),
+            "offset": int(r.get("offset"), 16),
+        }
+        for r in machine.findall("rom")
+        if r.get("sha1")  # skip NO_DUMP entries
+    ]
+    snapshot = {
+        "set": set_name,
+        "description": machine.findtext("description"),
+        "sourcefile": machine.get("sourcefile"),
+        "mame": root.get("build"),
+        "roms": roms,
+    }
+    ROMSETS.mkdir(parents=True, exist_ok=True)
+    out = ROMSETS / f"{set_name}.json"
+    out.write_text(json.dumps(snapshot, indent=2) + "\n")
+    print(f"wrote {out.relative_to(REPO)}: {len(roms)} files, MAME {snapshot['mame']}")
+    return 0
+
+
+def read_set(location: Path) -> dict[str, bytes] | None:
+    """The set's files by name, from a directory or a zip; None when neither exists (an empty directory counts as absent)."""
+    if location.is_dir():
+        files = {p.name: p.read_bytes() for p in location.iterdir() if p.is_file() and not p.name.startswith(".")}
+        if files:
+            return files
+    zip_path = location.with_suffix(".zip")
+    if zip_path.is_file():
+        with zipfile.ZipFile(zip_path) as z:
+            return {Path(i.filename).name: z.read(i) for i in z.infolist() if not i.is_dir()}
+    return None
+
+
+def check(snapshot: dict, files: dict[str, bytes], label: str) -> int:
+    problems: list[str] = []
+    expected = {r["name"]: r for r in snapshot["roms"]}
+    for name, rom in expected.items():
+        data = files.get(name)
+        if data is None:
+            problems.append(f"missing  {name}")
+            continue
+        if len(data) != rom["size"]:
+            problems.append(f"size     {name}: {len(data)} bytes, expected {rom['size']}")
+            continue
+        crc, sha1 = hashes(data)
+        if sha1 != rom["sha1"] or crc != rom["crc"]:
+            problems.append(f"hash     {name}: crc {crc} sha1 {sha1[:12]}…, expected crc {rom['crc']} sha1 {rom['sha1'][:12]}…")
+    extra = sorted(set(files) - set(expected))
+    for name in extra:
+        print(f"note     {name}: not part of set {snapshot['set']} (ignored)")
+    if problems:
+        print(f"FAIL {label}: {len(problems)} of {len(expected)} files wrong")
+        for p in problems:
+            print("  " + p)
+        return 1
+    total = sum(r["size"] for r in expected.values())
+    print(f"OK {label}: {len(expected)} files, {total} bytes, every CRC-32 and SHA-1 matches MAME {snapshot.get('mame', '?')}")
+    return 0
+
+
+def selftest() -> int:
+    """A synthetic three-file set: pass, then one byte flipped, one file dropped, one truncated."""
+    import random
+
+    rng = random.Random(1989)
+    files = {f"test-{i}.bin": bytes(rng.getrandbits(8) for _ in range(4096 if i else 2048)) for i in range(3)}
+    snapshot = {
+        "set": "selftest",
+        "mame": "n/a",
+        "roms": [
+            {"name": n, "size": len(d), "crc": hashes(d)[0], "sha1": hashes(d)[1], "region": "t", "offset": 0}
+            for n, d in files.items()
+        ],
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "selftest").mkdir()
+        for n, d in files.items():
+            (root / "selftest" / n).write_bytes(d)
+        good_dir = read_set(root / "selftest")
+        assert good_dir is not None
+        assert check(snapshot, good_dir, "selftest dir") == 0
+        with zipfile.ZipFile(root / "selfzip.zip", "w") as z:
+            for n, d in files.items():
+                z.writestr(n, d)
+        good_zip = read_set(root / "selfzip")
+        assert good_zip is not None
+        assert check(snapshot, good_zip, "selftest zip") == 0
+        bad = dict(files)
+        flipped = bytearray(bad["test-1.bin"])
+        flipped[100] ^= 0x01
+        bad["test-1.bin"] = bytes(flipped)
+        bad["test-2.bin"] = bad["test-2.bin"][:-1]
+        del bad["test-0.bin"]
+        bad["extra.bin"] = b"x"
+        assert check(snapshot, bad, "selftest broken") == 1
+        assert read_set(root / "nowhere") is None
+    print("selftest OK")
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--set", default="stunrun", help="MAME set name (default stunrun)")
+    ap.add_argument("--dir", type=Path, help="directory (or zip stem) holding the set; default <archive>/<set>")
+    ap.add_argument("--archive", type=Path, default=DEFAULT_ARCHIVE, help=f"rompath (default {DEFAULT_ARCHIVE})")
+    ap.add_argument("--refresh", action="store_true", help="rewrite the snapshot from `mame -listxml`")
+    ap.add_argument("--selftest", action="store_true")
+    args = ap.parse_args()
+
+    if args.selftest:
+        return selftest()
+    if args.refresh:
+        return refresh(args.set)
+    snapshot = load_snapshot(args.set)
+    location = args.dir if args.dir else args.archive / args.set
+    files = read_set(location)
+    if files is None:
+        print(f"SKIP {args.set}: no directory {location} and no {location.with_suffix('.zip')} (reference set absent)")
+        return 2
+    return check(snapshot, files, f"{args.set} at {location}")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
