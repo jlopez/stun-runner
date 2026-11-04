@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Build the five images the assembler trees incbin, from the reference set (`make`).
+
+    tools/merge-roms                      # ~/archive/261104-stun-runner/roms/stunrun (or .zip) -> build/
+    tools/merge-roms --dir DIR --out DIR  # any directory (or zip stem) holding the set
+    tools/merge-roms --set stunrunj       # another set's snapshot in tools/romsets/
+
+Writes <out>/stunrun-68k.bin, -obj.bin, -oki.bin, -jsa.bin and -nvram.bin, laid out by the
+snapshot's regions and offsets (tools/romset.py, docs/04-build.md). Checks presence and size of
+every file, not hashes (tools/check-roms does that). Exit status 2 when the set is absent, 1 on
+a missing or mis-sized file. The images are build artefacts: never commit them.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from romset import DEFAULT_ARCHIVE, REPO, load_snapshot, merge, read_set  # noqa: E402
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    ap.add_argument("--set", default="stunrun", help="MAME set name (default stunrun)")
+    ap.add_argument("--dir", type=Path, help="directory (or zip stem) holding the set")
+    ap.add_argument("--archive", type=Path, default=DEFAULT_ARCHIVE, help="rompath")
+    ap.add_argument("--out", type=Path, default=REPO / "build", help="output directory")
+    args = ap.parse_args()
+
+    snapshot = load_snapshot(args.set)
+    location = args.dir if args.dir else args.archive / args.set
+    files = read_set(location)
+    if files is None:
+        print(f"SKIP {args.set}: no directory {location} and no {location.with_suffix('.zip')}")
+        return 2
+    try:
+        images = merge(snapshot, files)
+    except ValueError as e:
+        print(f"FAIL {args.set} at {location}: {e}")
+        return 1
+    args.out.mkdir(parents=True, exist_ok=True)
+    for name, data in images.items():
+        path = args.out / f"{name}.bin"
+        if not path.exists() or path.read_bytes() != data:
+            path.write_bytes(data)  # keep the mtime when unchanged: make reassembles nothing
+        print(f"{path}: {len(data)} bytes")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

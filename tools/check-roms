@@ -18,31 +18,16 @@ Standard library only; no ROM byte is ever printed.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import os
 import subprocess
 import sys
 import tempfile
 import zipfile
-import zlib
 from pathlib import Path
 from xml.etree import ElementTree
 
-REPO = Path(__file__).resolve().parents[1]
-ROMSETS = REPO / "tools" / "romsets"
-DEFAULT_ARCHIVE = Path(os.environ.get("STUNRUN_ROMS", "~/archive/261104-stun-runner/roms")).expanduser()
-
-
-def hashes(data: bytes) -> tuple[str, str]:
-    return f"{zlib.crc32(data) & 0xFFFFFFFF:08x}", hashlib.sha1(data).hexdigest()
-
-
-def load_snapshot(set_name: str) -> dict:
-    path = ROMSETS / f"{set_name}.json"
-    if not path.exists():
-        sys.exit(f"no snapshot for set '{set_name}' at {path}; run tools/check-roms --refresh --set {set_name}")
-    return json.loads(path.read_text())
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from romset import DEFAULT_ARCHIVE, REPO, ROMSETS, hashes, load_snapshot, read_set  # noqa: E402
 
 
 def refresh(set_name: str) -> int:
@@ -53,11 +38,11 @@ def refresh(set_name: str) -> int:
     roms = [
         {
             "name": r.get("name"),
-            "size": int(r.get("size")),
+            "size": int(r.get("size", "0")),
             "crc": r.get("crc"),
             "sha1": r.get("sha1"),
             "region": r.get("region"),
-            "offset": int(r.get("offset"), 16),
+            "offset": int(r.get("offset", "0"), 16),
         }
         for r in machine.findall("rom")
         if r.get("sha1")  # skip NO_DUMP entries
@@ -74,21 +59,6 @@ def refresh(set_name: str) -> int:
     out.write_text(json.dumps(snapshot, indent=2) + "\n")
     print(f"wrote {out.relative_to(REPO)}: {len(roms)} files, MAME {snapshot['mame']}")
     return 0
-
-
-def read_set(location: Path) -> dict[str, bytes] | None:
-    """The set's files by name, from a directory or a zip; None when neither exists (an empty directory counts as absent)."""
-    if location.is_dir():
-        files = {p.name: p.read_bytes() for p in location.iterdir() if p.is_file() and not p.name.startswith(".")}
-        if files:
-            return files
-    # <rompath>/<set>.zip (what MAME reads) or a zip dropped inside the set's folder
-    for zip_path in (location.with_suffix(".zip"), location / f"{location.name}.zip"):
-        if not zip_path.is_file():
-            continue
-        with zipfile.ZipFile(zip_path) as z:
-            return {Path(i.filename).name: z.read(i) for i in z.infolist() if not i.is_dir()}
-    return None
 
 
 def check(snapshot: dict, files: dict[str, bytes], label: str) -> int:
