@@ -232,6 +232,57 @@ def test_every_object_has_a_unique_label_name() -> None:
             assert v[:-4] in names.values(), (n, v)
 
 
+def coplanar(points: list[tuple[int, int, int]]) -> bool:
+    """All points within one unit of one plane (the plane of the first three independent ones)."""
+    p0 = points[0]
+    d = [tuple(a - b for a, b in zip(p, p0, strict=True)) for p in points[1:]]
+    for a in d:
+        for b in d:
+            n = (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+            if any(n):
+                size = math.sqrt(sum(c * c for c in n))
+                return all(abs(sum(x * y for x, y in zip(n, p, strict=True))) <= size for p in d)
+    return True
+
+
+def test_shape_words_match_the_geometry() -> None:
+    """The shape words in the names say what the mesh is (docs/07 section 11.2, review r5):
+    a tetrahedron has four corners and four triangles, not coplanar; a prism two triangles and
+    three quadrilaterals on six corners; a hexagon or an octagon a face of six or eight vertices;
+    a ring_round is circular in object space (equal x and y extents, centred on the z axis), a
+    ring_oval is not; a panel (but a folded or framed one) is flat."""
+    _, meshes, names = read_data(DATA)
+    checked = 0
+    for n, name in names.items():
+        m = meshes[n]
+        corners = sorted(set(m.vertices))
+        sides = sorted(len(f.vertices) for f in m.faces)
+        xs, ys = [v[0] for v in m.vertices], [v[1] for v in m.vertices]
+        if name.startswith("tetrahedron_"):
+            assert len(corners) == 4 or len(m.vertices) == 12, name
+            assert sides == [3, 3, 3, 3], name
+            for f in m.faces:
+                assert len({m.vertices[i] for i in f.vertices}) == 3, name
+            if len(corners) == 4:
+                assert not coplanar(corners), name
+        elif name.startswith("prism_"):
+            assert (len(corners), sides) == (6, [3, 3, 4, 4, 4]), name
+        elif "hexagon" in name:
+            assert 6 in sides and 8 not in sides, name
+        elif "octagon" in name:
+            assert 8 in sides, name
+        elif name.startswith("ring_round_"):
+            assert (min(xs), max(xs)) == (min(ys), max(ys)) == (-max(xs), max(xs)), name
+        elif name.startswith("ring_oval_"):
+            assert max(xs) - min(xs) > 1.2 * (max(ys) - min(ys)), name
+        elif name.startswith("panel_") and not name.startswith(("panel_folded", "panel_framed")):
+            assert coplanar(corners), name
+        else:
+            continue
+        checked += 1
+    assert checked == 61
+
+
 def test_docs_table_names_are_the_manifest() -> None:
     """docs/07 section 10's name column is the manifest's (the full table needs the reference
     set: tools/test_objects.py::test_inventory_table_is_the_docs_table)."""
