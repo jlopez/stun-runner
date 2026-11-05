@@ -57,6 +57,7 @@ PAGES = 3
 ALIGN = 4
 TERMINATOR = 0xFFFF
 MAX_OBJECTS = 0x1000  # the object number is masked with 0FFF [0056-0058]
+CNTR_MAX = 0x3FFF  # vertex and normal counts are loaded into the 14-bit CNTR [014D, 015F]
 
 # The reciprocal table the projection reads [04BB-04C5 /MP = 1, /SIMCLK = z, /SIMBUF]:
 # z <= 0x200 takes the path at 04E0, which shifts the product left by 9.
@@ -385,8 +386,13 @@ def check_mesh(mesh: Mesh) -> None:
             if len(row) != 3 or not all(isinstance(c, int) and -0x8000 <= c <= 0x7FFF for c in row):
                 raise FormatError(f"object {mesh.number}: a {what} is not three 16-bit integers")
 
+    # The vertex and normal counts are DO-loop counts (CNTR at 014D and 015F): the ADSP-2100's
+    # counter is 14 bits, so a count above 3FFFh would be truncated, and a count of 0 does not
+    # mean "no iterations" (MAME runs the body once, 2100ops.hxx slow_condition).
     if not mesh.vertices or not mesh.normals:
         raise FormatError(f"object {mesh.number}: needs at least one vertex and one normal")
+    if len(mesh.vertices) > CNTR_MAX or len(mesh.normals) > CNTR_MAX:
+        raise FormatError(f"object {mesh.number}: more than {CNTR_MAX} vertices or normals")
     coords(mesh.vertices, "vertex")
     coords(mesh.normals, "normal")
     for f in mesh.faces:
@@ -768,6 +774,8 @@ def check_trace(decoded: Decoded, image: bytes, run: TraceRun) -> list[str]:
             problems.append(f"{where}: no decoded structure of this kind starts here")
         elif want != reads:
             problems.append(f"{where}: read {reads} words, the decoder says {want}")
+    # "open_at_end" (the sequence in flight when the run stopped, dropped by objtrace.lua because
+    # it may be cut short) is not a problem and is not checked.
     for key in ("mp_inside_sequence", "orphan_reads"):
         if run.header.get(key, "0") != "0":
             problems.append(f"{run.name}: {key} {run.header[key]}")
@@ -805,6 +813,7 @@ def trace_summary(decoded: Decoded, runs: Sequence[TraceRun]) -> dict[str, objec
                 "frames": int(run.header.get("frames", "0")),
                 "play": run.header.get("play", "no"),
                 "sequences": int(run.header.get("sequences", "0")),
+                "open_at_end": int(run.header.get("open_at_end", "0")),
                 "kinds": stats,
                 "reciprocal_z": [f"{min(z):04X}", f"{max(z):04X}"] if z else [],
                 "objects_loaded": touched,

@@ -23,6 +23,7 @@ from typing import Any
 import pytest
 from objects import (
     CHIPS,
+    CNTR_MAX,
     PAGE_WORDS,
     RECIP_FAR,
     RECIP_NEAR,
@@ -53,6 +54,7 @@ from objects import (
     sequences,
     to_bytes,
     to_words,
+    trace_summary,
     write_data,
 )
 from romset import hashes, load_snapshot
@@ -238,6 +240,9 @@ def test_layout_errors() -> None:
         encode(Layout(1, [[], [], [0]]), {0: big})
     with pytest.raises(FormatError, match="format"):
         layout_from_manifest('{"format": "other"}')
+    many = Mesh(0, [(0, 0, 0)] * (CNTR_MAX + 1), [(0, 0, 0)], [])
+    with pytest.raises(FormatError, match="more than"):
+        encode(Layout(1, [[], [], [0]]), {0: many})
 
 
 def test_data_files_round_trip(tmp_path: Path) -> None:
@@ -250,6 +255,34 @@ def test_data_files_round_trip(tmp_path: Path) -> None:
     (tmp_path / "999.json").write_text("{}")
     with pytest.raises(FormatError, match="beyond"):
         read_data(tmp_path)
+
+
+def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(TOOLS / "objects"), *args], capture_output=True, text=True, check=False
+    )
+
+
+def test_decode_keeps_names_when_a_mesh_is_invalid(tmp_path: Path) -> None:
+    """`make objects` is how a person restores data/objects after a bad edit: the names live in
+    the manifest and must survive an invalid mesh file."""
+    layout, meshes = synthetic(9)
+    image = tmp_path / "image.bin"
+    image.write_bytes(encode(layout, meshes))
+    out = tmp_path / "objects"
+    write_data(out, decode(image.read_bytes()), {2: "kept"})
+    bad = json.loads((out / "005.json").read_text())
+    bad["faces"] = [{"type": 15, "colour": 64, "normal": 0, "vertices": [0]}]
+    (out / "005.json").write_text(json.dumps(bad))
+    with pytest.raises(FormatError):
+        read_data(out)
+    r = run_cli("decode", "--image", str(image), "--out", str(out))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert read_data(out) == (layout, meshes, {2: "kept"})
+    (out / "manifest.json").write_text("{")
+    r = run_cli("decode", "--image", str(image), "--out", str(out))
+    assert r.returncode == 1 and "not overwritten" in r.stderr
+    assert (out / "manifest.json").read_text() == "{"
 
 
 def vasm() -> str | None:
@@ -329,8 +362,9 @@ def test_trace_check_catches_planted_problems() -> None:
     seq = sorted(sequences(decoded, image).items())
     (pc, page, address), reads = seq[0]
 
-    good = TraceRun("t", {"frames": "1"}, [(pc, page, address, reads, 3)])
+    good = TraceRun("t", {"frames": "1", "open_at_end": "1"}, [(pc, page, address, reads, 3)])
     assert check_trace(decoded, image, good) == []
+    assert trace_summary(decoded, [good])["runs"][0]["open_at_end"] == 1  # type: ignore[index]
     bad = TraceRun(
         "t",
         {"orphan_reads": "1"},

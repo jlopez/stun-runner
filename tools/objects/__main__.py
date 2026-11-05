@@ -8,7 +8,8 @@
                          build/mame/objtrace-attract.txt build/mame/objtrace-play.txt
 
 decode   reads the image as the ADSP does and writes the manifest and one mesh file per object
-         (keeps the manifest's names); fails where the image is not the format.
+         (keeps the names of the existing manifest, even when a mesh file is invalid; refuses to
+         overwrite a manifest that does not parse); fails where the image is not the format.
 asm      writes build/obj/page0.asm .. page2.asm, the vasm sources asm/obj/objects.asm includes
          (`make`): dc.w for every decoded structure, dcb.w for the zero fill, an incbin slice of
          the image for each residue range. The image supplies only the residue words (and so the
@@ -39,6 +40,7 @@ from objects import (  # noqa: E402
     decode,
     encode,
     inventory,
+    layout_from_manifest,
     read_data,
     read_trace,
     trace_summary,
@@ -79,9 +81,18 @@ def main() -> int:
             if not args.image.exists():
                 print(f"SKIP: {args.image} absent")
                 return 2
+            # The names come from the manifest alone, so an invalid mesh file (the usual reason to
+            # re-decode) does not lose them; a manifest that does not parse stops here instead of
+            # being overwritten without its names.
             names: dict[int, str] = {}
-            if (args.out / "manifest.json").exists():
-                names = read_data(args.out)[2] if _complete(args.out) else {}
+            manifest = args.out / "manifest.json"
+            if manifest.exists():
+                try:
+                    names = layout_from_manifest(manifest.read_text())[1]
+                except FormatError as err:
+                    raise FormatError(
+                        f"{manifest}: {err}; not overwritten (restore it or move it aside)"
+                    ) from err
             decoded = decode(args.image.read_bytes())
             write_data(args.out, decoded, names)
             faces = sum(len(m.faces) for m in decoded.meshes.values())
@@ -142,14 +153,6 @@ def main() -> int:
         print(f"FAIL: {err}", file=sys.stderr)
         return 1
     return 0
-
-
-def _complete(root: Path) -> bool:
-    try:
-        read_data(root)
-    except (FormatError, OSError):
-        return False
-    return True
 
 
 if __name__ == "__main__":
