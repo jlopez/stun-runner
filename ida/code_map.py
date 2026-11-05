@@ -4,7 +4,9 @@ Pure Python, applied by `ida.memory_map.setup_68k_full` with the memory map, so 
 `make ida` has them even without a snapshot; `make ida-annotate` re-applies them over a database
 whose snapshot predates them. M2 names only what places the programs: the reset paths, the two
 vector tables' handlers, the GSP and ADSP loaders and control helpers, the program table and
-the serial download monitors. No game logic.
+the serial download monitors. No game logic, but for M3a's object list for the ADSP
+(build_object_list, fill_object_entry, update_object_entry, object_descriptor and the
+descriptor table, docs/07-objects.md section 3).
 
 MAME 0.289 citations are file:line in src/mame/atari/ (harddriv.cpp, harddriv_m.cpp) and
 src/devices/cpu/tms34010/tms34010.cpp. The 68k writes the board's control lines through two
@@ -312,6 +314,38 @@ CODE_MAP_68K = [
         "set_sr(2000), download_gsp_program or load_gsp_program(gsp_program_ptr) (02DCB0), "
         "HSTCTL 7800 then 3800. Called from 02DCF0 and 04373A.",
     ),
+    # --- the object list for the ADSP (M3a, docs/07 section 3) ---
+    Entry(
+        0x02DD9E,
+        "build_object_list",
+        "Builds the ADSP's object list at DM 0A00 (809400, stored in FF9C6E at 02DDAE): one "
+        "24-word entry per entity through fill_object_entry, the entity at the long FFDC74 "
+        "first (02DEFC-02DF06), then the vehicles, FF9E70 and the list at FFDA96; FFFF after "
+        "the last (02DFB6), soft_reset past 15E3h words (02DFC6), clears DM 1FFF (02DFD4) to "
+        "start the ADSP frame. docs/07 section 3.1.",
+    ),
+    Entry(
+        0x02E1EC,
+        "fill_object_entry",
+        "fill_object_entry(entity, entry): the 24-word object list entry from the entity and "
+        "its descriptor (+26h, object_descriptor): near/far objects, matrix, position, radius, "
+        "LOD and cull distances, flags from entity +38h; +38h bit 5 set: cull distance 1 for "
+        "the FFDC74 entity, else returns 0 (02E214). The flags word's bit 0 is an "
+        "uninitialised local (link at 02E1EC). docs/07 section 3.1.",
+    ),
+    Entry(
+        0x02E30C,
+        "update_object_entry",
+        "As fill_object_entry for an entry already in the list, without rebuilding it; keeps "
+        "the flags word's bit 0 (loads it at 02E372); returns 0 for any +38h bit 5 entity "
+        "(02E318-02E320). docs/07 section 3.1.",
+    ),
+    Entry(
+        0x02ECF0,
+        "object_descriptor",
+        "object_descriptor(n): object_descriptors + 20 x n for n < 13Ah (cmpi/bge at "
+        "02ECF8-02ECFC, so 0-313), else 0. docs/07 section 3.2.",
+    ),
     Entry(
         0x02FCC0,
         "download_gsp_program",
@@ -340,6 +374,15 @@ CODE_MAP_68K = [
         "write_gsp_long",
         "Writes its long argument to HSTDATA (C0000C) low word first (02FE68), then high word "
         "(02FE6E); each write stores 16 bits at HSTADR and adds 10h (INCW).",
+    ),
+    Entry(
+        0x048F9C,
+        "object_descriptors",
+        "20-byte object descriptors, read through object_descriptor (0-313): near object, far "
+        "object, the descriptor number animations step from (03DAB8), radius, LOD distance "
+        "(long), cull distance (long), a long fill_object_entry does not read. 313 holds -1/-1 "
+        "(HYP: an end marker, no reader found). docs/07 section 3.2.",
+        "data",
     ),
 ]
 
