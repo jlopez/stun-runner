@@ -49,13 +49,17 @@ from objects import (
     descriptors,
     encode,
     encode_words,
+    far_name_problems,
     layout_from_manifest,
+    level_columns,
+    levels_summary,
     manifest_json,
     mesh_from_json,
     mesh_json,
     part_sum,
     place,
     read_data,
+    read_levels,
     read_trace,
     reciprocal,
     run_columns,
@@ -502,6 +506,102 @@ def test_descriptor_and_run_columns() -> None:
         ]
     }
     assert run_columns(summary, 5) == {0: "A", 1: "-", 2: "AP", 3: "P", 4: "-"}
+
+
+def test_far_name_rule() -> None:
+    """CI: the `_far` rule is checked against the descriptor pairs, not only the names' form."""
+    descs = [(0, 1), (2, 3), (4, 4), (-1, -1)]
+    names = {0: "a", 1: "a_far", 2: "b", 3: "b_far", 4: "c"}
+    assert far_name_problems(descs, names) == []
+    swapped = {**names, 1: "b_far", 3: "a_far"}
+    assert len(far_name_problems(descs, swapped)) == 2
+    assert far_name_problems(descs, {**names, 1: "ax"}) == ["1 ax: want a_far"]
+    assert far_name_problems(descs, {**names, 4: "c_far"}) == [
+        "4 c_far: ends in _far but is no descriptor's far object"
+    ]
+
+
+@pytest.mark.skipif(
+    not IMAGE_68K.exists(), reason="build/stunrun-68k.bin absent (no reference set)"
+)
+def test_names_follow_the_descriptor_pairs() -> None:
+    """With the reference set: every far object of the table at 0x048F9C is named its near
+    object's name + _far, and no other name ends in _far (docs/07 section 11.2)."""
+    _, _, names = read_data(DATA)
+    assert far_name_problems(descriptors(IMAGE_68K.read_bytes()), names) == []
+
+
+LEVEL_RUN_00 = """# frames 8000
+# start_level 0
+# replaced_writes 0
+# counted_from 1020
+# object level first_frame count
+0 0 1073 589
+0 1 2967 880
+5 1 3363 786
+"""
+LEVEL_RUN_03 = """# frames 6000
+# start_level 3
+# replaced_writes 8
+# counted_from 1020
+# object level first_frame count
+0 3 1030 12
+2 3 1030 4
+2 4 4000 1
+7 3 1100 2
+"""
+
+
+def test_levels_summary_and_columns(tmp_path: Path) -> None:
+    """CI: `tools/objects levels` and the inventory's levels column from two synthetic runs."""
+    (tmp_path / "objlevels-00.txt").write_text(LEVEL_RUN_00)
+    (tmp_path / "objlevels-03.txt").write_text(LEVEL_RUN_03)
+    runs = [read_levels(tmp_path / f"objlevels-{n}.txt") for n in ("00", "03")]
+    assert runs[0].name == "objlevels-00"
+    assert runs[0].header["counted_from"] == "1020"
+    assert runs[1].rows == [(0, 3, 1030, 12), (2, 3, 1030, 4), (2, 4, 4000, 1), (7, 3, 1100, 2)]
+    summary = levels_summary(9, runs)
+    assert summary["runs"] == [
+        {
+            "run": "objlevels-00",
+            "frames": 8000,
+            "start_level": 0,
+            "replaced_writes": 0,
+            "counted_from": 1020,
+            "levels": {"0": [0], "1": [0, 5]},
+        },
+        {
+            "run": "objlevels-03",
+            "frames": 6000,
+            "start_level": 3,
+            "replaced_writes": 8,
+            "counted_from": 1020,
+            "levels": {"3": [0, 2, 7], "4": [2]},
+        },
+    ]
+    assert summary["levels"] == {"0": [0], "1": [0, 5], "3": [0, 2, 7], "4": [2]}
+    assert summary["objects_loaded"] == 4
+    assert summary["objects_never_loaded"] == [1, 3, 4, 6, 8]
+    columns = level_columns(summary, 9)
+    assert columns == {
+        0: "0-1,3",
+        1: "-",
+        2: "3-4",
+        3: "-",
+        4: "-",
+        5: "1",
+        6: "-",
+        7: "3",
+        8: "-",
+    }
+    # the CLI writes the same summary
+    out = tmp_path / "summary.json"
+    r = run_cli(
+        "levels", "--summary", str(out), *(str(p) for p in sorted(tmp_path.glob("objlevels-*")))
+    )
+    assert r.returncode == 0, r.stderr
+    written = json.loads(out.read_text())
+    assert written["levels"] == summary["levels"]
 
 
 @pytest.mark.skipif(

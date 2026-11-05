@@ -779,6 +779,25 @@ def descriptor_columns(descs: Sequence[tuple[int, int]], objects: int) -> dict[i
     }
 
 
+def far_name_problems(descs: Sequence[tuple[int, int]], names: Mapping[int, str]) -> list[str]:
+    """The `_far` naming rule (docs/07 section 11.2) against the descriptor pairs: the far object
+    of every descriptor whose near and far differ is named its near object's name + "_far", and
+    no other object's name ends in "_far". Returns the violations (empty when the rule holds)."""
+    problems = []
+    far_of: dict[int, set[int]] = {}
+    for n, f in descs:
+        if n >= 0 and f >= 0 and f != n:
+            far_of.setdefault(f, set()).add(n)
+    for f, nears in sorted(far_of.items()):
+        wanted = sorted(names[n] + "_far" for n in nears)
+        if names.get(f) not in wanted:
+            problems.append(f"{f} {names.get(f)}: want {' or '.join(wanted)}")
+    for o, name in sorted(names.items()):
+        if name.endswith("_far") and o not in far_of:
+            problems.append(f"{o} {name}: ends in _far but is no descriptor's far object")
+    return problems
+
+
 def run_columns(summary: Mapping[str, object], objects: int) -> dict[int, str]:
     """Per object, the initials of the runs that loaded it (objtrace-attract -> A,
     objtrace-play -> P) in run order, or "-"."""
@@ -906,7 +925,7 @@ def read_levels(path: Path) -> LevelRun:
 
 def levels_summary(objects: int, runs: Sequence[LevelRun]) -> dict[str, object]:
     """Counts and object numbers only: per run (one start level each) the frames, the writes the
-    level select replaced, and the objects loaded at each level word; then, per level, the
+    level select replaced, the first frame counted, and the objects loaded at each level word; then, per level, the
     objects loaded at it in any run, and the objects no run loaded (the objtrace runs aside)."""
     per_level: dict[int, set[int]] = {}
     out_runs = []
@@ -921,6 +940,7 @@ def levels_summary(objects: int, runs: Sequence[LevelRun]) -> dict[str, object]:
                 "frames": int(run.header.get("frames", "0")),
                 "start_level": int(run.header.get("start_level", "0")),
                 "replaced_writes": int(run.header.get("replaced_writes", "0")),
+                "counted_from": int(run.header.get("counted_from", "0")),
                 "levels": {str(k): sorted(v) for k, v in sorted(levels.items())},
             }
         )

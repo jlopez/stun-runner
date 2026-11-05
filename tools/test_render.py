@@ -124,7 +124,9 @@ NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
 def test_every_object_has_a_unique_label_name() -> None:
     """Final names (M3c): one per object 0-412, lowercase identifiers usable as 68k labels,
-    unique; a far LOD object is named after its near object with _far."""
+    unique; a name ending in _far has its near name (the descriptor pairs themselves are
+    checked with the reference set: tools/test_objects.py::test_names_follow_the_descriptor_pairs,
+    and the rule synthetically in test_far_name_rule)."""
     layout, _, names = read_data(DATA)
     assert sorted(names) == list(range(layout.objects))
     assert all(NAME.match(v) for v in names.values()), [
