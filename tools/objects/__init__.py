@@ -19,7 +19,8 @@ An object, at a word address that is a multiple of 4 [00A5: the pointer is shift
     header   points (= vertices + normals; not used by the ADSP: 011C reads it into I0 and 011F
              overwrites it), vertices [011F -> DM 0032], normals [0123 -> DM 08DA]
     vertices 3 words each, x y z signed [014C-0155, transformed by 0157-015C]
-    normals  3 words each, x y z signed, unit 0x4000 [0161-0172, rotated by 0169-0171]
+    normals  3 words each, x y z signed, typically of length about 0x4000 (not checked: some
+             are not; docs/07 section 4) [0161-0172, rotated by 0169-0171]
     pointer  the address of the record list, the next word [read at 0172, sent to /SIMCLK 017B]
     records  2 words each: the address of the face's polygon, then type << 12 | count << 6 |
              colour [017F, 0182; JUMP (I4) at 0186 on the type through the table at 0187]; a
@@ -731,6 +732,49 @@ def inventory(decoded: Decoded) -> list[Inventory]:
             )
         )
     return rows
+
+
+# The 68k's object descriptors (docs/07 section 3.2): `object_descriptor` (0x02ECF0) returns
+# 0x048F9C + 20 x n for n < 13Ah (0x02ECF8-0x02ECFC); +0 is the near object, +2 the far object.
+DESCRIPTORS = 0x048F9C
+DESCRIPTOR_BYTES = 20
+DESCRIPTOR_COUNT = 0x13A
+
+
+def descriptors(image68k: bytes) -> list[tuple[int, int]]:
+    """(near, far) object numbers, signed, of descriptors 0..13Ah-1 in the 68k image."""
+    out = []
+    for n in range(DESCRIPTOR_COUNT):
+        a = DESCRIPTORS + DESCRIPTOR_BYTES * n
+        near, far = struct.unpack(">hh", image68k[a : a + 4])
+        out.append((near, far))
+    return out
+
+
+def descriptor_columns(descs: Sequence[tuple[int, int]], objects: int) -> dict[int, str]:
+    """Per object 0..objects-1, the descriptors that select it: "d" where it is the near object
+    of descriptor d, "df" where it is only the far object; "" where no descriptor names it.
+    Negative object numbers (descriptor 313: -1, -1) select nothing."""
+    near: dict[int, list[int]] = {}
+    far: dict[int, list[int]] = {}
+    for d, (n, f) in enumerate(descs):
+        near.setdefault(n, []).append(d)
+        if f != n:
+            far.setdefault(f, []).append(d)
+    return {
+        o: ", ".join([str(d) for d in near.get(o, [])] + [f"{d}f" for d in far.get(o, [])])
+        for o in range(objects)
+    }
+
+
+def run_columns(summary: Mapping[str, object], objects: int) -> dict[int, str]:
+    """Per object, the initials of the runs that loaded it (objtrace-attract -> A,
+    objtrace-play -> P) in run order, or "-"."""
+    loaded = [
+        (str(r["run"]).removeprefix("objtrace-")[:1].upper(), set(r["objects_loaded"]))
+        for r in summary["runs"]  # type: ignore[attr-defined]
+    ]
+    return {o: "".join(k for k, s in loaded if o in s) or "-" for o in range(objects)}
 
 
 # --- the MAME trace (tools/mame/objtrace.lua, `make objtrace`) --------------------------------
