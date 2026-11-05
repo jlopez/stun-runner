@@ -336,9 +336,12 @@ CODE_MAP_68K = [
     Entry(
         0x02E30C,
         "update_object_entry",
-        "As fill_object_entry for an entry already in the list, without rebuilding it; keeps "
-        "the flags word's bit 0 (loads it at 02E372); returns 0 for any +38h bit 5 entity "
-        "(02E318-02E320). docs/07 section 3.1.",
+        "Partial refresh of an entry already in the list: rewrites words 0-1 (02E35E, 02E368), "
+        "the matrix (02E332), the position (02E33C-02E350), word 22 (02E3CE) and flags bits "
+        "8-11 and 14 (02E37C-02E3BC, into the entry's word loaded at 02E372); leaves the cull "
+        "and LOD distances, the radius (words 17-21) and flags bits 15, 12-13 and 0-7 as "
+        "fill_object_entry wrote them. Returns 0 for any +38h bit 5 entity (02E318-02E320). "
+        "docs/07 section 3.1.",
     ),
     Entry(
         0x02ECF0,

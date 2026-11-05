@@ -92,22 +92,29 @@ one sequence.
 24-word entry per object; DM 001B then points at the next one (0085, 0095). Word 0 = FFFF ends
 the frame (0051-0053 -> 00B4).
 
-| Word | Read at | To | Meaning | 68k writer (`fill_object_entry` 0x02E1EC, refreshed by `update_object_entry` 0x02E30C) |
+| Word | Read at | To | Meaning | 68k writer (`fill_object_entry` 0x02E1EC; `update` = what `update_object_entry` 0x02E30C rewrites) |
 |---:|---|---|---|---|
-| 0 | 0051, & 0FFF at 0056-0059 | DM 001C, DM 0009 | near object number | descriptor +0 (0x02E22A, 0x02E35E) |
-| 1 | 005A, & 0FFF | DM 001D | far object number | descriptor +2 (0x02E230, 0x02E368) |
-| 2-10 | 005D-0061 | DM 0000-0008 | the object's rotation matrix | entity +14h, copied by 0x022DD6 (0x02E23E, 0x02E332) |
-| 11-16 | 0062-0066 | DM 001F-0024 | position x, y, z, 32 bits each (high, low) | entity +08h, +0Ch, +10h (0x02E244-0x02E250) |
-| 17-18 | 0067-006B | DM 000A-000B | cull distance, 32 bits | descriptor +0Ch (0x02E220); an entity with +38h bit 5 set (0x02E1FC) gets 1 if it is the one whose pointer is at 0xFFDC74 (0x02E204-0x02E20E: a cull distance of 1, HYP: then always culled). The camera reading of that entity is contradicted by MAME: in the DUMP_FRAMES=3000 attract dump, entry 0 at DM 0A00 (the 0xFFDC74 entity, 0x02DEFC-0x02DF06) holds objects 130/131, radius 9600, LOD distance 1900h and cull distance 5DC00h, descriptor 83's values, so bit 5 was clear; in that frame the entry was culled (its flags bit 0, DM 0A17, is 0: 0090-0094 write DM 0013 there; DM 0108, cleared at 0038 and counted at 00AF-00B2 after the 0096-0097 cull test, is 1, entry 17's object). A bit-5 entity is otherwise skipped: `fill_object_entry` returns 0 at 0x02E214 and `update_object_entry` returns 0 for any bit-5 entity at 0x02E318-0x02E320 |
-| 19-20 | 006C-0070 | DM 0025-0026 | level-of-detail distance, 32 bits | descriptor +08h (0x02E25A) |
-| 21 | 0071-0073 | DM 000F | bounding radius | descriptor +06h (0x02E264) |
-| 22 | 0074-0076 | DM 0027, sign into DM 0028 | (not decoded; no reader in the object path) | entity +36h (0x02E26A) |
-| 23 | 007E (not advanced), 0090-0094 | DM 002C, DM 002F | flags: bit 15 -> DM 002C (CALL 0887, HYP: an extra transform); bit 14 -> the batch handshake (0043-004F); bits 8-11 -> DM 002F, ORed into every face's colour word (01CE); bit 0 is written back by the ADSP: 1 = drawn, 0 = culled (DM 0013) | built from entity +38h: bit 7 -> flags bit 15 (0x02E2BE-0x02E2D2), bit 0 -> bit 14 (0x02E28A-0x02E2A2), bits 3-4 -> bits 10-11 (asl #3, lsr #6 at 0x02E274-0x02E276), bits 1-2 -> bits 8-9 (asl #5, lsr #6 at 0x02E2AA-0x02E2AC); bits 12-13 and 1-7 cleared (0x02E2D6-0x02E2F2); bit 0: uninitialised in `fill_object_entry`, whose flags word is the local at (-2,A6) of `link A6,#-$4` (0x02E1EC) and is never set before the `andi.b #$1,(-$1,A6)` at 0x02E2DC (the ADSP overwrites it at 0094), kept by `update_object_entry`, which loads the entry's word first (0x02E372); +38h bit 5 is not copied (tested at 0x02E1FC) |
+| 0 | 0051, & 0FFF at 0056-0059 | DM 001C, DM 0009 | near object number | descriptor +0 (0x02E22A; update 0x02E35E) |
+| 1 | 005A, & 0FFF | DM 001D | far object number | descriptor +2 (0x02E230; update 0x02E368) |
+| 2-10 | 005D-0061 | DM 0000-0008 | the object's rotation matrix | entity +14h, copied by 0x022DD6 (0x02E23E; update 0x02E332) |
+| 11-16 | 0062-0066 | DM 001F-0024 | position x, y, z, 32 bits each (high, low) | entity +08h, +0Ch, +10h (0x02E244-0x02E250; update 0x02E33C-0x02E350) |
+| 17-18 | 0067-006B | DM 000A-000B | cull distance, 32 bits | descriptor +0Ch (0x02E220; not rewritten by update); an entity with +38h bit 5 set (0x02E1FC) gets 1 if it is the one whose pointer is at 0xFFDC74 (0x02E204-0x02E20E: a cull distance of 1, HYP: then always culled). The camera reading of that entity is contradicted by MAME: in the DUMP_FRAMES=3000 attract dump, entry 0 at DM 0A00 (the 0xFFDC74 entity, 0x02DEFC-0x02DF06) holds objects 130/131, radius 9600, LOD distance 1900h and cull distance 5DC00h, descriptor 83's values, so bit 5 was clear; in that frame the entry was culled (its flags bit 0, DM 0A17, is 0: 0090-0094 write DM 0013 there; DM 0108, cleared at 0038 and counted at 00AF-00B2 after the 0096-0097 cull test, is 1, entry 17's object). A bit-5 entity is otherwise skipped: `fill_object_entry` returns 0 at 0x02E214 and `update_object_entry` returns 0 for any bit-5 entity at 0x02E318-0x02E320 |
+| 19-20 | 006C-0070 | DM 0025-0026 | level-of-detail distance, 32 bits | descriptor +08h (0x02E25A; not rewritten by update) |
+| 21 | 0071-0073 | DM 000F | bounding radius | descriptor +06h (0x02E264; not rewritten by update) |
+| 22 | 0074-0076 | DM 0027, sign into DM 0028 | (not decoded; no reader in the object path) | entity +36h (0x02E26A; update 0x02E3CE) |
+| 23 | 007E (not advanced), 0090-0094 | DM 002C, DM 002F | flags: bit 15 -> DM 002C (CALL 0887, HYP: an extra transform); bit 14 -> the batch handshake (0043-004F); bits 8-11 -> DM 002F, ORed into every face's colour word (01CE); bit 0 is written back by the ADSP: 1 = drawn, 0 = culled (DM 0013) | built from entity +38h: bit 7 -> flags bit 15 (0x02E2BE-0x02E2D2), bit 0 -> bit 14 (0x02E28A-0x02E2A2), bits 3-4 -> bits 10-11 (asl #3, lsr #6 at 0x02E274-0x02E276), bits 1-2 -> bits 8-9 (asl #5, lsr #6 at 0x02E2AA-0x02E2AC); bits 12-13 and 1-7 cleared (0x02E2D6-0x02E2F2); bit 0: uninitialised in `fill_object_entry`, whose flags word is the local at (-2,A6) of `link A6,#-$4` (0x02E1EC) and is never set before the `andi.b #$1,(-$1,A6)` at 0x02E2DC (the ADSP overwrites it at 0094); +38h bit 5 is not copied (tested at 0x02E1FC). Update: loads the entry's word (0x02E372), re-merges only bits 10-11 (0x02E37C-0x02E38C), 14 (0x02E390-0x02E3A6) and 8-9 (0x02E3AE-0x02E3BC) from +38h and writes it back (0x02E3C4); it has no `btst #7`, so bits 15, 12-13 and 0-7 stay as last written |
 
 `cull_and_lod` (06A1, called at 0088) culls an entry whose distance from the camera reaches
 words 17-18 or that lies outside the view (with the radius), and sets DM 0017 when the distance
 reaches words 19-20; 0098-009D then take word 1 instead of word 0. A culled entry never touches
 the object ROMs (0096-0097).
+
+`update_object_entry` (0x02E30C-0x02E3DE) is not a full refresh (CODE): it rewrites words 0-16
+and 22 and flags bits 8-11 and 14, and leaves words 17-21 (cull distance, LOD distance, radius)
+and flags bit 15 as `fill_object_entry` wrote them. An entity whose descriptor (+26h) changes
+between two `build_object_list` calls therefore gets the new descriptor's object numbers at the
+next refresh but keeps the old descriptor's cull and LOD distances and radius until the list is
+rebuilt.
 
 MAME (`tools/mame/dump.lua`, DUMP_FRAMES=3000, attract mode): DM 0A00 holds 18 entries and the
 FFFF at DM 0BB0 (0A00 + 18 × 24); words 0/1 are pairs such as 48/49, 60/61, 62/63 (near and far
@@ -120,7 +127,7 @@ per entity of its lists (the eight vehicles at 0xFF9C80 + 3Eh × k, 0xFF9E70, th
 0xFFDA96 and the entity whose pointer is the long at 0xFFDC74, 0x02DF00, filled first, into entry 0 at
 0x809400, 0x02DEFC-0x02DF06, and always followed by a 30h step, 0x02DF0C-0x02DF10) through `fill_object_entry`, writes FFFF after the last
 (0x02DFB6), calls `soft_reset` if the list passes 15E3h words (0x02DFC6), and starts the frame by
-clearing DM 1FFF (0x02DFD4). 0x02E064 refreshes entries without rebuilding the list: it calls
+clearing DM 1FFF (0x02DFD4). 0x02E064 refreshes entries (partially, see above) without rebuilding the list: it calls
 `update_object_entry` for the 0xFFDC74 entity unconditionally (0x02E180-0x02E186) and, for the
 entities of the 0xFFDA96 list (0x02E19E-0x02E1AE) and, through 0x02DFFE (0x02E1BC), the eight
 vehicles (0x02E016-0x02E026) and 0xFF9E70 (0x02E03A-0x02E050), only for those whose +38h bit 6
@@ -166,7 +173,8 @@ word P: the object starts at page P >> 14, word (P << 2) & FFFF. Objects therefo
 multiples of four words, and the directory is page 0 words 0000-019C (413 entries), FFFF at
 019D. The ADSP never reads the FFFF (the 68k's descriptors only hold 0-412); it is the
 directory's end for the decoder. Within each page the objects lie in number order, each at the
-first multiple of 4 after the one before (checked for all 413).
+first multiple of 4 after the one before (checked for all 413); `tools/objects` requires
+this order in both directions (section 8.1).
 
 ## 4. The object (CODE, MAME)
 
@@ -421,11 +429,16 @@ i + 1, normal nv + j + 1), the record-list pointer, the polygon addresses, the e
 FFFF terminators, the padding, the directory, the reciprocal table and the checksum words.
 
 `data/objects/manifest.json` holds the format name, the object count, per page the chips and the
-object numbers in address order (the placement: each page packs its objects in that order at
-the first multiple of 4 after the page's fixed part), the reciprocal table's rule, the residue
-ranges (position and length, never values) and the provisional names. A person edits a vertex,
-a colour or a face in a mesh file, or moves an object to another page in the manifest; the
-encoder re-places everything.
+object numbers in ascending number order, which is also the address order (the placement:
+each page packs its objects in that order at the first multiple of 4 after the page's fixed
+part), the reciprocal table's rule, the residue ranges (position and length, never values) and
+the provisional names. A person edits a vertex, a colour or a face in a mesh file, or moves an
+object to another page in the manifest by inserting its number at its sorted place in that
+page's list; the encoder re-places everything. The encoder rejects a page list that is not in
+ascending number order (`page N: objects must be in number order`), and the decoder rejects an
+image whose pages are not (section 3.3). The ADSP itself would not need the order (the
+directory holds each object's address); the rule keeps encode and decode inverse to each other
+and matches all three pages of the ROM.
 
 ### 8.2 tools/objects
 
