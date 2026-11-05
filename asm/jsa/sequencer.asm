@@ -1299,6 +1299,9 @@ sub_50A3
     rts
 
 ; read at 506D, 5071, 50A3, 50A7
+; The 59 stream ops 80-BA, each word the handler's address - 1 (sub_505D pushes it and returns
+; into it; sub_50A3 does the same with Y, from 509E). The table ends where the code of op_88
+; starts (5125). Handlers several ops share keep a neutral loc_XXXX.
 op_handlers
     .word op_80-1                       ; $80
     .word op_81-1                       ; $81
