@@ -9,7 +9,7 @@
 -- trigger at 1020), then the trigger is pressed every 20 frames (5 frames down) so that the
 -- vehicle shoots. The yoke is left centred: the game keeps the vehicle in the tunnel.
 --
--- Level select (a poke, not a game feature; committed pending Jesus, CLAUDE.md section 5): the
+-- Level select (a poke, not a game feature; committed, kept by Jesus 2026-11-05, card A4): the
 -- level is the word at 0xFF9578, with a copy at 0xFF9556. The game clears both (clr.w at 0x02B95E
 -- and 0x02B964; 0xFF9578 also at 0x024322); in 0x02543A a compiled-out debug switch at 0x025712
 -- (`moveq #0,d1` at 0x0256FC selects case 0) would set them to 0Fh, 0Dh, 0Ch or 04h (cases 1, 2, 4,

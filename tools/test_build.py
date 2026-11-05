@@ -4,14 +4,15 @@ merge-roms / split-roms round trip, bytecheck's report on a planted difference, 
 and 64tass are on PATH or in $VASM / $TASS) the whole `make all` + bytecheck + coverage on a copy
 of the repository's Makefile, asm/, tools/ and data/objects.
 
-The object image is built from the committed data/objects (docs/07-objects.md), so the synthetic
-set carries, in place of random bytes there, the image the committed meshes encode to, with its
-residue word taken from the random bytes: `make all` must rebuild it from data/objects plus that
-one incbin slice, and a mesh edited in the copy must change the built object ROMs.
+The object image is built from the committed data/objects alone (docs/07-objects.md: meshes,
+manifest, the residue constant), so the synthetic set carries, in place of random bytes there,
+the image the committed data encodes to: `make all` must rebuild it without reading
+build/stunrun-obj.bin, and a mesh edited in the copy must change the built object ROMs.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import random
 import shutil
@@ -40,10 +41,10 @@ def write_set(root: Path, files: dict[str, bytes]) -> Path:
     return root
 
 
-def plant_objects(image: bytes) -> bytes:
-    """The object image the committed data/objects encodes to, residue words from `image`."""
+def plant_objects() -> bytes:
+    """The object image the committed data/objects encodes to."""
     layout_, meshes, _ = read_data(REPO / "data/objects")
-    return encode(layout_, meshes, image)
+    return encode(layout_, meshes)
 
 
 def run(*args: object, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -191,7 +192,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     snapshot = load_snapshot("stunrun")
     images = merge(snapshot, synthetic_set(42))
     images["stunrun-68k"] = plant_programs(images["stunrun-68k"], 42)
-    images["stunrun-obj"] = plant_objects(images["stunrun-obj"])
+    images["stunrun-obj"] = plant_objects()
     files = split(snapshot, images)
     write_set(tmp_path / "archive" / "stunrun", files)
     work = tmp_path / "repo"
@@ -221,7 +222,12 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     blobs = {line.split()[0]: line.split() for line in r.stdout.splitlines() if line.strip()}
     assert blobs["adsp_program"][1:4] == ["1702E", "8270", "../../build/adsp/program.bin"]
     assert blobs["gsp_program"][1:4] == ["1907C", "24408", "../../build/gsp/program.bin"]
-    assert blobs["residue_0_019E"][1:4] == ["33C", "2", "../../build/stunrun-obj.bin"]
+    # the object image has no blob: the residue word is a dc.w like the rest
+    # the JSON line is the last of tools/coverage's output (GNU make 4 may print more after it)
+    summary = json.loads(next(x for x in reversed(r.stdout.splitlines()) if x.startswith("{")))
+    assert summary["images"]["stunrun-obj"]["blob"] == 0
+    assert summary["blob"] == 1118208
+    assert "build/stunrun-obj.bin" not in r.stdout
     # the merged blobs are kept (not deleted as intermediates of the pattern rules)
     assert sorted(p.name for p in (work / "build").glob("*.bin")) == sorted(
         f"{name}.bin" for name in IMAGES
@@ -233,6 +239,20 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert r.returncode == 0, r.stdout + r.stderr
     assert "blob: 74.0% of 1511424 bytes" in r.stdout
     assert (work / "build/stunrun-obj.lst").exists() and (work / "build/stunrun-jsa.lst").exists()
+    # the object image needs nothing from the set: rebuilt with build/stunrun-obj.bin gone (and
+    # its generated sources and output removed), it is still the same and the blob stays absent
+    for path in ["build/stunrun-obj.bin", "build/stunrun-obj.out", "build/stunrun-obj.lst"]:
+        (work / path).unlink()
+    shutil.rmtree(work / "build/obj")
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not (work / "build/stunrun-obj.bin").exists()
+    assert "stunrun-obj.bin" not in r.stdout + r.stderr
+    built = {p.name: p.read_bytes() for p in (work / "build/roms/stunrun").iterdir()}
+    assert built == files
+    r = run(*make, "coverage", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not (work / "build/stunrun-obj.bin").exists()
     # a planted difference in a blob reaches the built files and the report names the address
     image = work / "build/stunrun-68k.bin"
     data = bytearray(image.read_bytes())

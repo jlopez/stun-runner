@@ -34,9 +34,10 @@ the object path hands over to them.
   word** that makes each chip's byte sum equal the last two digits of its part number. **CODE**
   (the table, read at 04C5/04E1), checked over all six chips (the checksum).
 - Every one of the 196,608 words is accounted for: 413 objects, the directory, the table, three
-  checksum words, zero fill, and **one residue word** (0:019E) the format does not explain.
-  `data/objects` (a manifest and 413 mesh files) is now the source of the object image, and
-  `make check` rebuilds the six files byte for byte from it (section 8).
+  checksum words, zero fill, and **one residue word** (0:019E) the format does not explain,
+  committed as a named constant (Jesus, 2026-11-05, card A2). `data/objects` (a manifest and 413
+  mesh files) is the whole source of the object image: `make check` rebuilds the six files byte
+  for byte from it, and CI checks all six against MAME's hashes without the ROMs (section 8).
 - (M3c) Every object has a final name, `tools/objects render` draws them, `tools/objects/viewer.html`
   shows them interactively, and per-level MAME runs from start levels 0-23 (level words 0-24) raise the
   objects seen loaded from 174 to 336 of 413 (section 11).
@@ -295,11 +296,23 @@ The word after the directory's FFFF, in what would otherwise be the directory's 
 is not zero and nothing reads it: the ADSP reads directory words only at object numbers
 0-412, and no structure points at it. Its value interpreted as a directory pointer lands inside
 object 30's polygons (on an FFFF), and it matches no count or sum of the directory or the
-objects that was tried (sums, XOR, point, face and object counts per page). It stays a residue:
-`data/objects/manifest.json` lists its position, never its value, and the generated assembly
-takes it from the ROM image with an incbin slice of 2 bytes (`residue_0_019E` in `make
-coverage`). Card for Jesus in the M3a report. Because the checksum word of page 0 covers it,
-the page-0 chips (90h, 90k) can only be rebuilt with the ROM image present.
+objects that was tried (sums, XOR, point, face and object counts per page). It is still
+unexplained; only its storage changed. Until 2026-11-05 the manifest listed its position only
+and the generated assembly took it from the ROM image (an incbin slice of 2 bytes), so the
+page-0 chips (90h, 90k), whose checksum word covers it, could only be rebuilt with the ROM image
+present. Jesus decided on 2026-11-05 (card A2) that it may be committed as one named constant:
+`data/objects/manifest.json` holds it under `residue` as `page`, `address`, `value` (a 16-bit
+integer), `name` (`residue_0_019E`, the label) and `comment` (that it is unexplained), and the
+generated assembly emits it as a `dc.w` under its label with an assert, like every structure.
+
+The mechanism stays narrow: a residue is allowed only at a position listed in
+`RESIDUE_ALLOWED` (tools/objects/__init__.py) with the decision that allows it, today 0:019E
+alone. The decoder fails on any other word the format does not explain (`N words the format
+does not explain, first at P:AAAA, not in RESIDUE_ALLOWED`), and the manifest reader rejects a
+residue entry with missing or extra keys, a value that is not a non-zero 16-bit integer (zero is
+fill), a position out of range, unlisted or listed twice, or a name that is not a label; the
+encoder rejects one that does not land on fill. A new unexplained word therefore stops the
+decoder until its owner decides, as this one did.
 
 ### 5.4 The map of all 196,608 words
 
@@ -307,7 +320,7 @@ the page-0 chips (90h, 90k) can only be rebuilt with the ROM image present.
 |---|---:|---|
 | 0:0000-019C | 413 | directory |
 | 0:019D | 1 | FFFF, the directory's end |
-| 0:019E | 1 | residue (5.3) |
+| 0:019E | 1 | residue constant `residue_0_019E` (5.3) |
 | 0:019F | 1 | zero padding |
 | 0:01A0-F8F7 | 62,924 + 396 padding | 221 objects |
 | 0:F8F8 | 1 | checksum word |
@@ -322,7 +335,8 @@ the page-0 chips (90h, 90k) can only be rebuilt with the ROM image present.
 
 "Padding" is the zero words between objects (and before each page's checksum word) up to the
 next multiple of 4. The decoder rebuilds every word from the format alone except the residue
-word, and checks that it reproduces the image (`decode()` re-encodes and compares).
+word, which the encoder takes from the manifest's constant, and checks that it reproduces the
+image (`decode()` re-encodes and compares).
 
 ## 6. The inventory
 
@@ -413,7 +427,8 @@ FFFF terminators, the padding, the directory, the reciprocal table and the check
 `data/objects/manifest.json` holds the format name, the object count, per page the chips and the
 object numbers in ascending number order, which is also the address order (the placement:
 each page packs its objects in that order at the first multiple of 4 after the page's fixed
-part), the reciprocal table's rule, the residue ranges (position and length, never values) and
+part), the reciprocal table's rule, the residue constants (section 5.3: position, value, name and
+comment, at a position `RESIDUE_ALLOWED` lists) and
 the object names (section 11.2; the encoder does not read them). A person edits a vertex, a colour or a face in a mesh file, or moves an
 object to another page in the manifest by inserting its number at its sorted place in that
 page's list; the encoder re-places everything. The encoder rejects a page list that is not in
@@ -441,38 +456,52 @@ check); `tools/objects` the CLI:
 The decoder is strict: a header count that is not vertices + normals, a record list that does
 not follow the header, polygons out of record order, a count field, a face normal that is not a
 normal point, a vertex that is not a vertex point, an object out of the packed layout, a page 1
-that is not the reciprocal table, or a re-encoding that differs are errors. Non-zero words where
-the format predicts zero padding become residue ranges.
+that is not the reciprocal table, or a re-encoding that differs are errors. A non-zero word where
+the format predicts zero padding becomes a residue constant where `RESIDUE_ALLOWED` lists its
+position, and is an error everywhere else (section 5.3).
 
 ### 8.3 The build
 
 `asm/obj/objects.asm` includes the three generated page sources, with an assert at each page
 boundary and at the end (60000h); each generated source has a label and an assert at every
 structure (`object_NNN`, `object_directory`, `reciprocal_table`, `checksum_pageN`), `dc.w` for
-every decoded word, `dcb.w n,0` for every zero run, and `incbin "../../build/stunrun-obj.bin"`
-for the residue word. The page sources depend on data/objects, the tools and the image (which
-supplies the residue word and, through it, page 0's checksum word). `make check`: 25 files,
-0 differences.
+every decoded word, `dcb.w n,0` for every zero run, and a labelled `dc.w` with an assert for the
+residue constant (`residue_0_019E`, from the manifest). Nothing comes from the ROM image: the page
+sources depend on data/objects and the tools only, and the object tree's output does not depend
+on `build/stunrun-obj.bin` (the other trees' outputs depend on their merged blobs, which they
+incbin). `make check`: 25 files, 0 differences.
 
-`make coverage` counts the object image as `data` (296,270 bytes) and `fill` (96,944 bytes) under
-the generated sources `../../build/obj/page{0,1,2}.asm`, and 2 bytes of blob (`residue_0_019E`):
-the blob share of the set falls from 100.0% to 74.0%.
+A planted difference in the constant (its `value` in the manifest plus one, 2026-11-05) makes
+`make check` fail on one file: `136070-2118.90k: 2 differing bytes, first at file offset $0019E
+= ADSP object word $0019E`. The two bytes are the low byte of word 0:019E and the low byte of
+page 0's checksum word 0:F8F8 (file offset 0F8F8 of 90k), which the encoder recomputes so that
+the chip's byte sum stays 18h: the checksum hides nothing from the hash check, it only moves
+the difference into a second byte. Chip 90h does not change (the high byte does not carry).
+
+`make coverage` counts the object image as `data` (296,272 bytes) and `fill` (96,944 bytes) under
+the generated sources `../../build/obj/page{0,1,2}.asm`, and no blob: the blob share of the set
+fell from 100.0% to 74.0% with M3a (1,118,210 bytes, the residue word's 2 bytes among them) and
+is 74.0% (1,118,208 bytes) since the residue word became a constant.
 
 `make test` (tools/test_objects.py): synthetic objects through encode and decode on random
 layouts, planted differences (one vertex word changes exactly that word and its page's checksum
-word), residue handling, malformed images and mesh files rejected, the generated assembly
-assembled by vasm equal to `encode()`; in CI, the committed data/objects encodes to the four
-chips of pages 1 and 2 with the CRC-32 and SHA-1 MAME lists; with the reference set, decode
+word), residue constants (round trip through the manifest; an entry missing a key, out of
+range, not a non-zero 16-bit value, doubled or not in `RESIDUE_ALLOWED` rejected; an unexplained
+word outside the allow list fails decoding), malformed images and mesh files rejected, the
+generated assembly assembled by vasm equal to `encode()`; in CI, the committed data/objects
+encodes to all six object chips with the CRC-32 and SHA-1 MAME lists
+(`test_committed_data_rebuilds_all_six_chips`, no ROM read); with the reference set, decode
 reproduces data/objects file for file and encode reproduces the image; with the traces, section
 7. `tools/test_build.py` keeps `make all` on a synthetic set meaningful: the synthetic set
-carries the object image the committed data encodes to (with a random residue word), `make all`
-must rebuild it, and an edited mesh in the copy (object 100, first vertex x) must change exactly
+carries the object image the committed data encodes to, `make all` must rebuild it (also with
+`build/stunrun-obj.bin` deleted, which it does not recreate), and an edited mesh in the copy (object 100, first vertex x) must change exactly
 two bytes of chip 90k, at the vertex's x word and page 0's checksum word, and nothing else in the
 25 files (the test first undoes its planted 68k byte, then compares every built file).
 
 ## 9. Open questions
 
-1. The residue word 0:019E (section 5.3): what wrote it? Card for Jesus.
+1. The residue word 0:019E (section 5.3): what wrote it? Still unexplained; since 2026-11-05 it
+   is committed as a named constant (Jesus, card A2), which changed its storage only.
 2. Descriptor +10h (a long, 6000A0h for many) is not read by `fill_object_entry`; who reads it?
 3. Entry word 22 (entity +36h) reaches DM 0027-0028; its reader: answered by docs/08 section 1.5
    (07B7-07BB add it to every command's draw-order key: the object's depth bias).
@@ -1129,7 +1158,7 @@ or later (1026 in 21 of the 24 runs of `make objlevels`, 1027 in 2, 1042 at star
 `tools/test_objects.py` checks the bound and `counted_from` on the runs in build/mame/). Counted this way, 94-99 load at levels 7-8, 10-11,
 13, 17-18 and 21 only, 201 at those and 19, 226 at 15 of the 25 level words 0-24; the objtrace attract run
 (run column "A") is where the demo's loads are recorded. **The level select is a poke** (a MAME write tap, not a game feature; committed in
-`tools/mame/objlevels.lua`, pending Jesus's answer to the card in CLAUDE.md section 5), documented here
+`tools/mame/objlevels.lua`, kept by Jesus on 2026-11-05, card A4), documented here
 exactly: the game clears the words 0xFF9578 and 0xFF9556 (`clr.w` at 0x02B95E and 0x02B964; 0xFF9578
 also at 0x024322, in the routine 0x024306 that `game_reset` calls); in 0x02543A, the routine
 that sets up the player's vehicle, a compiled-out debug switch at 0x025712 (`moveq #0,d1` at 0x0256FC always selects case 0) would set

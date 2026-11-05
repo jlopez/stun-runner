@@ -37,15 +37,17 @@ as hex (136070-2121.90h sums to 0x21). The rest of the page is zero.
 
 Mesh files use 0-based indices into `vertices` and `normals`; point numbers, the header's point
 count, the record-list pointer, the polygon addresses, the end record, the FFFF terminators, the
-padding, the directory and the checksum words are derived when encoding. Words the format does
-not explain (a non-zero word where padding would be zero) are residue: they keep their place,
-are never written into data/objects, and the generated assembly takes them from the ROM image
-(an incbin slice: a blob in `make coverage`).
+padding, the directory and the checksum words are derived when encoding. A word the format does
+not explain (non-zero where padding would be zero) is residue: one named 16-bit constant in the
+manifest (page, address, value, name, comment), emitted by the generated assembly as a dc.w.
+Residue is committed only by an owner decision: each position must be in RESIDUE_ALLOWED with
+the decision that allows it, and the decoder fails on any other unexplained word.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import struct
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -57,6 +59,7 @@ PAGE_WORDS = 0x10000
 PAGES = 3
 ALIGN = 4
 TERMINATOR = 0xFFFF
+LABEL = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 MAX_OBJECTS = 0x1000  # the object number is masked with 0FFF [0056-0058]
 CNTR_MAX = 0x3FFF  # vertex and normal counts are loaded into the 14-bit CNTR [014D, 015F]
 
@@ -80,6 +83,16 @@ CHIPS = (
 # their normal by 0214 [01C7]. The ROM uses 1 and 15. Colour 0 skips the polygon [019F -> 01E4].
 TYPE_UNSHADED = 1
 TYPE_SHADED = 15
+
+# The residue words that may be committed as constants, (page, address) -> the owner decision
+# (CLAUDE.md section 2: unexplained data is not committed as raw numbers without Jesus's say-so).
+# Any other word the format does not explain is a decode error.
+RESIDUE_ALLOWED: dict[tuple[int, int], str] = {
+    (0, 0x019E): "Jesus 2026-11-05, card A2 (docs/07 section 5.3)",
+}
+RESIDUE_COMMENT = (
+    "unexplained: the format predicts zero padding here and no code reads it (docs/07 section 5.3)"
+)
 
 
 class FormatError(ValueError):
@@ -132,9 +145,17 @@ class Mesh:
 
 @dataclass
 class Residue:
+    """One word the format does not explain, committed as a named constant (RESIDUE_ALLOWED)."""
+
     page: int
-    address: int
-    words: int
+    address: int  # word address within the page
+    value: int  # 16-bit
+    name: str  # the label in the generated assembly
+    comment: str = RESIDUE_COMMENT
+
+
+def residue_name(page: int, address: int) -> str:
+    return f"residue_{page}_{address:04X}"
 
 
 @dataclass
@@ -281,9 +302,12 @@ class Decoded:
     placed: list[Placed]
 
 
-def decode(image: bytes) -> Decoded:
-    """The whole image. Raises FormatError where it is not the format; non-zero words where
-    padding would be zero become residue."""
+def decode(
+    image: bytes, allowed: Mapping[tuple[int, int], str] = RESIDUE_ALLOWED
+) -> Decoded:
+    """The whole image. Raises FormatError where it is not the format; a non-zero word where
+    padding would be zero becomes a residue constant if its position is `allowed`, and is an
+    error otherwise."""
     words = to_words(image)
     count = 0
     while words[count] != TERMINATOR:
@@ -336,19 +360,23 @@ def decode(image: bytes) -> Decoded:
         explained[base + a] = True
         pages.append(numbers)
     residue: list[Residue] = []
-    i = 0
-    while i < IMAGE_WORDS:
+    unexplained: list[int] = []
+    for i in range(IMAGE_WORDS):
         if not explained[i] and words[i] != expected[i]:
-            j = i
-            while j < IMAGE_WORDS and not explained[j] and words[j] != expected[j]:
-                j += 1
-            residue.append(Residue(i // PAGE_WORDS, i % PAGE_WORDS, j - i))
-            i = j
-        else:
-            i += 1
+            page, address = i // PAGE_WORDS, i % PAGE_WORDS
+            if (page, address) in allowed:
+                residue.append(Residue(page, address, words[i], residue_name(page, address)))
+            else:
+                unexplained.append(i)
+    if unexplained:
+        first = unexplained[0]
+        raise FormatError(
+            f"{len(unexplained)} words the format does not explain, first at "
+            f"{first // PAGE_WORDS}:{first % PAGE_WORDS:04X}, not in RESIDUE_ALLOWED"
+        )
     layout = Layout(count, pages, residue)
     decoded = Decoded(layout, meshes, placed)
-    rebuilt = encode_words(layout, meshes, image)
+    rebuilt = encode_words(layout, meshes, allowed)
     if rebuilt != words:
         diff = sum(1 for x, y in zip(rebuilt, words, strict=True) if x != y)
         raise FormatError(f"{diff} words do not re-encode (checksum words or an unknown field)")
@@ -417,27 +445,59 @@ def check_mesh(mesh: Mesh) -> None:
             raise FormatError(f"object {mesh.number}: face vertices out of range or empty")
 
 
+def check_residue(
+    layout: Layout, allowed: Mapping[tuple[int, int], str] = RESIDUE_ALLOWED
+) -> None:
+    """Each residue constant: a 16-bit non-zero integer (zero is fill), at an allowed position,
+    once. Whether it lands on fill is checked when encoding."""
+    seen: set[tuple[int, int]] = set()
+    for r in layout.residue:
+        where = f"residue {r.page}:{r.address:04X}" if _is_int(r.page) else f"residue {r.page!r}"
+        if not (_is_int(r.page) and 0 <= r.page < PAGES):
+            raise FormatError(f"{where}: page out of range")
+        if not (_is_int(r.address) and 0 <= r.address < PAGE_WORDS):
+            raise FormatError(f"{where}: address out of range")
+        if not (_is_int(r.value) and 0 < r.value <= 0xFFFF):
+            raise FormatError(f"{where}: value is not a non-zero 16-bit integer")
+        if (r.page, r.address) not in allowed:
+            raise FormatError(f"{where}: not in RESIDUE_ALLOWED (needs an owner decision)")
+        if (r.page, r.address) in seen:
+            raise FormatError(f"{where}: listed twice")
+        if not (isinstance(r.name, str) and LABEL.fullmatch(r.name)):
+            raise FormatError(f"{where}: name {r.name!r} is not an assembler label")
+        if not isinstance(r.comment, str):
+            raise FormatError(f"{where}: comment is not a string")
+        seen.add((r.page, r.address))
+
+
 def encode_words(
-    layout: Layout, meshes: Mapping[int, Mesh], residue_image: bytes | None = None
+    layout: Layout,
+    meshes: Mapping[int, Mesh],
+    allowed: Mapping[tuple[int, int], str] = RESIDUE_ALLOWED,
 ) -> list[int]:
-    """The image's words. Residue words come from `residue_image` (zero without it, and then the
-    checksum words of their pages are wrong)."""
+    """The image's words, residue constants included."""
     for mesh in meshes.values():
         check_mesh(mesh)
+    check_residue(layout, allowed)
     placed = place(layout, meshes)
     words = [0] * IMAGE_WORDS
+    data = [False] * IMAGE_WORDS  # the words the format puts there (not fill)
     for p in placed:
         words[p.number] = p.page << 14 | p.address >> 2
         base = p.page * PAGE_WORDS + p.address
         words[base : base + p.size] = meshes[p.number].words(p.address)
+        data[base : base + p.size] = [True] * p.size
     words[layout.objects] = TERMINATOR
+    data[: layout.objects + 1] = [True] * (layout.objects + 1)
     rb = RECIP_PAGE * PAGE_WORDS
     words[rb : rb + RECIP_WORDS] = reciprocal_table()
-    source = to_words(residue_image) if residue_image is not None else None
+    data[rb : rb + RECIP_WORDS] = [True] * RECIP_WORDS
+    checksums = {checksum_address(page, placed, layout) for page in range(PAGES)}
     for r in layout.residue:
         a = r.page * PAGE_WORDS + r.address
-        if source is not None:
-            words[a : a + r.words] = source[a : a + r.words]
+        if data[a] or a in checksums:
+            raise FormatError(f"residue {r.page}:{r.address:04X}: not on fill")
+        words[a] = r.value
     for page in range(PAGES):
         words[checksum_address(page, placed, layout)] = checksum(words, page, placed, layout)
     return words
@@ -469,8 +529,12 @@ def checksum(words: Sequence[int], page: int, placed: Sequence[Placed], layout: 
     return hi << 8 | lo
 
 
-def encode(layout: Layout, meshes: Mapping[int, Mesh], residue_image: bytes | None = None) -> bytes:
-    return to_bytes(encode_words(layout, meshes, residue_image))
+def encode(
+    layout: Layout,
+    meshes: Mapping[int, Mesh],
+    allowed: Mapping[tuple[int, int], str] = RESIDUE_ALLOWED,
+) -> bytes:
+    return to_bytes(encode_words(layout, meshes, allowed))
 
 
 # --- data/objects: the manifest and one JSON file per mesh ------------------------------------
@@ -538,7 +602,13 @@ def manifest_json(layout: Layout, names: Mapping[int, str] | None = None) -> str
             "rule": "tools/objects reciprocal(): 2^15/z for z <= 0x200, 2^24/z above, float32",
         },
         "residue": [
-            {"page": r.page, "address": f"{r.address:04X}", "words": r.words, "source": "ROM image"}
+            {
+                "page": r.page,
+                "address": f"{r.address:04X}",
+                "value": r.value,
+                "name": r.name,
+                "comment": r.comment,
+            }
             for r in layout.residue
         ],
         "names": {str(n): names[n] for n in sorted(names)},
@@ -569,7 +639,12 @@ def compact_lists(text: str) -> str:
     return "\n".join(out)
 
 
-def layout_from_manifest(text: str) -> tuple[Layout, dict[int, str]]:
+RESIDUE_KEYS = ["page", "address", "value", "name", "comment"]
+
+
+def layout_from_manifest(
+    text: str, allowed: Mapping[tuple[int, int], str] = RESIDUE_ALLOWED
+) -> tuple[Layout, dict[int, str]]:
     try:
         d = json.loads(text)
         if d["format"] != FORMAT:
@@ -577,13 +652,20 @@ def layout_from_manifest(text: str) -> tuple[Layout, dict[int, str]]:
         pages = [list(p["objects"]) for p in d["pages"]]
         if [p["page"] for p in d["pages"]] != list(range(len(pages))):
             raise FormatError("manifest pages out of order")
-        residue = [Residue(r["page"], int(r["address"], 16), r["words"]) for r in d["residue"]]
+        residue = []
+        for r in d["residue"]:
+            if sorted(r) != sorted(RESIDUE_KEYS):
+                raise FormatError(f"manifest residue entry keys {sorted(r)}, expected {RESIDUE_KEYS}")
+            residue.append(
+                Residue(r["page"], int(r["address"], 16), r["value"], r["name"], r["comment"])
+            )
         names = {int(k): v for k, v in d.get("names", {}).items()}
         layout = Layout(d["objects"], pages, residue)
-    except (ValueError, KeyError, TypeError) as e:
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
         if isinstance(e, FormatError):
             raise
         raise FormatError(f"malformed manifest: {e}") from e
+    check_residue(layout, allowed)
     return layout, names
 
 
@@ -596,8 +678,10 @@ def write_data(out: Path, decoded: Decoded, names: Mapping[int, str] | None = No
         (out / mesh_name(n)).write_text(mesh_json(mesh))
 
 
-def read_data(root: Path) -> tuple[Layout, dict[int, Mesh], dict[int, str]]:
-    layout, names = layout_from_manifest((root / "manifest.json").read_text())
+def read_data(
+    root: Path, allowed: Mapping[tuple[int, int], str] = RESIDUE_ALLOWED
+) -> tuple[Layout, dict[int, Mesh], dict[int, str]]:
+    layout, names = layout_from_manifest((root / "manifest.json").read_text(), allowed)
     meshes: dict[int, Mesh] = {}
     for n in range(layout.objects):
         path = root / mesh_name(n)
@@ -629,51 +713,48 @@ def _fill(n: int) -> list[str]:
 
 
 def asm_pages(
-    layout: Layout, meshes: Mapping[int, Mesh], residue_image: bytes | None, image_path: str
+    layout: Layout,
+    meshes: Mapping[int, Mesh],
+    allowed: Mapping[tuple[int, int], str] = RESIDUE_ALLOWED,
 ) -> list[str]:
-    """One vasm source per page: dc.w for every decoded structure, dcb.w for the zero fill,
-    incbin of `image_path` (as the main source sees it) for residue words."""
-    words = encode_words(layout, meshes, residue_image)
+    """One vasm source per page: dc.w for every decoded structure and residue constant, dcb.w
+    for the zero fill."""
+    words = encode_words(layout, meshes, allowed)
     placed = place(layout, meshes)
     sources: list[str] = []
     for page in range(PAGES):
         base = page * PAGE_WORDS
-        # (start, end, label, kind) over the page; kind: data / residue
+        # (start, end, label, comment) over the page; a comment marks a residue constant
         spans: list[tuple[int, int, str, str]] = []
         if page == 0:
-            spans.append((0, layout.objects, "object_directory", "data"))
-            spans.append((layout.objects, layout.objects + 1, "object_directory_end", "data"))
+            spans.append((0, layout.objects, "object_directory", ""))
+            spans.append((layout.objects, layout.objects + 1, "object_directory_end", ""))
         if page == RECIP_PAGE:
-            spans.append((0, RECIP_WORDS, "reciprocal_table", "data"))
+            spans.append((0, RECIP_WORDS, "reciprocal_table", ""))
         for p in placed:
             if p.page == page:
-                spans.append((p.address, p.address + p.size, f"object_{p.number:03d}", "data"))
+                spans.append((p.address, p.address + p.size, f"object_{p.number:03d}", ""))
         ck = checksum_address(page, placed, layout) - base
-        spans.append((ck, ck + 1, f"checksum_page{page}", "data"))
+        spans.append((ck, ck + 1, f"checksum_page{page}", ""))
         for r in layout.residue:
             if r.page == page:
-                spans.append(
-                    (r.address, r.address + r.words, f"residue_{page}_{r.address:04X}", "residue")
-                )
+                spans.append((r.address, r.address + 1, r.name, f"residue: {r.comment}"))
         spans.sort()
         lines = [
             f"; object ROM page {page} (words {base:05X}-{base + PAGE_WORDS - 1:05X}): generated by",
             "; tools/objects from data/objects (docs/07-objects.md). Build output: do not edit.",
         ]
         at = 0
-        for start, end, label, kind in spans:
+        for start, end, label, comment in spans:
             if start < at:
                 raise FormatError(f"page {page}: {label} overlaps the previous structure")
             lines += _fill(start - at)
             lines.append(f"{label}:")
             lines.append(f'\tassert\t*=${2 * (base + start):05X},"{label} misplaced"')
-            if kind == "residue":
-                lines.append(
-                    f'\tincbin\t"{image_path}",${2 * (base + start):05X},{2 * (end - start)}'
-                    "\t; residue: not explained by the format (docs/07)"
-                )
-            else:
-                lines += _dcw(words[base + start : base + end])
+            code = _dcw(words[base + start : base + end])
+            if comment:
+                code[-1] += f"\t; {comment.replace(';', ',')}"
+            lines += code
             at = end
         lines += _fill(PAGE_WORDS - at)
         sources.append("\n".join(lines) + "\n")

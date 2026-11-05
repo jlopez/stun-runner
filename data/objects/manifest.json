@@ -28,8 +28,9 @@
     {
       "page": 0,
       "address": "019E",
-      "words": 1,
-      "source": "ROM image"
+      "value": 1957,
+      "name": "residue_0_019E",
+      "comment": "unexplained: the format predicts zero padding here and no code reads it (docs/07 section 5.3)"
     }
   ],
   "names": {

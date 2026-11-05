@@ -1,9 +1,9 @@
 """The object ROMs (tools/objects, docs/07-objects.md): decoder, encoder, generated assembly.
 
 Synthetic tests run everywhere (CI): hand-made objects through encode and decode, planted
-differences, malformed input. Because data/objects is committed, CI also encodes it and checks
-the four chips of pages 1 and 2 against the CRC-32 and SHA-1 MAME lists (page 0 holds a residue
-word only the ROM image supplies). With the reference set built (`make`), decode(image) must
+differences, malformed input, residue constants. Because data/objects is committed (the residue
+word 0:019E included, as a named constant), CI also encodes it and checks all six chips against
+the CRC-32 and SHA-1 MAME lists, without the ROMs. With the reference set built (`make`), decode(image) must
 reproduce data/objects exactly and encode(data/objects) the image; with the MAME traces
 (`make objtrace`), every object-ROM read sequence the ADSP made must match the decoder.
 """
@@ -32,11 +32,13 @@ from objects import (
     RECIP_NEAR,
     RECIP_SPLIT,
     RECIP_WORDS,
+    RESIDUE_ALLOWED,
     SEQ_DIRECTORY,
     SEQ_HEADER,
     SEQ_POLYGON,
     SEQ_RECORD,
     TERMINATOR,
+    Decoded,
     Face,
     FormatError,
     Layout,
@@ -179,23 +181,107 @@ def test_planted_difference_is_one_word() -> None:
     assert len(diff) == 2 and diff[1] // PAGE_WORDS == p.page
 
 
-def test_residue_is_kept_out_of_the_data() -> None:
-    layout, meshes = synthetic(5)
-    words = encode_words(layout, meshes)
-    words[layout.objects + 1] = 0x1234  # a non-zero word in the directory's padding
-    # the checksum word of page 0 was computed without it: decode takes the word as residue,
-    # re-encodes with it and finds the stale checksum
+# synthetic(count = 10): the directory and its terminator take words 0-10, word 11 is padding
+PADDING = (0, 11)
+ALLOW = {PADDING: "test"}
+
+
+def with_residue(seed: int, value: int = 0x1234) -> tuple[Layout, dict[int, Mesh]]:
+    layout, meshes = synthetic(seed)
+    layout.residue = [Residue(*PADDING, value, "residue_0_000B", "a test constant")]
+    return layout, meshes
+
+
+def test_residue_allow_list_is_the_one_decision() -> None:
+    """Card A2 (Jesus, 2026-11-05): the word after the directory's FFFF, and nothing else."""
+    assert list(RESIDUE_ALLOWED) == [(0, 0x019E)]
+    assert "Jesus 2026-11-05" in RESIDUE_ALLOWED[(0, 0x019E)]
+
+
+def test_residue_constant_round_trip(tmp_path: Path) -> None:
+    layout, meshes = with_residue(5)
+    image = encode(layout, meshes, ALLOW)
+    decoded = decode(image, ALLOW)
+    assert decoded.layout.residue == [Residue(*PADDING, 0x1234, "residue_0_000B")]
+    decoded.layout.residue[0].comment = "a test constant"
+    assert decoded.layout == layout and decoded.meshes == meshes
+    # the manifest carries the constant (value, name, comment) and reads back to the same image
+    text = manifest_json(layout)
+    assert '"value": 4660' in text and '"name": "residue_0_000B"' in text
+    assert layout_from_manifest(text, ALLOW) == (layout, {})
+    write_data(tmp_path, Decoded(layout, meshes, decoded.placed))
+    assert encode(*read_data(tmp_path, ALLOW)[:2], ALLOW) == image
+    # without it the word is zero and page 0's checksum word differs: two words
+    blank = to_words(encode(Layout(layout.objects, layout.pages), meshes))
+    diff = [i for i, (a, b) in enumerate(zip(blank, to_words(image), strict=True)) if a != b]
+    assert len(diff) == 2 and diff[0] == PADDING[1]
+    # a stale checksum word: the residue is allowed, but the image does not re-encode
+    stale = blank[:]
+    stale[PADDING[1]] = 0x1234
     with pytest.raises(FormatError, match="re-encode"):
-        decode(to_bytes(words))
-    layout2 = Layout(layout.objects, layout.pages, [Residue(0, layout.objects + 1, 1)])
-    fixed = encode(layout2, meshes, to_bytes(words))
-    decoded = decode(fixed)
-    assert decoded.layout.residue == [Residue(0, layout.objects + 1, 1)]
-    assert "1234" not in manifest_json(decoded.layout)
-    # without the image the residue word is zero and its page's checksum word differs
-    blank = to_words(encode(decoded.layout, decoded.meshes))
-    diff = [i for i, (a, b) in enumerate(zip(blank, to_words(fixed), strict=True)) if a != b]
-    assert len(diff) == 2 and diff[0] == layout.objects + 1
+        decode(to_bytes(stale), ALLOW)
+
+
+def test_unexplained_word_outside_the_allow_list_fails_decoding() -> None:
+    layout, meshes = with_residue(5)
+    image = encode(layout, meshes, ALLOW)
+    with pytest.raises(FormatError, match="1 words the format does not explain, first at 0:000B"):
+        decode(image)
+    with pytest.raises(FormatError, match="first at 0:000B"):
+        decode(image, {(0, 12): "another word"})
+    # nor can it be encoded without the decision
+    with pytest.raises(FormatError, match="not in RESIDUE_ALLOWED"):
+        encode(layout, meshes)
+
+
+@pytest.mark.parametrize(
+    ("edit", "match"),
+    [
+        (lambda r: r.pop("value"), "keys"),
+        (lambda r: r.__setitem__("words", 1), "keys"),
+        (lambda r: r.__setitem__("value", 0), "non-zero 16-bit"),
+        (lambda r: r.__setitem__("value", 0x10000), "non-zero 16-bit"),
+        (lambda r: r.__setitem__("value", -1), "non-zero 16-bit"),
+        (lambda r: r.__setitem__("value", True), "non-zero 16-bit"),
+        (lambda r: r.__setitem__("value", "1234"), "non-zero 16-bit"),
+        (lambda r: r.__setitem__("value", 4660.0), "non-zero 16-bit"),
+        (lambda r: r.__setitem__("address", "10000"), "address out of range"),
+        (lambda r: r.__setitem__("address", "zz"), "malformed"),
+        (lambda r: r.__setitem__("page", 3), "page out of range"),
+        (lambda r: r.__setitem__("address", "000C"), "not in RESIDUE_ALLOWED"),
+        (lambda r: r.__setitem__("name", "9x"), "not an assembler label"),
+        (lambda r: r.__setitem__("name", None), "not an assembler label"),
+        (lambda r: r.__setitem__("comment", 1), "comment"),
+    ],
+)
+def test_malformed_residue_entries_are_rejected(
+    edit: Callable[[dict[str, Any]], object], match: str
+) -> None:
+    layout, _ = with_residue(5)
+    d = json.loads(manifest_json(layout))
+    edit(d["residue"][0])
+    with pytest.raises(FormatError, match=match):
+        layout_from_manifest(json.dumps(d), ALLOW)
+
+
+def test_manifest_residue_list_missing_or_doubled() -> None:
+    layout, _ = with_residue(5)
+    d = json.loads(manifest_json(layout))
+    d["residue"].append(dict(d["residue"][0]))
+    with pytest.raises(FormatError, match="listed twice"):
+        layout_from_manifest(json.dumps(d), ALLOW)
+    del d["residue"]
+    with pytest.raises(FormatError, match="malformed manifest"):
+        layout_from_manifest(json.dumps(d), ALLOW)
+
+
+def test_residue_must_land_on_fill() -> None:
+    layout, meshes = synthetic(5)
+    first = place(layout, meshes)[0]
+    on_object = (first.page, first.address)
+    layout.residue = [Residue(*on_object, 1, "residue_on_an_object")]
+    with pytest.raises(FormatError, match="not on fill"):
+        encode(layout, meshes, {on_object: "test"})
 
 
 @pytest.mark.parametrize(
@@ -334,13 +420,17 @@ def vasm() -> str | None:
 @pytest.mark.skipif(vasm() is None, reason="vasm not available")
 def test_generated_assembly_matches_encode(tmp_path: Path) -> None:
     layout, meshes = synthetic(8)
-    words = encode_words(layout, meshes)
-    words[layout.objects + 1] = 0xBEEF
-    layout.residue = [Residue(0, layout.objects + 1, 1)]
-    image = encode(layout, meshes, to_bytes(words))
-    (tmp_path / "image.bin").write_bytes(image)
+    layout.residue = [Residue(*PADDING, 0xBEEF, "residue_0_000B", "a test; constant")]
+    image = encode(layout, meshes, ALLOW)
     main = ["\torg\t0"]
-    for page, text in enumerate(asm_pages(layout, meshes, image, "image.bin")):
+    sources = asm_pages(layout, meshes, ALLOW)
+    # the residue is a labelled dc.w with an assert, like every structure; nothing is incbin'd
+    assert "incbin" not in "".join(sources)
+    lines = sources[0].splitlines()
+    at = lines.index("residue_0_000B:")
+    assert lines[at + 1] == '\tassert\t*=$00016,"residue_0_000B misplaced"'
+    assert lines[at + 2] == "\tdc.w\t$BEEF\t; residue: a test, constant"
+    for page, text in enumerate(sources):
         (tmp_path / f"page{page}.asm").write_text(text)
         main.append(f'\tinclude\t"page{page}.asm"')
     main.append('\tassert\t*=$60000,"end"')
@@ -356,17 +446,20 @@ def test_generated_assembly_matches_encode(tmp_path: Path) -> None:
     assert (tmp_path / "out.bin").read_bytes() == image
 
 
-def test_committed_data_rebuilds_pages_1_and_2() -> None:
-    """CI: the committed meshes encode to the four chips of pages 1 and 2 exactly as MAME lists
-    them (page 0 needs the residue word from the ROM image)."""
+def test_committed_data_rebuilds_all_six_chips() -> None:
+    """CI: the committed data/objects (meshes, manifest and its residue constant) encodes to all
+    six object chips exactly as MAME lists them, with no ROM file read."""
     layout, meshes, _ = read_data(DATA)
     image = encode(layout, meshes)
     roms = {r["name"]: r for r in load_snapshot("stunrun")["roms"]}
-    for page in (1, 2):
+    checked = []
+    for page in range(3):
         block = image[page * 0x20000 : (page + 1) * 0x20000]
         for chip, data in zip(CHIPS[page], (block[0::2], block[1::2]), strict=True):
             assert hashes(data) == (roms[chip]["crc"], roms[chip]["sha1"]), chip
-    assert [(r.page, r.words) for r in layout.residue] == [(0, 1)]
+            checked.append(chip)
+    assert len(checked) == 6
+    assert [(r.page, r.address, r.name) for r in layout.residue] == [(0, 0x019E, "residue_0_019E")]
 
 
 @pytest.mark.skipif(not IMAGE.exists(), reason="build/stunrun-obj.bin absent (no reference set)")
@@ -379,7 +472,7 @@ def test_reference_image_decodes_to_committed_data(tmp_path: Path) -> None:
     differ = [n for n in committed if (tmp_path / n).read_text() != (DATA / n).read_text()]
     assert differ == []
     layout, meshes, _ = read_data(DATA)
-    assert encode(layout, meshes, image) == image
+    assert encode(layout, meshes) == image
 
 
 @pytest.mark.skipif(
