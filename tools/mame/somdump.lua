@@ -6,7 +6,7 @@
 --
 -- How it sees the SOM buffer. MAME keeps the two 8K-word SOM banks in a plain array that Lua cannot
 -- reach (m_som_memory, harddriv.h:386), and the 68k sees only one bank at 810000 (hd68k_adsp_buffer_r,
--- harddriv_m.cpp:612). So the script rebuilds both banks from the ADSP's own writes: a write tap on
+-- harddriv_m.cpp:614). So the script rebuilds both banks from the ADSP's own writes: a write tap on
 -- ADSP data 2002-2003 follows /SOMCLK (the SOM address) and SOMLATCH (a word into bank
 -- m68k_bank ^ 1 at the address, which then advances; hdadsp_special_w, harddriv_m.cpp:803), and a
 -- write tap on the 68k's ADSP control latch 818000-81801F follows line 3, the 68k's bank
@@ -39,12 +39,17 @@
 --   snap_<n>.png  screen snapshots 1 and 2 frames after the capture (in MAME's snapshot dir,
 --                 renamed here: MAME writes them under -snapshot_directory)
 -- With SOM_PLAY=1 it inserts a coin at frame 900, presses start at 960 and the trigger at 1020
--- (pcwatch.lua). It exits after the last capture. Everything here is runtime RAM state.
+-- (pcwatch.lua). With SOM_DITHER=1 it rewrites, every frame, each colour word at FFF71D20 (the
+-- table the SOM polygons index, GSP FFF452D0) as lo | (lo ^ 80h) << 8: the game's own table has
+-- equal bytes in every word, and this makes the expander's even/odd byte rule visible in the
+-- page (docs/08 section 4.3). The GSP only reads the table, so the game runs as without it. It
+-- exits after the last capture. Everything here is runtime RAM state.
 
 local OUT = os.getenv("SOM_DIR") or "./"
 local PLAY = os.getenv("SOM_PLAY") == "1"
 local SNAPDIR = os.getenv("SOM_SNAPDIR")
 local PREFIX = os.getenv("SOM_PREFIX") or "f"
+local DITHER = os.getenv("SOM_DITHER") == "1"
 local FRAMES = {}
 for n in string.gmatch(os.getenv("SOM_FRAMES") or "700,2400", "%d+") do
   FRAMES[#FRAMES + 1] = tonumber(n)
@@ -345,6 +350,12 @@ assert(not PLAY or (coin and start and trigger), "stunrun input fields not found
 SOM_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
   frame = frame + 1
   ev("frame")
+  if DITHER then
+    for i = 0, 0x3FF do
+      local lo = gs:read_u16(0xFFF71D20 + 16 * i) & 0xFF
+      gs:write_u16(0xFFF71D20 + 16 * i, lo | ((lo ~ 0x80) << 8))
+    end
+  end
   if PLAY then
     if frame == 900 then coin:set_value(1) elseif frame == 905 then coin:clear_value() end
     if frame == 960 then start:set_value(1) elseif frame == 965 then start:clear_value() end

@@ -7,12 +7,15 @@ image. The committed captures under artifacts/display-list/ (SOM lists as MAME's
 runtime RAM state) are decoded in CI too, and their polygons redrawn against a recorded checksum. The capture tests run on
 `make somdump` output (build/mame/som/) and skip without it: every capture decodes with no word
 unexplained, the rebuilt bank equals the 68k's view, the GSP buffer carries the same list, and the
-redrawing equals MAME's frame buffer on every pixel it draws and misses none the list changed.
+redrawing equals MAME's frame buffer on every pixel it draws and misses none the list changed;
+the dither-f* captures (a colour table whose words have two different bytes) pin the expander's
+even/odd bytes for fills and outlines.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import struct
 import zlib
 from pathlib import Path
@@ -223,6 +226,46 @@ def test_stipple_phase_at_an_odd_row():
                                              [10, 12, 13, 14, 16, 17, 18]]
 
 
+def test_colour_byte_4_is_75_percent():
+    """FFF45230-FFF452A0: fill 0 (via FFF45190) and fill 2 (after MOVI 01010101h) test the
+    command's low byte; 4 loads 15151515h, three pixels in four. Top row 40h: no rotation, bits
+    0 2 4 8 10 12 of 1515h, so x mod 8 in {0, 1, 2, 4, 5, 6}."""
+    colours = synthetic_colours()
+    k = (0x40 - TOP) * WIDTH
+
+    def top_row(cmd: int) -> list[int]:
+        c = Canvas()
+        draw_polygon(c, square(cmd), colours)
+        return [x for x in range(WIDTH) if c.drawn[k + x]]
+
+    three = [10, 12, 13, 14, 16, 17, 18]
+    assert top_row(0x0104) == top_row(0x0904) == top_row(0x0504) == three
+    assert top_row(0x0105) == list(range(10, 20))  # another byte: solid
+    assert top_row(0x0905) == [12, 16]  # ... and one in four (x mod 4 = 0)
+
+
+def test_skipped_row_keeps_the_stipple_phase():
+    """FFF454C0-FFF454F0: SUBXY sets V when xl > xr + 1 (MAME's SUB_XY: V = a.x > b.x) and JRV
+    skips both the FILL and the RL 4 of B9; a row with xl = xr + 1 runs a FILL of width 0 (it
+    draws nothing, 34010gfx.hxx `dx <= 0`) and rotates. 25% fill, top row 40h: x mod 4 = 0, then
+    2 after one rotation, 0 after two."""
+    colours = synthetic_colours()
+
+    def rows(left_slope: int) -> list[list[int]]:
+        # row 40h: 10..19; row 41h: xr + 1 = 10, xl = 10 + left_slope; row 42h: 10..19; no more
+        segs = (Segment(0, -10 * ONE, left_slope * ONE, 2),
+                Segment(0, 10 * ONE, -left_slope * ONE, 2))
+        c = Canvas()
+        draw_polygon(c, Command(0, 0x0940, 0, 10, 19, 0x40, segs), colours)
+        return [[x for x in range(WIDTH) if c.drawn[(y - TOP) * WIDTH + x]]
+                for y in (0x40, 0x41, 0x42, 0x43)]
+
+    # xl = 15 > xr + 1 = 10: row 41h skipped and not rotated, row 42h has the second phase
+    assert rows(5) == [[12, 16], [], [10, 14, 18], []]
+    # xl = 10 = xr + 1: an empty FILL, rotated, row 42h back to the first phase
+    assert rows(0) == [[12, 16], [], [12, 16], []]
+
+
 def test_window_clips():
     c = Canvas(window=(0, 0x41, 14, 0x117))
     draw_polygon(c, square(), synthetic_colours())
@@ -230,10 +273,18 @@ def test_window_clips():
 
 
 def test_outline_is_edges_only():
+    colours = synthetic_colours()
+    lo, hi = colours[0x140] & 0xFF, colours[0x140] >> 8
+    assert lo != hi
     c = Canvas()
-    draw_polygon(c, square(0x0C00 | 0x0140), synthetic_colours())
+    draw_polygon(c, square(0x0C00 | 0x0140), colours)
     # top and bottom rows (10 each) and both sides (8 inner rows each)
     assert sum(c.drawn) == 10 + 10 + 2 * 8
+    # the LINE pixels go through the 2 bpp expander as the fills do: the left edge (x = 10) gets
+    # the low byte, the right edge (x = 19) the high byte (harddriv_v.cpp:300; MAME: dither-f*)
+    for y in range(0x41, 0x49):
+        k = (y - TOP) * WIDTH
+        assert (c.pixels[k + 10], c.pixels[k + 19]) == (lo, hi), hex(y)
 
 
 def test_compare_counts():
@@ -279,8 +330,9 @@ def test_image_quad_scaling():
 
 
 def test_image_quad_rejections():
-    """FFF49230-FFF49650: no image, x >= 200h, y >= 117h, a far corner left of or above the near
-    one, and, without FFF77E60 bit 4, a box 15Eh wide or C8h high or more."""
+    """FFF49230-FFF49650: no image, p0.x >= 200h, p0.y >= 117h, p1.x left of p0.x, p2.y below
+    28h (FFF49510) or above p1.y (FFF49570), and, without FFF77E60 bit 4, a box 15Eh wide or C8h
+    high or more."""
     images = {3: PICTURE}
     rejected = {
         "no image": quad(100, 0x50, 105, 0x54, cmd=0x1005),
@@ -288,6 +340,8 @@ def test_image_quad_rejections():
         "y >= 117h": quad(100, 0x117, 105, 0x118),
         "far corner left": quad(100, 0x50, 99, 0x54),
         "far corner above": quad(100, 0x50, 105, 0x4E),
+        "p2.y below 28h": quad(100, 0x20, 105, 0x27),
+        "p2.y above p1.y": Command(0, 0x1003, 0, points=((100, 0x50), (105, 0x60), (105, 0x58))),
     }
     for name, c in rejected.items():
         canvas = Canvas()
@@ -299,6 +353,12 @@ def test_image_quad_rejections():
         assert draw_image(Canvas(), c, images, True)  # bit 4: none
     for c in (quad(0x10, 0x30, 0x10 + 0x15C, 0x31), quad(0x10, 0x30, 0x11, 0x30 + 0xC6)):
         assert draw_image(Canvas(), c, images, False)  # one less passes
+    # the height is measured from p1.y, not p0.y: p0.y 60h, p1.y 50h, p2.y 58h is 6 x 9 from 60h
+    canvas = Canvas()
+    assert draw_image(canvas, Command(0, 0x1003, 0, points=((100, 0x60), (105, 0x50), (105, 0x58))),
+                      images, False)
+    assert {y for y in range(TOP, TOP + 240) for x in range(100, 106)
+            if canvas.drawn[(y - TOP) * WIDTH + x]} == set(range(0x60, 0x69))
     som = decode_som(encode_som([quad(100, 0x50, 105, 0x54), quad(0x200, 0x50, 0x205, 0x54)]))
     canvas = render(som, synthetic_colours(), images=images)
     assert canvas.images == 1 and sum(canvas.drawn) == 26
@@ -355,6 +415,7 @@ IMAGE_WRITERS = {"command word": 0x066A, "command end FFFF FFFF": 0x0680,
 @pytest.mark.skipif(not captures(), reason="no captures: run make somdump (needs MAME and ROMs)")
 def test_captures_against_mame():
     seen: dict[str, set[int]] = {}
+    dithered: set[tuple[str, int, bool]] = set()
     for d in captures():
         words = read_words(d / "som.bin")
         som = decode_som(words)
@@ -368,10 +429,29 @@ def test_captures_against_mame():
         window = capture_window(d)
         images = read_images((d / "images.bin").read_bytes())
         loose = bool(int(meta["FFF77E60"], 16) & 0x10)
-        canvas = render(som, read_words(d / "colors.bin"), window, images, loose)
+        colours = read_words(d / "colors.bin")
+        canvas = render(som, colours, window, images, loose)
         a = compare(canvas, (d / "fb_som.bin").read_bytes(), (d / "fb_pre.bin").read_bytes())
         assert a.drawn > 0 and a.equal == a.drawn, (d, a)
         assert a.missed == 0, (d, a)
+        if d.name.startswith("dither-"):
+            # SOM_DITHER: every word's bytes differ, so the comparison tests the expander's
+            # even/odd bytes; it must cover fills and outlines at both parities
+            assert all(c & 0xFF != c >> 8 for c in colours), d
+            page = (d / "fb_som.bin").read_bytes()
+            for c in som.commands:
+                if c.is_image:
+                    continue
+                word = colours[c.colour]
+                kind = "outline" if c.fill == 3 else "fill"
+                one = Canvas(window)
+                draw_polygon(one, c, colours)
+                for m in re.finditer(b"\x01", bytes(one.drawn)):
+                    k = m.start()
+                    if page[k] == one.pixels[k]:
+                        dithered.add((kind, (k % WIDTH) & 1, page[k] == word >> 8))
+        else:
+            assert all(c & 0xFF == c >> 8 for c in colours), d  # the game's table: no dither
         assert canvas.images == 0 and canvas.skipped == 0, d
         # the screen MAME shows a frame later is the page the buffer drew, rows 0-239 = GSP y
         # 28h-117h (snap_2, a frame further, can already show something else: game-f4200)
@@ -390,3 +470,6 @@ def test_captures_against_mame():
         for kind, addr in IMAGE_WRITERS.items():
             assert (addr in writers.get(kind, [])) == has_images, (d, kind)
     assert seen == WRITERS  # over the captures, every writer of the table occurs
+    if any(d.name.startswith("dither-") for d in captures()):
+        # pixels equal to MAME's page: even x hold the low byte, odd x the high byte, both kinds
+        assert dithered == {(k, x, x == 1) for k in ("fill", "outline") for x in (0, 1)}

@@ -203,13 +203,16 @@ objtrace: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
 # The SOM display list on its way from the ADSP to the GSP (docs/08-display-list.md):
 # tools/mame/somdump.lua captures, at each frame of SOM_ATTRACT (attract mode) and SOM_GAME (a game
 # started at frame 900), the SOM banks, ADSP data RAM, the GSP command buffer, the frame-buffer
-# page before and after the list and a screen snapshot into build/mame/som/<attract|game>-f<N>/;
+# page before and after the list and a screen snapshot into build/mame/som/<attract|game|dither>-f<N>/;
 # tools/displaylist.py decodes and redraws each one and compares it with MAME's page. Every MAME
 # run starts from an empty private state (SOM_STATE, removed first): no NVRAM file, so the game
 # boots from the set's own 200e/210e, and attract mode, which depends on the NVRAM history (high
 # scores, the attract cycle), is the same on every machine and every run.
 SOM_ATTRACT ?= 1200,1500,1800,2100,2700,3000
 SOM_GAME ?= 1000,2400,3000,3600,4200,4800
+# attract mode again with every colour word's two bytes made different (SOM_DITHER, somdump.lua):
+# the game's table has equal bytes, so only these captures test the expander's even/odd bytes
+SOM_DITHER ?= 1200,1800,2100
 SOM_DIR := $(BUILD)/mame/som
 SOM_STATE := $(BUILD)/mame/somstate
 SOM_MAME = $(MAME) stunrun $(MAME_FLAGS) -nvram_directory $(SOM_STATE)/nvram \
@@ -224,6 +227,9 @@ somdump: $(PROGRAMS)
 	rm -rf $(SOM_STATE) && mkdir -p $(SOM_STATE)/nvram $(SOM_STATE)/cfg
 	SOM_DIR=$(SOM_DIR)/ SOM_SNAPDIR=$(BUILD)/mame/snap/ SOM_PREFIX=game-f SOM_PLAY=1 \
 		SOM_FRAMES=$(SOM_GAME) $(SOM_MAME)
+	rm -rf $(SOM_STATE) && mkdir -p $(SOM_STATE)/nvram $(SOM_STATE)/cfg
+	SOM_DIR=$(SOM_DIR)/ SOM_SNAPDIR=$(BUILD)/mame/snap/ SOM_PREFIX=dither-f SOM_PLAY=0 SOM_DITHER=1 \
+		SOM_FRAMES=$(SOM_DITHER) $(SOM_MAME)
 	@for d in $(SOM_DIR)/*/; do echo "== $$d"; \
 		$(PYTHON) tools/displaylist.py $$d --render $$d/compare.png | grep -v 'written at'; done
 

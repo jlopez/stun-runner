@@ -10,7 +10,7 @@ Standard library only. docs/08-display-list.md has the evidence for every field;
 below are ADSP program words (PM), 68k addresses (0x......) and GSP bit addresses (FFF.....).
 
 The SOM bank (0x2000 words; the ADSP writes one bank through SOMLATCH while the 68k reads the
-other at 810000, harddriv_m.cpp:612/811):
+other at 810000, harddriv_m.cpp:614/811):
 
     word 0      N: the address of the last word, an FFFF (written at PM 00BE, read at 0x02F0C2
                 as the copy length and checked at 0x02F0E2)
@@ -439,7 +439,9 @@ class Canvas:
             inc1, inc2 = (incx, 1), (0, 1)
         d = 2 * minor - major
         for _ in range(major + 1):
-            self.put(x, y, colour & 0xFF)  # MAME: COLOR1's low pixel; B9 = FFFFFFFF here
+            # LINE writes one 2-bit pixel (COLOR1's low pixel, B9 = FFFFFFFF here) and the
+            # expander gives it the colour byte of its parity, as for FILL (harddriv_v.cpp:300)
+            self.put(x, y, (colour >> (8 * (x & 1))) & 0xFF)
             if d >= 0:
                 d += 2 * minor - 2 * major
                 x, y = x + inc1[0], y + inc1[1]
