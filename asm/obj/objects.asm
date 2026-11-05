@@ -5,7 +5,7 @@
 ; object). `tools/objects asm` turns it into build/obj/page0.asm-page2.asm, one per /MP page of
 ; 0x10000 words: dc.w for the directory, the reciprocal table, every object and the checksum
 ; words, dcb.w for the zero fill, and an incbin slice of build/stunrun-obj.bin for each residue
-; range the format does not explain (docs/07 section 4). Each page holds two chips: the even
+; range the format does not explain (docs/07 section 5.3). Each page holds two chips: the even
 ; bytes (the high byte of each word) go to the first file of the pair (tools/split-roms).
 ; Assembled with vasmm68k_mot as a plain byte image (docs/04-build.md).
 

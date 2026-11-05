@@ -16,11 +16,13 @@ the object path hands over to them.
 - The ADSP reads the object ROMs only as a serial stream: a 64K-word page (/MP), a word
   address (/SIMCLK), and reads that return a word and advance (/SIMBUF). Five places start a
   read sequence (section 2), and a MAME trace of 4.1 million sequences over attract mode and a
-  started game matches the decoder word for word (section 7). **MAME**
+  started game matches the decoder's structure: every sequence starts at a structure the
+  decoder knows and reads exactly its length (section 7). The trace records no word values;
+  those are proven by the byte-identical `make check`. **MAME**
 - Page 0 starts with a **directory** of 413 words, one per object, P = page << 14 | address >> 2,
   ended by FFFF. The 68k chooses objects by number through a 24-word **object list entry** per
-  object in ADSP data RAM at DM 0A00; a 68k table of 313 **object descriptors** (0x048F9C, 20
-  bytes each) gives each game entity a near and a far object number, cull and level-of-detail
+  object in ADSP data RAM at DM 0A00; a 68k table of 314 **object descriptors** (0x048F9C, 20
+  bytes each, 0-313; 313 holds -1/-1) gives each game entity a near and a far object number, cull and level-of-detail
   distances and a radius. **CODE, MAME**
 - An **object** is a header (point count, vertex count, normal count), the vertices and the
   normals (three signed words each; the normals are typically of length about 4000h, Q14, an
@@ -96,11 +98,11 @@ the frame (0051-0053 -> 00B4).
 | 1 | 005A, & 0FFF | DM 001D | far object number | descriptor +2 (0x02E230, 0x02E368) |
 | 2-10 | 005D-0061 | DM 0000-0008 | the object's rotation matrix | entity +14h, copied by 0x022DD6 (0x02E23E, 0x02E332) |
 | 11-16 | 0062-0066 | DM 001F-0024 | position x, y, z, 32 bits each (high, low) | entity +08h, +0Ch, +10h (0x02E244-0x02E250) |
-| 17-18 | 0067-006B | DM 000A-000B | cull distance, 32 bits | descriptor +0Ch (0x02E220); an entity with +38h bit 5 set (0x02E1FC) gets 1 if it is the one whose pointer is at 0xFFDC74 (0x02E204-0x02E20E; HYP: the camera's, never drawn) and is otherwise skipped: `fill_object_entry` returns 0 at 0x02E214 and `update_object_entry` returns 0 for any bit-5 entity at 0x02E318-0x02E320 |
+| 17-18 | 0067-006B | DM 000A-000B | cull distance, 32 bits | descriptor +0Ch (0x02E220); an entity with +38h bit 5 set (0x02E1FC) gets 1 if it is the one whose pointer is at 0xFFDC74 (0x02E204-0x02E20E: a cull distance of 1, HYP: then always culled). The camera reading of that entity is contradicted by MAME: in the DUMP_FRAMES=3000 attract dump, entry 0 at DM 0A00 (the 0xFFDC74 entity, 0x02DEFC-0x02DF06) holds objects 130/131, radius 9600, LOD distance 1900h and cull distance 5DC00h, descriptor 83's values, so bit 5 was clear, and object 131 is in the attract trace's loaded list and is otherwise skipped: `fill_object_entry` returns 0 at 0x02E214 and `update_object_entry` returns 0 for any bit-5 entity at 0x02E318-0x02E320 |
 | 19-20 | 006C-0070 | DM 0025-0026 | level-of-detail distance, 32 bits | descriptor +08h (0x02E25A) |
 | 21 | 0071-0073 | DM 000F | bounding radius | descriptor +06h (0x02E264) |
 | 22 | 0074-0076 | DM 0027, sign into DM 0028 | (not decoded; no reader in the object path) | entity +36h (0x02E26A) |
-| 23 | 007E (not advanced), 0090-0094 | DM 002C, DM 002F | flags: bit 15 -> DM 002C (CALL 0887, HYP: an extra transform); bit 14 -> the batch handshake (0043-004F); bits 8-11 -> DM 002F, ORed into every face's colour word (01CE); bit 0 is written back by the ADSP: 1 = drawn, 0 = culled (DM 0013) | built from entity +38h: bit 7 -> flags bit 15 (0x02E2BE-0x02E2D2), bit 0 -> bit 14 (0x02E28A-0x02E2A2), bits 3-4 -> bits 10-11 (asl #3, lsr #6 at 0x02E274-0x02E276), bits 1-2 -> bits 8-9 (asl #5, lsr #6 at 0x02E2AA-0x02E2AC); bits 12-13 and 1-7 cleared (0x02E2D6-0x02E2F2), bit 0 kept; +38h bit 5 is not copied (tested at 0x02E1FC) |
+| 23 | 007E (not advanced), 0090-0094 | DM 002C, DM 002F | flags: bit 15 -> DM 002C (CALL 0887, HYP: an extra transform); bit 14 -> the batch handshake (0043-004F); bits 8-11 -> DM 002F, ORed into every face's colour word (01CE); bit 0 is written back by the ADSP: 1 = drawn, 0 = culled (DM 0013) | built from entity +38h: bit 7 -> flags bit 15 (0x02E2BE-0x02E2D2), bit 0 -> bit 14 (0x02E28A-0x02E2A2), bits 3-4 -> bits 10-11 (asl #3, lsr #6 at 0x02E274-0x02E276), bits 1-2 -> bits 8-9 (asl #5, lsr #6 at 0x02E2AA-0x02E2AC); bits 12-13 and 1-7 cleared (0x02E2D6-0x02E2F2); bit 0: uninitialised in `fill_object_entry`, whose flags word is the local at (-2,A6) of `link A6,#-$4` (0x02E1EC) and is never set before the `andi.b #$1,(-$1,A6)` at 0x02E2DC (the ADSP overwrites it at 0094), kept by `update_object_entry`, which loads the entry's word first (0x02E372); +38h bit 5 is not copied (tested at 0x02E1FC) |
 
 `cull_and_lod` (06A1, called at 0088) culls an entry whose distance from the camera reaches
 words 17-18 or that lies outside the view (with the radius), and sets DM 0017 when the distance
@@ -115,7 +117,8 @@ bit 14 (entry 1), bits 8-11 (0100h, 0800h, 0C00h) and bit 0 (entry 17).
 The 68k builds the list each frame in `build_object_list` (0x02DD9E): it stores 0x809400 (DM
 0A00, `hd68k_adsp_data_w` maps DM n to 0x808000 + 2n) in 0xFF9C6E (0x02DDAE), fills one entry
 per entity of its lists (the eight vehicles at 0xFF9C80 + 3Eh × k, 0xFF9E70, the list at
-0xFFDA96 and the entity whose pointer is the long at 0xFFDC74, 0x02DF00; HYP: the camera's) through `fill_object_entry`, writes FFFF after the last
+0xFFDA96 and the entity whose pointer is the long at 0xFFDC74, 0x02DF00, filled first, into entry 0 at
+0x809400, 0x02DEFC-0x02DF06, and always followed by a 30h step, 0x02DF0C-0x02DF10) through `fill_object_entry`, writes FFFF after the last
 (0x02DFB6), calls `soft_reset` if the list passes 15E3h words (0x02DFC6), and starts the frame by
 clearing DM 1FFF (0x02DFD4). 0x02E064 is the same without rebuilding (it calls
 `update_object_entry` per entity). 0x02C85A walks the same entities with their entry index
@@ -123,7 +126,7 @@ clearing DM 1FFF (0x02DFD4). 0x02E064 is the same without rebuilding (it calls
 
 ### 3.2 The object descriptors at 0x048F9C (CODE)
 
-`object_descriptor` (0x02ECF0) returns 0x048F9C + 20 × n for n < 13Ah (0x02ECF8), else 0. Each
+`object_descriptor` (0x02ECF0) returns 0x048F9C + 20 × n for n < 13Ah (`cmpi.w #$13a` / `bge`, 0x02ECF8-0x02ECFC: 314 entries, 0-313), else 0. Each
 entity holds the pointer at +26h (written at 0x02ECBE, 0x031CF0 and 23 more sites); 63 call
 sites pass a descriptor number. The 20-byte descriptor:
 
@@ -137,8 +140,12 @@ sites pass a descriptor number. The 20-byte descriptor:
 | +0Ch | long | cull distance (entry words 17-18) |
 | +10h | long | not read by `fill_object_entry` (open question) |
 
-Descriptors 0-312 are used; 313 holds -1 (an end marker). **Every object 0-412 is the near or
-far object of at least one descriptor**, and 100 objects are only ever far objects (marked in
+Descriptors 0-312 are populated (whether every one is reached from the 63 call sites is not
+established); 313, which `object_descriptor` also accepts, holds -1 as both object numbers and
+0 elsewhere (HYP: an end marker; no code that reads it as one was found; were it selected,
+entry word 0 = FFFF would end the ADSP's frame at 0051-0053). The table is followed at entry 314
+by data that is not a descriptor. **Every object 0-412 is the near or far object of at least
+one of descriptors 0-312**, and 100 objects are only ever far objects (marked in
 the inventory). Examples of call sites: descriptors 1-10 and D2h are taken at 0x0254A4-0x02561A and
 0x02BDBA-0x02BEDE and passed with the vehicle entities (0xFF9C80 + 3Eh × k, k = 0-7) to
 0x02EC9C; descriptor 7Bh + D2 (0x031D68, 0x0323F0) steps through the iris rings 204-209; 0x0364D4 (A3h -> object 252), 0x03665A and 0x03BFDE (94h -> 230/231), 0x03BE02 (93h
@@ -308,7 +315,7 @@ entities. Families:
 |---|---|---|
 | 0-10 | shapes of the eight vehicle entities and their variants | descriptors 0-10 (radius 1131), bound to the vehicle entities at 0x0254A4-0x02561A; 0, 7, 9, 10 have craft-like geometry |
 | 11-47 | craft (22-25, 30-31, 39-40), panels, wedges, boxes, slabs | geometry; LOD pairs 11/12, 13/14, 15/16, 22/23, 24/25, 30/31 |
-| 48-99, 128-129, 194-196, 350-352 | tunnel sections (open cylinders, straight, curved, tapered, with openings) | geometry; loaded in both runs; near/far pairs such as 48/49, 60/61, 62/63 in the MAME list dump |
+| 48-99, 128-129, 194-196, 350-352 | tunnel sections (open cylinders, straight, curved, tapered, with openings) | geometry; 30 loaded in at least one run (18 in both: 62-63, 68-69 and 86-93 in one only), 30 never loaded (54-55, 58-59, 64-67, 70-85, 194-196, 350-352; section 10's run column); near/far pairs such as 48/49, 60/61, 62/63 in the MAME list dump |
 | 74-77, 134-161 | tunnel sections with a second set of colours | geometry, colours |
 | 100-121, 197 | flat track sections (108-109 forks) | geometry |
 | 122-127 | tunnel mouth, half-pipe, a structure with openings | geometry |
@@ -326,8 +333,8 @@ entities. Families:
 
 The traces loaded 174 objects (137 in attract mode, 115 in the game, 78 in both); the 239 never
 loaded are marked `-` in the run column of section 10 and listed in `artifacts/objtrace-summary.json`.
-A run that reached later levels would load more; every one of the 413 is reachable through a
-descriptor.
+A run that reached later levels would load more; every one of the 413 is the near or far
+object of a populated descriptor.
 
 Columns of the table in section 10: address = word within the page; x, y, z = the vertices' bounding box (object units);
 descriptor = the descriptors naming the object as near (n) or far (nf); run = loaded in the
@@ -375,7 +382,8 @@ and that no /MP write falls between two reads of one sequence and no read preced
 | attract | 3,600 | 1,036,283 | 13,914 | 13,914 | 238,982 | 225,070 | 544,403 | 137 |
 | play | 7,200 | 3,113,316 | 45,086 | 45,086 | 728,772 | 683,506 | 1,610,866 | 115 |
 
-**0 problems**: every one of the 4,149,599 sequences matches the decoder, over 3,289 distinct
+**0 problems**: every one of the 4,149,599 sequences starts at a structure the decoder knows
+and reads exactly its length (the trace holds no word values; `make check` proves those), over 3,289 distinct
 record starts and 3,109 distinct polygon starts, the colour-0 faces of object 87 included (the
 other colour-0 objects, 179, 193, 195 and 197, were not loaded); reciprocal reads use z
 0064-4E2E. 174 objects were loaded, 239 never (they are in

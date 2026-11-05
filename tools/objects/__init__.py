@@ -16,7 +16,7 @@ The image is 0x30000 big-endian 16-bit words (byte offset / 2 = word index), thr
 
 An object, at a word address that is a multiple of 4 [00A5: the pointer is shifted left by 2]:
 
-    header   points (= vertices + normals; not read by the ADSP: 011C reads it into I0 and 011F
+    header   points (= vertices + normals; not used by the ADSP: 011C reads it into I0 and 011F
              overwrites it), vertices [011F -> DM 0032], normals [0123 -> DM 08DA]
     vertices 3 words each, x y z signed [014C-0155, transformed by 0157-015C]
     normals  3 words each, x y z signed, unit 0x4000 [0161-0172, rotated by 0169-0171]
