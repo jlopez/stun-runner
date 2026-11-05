@@ -25,7 +25,7 @@ A complete source reverse-engineering of S.T.U.N. Runner (Atari Games, 1989, MAM
 4. `docs/03-plan.md`: milestones and acceptance checks; find the milestone your room is scoped to and do not cross into the next.
 5. `docs/04-build.md`: how `make`, `make check` and `make coverage` work, the five images and the tool versions.
 6. `docs/05-ida.md`: the IDA databases (built by `make ida`, never committed), the snapshot rule and the 6502 bank scheme.
-7. `docs/06-code-map.md` (where the four programs live) and `docs/07-objects.md` (the object ROMs, `data/objects`) when your work touches them.
+7. `docs/06-code-map.md` (where the four programs live) and `docs/07-objects.md` (the object ROMs, `data/objects`) and `docs/08-display-list.md` (the SOM display list, the frame protocol, the GSP command set and rasteriser) when your work touches them.
 8. Spindizzy's `CLAUDE.md` sections 5-7 and 12 and `docs/26-assembler-source.md`: the method (bottom-up, evidence standard, naming conventions), the partition-by-region wave pattern and the IDA sync.
 9. `~/.claude/notes/autonomous-parallel-delivery-process.md` when you coordinate a wave.
 
@@ -34,7 +34,7 @@ A complete source reverse-engineering of S.T.U.N. Runner (Atari Games, 1989, MAM
 0. **Kickoff** (this leg, 2026-11-04): hardware map, toolchain, plan, this notebook, `tools/check-roms`.
 1. ROMs verified, image merged and split, Makefile skeleton with 100% blob coverage, IDA databases loaded, CI.
 2. Code map: the GSP and ADSP programs located in the 68k image, extracted and proven against MAME dumps; partition of the 768 KB. Done 2026-11-04 (docs/06): both programs in pair R at 0x01702E-0x01EFD4 through the table at 0x017000, equal to MAME's memory but one runtime word; no 68k code in RAM.
-3. Object ROM format and display list: meshes out, meshes in, byte-identical.
+3. Object ROM format and display list: meshes out, meshes in, byte-identical. Done 2026-11-05 (docs/07, docs/08): the six object ROMs are built from `data/objects` (413 named meshes; one residue word, 0:019E, stays a 2-byte blob pending Jesus), every ADSP object-ROM read in MAME matches the decoder, the SOM display list is decoded and redrawn equal to MAME's frame buffer; blob share 74.0%.
 4. 6502 sound program as source; ADPCM samples external.
 5. 68k source by region waves.
 6. GSP and ADSP programs as source through in-repo assemblers proven against unidasm.

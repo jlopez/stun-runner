@@ -80,8 +80,7 @@ SR0 + AY0` with AY0 = 10h (0233), 0235 `AR = MR1 OR AF`; so the index is `(colou
 shade`, and bit 4 is clear for an odd record colour; colours 1Fh and up are not lit and
 are stored masked, `colour AND 1Fh` (021A-021F), so a record colour of 20h-3Fh reaches the command
 word as 00h-1Fh), 1000h for image records, the type-1 faces (01C9-01CC; docs/07 section 4), and the object's
-flags DM 002F (the object list entry's bits 8-11, 0082-0084, docs/07 section 3.1, which calls
-them the colour bank: bits 8-9 land in the colour index, bits 10-11 are the fill).
+flags DM 002F (the object list entry's bits 8-11, 0082-0084, docs/07 section 3.1, where bits 8-9 land in the colour index, bits 10-11 are the fill).
 
 | Bits | Meaning | GSP |
 |---|---|---|

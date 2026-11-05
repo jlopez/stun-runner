@@ -227,8 +227,8 @@ from 1019 with M4 = 1 while L3 = 3 wraps I3 over the normal at DM 0014-0016, so 
 normal . (PM 1019-101B + PM 101C-101E); `copy_frame_parameters` fills all six from DM 1FEF-1FF4
 at 001B-0020; HYP: two light vectors), faded with depth by 0238; colours 1Fh and up become colour & 1Fh. Type 1 faces skip shading and
 carry 1000h (01C9-01CC), and the clipper takes another path for them (0273-0276 -> 068B, then
-0663 at 01D9; docs/08). Every face's colour word then gets the entry's colour bank, flags bits
-8-11 (01CD-01D0). What the colour word selects in the GSP palette is docs/08. Type 1 faces are not
+0663 at 01D9; docs/08). Every face's colour word then gets the entry's flags bits
+8-11 (01CD-01D0): bits 8-9 extend the colour index and bits 10-11 are the GSP fill mode (docs/08 section 1.2). What the colour word selects in the GSP palette is docs/08. Type 1 faces are not
 polygons: `emit_image` (0663) writes each as a SOM image command whose bits 0-5, the face's
 colour, name an image, and the GSP draws it as a scaled image quad (docs/08 sections 1.4 and
 4.4); the meshes of objects 335 and 353-363 are the quads' corners.
