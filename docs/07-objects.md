@@ -336,6 +336,7 @@ entities. Families:
 | 74-77, 134-161 | tunnel sections with a second set of colours | geometry, colours |
 | 100-121, 197 | flat track sections (108-109 forks) | geometry |
 | 122-127 | tunnel mouth, half-pipe, a structure with openings | geometry |
+| 130-133 | large panels (130/131) and a ramp or flat (132/133) | geometry; descriptors 83 (130/131: the 0xFFDC74 entity of section 3.1, entry 0 of the DUMP_FRAMES=3000 attract dump) and 84 (132/133); 131 loaded in both runs, 132-133 in attract mode only, 130 never (section 10's run column) |
 | 162-193 | striped tunnel sections (HYP: the map's "construction") | geometry: orange stripes over the tunnel shape |
 | 198-203 | arrow signs, the words "STATION" and "CAUTION" | geometry (letters readable in the faces) |
 | 204-209 | an iris ring in six steps (from a full disc to a thin ring) | geometry; descriptor 7Bh + n (0x031D68) |
