@@ -469,8 +469,10 @@ the CPUs (harddriv_m.cpp:595-601).
 2. The SOM display list: answered by docs/08 sections 1 and 2 (the header words written at
    00BB-00C0, the FFFF at 00B5 that ends the commands, `write_draw_order` 080B and the frame
    protocol); what it leaves open is docs/08 section 6.
-3. GSP sections 1 and 2: confirm the `.cinit` reading of section 1 by decoding FFF59C70 (M6), and
-   the command-buffer format at FFF9FC10/FFFCFC10 and its writer (M5d).
+3. GSP sections 1 and 2: confirm the `.cinit` reading of section 1 by decoding FFF59C70 (M6). The
+   command-buffer format at FFF9FC10/FFFCFC10 and its writer (the 68k, through the host port) are
+   answered by docs/08 sections 2 and 3; the header block, the writer of FFF77F50 and the targets
+   of codes 6, 8, B and D stay open there (docs/08 section 6, M5d).
 4. The packed image format of pairs U-V, and when the images of 0x09F1C5-0x0B10EB (table entries
    47-68) are shown (M5d, M5f).
 5. The two longs at 0x017008, the word at 0x01702C, ADSP control lines 2 and 4, and 818040.
