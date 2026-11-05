@@ -85,11 +85,12 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
 - `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/`, `tools/` and `data/objects` fed with a synthetic set (this is how CI exercises the real trees without ROMs; since M3a the synthetic set carries the object image the committed meshes encode to, with a random residue word, and an edited mesh must change the built chip). `tools/test_objects.py` adds the object format's tests (docs/07 section 8.3), among them one that runs in CI against the real hashes: the committed meshes encode to the four chips of pages 1 and 2 with MAME's CRC-32 and SHA-1.
 - `make lint`: ruff and mypy over the tools.
 - `make somdump` (needs MAME and the ROMs; never in CI): `tools/mame/somdump.lua` captures the
-  SOM display list at the frames of `SOM_ATTRACT` (attract mode) and `SOM_GAME` (a game started at
-  frame 900) into `build/mame/som/<attract|game>-f<N>/` (SOM banks, ADSP data RAM, the GSP command
+  SOM display list at the frames of `SOM_ATTRACT` (attract mode), `SOM_GAME` (a game started at
+  frame 900) and `SOM_DITHER` (attract mode with every colour word's two bytes made different,
+  `SOM_DITHER=1`, docs/08 section 5) into `build/mame/som/<attract|game|dither>-f<N>/` (SOM banks, ADSP data RAM, the GSP command
   buffer, the frame-buffer page before and after the list, colour and image tables, palette,
   snapshots, the frame's protocol events), then runs `tools/displaylist.py` on each: decode,
-  redraw, compare with MAME's page (docs/08-display-list.md). Each of its two MAME runs starts
+  redraw, compare with MAME's page (docs/08-display-list.md). Each of its three MAME runs starts
   from an empty private state, `build/mame/somstate` (removed first, then `-nvram_directory` and
   `-cfg_directory` there): the game boots from the set's own 200e/210e, attract mode (which
   follows the NVRAM's history) shows the same scenes on every run and machine, the user's

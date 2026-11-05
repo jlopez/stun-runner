@@ -20,10 +20,11 @@ become a projected polygon.
 - After the ADSP flips the bank, the 68k copies the list verbatim through the GSP host port into
   one of two GSP command buffers, as command 7000 among its own commands (section 2, MAME).
 - The GSP's command interpreter has 16 command codes (section 3); code 7 walks the table and fills
-  each polygon span by span through the 2 bpp expander, with dithered colours, stipple patterns,
-  outlines and scaled images (section 4).
+  each polygon span by span through the 2 bpp expander (whose even and odd pixels take the two
+  bytes of the colour word), with stipple patterns, outlines and scaled images (section 4).
 - **The reference renderer in `tools/displaylist.py` redraws all 12 captured lists and equals
-  MAME's frame buffer on every pixel it draws: 820,519 pixels over 12 frames, 0 different; and
+  MAME's frame buffer on every pixel it draws: 820,519 pixels over 12 frames, 0 different (and
+  224,180 more over three replays whose colour words have two different bytes); and
   every pixel the list changed in MAME's page (page before the list vs after) is one it drew: 0
   missed.** The screen MAME shows a frame later is that page pixel for pixel (122,880 of 122,880
   in all 12 captures). Section 5 says what this proves and what it does not.
@@ -33,7 +34,7 @@ become a projected polygon.
 The SOM memory is two banks of 0x2000 words (`m_som_memory`, harddriv.h:386). The ADSP writes
 with /SOMCLK (DM 2003, sets the address) and SOMLATCH (DM 2002, stores a word into bank
 `m68k_bank ^ 1` and advances; `hdadsp_special_w`, harddriv_m.cpp:803-818); the 68k reads bank
-`m68k_bank` at 810000-813FFF (`hd68k_adsp_buffer_r`, harddriv_m.cpp:612) and sets `m68k_bank` with
+`m68k_bank` at 810000-813FFF (`hd68k_adsp_buffer_r`, harddriv_m.cpp:614) and sets `m68k_bank` with
 ADSP control line 3 (`hd68k_adsp_control_w` case 3, harddriv_m.cpp:699-701; 0x02C3FA writes 818006 =
 bank 0, 0x02C408 writes 818016 = bank 1).
 
@@ -68,8 +69,10 @@ image x, y      PM 0678, 067A (attract-f2700, -f3000)
 ### 1.2 The command word (CODE; MAME for the cases marked)
 
 Written at 0515 (polygons) or 066A (images) from DM 0036, which the record reader builds (docs/07):
-the record's colour (the low 6 bits of its second word, 01A0), lit at 0214 (`colour << 4 | 10h`
-plus a shade 0-Fh from the normal and the light, 0221-0236; colours 1Fh and up are not lit and
+the record's colour (the low 6 bits of its second word, 01A0), lit at 0214 (`((colour << 4) + 10h)
+OR shade`, the shade 0-Fh from the normal and the light: 0232 `SR = LSHIFT SI BY 4`, 0234 `AF =
+SR0 + AY0` with AY0 = 10h (0233), 0235 `AR = MR1 OR AF`; so the index is `(colour + 1) << 4 |
+shade`, and bit 4 is clear for an odd record colour; colours 1Fh and up are not lit and
 are stored masked, `colour AND 1Fh` (021A-021F), so a record colour of 20h-3Fh reaches the command
 word as 00h-1Fh), 1000h for image records (01C9-01CC) and the object's flags DM 002F (the object list
 entry's bits 8-11, 0082-0084).
@@ -134,13 +137,13 @@ MAME: in every capture the table is a permutation of the commands (the decoder c
 every command is drawn exactly once; the GSP draws in table order, so the head end is behind (HYP
 that larger keys are farther: the redrawing only needs the order, not its meaning).
 
-### 1.6 MAME's LOG_COMMANDS reading (`deferred_adsp_bank_switch`, harddriv_m.cpp:632-680)
+### 1.6 MAME's LOG_COMMANDS reading (`deferred_adsp_bank_switch`, harddriv_m.cpp:634-682)
 
 | MAME | This document | Verdict |
 |---|---|---|
 | `end = base + base[0]` | N, the final FFFF; the loop stops before it | right |
 | `table = base + 1 + base[1]` | T + 1, the first table entry | right |
-| `current = base + 2`, `while (current + 5 < table)` | commands from word 2 | right for polygons; a list whose last command is shorter than 6 words would lose it (none can be: a polygon is at least 6, an image with no point 3, HYP) |
+| `current = base + 2`, `while (current + 5 < table)` | commands from word 2 | right for polygons: `table` is word T + 1, so a command at word c is read while c + 5 < T + 1 and only a last command shorter than 5 words would be lost (a polygon is at least 6, an image with one point 5 and still read; only an image with no point, 3 words, would be lost: never seen, HYP that none is written) |
 | `Cmd @ off = c1 c2-c3 @ c4` | cmd, xl - xr @ y | right (xl, xr on the top row y) |
 | `rslope` = first long, `lslope` = second, then `count` | right slope, left slope, count | right; the first long is the right edge's (GSP A6, FFF45540) |
 | `rslope == 0xffffffff` ends the command | FFFF FFFF | right (as the GSP, which tests only the first long, FFF45520) |
@@ -308,8 +311,13 @@ The right edge is exclusive (A6 = xr + 1), so a row spans xl..xr inclusive.
 The colour is the word at FFF71D20 + 10h * (command & 3FFh), written to F4000000
 (`gsp_control_lo[0]`, FFF452D0-FFF45330). The expander replicates it as `color | color << 16`
 and writes byte i of that long to pixel i of each group of four (harddriv_v.cpp:300-318, the
-mask table at :32-56): **even pixels get the low byte, odd pixels the high byte**, so each colour
-is a two-index dither (MAME: the redrawing writes them so and matches).
+mask table at :32-56): **even pixels get the low byte, odd pixels the high byte**, so a colour
+word could be a two-index dither (CODE, the MAME source). The game's own table does not use it:
+in all 12 captures every one of the 400h words has equal bytes, so those comparisons cannot tell
+this rule from one byte everywhere. The MAME evidence is the three `dither-f*` captures of
+section 5, a replay of attract mode in which `somdump.lua` (SOM_DITHER=1) rewrites every word
+as lo | (lo ^ 80h) << 8 each frame: there the redrawing matches MAME's page on every pixel, fills
+and outlines, even and odd (MAME).
 
 The pattern COLOR1 (B9) decides which 2-bit pixels are written: FFFFFFFF (solid), 15151515h
 (01 01 01 00: three pixels in four; also for colour byte 4 with fill 0 or 2, FFF45230-FFF45290),
@@ -325,8 +333,11 @@ would give the same result). The 25% fill is the shadow under the player's ship 
 segment of count n > 1 both edges as LINE 0 Bresenham lines from the current vertex by (dx, n - 1),
 dx = the integer part of slope * (n - 1) (MPYS with a 12-bit field, FFF45A80-FFF45AF0, no
 rounding), then the bottom row (FFF45BF0). `draw_edge_line` (FFF45C60) sets up LINE 0 (decision
-2 minor - major, a diagonal step when it is >= 0). MAME's LINE writes COLOR1's low pixel
-(`line`, 34010gfx.hxx:21-60); the pattern is all ones here. The attract mode's wireframe tunnel
+2 minor - major, a diagonal step when it is >= 0). MAME's LINE writes one 2-bit pixel, COLOR1's
+low pixel (`line`, 34010gfx.hxx:21-60; the pattern is all ones here), through the 2 bpp expander:
+nothing between FFF45C60 and FFF45DD0 changes PSIZE, so the expander stores byte x & 3 of
+`color | color << 16`, and a line pixel gets the colour word's byte for its parity, low at even
+x, high at odd x, as a fill does (MAME: the `dither-f*` captures, section 5). The attract mode's wireframe tunnel
 (attract-f2100, 102 outlines; also attract-f1200 and -f1800) is drawn this way (MAME, redrawn
 exactly).
 
@@ -335,9 +346,12 @@ E0h (pixel 0 transparent), the image (command & 3Fh) from the table FFF78150 (lo
 E0): height, width, then pixels from 60h bits on. The box is from point 0 to (point 1's x, point
 2's y); its height is point 2's y - point 1's y + 1 (FFF494E0-FFF495C0). Each axis is scaled by a
 16.16 step (DIVU: image size << 16 / box size, FFF496E0, FFF49760) whose fraction accumulator
-starts at one step, not zero (FFF49710, FFF49790). Boxes are rejected when the image is missing,
-x >= 200h, y >= 117h, the far corner is left of or above the near one, or (without FFF77E60 bit
-4) the box is 15Eh wide or C8h high or more (FFF49230-FFF49650). The text panel of the attract
+starts at one step, not zero (FFF49710, FFF49790). Boxes are rejected (FFF49230-FFF49650) when
+the image is missing (FFF49230), point 0's x >= 200h (FFF49280) or its y >= 117h (FFF492F0),
+point 1's x is negative (FFF49380) or left of point 0's (`SUB A0,A1`, FFF493D0), point 2's y is
+below 28h (`CMPI 28h,A2`, FFF49510) or above point 1's y (`SUB A0,A2` with A0 = point 1's y
+from FFF494E0, FFF49570; the height is p2.y - p1.y + 1), or (without FFF77E60 bit 4) the box is
+15Eh wide or C8h high or more (FFF49480, FFF495F0). The text panel of the attract
 mode's story screen is one such quad (attract-f3000); attract-f2700 has a small one, scaled down. The images are the 68k's
 packed images (pairs U-V, M5d); `somdump.lua` dumps them for the redrawing, never committed.
 
@@ -353,8 +367,8 @@ the image quads that are part of the 3D scene (sprites placed in the world, the 
 
 `tools/displaylist.py` implements section 4 instruction by instruction: the packed (y, x)
 arithmetic with carries, the half-pixel start, the V test that skips a row and its pattern
-rotation, the window, the expander's even/odd bytes, the three patterns and their rotation, LINE 0
-for outlines, and the image quad's scaling. `make somdump` captures, for each chosen frame:
+rotation, the window, the expander's even/odd bytes (for FILL and LINE alike), the three patterns
+and their rotation, LINE 0 for outlines, and the image quad's scaling. `make somdump` captures, for each chosen frame:
 the page when the GSP reads the 7000 (before the list) and when it reads the word after the list
 (GSP read taps on those two command-buffer words; both reads are the dispatcher's `MOVE *A5+,A4,0`
 at FFF46F90, the CURPC that `meta.txt` records as `fb_som_pc`), the colour and image
@@ -375,10 +389,20 @@ page and is compared with MAME's page after the list:
 | game-f3600 | 3606 | 3311 | 178 solid, 3 25% | 60332 | 60332 | 60332 | 0 | 122880 |
 | game-f4200 | 4232 | 4973 | 257 solid, 5 25% | 59993 | 59993 | 59993 | 0 | 122880 |
 | game-f4800 | 4806 | 4770 | 243 solid, 5 25% | 44713 | 44713 | 44713 | 0 | 122880 |
+| dither-f1200 | 1206 | 6192 | as attract-f1200 | 106496 | 106496 | 106496 | 0 | 122880 |
+| dither-f1800 | 1808 | 6721 | as attract-f1800 | 106460 | 106460 | 106103 | 0 | 122880 |
+| dither-f2100 | 2105 | 5908 | as attract-f2100 | 11224 | 11224 | 11224 | 0 | 122880 |
 
 "Pixels drawn" counts the pixels the renderer writes (last writer wins), "Equal" those equal to
 MAME's page after the list, "Changed" the pixels that differ between MAME's page before and after
-the list, "Missed" the changed pixels the renderer did not draw. "Snapshot = page" compares the
+the list, "Missed" the changed pixels the renderer did not draw. The three `dither-f*` rows are
+a third MAME run of `make somdump`: attract mode again from the same empty state, with
+`SOM_DITHER=1`, which rewrites every colour word as lo | (lo ^ 80h) << 8 each frame (the GSP only
+reads the table): the lists are byte-identical to attract-f1200, -f1800 and -f2100's, but every
+polygon now has two different bytes for its even and odd pixels. In the 12 game-table captures
+every colour word has equal bytes, so only these three test which byte a pixel gets; in them the
+redrawing is equal on every pixel, fills and outlines (dither-f2100: 102 outlines), even x low
+byte and odd x high byte (`test_captures_against_mame` asserts all four cases occur). "Snapshot = page" compares the
 screen snapshot one frame later with the final page through palette bank 0. Pictures (MAME's page
 | the redrawing | green equal, red different, grey not drawn): ![wireframe](../artifacts/display-list/compare-attract-f2100.png)
 ![game](../artifacts/display-list/compare-game-f2400.png)
@@ -386,18 +410,21 @@ screen snapshot one frame later with the final page through palette bank 0. Pict
 
 **What this proves.** For these 12 frames the format of section 1 is complete (no word
 unexplained, the table a permutation), and the description of section 4 reproduces MAME's TMS34010
-pixel for pixel on every pixel the list touches, including the dithered colours, the stipple
-phase, the window, the outlines' Bresenham lines and the scaled image; nothing the list changed
-is missing from the redrawing. **What it does not prove.** MAME is the oracle, not the board: where
+pixel for pixel on every pixel the list touches, including the stipple phase, the window, the
+outlines' Bresenham lines and the scaled image; nothing the list changed is missing from the
+redrawing. The expander's even/odd bytes, for fills and for outlines, rest on the three
+`dither-f*` captures with their modified table: the game's own table gives no two-byte colour in
+any capture, so no frame the game draws shows a dither. **What it does not prove.** MAME is the oracle, not the board: where
 MAME's TMS34010 simplifies (FILL's COLOR1 halves, LINE's pixel colour) the redrawing follows MAME.
-The fill 1 pattern (75%), colour byte 4, bit 15 and commands 1, 2, 6, A, B, C and E0 do not occur
-in the captures: their description is CODE only. The colour table, the palette and the images are
+The fill 1 pattern (75%), colour byte 4, a row skipped by the V test, bit 15 and commands 1, 2,
+6, A, B, C and E0 do not occur in the captures: their description is CODE only (the first three
+have synthetic CI tests of the renderer, which pin the code reading, not MAME). The colour table, the palette and the images are
 inputs taken from MAME's memory; how they are loaded is M5d. "Changed" equals "drawn" in 11 of the 12
 captures; in attract-f1800 the list writes 81 pixels with the value they already had (drawn and
 equal, not changed). A pixel written so is invisible to the "missed" test.
 
 The captures are reproducible: `make somdump` removes `build/mame/somstate` and starts each MAME
-run (attract, then the game) with that empty directory as its NVRAM and cfg, so the game boots
+run (attract, the game, then attract with the modified colour table) with that empty directory as its NVRAM and cfg, so the game boots
 from the set's own 200e/210e. Attract mode depends on the NVRAM's history (a run from a previous
 run's NVRAM shows different scenes at the same frames), so the frames above hold only from that
 state; two runs from it give byte-identical captures.
@@ -405,12 +432,15 @@ state; two runs from it give byte-identical captures.
 CI cannot run MAME: it decodes the three lists committed under `artifacts/display-list/`
 (attract-f2100, attract-f3000, game-f3000; runtime SOM memory, 11.5 KB, 134 bytes and 5.2 KB) and
 redraws their polygons with a synthetic colour table against checksums recorded when the same
-redrawing matched MAME (`expected.json`, written by `tools/displaylist.py CAPTURE --export NAME`).
+redrawing matched MAME, the `dither-f*` captures included, whose colour words have two bytes as
+the synthetic table's do (`expected.json`, written by `tools/displaylist.py CAPTURE --export NAME`).
 The colour table and the images are not committed (the game's data), so CI does not redraw
 attract-f3000's image quad: the test asserts it is the one command left undrawn. The image
-scaler (16.16 steps, the accumulators' start at one step, the transparent pixel, the box limits
-with and without FFF77E60 bit 4), the stipple phase at an odd y and the clamp of a command-5
-window run in CI on synthetic inputs (`tools/test_displaylist.py`).
+scaler (16.16 steps, the accumulators' start at one step, the transparent pixel, every rejection
+of section 4.4, the box limits with and without FFF77E60 bit 4), the stipple phase at an odd y,
+a row skipped by the V test (no rotation) against an empty row (rotated), colour byte 4 as 75%,
+the outline's odd-x pixels taking the high byte and the clamp of a command-5 window run in CI on
+synthetic inputs (`tools/test_displaylist.py`).
 
 ## 6. Open questions
 
