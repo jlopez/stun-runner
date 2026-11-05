@@ -2,15 +2,18 @@
 ;
 ; Named where the code shows the role (docs/09-sound-program.md section 5); every other address
 ; the code uses is zp_XX (zero page) or ram_XXXX, for later legs to rename. An address is
-; listed once, at the base the code indexes from: the arrays of 30 bytes ($1E, one per entry
-; of a 30-entry table indexed by X) start at 0248 and are $1E apart up to 0842.
+; listed at the base the code indexes from: most of 0248-085F are arrays of 30 bytes, 1E apart
+; and indexed by X up to 1D (imm_00 clears five of them at 4253-4265), for later legs to name
+; together.
 
 ; zero page
 zp_00 = $00
 zp_01 = $01
 zp_02 = $02
 zp_03 = $03
-nmi_data_ptr = $04                      ; 2 bytes: where h_nmi stores a data byte while nmi_mode = 0 (5CC5 points it at zp_63)
+; 2 bytes: where h_nmi stores a byte while nmi_mode is 0 (57FA-5805); imm_04 points it at
+; zp_63 (5CC5-5CCE)
+nmi_data_ptr = $04
 zp_06 = $06
 zp_07 = $07
 zp_08 = $08
@@ -39,9 +42,12 @@ zp_21 = $21
 zp_22 = $22
 zp_23 = $23
 zp_43 = $43
-mix_shadow = $44                        ; the last value written to MIX (4729, 42CB, 59EB, 5CAE)
-wrio_shadow = $45                       ; the last value written to WRIO (409B, 411C, 58FE, 5BAC, 5DA7)
-ym_1b_shadow = $46                      ; the last value written to YM2151 register 1B (438F, 42AC)
+; the value last written to MIX (written at 42CB and 4729)
+mix_shadow = $44
+; the value last written to WRIO (written at 4092, 409B, 411C, 5901, 5BB5, 5DA7)
+wrio_shadow = $45
+; the value last written to YM2151 register 1B (written at 4123, 4396, 43A5, 5674)
+ym_1b_shadow = $46
 zp_47 = $47
 zp_48 = $48
 zp_49 = $49
@@ -71,15 +77,24 @@ zp_75 = $75
 stack = $0100
 
 ; RAM
-cmd_queue = $0200                       ; 48 bytes: commands h_nmi queues (5836-5846), main_loop runs (4171-4186)
-cmd_queue_out = $0230                   ; index of the last command taken by main_loop (4171-4180)
-cmd_queue_in = $0231                    ; index of the last command queued by h_nmi (5815-581F)
-nmi_data_count = $0232                  ; 2 bytes: bytes h_nmi stored while nmi_mode = 0 (57F2-57F7)
-nmi_mode = $0234                        ; FF: h_nmi queues commands; 0: stores the byte at nmi_data_ptr; else drops it
-resp_queue = $0235                      ; 16 bytes: responses queue_response queues, main_loop sends (4159-416E)
-resp_queue_out = $0245                  ; next response main_loop sends
-resp_queue_in = $0246                   ; next free entry of resp_queue (44D0)
-resp_queue_full = $0247                 ; 80 when queue_response found resp_queue full (44E6)
+; 48 bytes: the commands h_nmi queues (5834-5846) and main_loop runs (4171-4186)
+cmd_queue = $0200
+; the entry main_loop took last (4171-4180)
+cmd_queue_out = $0230
+; the entry h_nmi filled last (5815-581F)
+cmd_queue_in = $0231
+; 2 bytes: the bytes h_nmi stored while nmi_mode is 0 (57F2-57F7)
+nmi_data_count = $0232
+; FF: h_nmi queues commands; 0: it stores the byte at nmi_data_ptr; else it drops it
+nmi_mode = $0234
+; 16 bytes: the responses queue_response queues (44D0) and main_loop sends (4159-416E)
+resp_queue = $0235
+; the next entry main_loop sends
+resp_queue_out = $0245
+; the next free entry
+resp_queue_in = $0246
+; 80 when queue_response found resp_queue full (44E6)
+resp_queue_full = $0247
 ram_0248 = $0248
 ram_0266 = $0266
 ram_0284 = $0284

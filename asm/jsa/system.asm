@@ -13,11 +13,11 @@
     .cerror * != $4000, "system.asm must start at $4000"
 
 ; --- The reset vector. A pulse of WRIO bit 0 (YM2151 reset, active low) with every other WRIO bit
-; 0 (bank 0, OKI reset held low). RDIO bit 7 is the self-test input (in MAME the inverted IN0
-; bit 5 of the main board, the test switch): clear, the normal start, which clears the zero page
-; and goes to the initialisation (_l4113); set, the self-test (_l402A): zero page and stack page
-; with a walking bit, then pages 02-1F, the ROM checksum and the timed IRQ, each failure a bit in
-; zp_02 (the byte imm_03 sends the 68010, 4533). Not executed in the make sndtrace runs.
+; 0 (bank 0, OKI reset held low). RDIO bit 7, the self-test request: clear, the normal start,
+; which clears the zero page and goes to the initialisation (_l4113); set, the self-test
+; (_l402A): zero page and stack page with a walking bit, then pages 02-1F, the ROM checksum and
+; the timed IRQ, each failure a bit in zp_02 (the byte imm_03 sends the 68010, 4533). The
+; self-test cannot run in MAME 0.289, where RDIO bit 7 is always 0 (hardware.asm).
 reset
     sei
     cld
@@ -291,7 +291,8 @@ sub_41BD
 ; during the self-test (zp_01 set) it only counts zp_00; else, unless it interrupted itself
 ; (zp_11), it runs, with interrupts enabled, sub_4229 (into sequencer.asm at loc_5043, X = 0
 ; and 1 on alternate ticks), sub_5BC6 (oki.asm) and sub_5CE8 (io.asm), again as long as a nested
-; IRQ came in meanwhile (zp_12). A BRK (status bit 4 on the stack) restarts at loc_4141 with an empty stack.
+; IRQ came in meanwhile (zp_12). A BRK (status bit 4 on the stack) restarts at loc_4141 with an
+; empty stack.
 h_irq
     pha
     txa

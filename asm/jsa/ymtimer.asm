@@ -384,7 +384,8 @@ _l5B60
     tay
     rts
 
-; from 5AD2, 5AD7, 5ADC, 5AE1, 5AE6, 5AEB, 5AF0, 5AF5, 5AFA, 5AFF, 5B04, 5B09, 5B11, 5B16, 5B1B, 5B20, 5B25, 5B2A, 5B2F, 5B34, 5B39, 5B3E, 5B43, 5B48; not executed in the make sndtrace runs
+; from 5AD2, 5AD7, 5ADC, 5AE1, 5AE6, 5AEB, 5AF0, 5AF5, 5AFA, 5AFF, 5B04, 5B09, 5B11, 5B16, 5B1B,
+; 5B20, 5B25, 5B2A, 5B2F, 5B34, 5B39, 5B3E, 5B43, 5B48; not executed in the make sndtrace runs
 sub_5B63
     iny
     lda (zp_49),y

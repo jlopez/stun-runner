@@ -229,7 +229,8 @@ cmdtype_00
     sta zp_1E
     rts
 
-; cmdtype_handlers entry $11; op_handlers entry for stream byte $A5; not executed in the make sndtrace runs
+; cmdtype_handlers entry $11; op_handlers entry for stream byte $A5; not executed in the make
+; sndtrace runs
 cmdtype_11
     php
     sei
