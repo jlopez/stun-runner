@@ -8,6 +8,7 @@ the ROM image.
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 
@@ -108,7 +109,8 @@ def test_winding_tells_an_in_plane_normal_from_a_zero_area_face() -> None:
 def test_winding_counts_of_the_data() -> None:
     """docs/07 section 11.1's winding counts over data/objects: 6,531 faces agree with their
     stored normal, 5 are reversed, 2 (object 122, faces 11 and 16) have a stored normal in their
-    plane, 2 are lines, none has zero area."""
+    plane, 2 are lines (310 and 336, face 0 each), none has zero area. The test is the sign
+    of n . normal only (see the next test for the angle)."""
     _, meshes, _ = read_data(DATA)
     by: dict[str, list[tuple[int, int]]] = {}
     for n, m in sorted(meshes.items()):
@@ -122,6 +124,66 @@ def test_winding_counts_of_the_data() -> None:
     }
     assert by["reversed"] == [(122, 10), (122, 17), (260, 37), (262, 37), (264, 36)]
     assert by["in-plane"] == [(122, 11), (122, 16)]
+    assert by["line"] == [(310, 0), (336, 0)]
+
+
+def _newell(m: Mesh, i: int) -> tuple[int, int, int]:
+    vs = [m.vertices[k] for k in m.faces[i].vertices]
+    nx = ny = nz = 0
+    for k, a in enumerate(vs):
+        b = vs[(k + 1) % len(vs)]
+        nx += (a[1] - b[1]) * (a[2] + b[2])
+        ny += (a[2] - b[2]) * (a[0] + b[0])
+        nz += (a[0] - b[0]) * (a[1] + b[1])
+    return nx, ny, nz
+
+
+def _angle(u: tuple[int, int, int], v: tuple[int, int, int]) -> float:
+    c = sum(a * b for a, b in zip(u, v, strict=True)) / math.hypot(*u) / math.hypot(*v)
+    return math.degrees(math.acos(max(-1.0, min(1.0, c))))
+
+
+def test_stored_normals_far_from_the_face_normal() -> None:
+    """docs/07 section 11.1: the faces whose stored normal is more than 30 degrees from Newell's
+    normal of the vertex order; object 122's left half (faces 10-17) carries the y-mirror of each
+    face's own normal, its right half (0-9) agrees within a degree, and object 350's faces 15-20
+    carry Newell's normal with y (and on 17-20 z) negated. The sign test of winding() calls
+    12-15 of 122 and all of 350 "agrees"."""
+    _, meshes, _ = read_data(DATA)
+    far = []
+    for n, m in sorted(meshes.items()):
+        for i, f in enumerate(m.faces):
+            if len(f.vertices) >= 3 and _angle(_newell(m, i), m.normals[f.normal]) > 30:
+                far.append((n, i))
+    assert far == [
+        *((122, i) for i in (10, 11, 12, 15, 16, 17)),
+        (260, 37),
+        (262, 37),
+        (264, 36),
+        (264, 40),
+        (350, 17),
+        (350, 18),
+    ]
+    m = meshes[122]
+    for i in range(10):
+        assert _angle(_newell(m, i), m.normals[m.faces[i].normal]) < 1, i
+    for i in range(10, 18):
+        nx, ny, nz = _newell(m, i)
+        stored = m.normals[m.faces[i].normal]
+        assert _angle((nx, -ny, nz), stored) < 1, i
+    assert [winding(m, i) for i in range(10, 18)] == [
+        "reversed",
+        "in-plane",
+        *["agrees"] * 4,
+        "in-plane",
+        "reversed",
+    ]
+    m = meshes[350]
+    for i in range(15, 21):
+        nx, ny, nz = _newell(m, i)
+        stored = m.normals[m.faces[i].normal]
+        assert _angle((nx, -ny, -nz if i >= 17 else nz), stored) < 1, i
+        assert winding(m, i) == "agrees", i
 
 
 def test_unshaded_faces_keep_the_index_colour() -> None:

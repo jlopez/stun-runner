@@ -108,7 +108,9 @@ def winding(mesh: Mesh, face_index: int) -> Winding:
     (n != 0) but the stored normal lies in its plane (n . normal = 0), "zero-area" when n = 0,
     "line" for a face of fewer than three vertices. In the left-handed object space "agrees"
     means the vertices run clockwise on screen when the face is drawn (seen from the side its
-    normal points to). The ADSP never uses the winding; docs/07 section 11.1 counts it."""
+    normal points to). Only the sign of n . normal counts: a stored normal 54 degrees off (object
+122 faces 12 and 15) still "agrees". The ADSP never uses the winding; docs/07 section 11.1
+counts it and lists the faces whose stored normal is far from n."""
     f = mesh.faces[face_index]
     vs = [mesh.vertices[i] for i in f.vertices]
     if len(vs) < 3:
