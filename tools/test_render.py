@@ -10,21 +10,25 @@ from __future__ import annotations
 import json
 import math
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
-from objects import Face, Mesh, read_data
+from objects import Face, FormatError, Mesh, read_data
 from objects.render import (
     PICTURES,
     VIEWS,
     Canvas,
     draw,
+    face_rgb,
     face_visible,
     index_rgb,
     parse_numbers,
     pictures,
     png,
     png_pixels,
+    read_palette,
     render,
     winding,
 )
@@ -95,7 +99,7 @@ def test_culling_follows_the_adsp() -> None:
 
 def test_winding_tells_an_in_plane_normal_from_a_zero_area_face() -> None:
     """A square whose stored normal lies in its plane has area but is "in-plane"; a face whose
-    vertices are collinear is "zero-area"; a two-vertex face is a "line"."""
+    vertices are collinear is "zero-area"; a two-vertex face is "degenerate"."""
     v = [(-10, -10, 0), (-10, 10, 0), (10, 10, 0), (10, -10, 0), (0, 0, 0)]
     mesh = Mesh(
         0,
@@ -103,13 +107,13 @@ def test_winding_tells_an_in_plane_normal_from_a_zero_area_face() -> None:
         [(0x4000, 0, 0)],
         [Face(15, 5, 0, [0, 1, 2, 3]), Face(15, 5, 0, [0, 4, 2]), Face(15, 5, 0, [0, 2])],
     )
-    assert [winding(mesh, i) for i in range(3)] == ["in-plane", "zero-area", "line"]
+    assert [winding(mesh, i) for i in range(3)] == ["in-plane", "zero-area", "degenerate"]
 
 
 def test_winding_counts_of_the_data() -> None:
     """docs/07 section 11.1's winding counts over data/objects: 6,531 faces agree with their
     stored normal, 5 are reversed, 2 (object 122, faces 11 and 16) have a stored normal in their
-    plane, 2 are lines (310 and 336, face 0 each), none has zero area. The test is the sign
+    plane, 2 are degenerate (310 and 336, face 0 each), none has zero area. The test is the sign
     of n . normal only (see the next test for the angle)."""
     _, meshes, _ = read_data(DATA)
     by: dict[str, list[tuple[int, int]]] = {}
@@ -120,11 +124,23 @@ def test_winding_counts_of_the_data() -> None:
         "agrees": 6531,
         "reversed": 5,
         "in-plane": 2,
-        "line": 2,
+        "degenerate": 2,
     }
     assert by["reversed"] == [(122, 10), (122, 17), (260, 37), (262, 37), (264, 36)]
     assert by["in-plane"] == [(122, 11), (122, 16)]
-    assert by["line"] == [(310, 0), (336, 0)]
+    assert by["degenerate"] == [(310, 0), (336, 0)]
+
+
+def test_the_degenerate_faces_are_one_point_never_drawn() -> None:
+    """310 and 336 face 0 are vertex 0 twice with the zero normal 0: one point, not a line. The
+    ADSP rotates the normal (0169-0171: 0 stays 0) and 01A8-01A9 skip a face whose normal .
+    vertex is >= 0, so they are culled in every view; the renderer's culling agrees."""
+    _, meshes, _ = read_data(DATA)
+    for n in (310, 336):
+        m = meshes[n]
+        f = m.faces[0]
+        assert f.vertices == [0, 0] and f.normal == 0 and m.normals[0] == (0, 0, 0), n
+        assert not any(face_visible(m, 0, v) for v in VIEWS), n
 
 
 def _newell(m: Mesh, i: int) -> tuple[int, int, int]:
@@ -256,8 +272,9 @@ def coplanar(points: list[tuple[int, int, int]]) -> bool:
 
 
 def test_shape_words_match_the_geometry() -> None:
-    """The shape words in the names say what the mesh is, both ways (docs/07 section 11.2,
-    reviews r5 and r6): every object of four non-coplanar corners and four triangles is a
+    """The shape words in the names say what the mesh is (docs/07 section 11.2, reviews r5-r7),
+    tetrahedron, prism and image_quad both ways, wedge and box one way (the name implies the
+    shape; 42 block_faceted has wedge_b's topology and is no wedge): every object of four non-coplanar corners and four triangles is a
     tetrahedron and every tetrahedron is one; every object of six corners, two triangles and
     three quadrilaterals is a prism, unless a proportion word (rod, slab: longest extent at least
     three times the middle one) or an identified role (the player craft's wings) names it, and
@@ -339,3 +356,64 @@ def test_viewer_page_is_self_contained() -> None:
     assert "../../data/objects/" in page
     assert not re.findall(r'<link[^>]*href="http', page)
     json.loads((DATA / "manifest.json").read_text())  # the page reads it as JSON
+
+
+# A palette whose 64 entries all differ: entry i = (4i, 0, 255 - 4i).
+PALETTE = [(4 * i, 0, 255 - 4 * i) for i in range(64)]
+
+
+def test_palette_colours_the_faces() -> None:
+    """With a palette a face takes its colour index's entry: flat for colour 1Fh and up (40 here),
+    shaded from that entry below (5 here), so the hue is the entry's (r / b = 20 / 235)."""
+    flat = render(quad(-0x4000, colour=40), "rear", 32, palette=PALETTE, edges=False)
+    o = 3 * (16 * 32 + 16)
+    assert tuple(flat.pixels[o : o + 3]) == PALETTE[40] == face_rgb(quad(-0x4000, 40), 0, PALETTE)
+    lit = quad(-0x4000, colour=5)
+    shaded = render(lit, "rear", 32, palette=PALETTE, edges=False)
+    r, g, b = shaded.pixels[o : o + 3]
+    assert (r, g, b) == face_rgb(lit, 0, PALETTE) and g == 0 and 0 < r < b
+    assert abs(r / b - 20 / 235) < 0.02
+    assert render(lit, "rear", 32, edges=False).pixels != shaded.pixels
+
+
+def run_render(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(TOOLS / "objects"), "render", *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_render_command_sheet_with_a_palette(tmp_path: Path) -> None:
+    """`tools/objects render --palette FILE --sheet --tile 32 --columns 2` writes what draw()
+    draws with that palette and tile size; without the palette the picture differs."""
+    pal = tmp_path / "palette.json"
+    pal.write_text(json.dumps([list(c) for c in PALETTE]))
+    out = tmp_path / "sheet.png"
+    args = ["--palette", str(pal), "--sheet", "--tile", "32", "--columns", "2"]
+    r = run_render(*args, "--out", str(out), "26,48")
+    assert r.returncode == 0, r.stdout + r.stderr
+    _, meshes, _ = read_data(DATA)
+    w, h, pixels = png_pixels(out.read_bytes())
+    assert (w, h) == (64, 32)
+    want = draw(meshes, [26, 48], size=32, sheet_mode=True, columns=2, palette=PALETTE)
+    assert pixels == bytes(want.pixels)
+    plain = draw(meshes, [26, 48], size=32, sheet_mode=True, columns=2)
+    assert pixels != bytes(plain.pixels)
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["[[1, 2, 3]]", "{", json.dumps([[1, 2]] * 64), json.dumps([[0, 0, 256]] * 64)],
+)
+def test_a_bad_palette_is_a_clean_failure(tmp_path: Path, content: str) -> None:
+    """A palette that is not 64 [r, g, b] in 0-255 is a FormatError, and the command reports it
+    on one FAIL line with exit status 1, not a traceback."""
+    pal = tmp_path / "palette.json"
+    pal.write_text(content)
+    with pytest.raises(FormatError):
+        read_palette(pal)
+    r = run_render("--palette", str(pal), "--out", str(tmp_path / "p.png"), "0")
+    assert r.returncode == 1 and r.stderr.startswith("FAIL: "), r.stderr
+    assert "Traceback" not in r.stderr and not (tmp_path / "p.png").exists()

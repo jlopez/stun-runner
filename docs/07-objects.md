@@ -920,7 +920,8 @@ name column is the manifest's (everywhere).
 
 A verification aid, standard library only: a parallel projection from one of four fixed views,
 faces filled through a z-buffer (a face later in ROM order wins a tie with a coplanar one, so
-stripes and decals show), edges drawn darker, two-vertex faces as lines, PNG written with zlib.
+stripes and decals show), edges drawn darker, a face of fewer than three vertices as a line
+(none is ever drawn with culling on: see the degenerate faces below), PNG written with zlib.
 Every step is IEEE 754 arithmetic whose result the standard fixes (+ - * /, `int()`, `round()`
 and one square root, `math.sqrt`, which IEEE 754 requires correctly rounded; no `pow`, sine or
 cosine: the view matrices are literals), so a picture is the same on every machine that follows
@@ -956,7 +957,12 @@ normal · d < 0); colour-0 faces are never drawn (019F). `--no-cull` draws all f
 the 6,540 faces Newell's normal of the vertex order (right-hand formula, exact in integers)
 points the way of the stored normal, which in this left-handed space means the vertices run
 clockwise on screen when the face is drawn; 5 run the other way (object 122 faces 10 and 17, 260
-face 37, 262 face 37, 264 face 36), 2 are lines (two-vertex faces: 310 face 0 and 336 face 0, the only ones in the 413 objects), and 2, object 122 faces 11 and 16, have area
+face 37, 262 face 37, 264 face 36), 2 are degenerate (`winding()` gives "degenerate": 310 face 0
+and 336 face 0, the only faces of fewer than three vertices in the 413 objects, each vertex 0
+twice, so one point and not a line, with the zero normal 0; CODE: the normal is rotated (0169-0171,
+0 + 4000h >> 15 stays 0), so `read_face_normal` returns normal · vertex = 0 (0204-0212) and 01A9
+`IF GE JUMP 01E4` skips them in every view: the ADSP never draws them, nor does the renderer
+with culling on), and 2, object 122 faces 11 and 16, have area
 but a stored normal that lies in their plane (Newell's normal (-860928, -860928, 0) and
 (-3681600, 3681600, 0) against stored normals (-11585, 11585, 0) and (-11585, -11585, 0): dot
 product 0; `winding()` gives "in-plane"). No face has zero area. The ADSP never uses the
@@ -1012,7 +1018,17 @@ far object of a descriptor, the 100 marked "f" in section 10) is its near object
 variants form **numbered families** (`iris_1`-`iris_8`, `letter_a`-`letter_z`); tunnel bends
 carry their measured end cut (`tunnel_bend_xp7_yn5`: the -z end's plane is tilted about 7° with
 +x forwards and 5° with -y forwards, from a least-squares fit of the vertices of the -z half; the
-+z end is square in every bend); shape words say the topology both ways: `tetrahedron_` is every object of four non-coplanar corners and four triangles, `prism_` every one of six corners, two triangles and three quadrilaterals unless a proportion word (`rod_`, `slab_`: the longest extent at least three times the middle one) or an identified role (`player_craft_wing_*`) names it, `wedge_` a solid of five to seven faces that is neither, `box_` one of eight corners or more. The angle is rounded to the nearest degree, except that the
++z end is square in every bend); three shape words say the topology both ways: `tetrahedron_` is
+every object of four non-coplanar corners and four triangles, `prism_` every one of six corners,
+two triangles and three quadrilaterals unless a proportion word (`rod_`, `slab_`: the longest
+extent at least three times the middle one) or an identified role (`player_craft_wing_*`) names
+it, and `image_quad_` every object with a type 1 face; `wedge_` and `box_` hold one way only:
+a `wedge_` is a solid of five to seven faces that is neither a tetrahedron nor a prism, a `box_`
+has eight corners or more, but many shapes that fit those words carry others (42
+`block_faceted` has the topology of 287 `wedge_b`, seven corners and faces of 3, 3, 3, 3, 3, 4
+and 5 sides; the six-quad hexahedra 46 `slab_c`, 274-275 `beam_a`/`_b` and 286
+`block_bevelled` are neither `wedge_` nor `box_`; every tunnel has eight corners or more). The
+angle is rounded to the nearest degree, except that the
 x cut of every gentle bend, which fits at 7.47-7.50° in all three radii (50-73, 138-141,
 150-153), is written 7 throughout, so equal geometry gets equal names; the sharp bends 96-99 fit
 at 26.7° (27). `tools/test_render.py` checks the form and the uniqueness, and that section 10's name column is
@@ -1044,7 +1060,7 @@ the frames repeat).
 | 100-121 | `track_wide`, `track_narrow`, `track_narrowing`, `track_widening`, `track_fork`, `track_*_bend_N` | flat strips at the tunnel floor's height (y -1561..-1401), 3264 or 1052 wide | pairs, descriptors 67-77 | level runs 16/22, levels 0-24 | identified: open track (the snapshots of start level 14 at 2200 and of start level 5 at 1232 show the vehicle on a track in the open; levels 1 and 14 load 100-107 and 114-117, level 5 100-104) |
 | 122-133 | `tunnel_mouth_a`, `tunnel_mouth_flared`, `tunnel_square_a/b`, `tunnel_roof_raised`, `pyramid_large`, `ramp` | a tunnel whose roof comes down to the floor, a flared one, two square-section halls (6400 × 5120), a tunnel with a raised roof, a square pyramid (far: a nine-sided cone), a ramp | 130/131 are descriptor 83, the 0xFFDC74 entity of section 3.1 | level runs 10/12, levels 0-23 | tunnels identified as above; 126-133 shape |
 | 134-161 | `tunnel_taper_800_1200`, `tunnel_r800_bend_*`, `tunnel_r1200_bend_*` | the narrower tunnels (radius 800 and 1200, colour 4) | pairs, descriptors 85-98 | level runs 20/28, levels 2,4,9-11,13,15,17,20-22 | identified: tunnel sections |
-| 162-197 | `tunnel_wire_1`-`18` | tunnels whose wall is partly thin strips (colour 8: quads 63-64 units across that run the full z -3200..3200, a wire look) and partly solid quads (colour 2); every face has four vertices, none is a line (section 11.1) | pairs, descriptors 99-116 (descriptors 115 and 116, objects 194/195 and 196/197, hold each other's +4 field, section 3.2) | level runs 32/36, levels 0,12-20,22 | identified: tunnel sections ("wire" names the thin colour-8 strips, not line faces; the line-drawn look of the level-5 snapshot, start level 5 at 2200, is not these objects: among 48-197 level 5 loads only 48-53, 56-57, 60-61, 86-93, 100-104, 128-129 and 131, so that look comes from the run-time colours) |
+| 162-197 | `tunnel_wire_1`-`18` | tunnels whose wall is partly thin strips (colour 8: quads 63-64 units across that run the full z -3200..3200, a wire look) and partly solid quads (colour 2); every face has four vertices, none is degenerate (section 11.1) | pairs, descriptors 99-116 (descriptors 115 and 116, objects 194/195 and 196/197, hold each other's +4 field, section 3.2) | level runs 32/36, levels 0,12-20,22 | identified: tunnel sections ("wire" names the thin colour-8 strips, not line faces; the line-drawn look of the level-5 snapshot, start level 5 at 2200, is not these objects: among 48-197 level 5 loads only 48-53, 56-57, 60-61, 86-93, 100-104, 128-129 and 131, so that look comes from the run-time colours) |
 | 198-203 | `sign_arrow_right/left`, `sign_arrows_inward/outward`, `sign_station`, `sign_caution` | arrows; the words STATION and CAUTION; all stored upside down (section 11.1), so 198 and 199 are named by the direction the game shows, the opposite of their render | | level runs 6/6, levels 0-23 | identified by their text and shape (198/199's direction by the entry matrices, MAME); STATION and CAUTION seen as an arch over the tunnel (start level 0, frames 2908 and 4508) |
 | 204-212 | `iris_1`-`8`, `ring_spiked` | 204-211: a disc of eight blades, closed in 204 and opening step by step to a thin broken ring in 211 (28-36 vertices, 1 normal, 8 faces each, two colours); 212: a wider ring with spikes (27 vertices, 19 faces) | 0x0323F0 and 0x031D68 select descriptors 124-130, objects 205-211, in turn by the step byte 0xFFDC86 (section 3.2); 204 is descriptor 123, selected elsewhere | level runs 9/9, levels 0-22 | identified: the iris door at a tunnel mouth (MAME): at start level 5, 204 and 212 load from frame 1028 and 205-211 once each in turn at frames 1215-1249, and the snapshots at 1220, 1232 and 1244 show blades opening in a tunnel mouth ahead of the vehicle; which picture each number gives is the render's, not checked frame by frame |
 | 213-252 | `arch`, `pillar_*`, `coil_stack_*`, `lamp_post_*`, `burst_1`-`4` (+ `_far`), `rod_clamped_*`, `fighter_spiky_a/b`, ... | arches, pillars, lamp posts, flat pieces, bursts of shards, rods with clamps, spiky craft | 252 by constant descriptor A3h (0x0364D4) | level runs 32/40, levels 0-24; 35 of 40 with the objtrace runs (242-244 only there) | shape |

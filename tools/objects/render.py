@@ -5,7 +5,11 @@ views, its faces filled through a z-buffer, with the ADSP's own visibility rule:
 when its stored normal points towards the viewer (PM 01A8-01A9: `read_face_normal` returns the
 sign of normal . first vertex in camera space, >= 0 looks away and 01E4 skips the polygon; with
 the viewer at infinity along the view direction d that is normal . d >= 0). Faces of colour 0 are
-skipped as the ADSP skips them (019F -> 01E4). Edges are drawn darker, two-vertex faces as lines.
+skipped as the ADSP skips them (019F -> 01E4). Edges are drawn darker. A face of fewer than
+three vertices is drawn as a line (a point when its vertices coincide): the only two in the data,
+310 and 336 face 0, are vertex 0 twice with the zero normal 0, which the culling never draws (the
+rotated normal stays 0 at 0169-0171, so normal . vertex = 0 and 01A9 skips it in every view), so
+they show only with --no-cull.
 
 Type 1 faces are not polygons: the ADSP sends them to `emit_image` (0663, 01D6-01D9: DM 0038
 set by 0197-0198 skips the CALL 04EB polygon path), whose command names an image by the face's
@@ -38,7 +42,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from objects import TYPE_UNSHADED, Face, Mesh
+from objects import TYPE_UNSHADED, Face, FormatError, Mesh
 
 Vec = tuple[float, float, float]
 RGB = tuple[int, int, int]
@@ -85,13 +89,21 @@ def index_rgb(colour: int) -> RGB:
 def read_palette(path: Path) -> list[RGB]:
     """A palette file: a JSON list of 64 [r, g, b] (0-255), one per colour index. None is
     committed: a palette captured from MAME is ROM-derived runtime state (build/ only)."""
-    data = json.loads(path.read_text())
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError) as err:
+        raise FormatError(f"{path}: {err}") from err
     if not isinstance(data, list) or len(data) != 64:
-        raise ValueError(f"{path}: expected a list of 64 [r, g, b]")
+        raise FormatError(f"{path}: expected a list of 64 [r, g, b]")
     out: list[RGB] = []
-    for e in data:
-        r, g, b = (int(c) for c in e)
-        out.append((r, g, b))
+    for i, e in enumerate(data):
+        if not (
+            isinstance(e, list)
+            and len(e) == 3
+            and all(type(c) is int and 0 <= c <= 255 for c in e)
+        ):
+            raise FormatError(f"{path}: entry {i} is not [r, g, b] in 0-255")
+        out.append((e[0], e[1], e[2]))
     return out
 
 
@@ -105,7 +117,7 @@ def face_visible(mesh: Mesh, face_index: int, view: str) -> bool:
     return _dot(mesh.normals[mesh.faces[face_index].normal], VIEWS[view][2]) < 0
 
 
-Winding = Literal["agrees", "reversed", "in-plane", "zero-area", "line"]
+Winding = Literal["agrees", "reversed", "in-plane", "zero-area", "degenerate"]
 
 
 def winding(mesh: Mesh, face_index: int) -> Winding:
@@ -113,7 +125,8 @@ def winding(mesh: Mesh, face_index: int) -> Winding:
     order (the right-hand-rule formula, exact in integers): "agrees" when n points the way of the
     stored normal (n . normal > 0), "reversed" the other way, "in-plane" when the face has area
     (n != 0) but the stored normal lies in its plane (n . normal = 0), "zero-area" when n = 0,
-    "line" for a face of fewer than three vertices. In the left-handed object space "agrees"
+    "degenerate" for a face of fewer than three vertices (in the data: 310 and 336 face 0, one
+    point twice with a zero normal, never drawn, 01A8-01A9). In the left-handed object space "agrees"
     means the vertices run clockwise on screen when the face is drawn (seen from the side its
     normal points to). Only the sign of n . normal counts: a stored normal 54 degrees off (object
 122 faces 12 and 15) still "agrees". The ADSP never uses the winding; docs/07 section 11.1
@@ -121,7 +134,7 @@ counts it and lists the faces whose stored normal is far from n."""
     f = mesh.faces[face_index]
     vs = [mesh.vertices[i] for i in f.vertices]
     if len(vs) < 3:
-        return "line"
+        return "degenerate"
     nx = ny = nz = 0
     for i, a in enumerate(vs):
         b = vs[(i + 1) % len(vs)]
