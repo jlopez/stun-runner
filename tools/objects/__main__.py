@@ -5,9 +5,11 @@
     tools/objects encode [--data data/objects] [--image IMAGE] --out FILE
     tools/objects inventory [--data data/objects] [--image68k build/stunrun-68k.bin]
                             [--summary artifacts/objtrace-summary.json]
+                            [--levels artifacts/objlevels-summary.json]
     tools/objects trace  [--image build/stunrun-obj.bin] [--summary artifacts/objtrace-summary.json]
                          build/mame/objtrace-attract.txt build/mame/objtrace-play.txt
-    tools/objects levels [--summary artifacts/objlevels-summary.json] build/mame/objlevels-*.txt
+    tools/objects levels [--data data/objects] [--summary artifacts/objlevels-summary.json]
+                         build/mame/objlevels-*.txt
     tools/objects render [--data data/objects] [--view VIEW] [--size N] [--no-cull]
                          [--palette FILE] [--sheet [--tile N] [--columns N]] --out FILE NUMBERS
     tools/objects pictures [--data data/objects] [--out artifacts/objects]
@@ -23,7 +25,8 @@ encode   writes the image itself (tests, experiments).
 inventory prints the object table of docs/07 (numbers, addresses, counts, bounding boxes); with
          --image68k the descriptor column (the 68k descriptors that select each object) and,
          on stderr, how many objects are near objects, only far objects or in no descriptor;
-         with --summary the run column (the traced runs that loaded each object).
+         with --summary the run column (the traced runs that loaded each object); with --levels
+         the levels column (the level words of the per-level runs that loaded it).
 levels   reads the per-level MAME runs (tools/mame/objlevels.lua) and writes their summary
          (object numbers and counts only) to --summary.
 render   draws objects to a PNG (tools/objects/render.py): NUMBERS such as 0, 0-7 or 48,50-53;
