@@ -139,6 +139,42 @@ def test_malformed_lists_are_rejected():
             pytest.fail(name)
 
 
+@pytest.mark.parametrize("corner", [0, 1, 2, 3])
+def test_image_corner_at_minus_one(corner):
+    """emit_image writes the corners unclamped (0675-067A): a corner at (-1, -1) is an FFFF FFFF
+    pair, and the GSP, reaching each command through the table (FFF45000), reads three corners
+    before it looks for FFFFFFFF (FFF49270-FFF49500, FFF499D0). The table bounds the command."""
+    pts = [(10, 50), (40, 50), (40, 80), (10, 80)]
+    pts[corner] = (0xFFFF, 0xFFFF)
+    quad = Command(0, 0x1003, 0, points=tuple(pts))
+    for cmds in ([quad, square()], [square(), quad], [quad]):
+        words = encode_som(cmds, order=list(range(len(cmds)))[::-1])
+        som = decode_som(words)
+        assert [c.points for c in som.commands if c.is_image] == [tuple(pts)]
+        assert 2 + sum(c.length for c in som.commands) == som.table_at
+        assert encode_som(som.commands, [som.commands.index(c) for c in som.draw_order()]) == words
+
+
+def test_commands_are_bounded_by_the_table():
+    good = encode_som([image(), square()])
+    som = decode_som(good)
+    t = som.table_at
+    no_end = list(good)
+    no_end[som.commands[1].offset - 1] = 0  # the image's FFFF FFFF becomes a corner
+    with pytest.raises(DisplayListError, match="no FFFF FFFF"):
+        decode_som(no_end)
+    # a table without the square: the image would run over it
+    short = good[:t + 1] + [e for e in good[t + 1 : som.last] if e + 1 != som.commands[1].offset]
+    short = [len(short)] + short[1:] + [END]
+    with pytest.raises(DisplayListError):
+        decode_som(short)
+    # a table without the first command
+    first = good[:t + 1] + [e for e in good[t + 1 : som.last] if e + 1 != 2]
+    first = [len(first)] + first[1:] + [END]
+    with pytest.raises(DisplayListError, match="0002"):
+        decode_som(first)
+
+
 def test_gsp_buffer_around_a_list():
     som_words = encode_som([triangle(), image()])
     header = [0] * 0x44
@@ -549,9 +585,15 @@ IMAGE_WRITERS = {"command word": 0x066A, "command end FFFF FFFF": 0x0680,
 def test_captures_against_mame():
     seen: dict[str, set[int]] = {}
     dithered: set[tuple[str, int, bool]] = set()
+    rare: dict[str, set[str]] = {"fill 1": set(), "colour byte 4": set()}
     for d in captures():
         words = read_words(d / "som.bin")
         som = decode_som(words)
+        for c in som.commands:
+            if not c.is_image and c.fill == 1:
+                rare["fill 1"].add(d.name)
+            if not c.is_image and c.fill in (0, 2) and c.cmd & 0xFF == 4:
+                rare["colour byte 4"].add(d.name)
         assert read_words(d / "som68k.bin")[: som.words] == words[: som.words], d
         meta = read_meta(d / "meta.txt")
         buf = read_words(d / "cmdbuf.bin")
@@ -605,6 +647,13 @@ def test_captures_against_mame():
         for kind, addr in IMAGE_WRITERS.items():
             assert (addr in writers.get(kind, [])) == has_images, (d, kind)
     assert seen == WRITERS  # over the captures, every writer of the table occurs
+    # docs/08 section 5: the default SOM_GAME frames 6600 (the ship stippled 75%) and 1100
+    # (colour byte 4 under fill 0) put both rules under the comparison with MAME's page above
+    names = {d.name for d in captures()}
+    if "game-f6600" in names:
+        assert "game-f6600" in rare["fill 1"]
+    if "game-f1100" in names:
+        assert "game-f1100" in rare["colour byte 4"]
     if any(d.name.startswith("dither-") for d in captures()):
         # pixels equal to MAME's page: even x hold the low byte, odd x the high byte, both kinds
         assert dithered == {(k, x, x == 1) for k in ("fill", "outline") for x in (0, 1)}

@@ -17,9 +17,11 @@ other at 810000, harddriv_m.cpp:614/811):
     word 1      T: the address of the FFFF that ends the commands (PM 00C0; GSP FFF44CA0)
     2 .. T-1    the commands, back to back, in the order the ADSP produced them
     T           FFFF (PM 00B5)
-    T+1 .. N-1  the draw order: one entry e per command, the command at word e + 1, sorted
+    T+1 .. N-1  the draw order: one entry e per command, the command at word e + 1, ordered
                 command by command (PM 080B walks the list at PM 123C that insert_depth_node,
-                07A2, keeps sorted by each polygon's largest vertex z; GSP FFF45000)
+                07A2, builds from each polygon's largest vertex z; GSP FFF45000). Not sorted by
+                the stored key: the walk compares key - 10h (07C1-07C5), so a node's key can be
+                up to 10h above the one before it (MAME: make depthkeys, docs/08 section 1.5)
     N           FFFF (PM 082B; ends the GSP's walk, FFF45020)
 
 A command starts with a command word (PM 0515 or 066A, the record colour from DM 0036):
@@ -33,7 +35,9 @@ A command starts with a command word (PM 0515 or 066A, the record colour from DM
               slope (2 words, low first: PM 057F-0582), the left edge's slope (2 words: 0583-0586)
               and a row count (0588), and FFFF FFFF (PM 05D2/05D4). Slopes are signed 16.16 x
               steps per row; a segment of count n advances n - 1 rows (GSP FFF45460-FFF45620).
-    image:    cmd, then (x, y) pairs (PM 0678/067A), then FFFF FFFF (PM 0680/0682).
+    image:    cmd, then (x, y) pairs (PM 0678/067A), then FFFF FFFF (PM 0680/0682); the corners
+              are unclamped, so one at (-1, -1) is an FFFF FFFF pair too: the decoder bounds
+              each command by the next start the table gives, as the GSP reaches it.
 
 The GSP command buffer (FFF9FC10 / FFFCFC10, filled by the 68k through the host port) starts with
 a header block the GSP skips (FFF77F50 bits, 0x440 in every capture), then commands whose top
@@ -173,47 +177,56 @@ def _need(w: Sequence[int], i: int, n: int, what: str) -> None:
 
 
 def decode_command(w: Sequence[int], i: int, limit: int) -> Command:
-    """The command at word i; it must end at or before `limit` (T)."""
+    """The command at word i, which must end exactly at `limit`: the next command's start in the
+    table, or T for the last one.
+
+    An image is the command word, its corners as (x, y) pairs and FFFF FFFF (PM 0663-0682). Its
+    corners are not clamped (0675-067A), so a corner at (-1, -1) is itself the pair FFFF FFFF; the
+    GSP reads three corners unconditionally (FFF49270-FFF49500) and only then scans longs for
+    FFFFFFFF (FFF499D0), and inside the SOM it reaches every command through the table (FFF45000),
+    so such a list draws. The table bounds the command here for the same reason: every pair before
+    the last is a corner, whatever its value."""
     _need(w, i, 1, "command")
     cmd = w[i]
     if cmd == END:
         raise DisplayListError(f"FFFF where a command word is expected at {i:04X}")
     if cmd & CMD_IMAGE:
-        j = i + 1
-        points: list[tuple[int, int]] = []
-        while True:
-            _need(w, j, 2, "image point")
-            if j + 2 > limit:
-                raise DisplayListError(f"image at {i:04X} runs into the table at {limit:04X}")
-            if _long(w, j) == END32:
-                j += 2
-                break
-            points.append((w[j], w[j + 1]))
-            j += 2
-        return Command(i, cmd, j - i, points=tuple(points))
+        _need(w, i, limit - i, "image")
+        if (limit - i - 1) % 2 or limit - i < 1 + 6 + 2:
+            raise DisplayListError(
+                f"image at {i:04X}: {limit - i - 1} words before the next command at {limit:04X},"
+                " not three or more (x, y) corners and FFFF FFFF")
+        if _long(w, limit - 2) != END32:
+            raise DisplayListError(f"image at {i:04X} has no FFFF FFFF before {limit:04X}")
+        points = tuple((w[j], w[j + 1]) for j in range(i + 1, limit - 2, 2))
+        return Command(i, cmd, limit - i, points=points)
     _need(w, i, 4, "polygon header")
     j = i + 4
     segments: list[Segment] = []
     while True:
         _need(w, j, 2, "polygon segment")
         if j + 2 > limit:
-            raise DisplayListError(f"polygon at {i:04X} runs into the table at {limit:04X}")
+            raise DisplayListError(f"polygon at {i:04X} runs into the next command at {limit:04X}")
         if _long(w, j) == END32:
             j += 2
             break
         _need(w, j, 5, "polygon segment")
         segments.append(Segment(j, s32(_long(w, j)), s32(_long(w, j + 2)), w[j + 4]))
         j += 5
-    if not segments:
-        pass  # a single-row polygon: legal (the GSP fills the top row and stops)
+    # no segment: a single-row polygon, legal (the GSP fills the top row and stops)
+    if j != limit:
+        raise DisplayListError(
+            f"polygon at {i:04X} ends at {j:04X}, the next command starts at {limit:04X}")
     return Command(i, cmd, j - i, w[i + 1], w[i + 2], w[i + 3], tuple(segments))
 
 
 def decode_som(words: Sequence[int]) -> SomList:
     """Decode a SOM bank (or a list of at least N + 1 words), accounting for every word up to N.
 
-    Raises DisplayListError when the header, the commands, the separator, the table or the end
-    marker do not tile 0..N exactly, or when the table is not a permutation of the commands."""
+    The table gives where each command starts (entry + 1), as it does the GSP; the commands must
+    tile 2..T-1 in those starts, each ending exactly where the next begins. Raises
+    DisplayListError when the header, a command, the separator, the table or the end marker do
+    not, or when the table is not one entry per command."""
     if len(words) < 4:
         raise DisplayListError(f"{len(words)} words: too short for a SOM list")
     n, t = words[0], words[1]
@@ -225,24 +238,18 @@ def decode_som(words: Sequence[int]) -> SomList:
         raise DisplayListError(f"no FFFF at {t:04X} after the commands")
     if words[n] != END:
         raise DisplayListError(f"no FFFF end marker at {n:04X}")
-    commands: list[Command] = []
-    i = 2
-    while i < t:
-        c = decode_command(words, i, t)
-        commands.append(c)
-        i += c.length
-    if i != t:
-        raise DisplayListError(f"the commands end at {i:04X}, not at the separator {t:04X}")
     order = list(words[t + 1 : n])
-    starts = {c.offset for c in commands}
-    targets = [e + 1 for e in order]
-    missing = [e for e, s in zip(order, targets, strict=True) if s not in starts]
-    if missing:
-        raise DisplayListError(f"table entries point at no command: {missing[:4]}")
-    if len(set(targets)) != len(targets) or len(targets) != len(commands):
+    targets = [(e + 1) & 0xFFFF for e in order]
+    outside = [e for e, s in zip(order, targets, strict=True) if not 2 <= s < t]
+    if outside:
+        raise DisplayListError(f"table entries point at no command: {outside[:4]}")
+    if len(set(targets)) != len(targets):
         raise DisplayListError(
-            f"the table has {len(targets)} entries ({len(set(targets))} distinct) "
-            f"for {len(commands)} commands")
+            f"the table has {len(targets)} entries, {len(set(targets))} distinct")
+    starts = sorted(targets)
+    if t > 2 and (not starts or starts[0] != 2):
+        raise DisplayListError("no table entry for the command at 0002")
+    commands = [decode_command(words, s, e) for s, e in zip(starts, starts[1:] + [t], strict=True)]
     return SomList(n, t, commands, order)
 
 
