@@ -918,8 +918,11 @@ name column is the manifest's (everywhere).
 A verification aid, standard library only: a parallel projection from one of four fixed views,
 faces filled through a z-buffer (a face later in ROM order wins a tie with a coplanar one, so
 stripes and decals show), edges drawn darker, two-vertex faces as lines, PNG written with zlib.
-Every step is IEEE arithmetic with literal view matrices (no libm call), so a picture is the same
-on every machine.
+Every step is IEEE 754 arithmetic whose result the standard fixes (+ - * /, `int()`, `round()`
+and one square root, `math.sqrt`, which IEEE 754 requires correctly rounded; no `pow`, sine or
+cosine: the view matrices are literals), so a picture is the same on every machine that follows
+the standard; `tools/test_render.py` compares the committed pictures pixel for pixel on macOS and
+on CI's Linux.
 
 **Object space** (CODE, read off the data and the projection): `project_vertices` reads a
 camera-space vertex as x (04BD/04C9 into MX0), y (04BF, SR1) and z (04C0, AR), and writes screen
@@ -946,11 +949,18 @@ the 68k call site. The single arrows 198 and 199 get the same turn, so the game 
 the viewer (01A8-01A9: `read_face_normal` returns the sign of normal · first vertex in camera
 space and >= 0 skips the polygon; for a viewer at infinity along the view direction d that is
 normal · d < 0); colour-0 faces are never drawn (019F). `--no-cull` draws all faces. **Winding**
-(`winding()`, computed over data/objects): for 6,531 of the 6,540 faces Newell's normal of the
-vertex order (right-hand formula) points the way of the stored normal, which in this left-handed
-space means the vertices run clockwise on screen when the face is drawn; 5 run the other way
-(object 122: 2 faces, 260, 262 and 264: 1 each), 2 have zero area and 2 are lines. The ADSP
-never uses the winding, so these 5 faces are drawn by their normals like the others.
+(`winding()`, computed over data/objects, counts pinned by `tools/test_render.py`): for 6,531 of
+the 6,540 faces Newell's normal of the vertex order (right-hand formula, exact in integers)
+points the way of the stored normal, which in this left-handed space means the vertices run
+clockwise on screen when the face is drawn; 5 run the other way (object 122 faces 10 and 17, 260
+face 37, 262 face 37, 264 face 36), 2 are lines, and 2, object 122 faces 11 and 16, have area
+but a stored normal that lies in their plane (Newell's normal (-860928, -860928, 0) and
+(-3681600, 3681600, 0) against stored normals (-11585, 11585, 0) and (-11585, -11585, 0): dot
+product 0; `winding()` gives "in-plane"). No face has zero area. The ADSP never uses the
+winding, so the 5 reversed faces are drawn by their normals like the others; the 2 in-plane
+faces are culled by a normal edge-on to them, so the ADSP's test (normal · first vertex in
+camera space) decides them by which side of the plane through the vertex, perpendicular to the
+face, the camera is on, not by which side of the face.
 
 **Colours.** The colour field (0-63) indexes GSP colour tables and a palette that the game loads
 at run time (docs/08); they are not in the repository. A picture uses a made-up colour per index
@@ -1110,7 +1120,8 @@ and 20: 84, 136 and 151).
 A static page, Three.js r128 from cdnjs its only dependency, that reads
 `data/objects/manifest.json` and the mesh files over HTTP. `make view` serves the repository
 root (`python3 -m http.server --bind 127.0.0.1 8000`) and prints the URL,
-`http://127.0.0.1:8000/tools/objects/viewer.html#48` (the hash is the object number). Pick an
+`http://127.0.0.1:8000/tools/objects/viewer.html#0` (the hash is the object number: `#48` opens
+`tunnel_straight`). Pick an
 object by number (or the arrows) or by name (a search box over the manifest's names); drag to
 orbit, wheel to zoom; toggles for wireframe, the ADSP's culling (normal · (first vertex - eye) <
 0, from the current eye), face normals (from each face's centroid), axes, vertex and face

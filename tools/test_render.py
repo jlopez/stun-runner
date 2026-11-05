@@ -85,11 +85,43 @@ def test_culling_follows_the_adsp() -> None:
     drawn again with culling off. The winding plays no part (both squares wind the same way)."""
     towards, away = quad(-0x4000), quad(0x4000)
     assert face_visible(towards, 0, "rear") and not face_visible(away, 0, "rear")
-    assert winding(towards, 0) == 1 and winding(away, 0) == -1
+    assert winding(towards, 0) == "agrees" and winding(away, 0) == "reversed"
     bg = render(quad(0x4000, colour=0), "rear", 32)  # colour 0: never drawn (019F)
     assert render(away, "rear", 32).pixels == bg.pixels
     assert render(towards, "rear", 32).pixels != bg.pixels
     assert render(away, "rear", 32, cull=False).pixels != bg.pixels
+
+
+def test_winding_tells_an_in_plane_normal_from_a_zero_area_face() -> None:
+    """A square whose stored normal lies in its plane has area but is "in-plane"; a face whose
+    vertices are collinear is "zero-area"; a two-vertex face is a "line"."""
+    v = [(-10, -10, 0), (-10, 10, 0), (10, 10, 0), (10, -10, 0), (0, 0, 0)]
+    mesh = Mesh(
+        0,
+        v,
+        [(0x4000, 0, 0)],
+        [Face(15, 5, 0, [0, 1, 2, 3]), Face(15, 5, 0, [0, 4, 2]), Face(15, 5, 0, [0, 2])],
+    )
+    assert [winding(mesh, i) for i in range(3)] == ["in-plane", "zero-area", "line"]
+
+
+def test_winding_counts_of_the_data() -> None:
+    """docs/07 section 11.1's winding counts over data/objects: 6,531 faces agree with their
+    stored normal, 5 are reversed, 2 (object 122, faces 11 and 16) have a stored normal in their
+    plane, 2 are lines, none has zero area."""
+    _, meshes, _ = read_data(DATA)
+    by: dict[str, list[tuple[int, int]]] = {}
+    for n, m in sorted(meshes.items()):
+        for i in range(len(m.faces)):
+            by.setdefault(winding(m, i), []).append((n, i))
+    assert {k: len(v) for k, v in by.items()} == {
+        "agrees": 6531,
+        "reversed": 5,
+        "in-plane": 2,
+        "line": 2,
+    }
+    assert by["reversed"] == [(122, 10), (122, 17), (260, 37), (262, 37), (264, 36)]
+    assert by["in-plane"] == [(122, 11), (122, 16)]
 
 
 def test_unshaded_faces_keep_the_index_colour() -> None:

@@ -14,19 +14,22 @@ and colour below 1Fh, 0214 at 01C7) and unlit for the others (type 1, colours 1F
 of a palette file (`--palette`, a JSON list of 64 [r, g, b]) if one is given. The pictures
 therefore show shape, face order and which faces share a colour index, not the game's colours.
 
-Every step is IEEE arithmetic (no libm call: the view matrices are literals), so a picture is the
-same on every machine; `png_pixels` reads a PNG back to its pixel rows for the test that pins
+Every step is IEEE 754 arithmetic whose result the standard fixes: + - * /, int() and round(),
+and one square root, math.sqrt, which IEEE 754 requires correctly rounded (no pow, sin or cos:
+the view matrices are literals). So a picture is the same on every machine that follows it; `png_pixels` reads a PNG back to its pixel rows for the test that pins
 the committed pictures.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import struct
 import zlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from objects import TYPE_UNSHADED, Face, Mesh
 
@@ -95,24 +98,31 @@ def face_visible(mesh: Mesh, face_index: int, view: str) -> bool:
     return _dot(mesh.normals[mesh.faces[face_index].normal], VIEWS[view][2]) < 0
 
 
-def winding(mesh: Mesh, face_index: int) -> int:
-    """+1 when Newell's normal of the vertex order (the right-hand-rule formula) points the way
-    of the stored normal, -1 the other way, 0 for a line or a zero-area face. In the left-handed
-    object space, +1 means the vertices run clockwise on screen when the face is drawn (seen
-    from the side its normal points to). The ADSP never uses the winding; docs/07 section 11.1
-    counts it."""
+Winding = Literal["agrees", "reversed", "in-plane", "zero-area", "line"]
+
+
+def winding(mesh: Mesh, face_index: int) -> Winding:
+    """How the vertex order relates to the stored normal, by Newell's normal n of the vertex
+    order (the right-hand-rule formula, exact in integers): "agrees" when n points the way of the
+    stored normal (n . normal > 0), "reversed" the other way, "in-plane" when the face has area
+    (n != 0) but the stored normal lies in its plane (n . normal = 0), "zero-area" when n = 0,
+    "line" for a face of fewer than three vertices. In the left-handed object space "agrees"
+    means the vertices run clockwise on screen when the face is drawn (seen from the side its
+    normal points to). The ADSP never uses the winding; docs/07 section 11.1 counts it."""
     f = mesh.faces[face_index]
     vs = [mesh.vertices[i] for i in f.vertices]
     if len(vs) < 3:
-        return 0
+        return "line"
     nx = ny = nz = 0
     for i, a in enumerate(vs):
         b = vs[(i + 1) % len(vs)]
         nx += (a[1] - b[1]) * (a[2] + b[2])
         ny += (a[2] - b[2]) * (a[0] + b[0])
         nz += (a[0] - b[0]) * (a[1] + b[1])
+    if nx == ny == nz == 0:
+        return "zero-area"
     d = _dot((nx, ny, nz), mesh.normals[f.normal])
-    return (d > 0) - (d < 0)
+    return "agrees" if d > 0 else "reversed" if d < 0 else "in-plane"
 
 
 @dataclass
@@ -150,7 +160,7 @@ def face_rgb(mesh: Mesh, face_index: int, palette: Sequence[RGB] | None = None) 
     if f.type == TYPE_UNSHADED or f.colour >= 0x1F:
         return base
     n = mesh.normals[f.normal]
-    length = _dot(n, n) ** 0.5
+    length = math.sqrt(_dot(n, n))  # correctly rounded (IEEE 754), unlike pow
     lit = max(0.0, _dot(n, LIGHT) / length) if length else 0.0
     return _shade(base, 0.35 + 0.65 * lit)
 
