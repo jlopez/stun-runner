@@ -32,6 +32,7 @@ from displaylist import (
     Image,
     Segment,
     adsp_slope,
+    capture_state,
     capture_window,
     compare,
     decode_gsp_buffer,
@@ -39,6 +40,7 @@ from displaylist import (
     draw_image,
     draw_polygon,
     encode_som,
+    field0_sign_extended,
     field_writers,
     read_images,
     read_meta,
@@ -333,7 +335,8 @@ def test_image_quad_scaling():
 def test_image_quad_rejections():
     """FFF49230-FFF49650: no image, p0.x >= 200h, p0.y >= 117h, p1.x left of p0.x (FFF493D0),
     p2.y below 28h (FFF49510) or above p1.y (FFF49570), and, without FFF77E60 bit 4, a box 15Eh
-    wide or C8h high or more. The corners are read zero-extended: none is ever negative."""
+    wide or C8h high or more. Zero-extended (the default, field 0 after a command 9 or 5), no
+    corner is ever negative; the sign-extended reading is test_image_quad_sign_extended's."""
     images = {3: PICTURE}
     rejected = {
         "no image": quad(100, 0x50, 105, 0x54, cmd=0x1005),
@@ -360,7 +363,7 @@ def test_image_quad_rejections():
                       images, False)
     assert {y for y in range(TOP, TOP + 240) for x in range(100, 106)
             if canvas.drawn[(y - TOP) * WIDTH + x]} == set(range(0x60, 0x69))
-    # the corners are 16-bit unsigned (field 0 zero-extended, ST FE0 = 0): a p1.x of FFF0h is
+    # zero-extended (ST FE0 = 0), the corners are 16-bit unsigned: a p1.x of FFF0h is
     # never negative (the JRNN at FFF49390 is always taken), so the box is FF8Dh wide; only the
     # 15Eh limit rejects it, and with bit 4 it is drawn, clipped by the window to x 100-1FFh
     wide = quad(100, 0x50, 0xFFF0, 0x54)
@@ -376,6 +379,62 @@ def test_image_quad_rejections():
     som = decode_som(encode_som([quad(100, 0x50, 105, 0x54), quad(0x200, 0x50, 0x205, 0x54)]))
     canvas = render(som, synthetic_colours(), images=images)
     assert canvas.images == 1 and sum(canvas.drawn) == 26
+
+
+def test_image_quad_sign_extended():
+    """With ST FE0 = 1 (a list whose 7 no command 4, 5, 6, 8, 9, C or E0 precedes) the corners
+    are read sign-extended: a p1.x of FFF0h is negative and rejected by the JRNN at FFF49390, and
+    a p0.x or p0.y of FFF0h is -16, passes the 200h/117h tests and starts the box left of or
+    above the window, which clips it."""
+    images = {3: PICTURE}
+    wide = quad(100, 0x50, 0xFFF0, 0x54)
+    assert draw_image(Canvas(), wide, images, True)
+    assert not draw_image(Canvas(), wide, images, True, sign_extended=True)
+    left = quad(0xFFF0, 0x50, 5, 0x54)  # x -16..5: 22 columns, 6 of them in the window
+    assert not draw_image(Canvas(), left, images, True)
+    canvas = Canvas()
+    assert draw_image(canvas, left, images, True, sign_extended=True)
+    cols = {x for y in range(0x50, 0x55) for x in range(WIDTH)
+            if canvas.drawn[(y - TOP) * WIDTH + x]}
+    assert cols == set(range(0, 6))
+    above = Command(0, 0x1003, 0, points=((100, 0xFFF0), (105, 0xFFF0), (105, 0x2A)))
+    assert not draw_image(Canvas(), above, images, True)
+    canvas = Canvas()
+    assert draw_image(canvas, above, images, True, sign_extended=True)
+    rows = {y for y in range(TOP, TOP + 240) for x in range(100, 106)
+            if canvas.drawn[(y - TOP) * WIDTH + x]}
+    assert rows == {0x28, 0x29, 0x2A}  # -16..2Ah, clipped to the window's top row 28h
+    som = decode_som(encode_som([wide, left]))
+    zero = render(som, synthetic_colours(), images=images, loose=True)
+    sign = render(som, synthetic_colours(), images=images, loose=True, sign_extended=True)
+    assert zero.images == 1 and sign.images == 1 and bytes(zero.drawn) != bytes(sign.drawn)
+
+
+def test_field0_extension_through_the_buffer(tmp_path):
+    """read_list_header (FFF4D990 `SETF 10h,1,0`) starts every list sign-extended; handlers 4,
+    5, 6, 8, 9, C and E0 reset field 0 to zero-extended; 1, 2, 3, 7, A, B and D keep it."""
+    som_words = [0x7000, *encode_som([square()])[1:]]
+    header = [0] * 0x44
+    rect = [0x30F0, 0, 0xA0, 0x200, 0x58]
+    window = [0x5000, 0, 0x28, 0x1FF, 0x117]
+    pal = [0x9001, 1, 5, 6]
+    table = [0xE000, 0x3E, 1, 1, 2]
+    cases = {
+        "list first": ([], True),
+        "D, 3, A, B first": ([0xD000, 0, 0, 0x28, 0, *rect, 0xA001, 0x10, 0xB000], True),
+        "after 9": ([0xD000, 0, 0, 0x28, 0, *pal], False),
+        "after 5": ([*window, *rect], False),
+        "after E0": ([*table], False),
+        "after C": ([0xC001, 0x10, 1, 7], False),
+    }
+    for name, (before, expected) in cases.items():
+        buf = header + before + som_words + [0xF000]
+        cmds = decode_gsp_buffer(buf)
+        k = next(i for i, c in enumerate(cmds) if c.som is not None)
+        assert field0_sign_extended(cmds, k) is expected, name
+        (tmp_path / "cmdbuf.bin").write_bytes(struct.pack(f"<{len(buf)}H", *buf))
+        (tmp_path / "meta.txt").write_text("FFF77F50 0440\n")
+        assert capture_state(tmp_path)[1] is expected, name
 
 
 # ------------------------------------------------------------------ committed captures (CI too)
@@ -453,11 +512,13 @@ def test_captures_against_mame():
         lists = [c.som for c in cmds if c.som is not None]
         assert len(lists) == 1 and lists[0].order == som.order, d
         assert lists[0].commands == som.commands, d
-        window = capture_window(d)
+        window, sign_extended = capture_state(d)
+        # every capture's 7 follows a 9 and a 5 (FFF48C30, FFF47B20): field 0 zero-extended
+        assert not sign_extended, d
         images = read_images((d / "images.bin").read_bytes())
         loose = bool(int(meta["FFF77E60"], 16) & 0x10)
         colours = read_words(d / "colors.bin")
-        canvas = render(som, colours, window, images, loose)
+        canvas = render(som, colours, window, images, loose, sign_extended)
         a = compare(canvas, (d / "fb_som.bin").read_bytes(), (d / "fb_pre.bin").read_bytes())
         assert a.drawn > 0 and a.equal == a.drawn, (d, a)
         assert a.missed == 0, (d, a)

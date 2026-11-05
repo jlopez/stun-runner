@@ -90,7 +90,9 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   `SOM_DITHER=1`, docs/08 section 5) into `build/mame/som/<attract|game|dither>-f<N>/` (SOM banks, ADSP data RAM, the GSP command
   buffer, the frame-buffer page before and after the list, colour and image tables, palette,
   snapshots, the frame's protocol events), then runs `tools/displaylist.py` on each: decode,
-  redraw, compare with MAME's page (docs/08-display-list.md). Each of its three MAME runs starts
+  redraw, compare with MAME's page (docs/08-display-list.md), and the target fails when a capture
+  does not decode or its redrawing differs from the page (`--render` exits 2; each capture's
+  output also goes to `render.txt` in its directory). Each of its three MAME runs starts
   from an empty private state, `build/mame/somstate` (removed first, then `-nvram_directory` and
   `-cfg_directory` there): the game boots from the set's own 200e/210e, attract mode (which
   follows the NVRAM's history) shows the same scenes on every run and machine, the user's
@@ -100,9 +102,10 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   `artifacts/display-list/` are decoded and redrawn in CI.
 - `make fieldext` (needs MAME and the ROMs; never in CI): `tools/mame/fieldext.lua` counts, under
   `-debug -debugger none` and from an empty private state (`build/mame/fieldstate`), the GSP's
-  ST FE0 at the image-quad corner read FFF49380 and at the SOM command loop FFF45010 over
-  `FIELD_FRAMES` attract frames, into `build/mame/fieldext.txt` (docs/08 section 4.4: the
-  corners are read zero-extended).
+  ST FE0 (field 0 sign-extended) at the start of every list FFF46E30, at command 7 FFF44BF0, at
+  the image-quad corner read FFF49380 and at the SOM command loop FFF45010 over `FIELD_FRAMES`
+  attract frames, into `build/mame/fieldext.txt` (docs/08 section 4.4: each list starts
+  sign-extended, and the 9 and 5 before every captured 7 reset field 0 to zero-extended).
 
 ## 5. Coverage at the zero point (M1)
 

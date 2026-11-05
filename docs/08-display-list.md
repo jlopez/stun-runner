@@ -215,7 +215,10 @@ quads, FFF49460; bit 5 outlines without right edges, FFF45B50; bit 2 a debug ove
 
 `run_command_list` (FFF46E30) sets B4 = page - A000h, the window (0, 28h)-(1FFh, 117h) and
 CONTROL = C0h (window clipping, W = 3), then reads a command word, dispatches on its top nibble
-through `command_table` (FFF470E0, 16 longs) and loops (FFF46F90-FFF47040).
+through `command_table` (FFF470E0, 16 longs) and loops (FFF46F90-FFF47040). Field 0 starts
+every list sign-extended (`read_list_header` leaves ST FE0 = 1, FFF4D990) until a handler resets
+it; the handlers that read 16-bit operands without their own SETF (1, 2, 3, 7, A, D) see the mode
+the commands before them left (section 4.4).
 
 ### 3.2 The codes
 
@@ -355,15 +358,33 @@ E0): height, width, then pixels from 60h bits on. The box is from point 0 to (po
 2's y); its height is point 2's y - point 1's y + 1 (FFF494E0-FFF495C0). Each axis is scaled by a
 16.16 step (DIVU: image size << 16 / box size, FFF496E0, FFF49760) whose fraction accumulator
 starts at one step, not zero (FFF49710, FFF49790). The corners are read with field 0
-(`MOVE *A5+,An,0`), 16 bits zero-extended: ST FE0 is 0 (`SETF 10h,0,0`, FFF40000 and the other
-handlers; MAME: `make fieldext`, `tools/mame/fieldext.lua`, counts 0 hits with FE0 = 1 and 83h
-with FE0 = 0 at FFF49380 over attract frames 0-3100, last ST 00200010, and 0 against 2274Ch at
-the SOM command loop FFF45010), so no corner is ever negative. Boxes are rejected
+(`MOVE *A5+,An,0`, 16 bits), and the handler has no SETF of its own: whether they are sign- or
+zero-extended is ST FE0 as the commands before it left it. `read_list_header` sets FE0 = 1 before
+every list (`SETF 10h,1,0` at FFF4D990, no SETF before its RETS at FFF4DAB0; called at FFF41270,
+then `run_command_list` at FFF412A0), so each list starts sign-extended. Handlers 4 (FFF48900),
+5 (FFF47B20), 6 (FFF47890), 8 (FFF48C00), 9 (FFF48C30), C (FFF4A420) and E0 (FFF4A6F0) run
+`SETF 10h,0,0` and return with it; 1, 2, 3, 7, A, B (whose CALLA FFF52060 reaches a bare RETS)
+and D have no SETF of field 0 and keep the mode, and nothing in the SOM loop (FFF44BF0-FFF45FB0)
+sets it (CODE). In every captured buffer the 7 follows a 9 and a 5 (section 3.2), so its image
+quads read their corners zero-extended: that is the 68k's command order, not a property of the
+handler. MAME (`make fieldext`, `tools/mame/fieldext.lua`, attract frames 0-3100 from an empty
+state): FE0 = 1 at all 307 list starts (FFF46E30) and 0 at none; at command 7 (FFF44BF0) 0 at all
+287 and 1 at none; at the corner read FFF49380 0 at all 83 hits, last ST 00200010; at the SOM
+command loop FFF45010 0 at all 2274Dh. (The SOM loop zero-extends its table entries itself,
+`ZEXT A5,0` at FFF45010, and its polygons do not depend on FE0: the x reads keep only their low
+16 bits, MOVY at FFF453B0-FFF453D0, y is shifted left by 16, FFF453A0, and a row count would
+need 8000h rows to differ.)
+`field0_sign_extended` in `tools/displaylist.py` follows the buffer's commands and the renderer
+reads the corners accordingly. Zero-extended, no corner is negative; sign-extended, a corner of
+8000h or more is. Boxes are rejected
 (FFF49230-FFF49650) when the image is missing (FFF49230), point 0's x >= 200h (FFF49280) or its
-y >= 117h (FFF492F0) (a "negative" p0.x or p0.y reads as 8000h or more and is rejected here),
-point 1's x is left of point 0's (`SUB A0,A1`, FFF493D0; the `JRNN` after the read at FFF49390
-is always taken, and a p1.x of 8000h or more is a very wide box that only the 15Eh limit
-rejects, so with bit 4 it is drawn, clipped by the window), point 2's y is
+y >= 117h (FFF492F0) (signed tests, `CMPI` then `JRN`: zero-extended, a p0.x or p0.y of 8000h or
+more is rejected here; sign-extended, it passes and the box starts left of or above the window,
+which clips it), point 1's x is negative (the `JRNN` after the read at FFF49390 skips the
+rejection whenever the corners are zero-extended, so a p1.x of 8000h or more is then a very wide
+box that only the 15Eh limit rejects, drawn with bit 4, clipped by the window) or left of point
+0's (`SUB A0,A1`, FFF493D0),
+point 2's y is
 below 28h (`CMPI 28h,A2`, FFF49510) or above point 1's y (`SUB A0,A2` with A0 = point 1's y
 from FFF494E0, FFF49570; the height is p2.y - p1.y + 1), or (without FFF77E60 bit 4) the box is
 15Eh wide or C8h high or more (FFF49480, FFF495F0). The text panel of the attract
@@ -383,7 +404,9 @@ the image quads that are part of the 3D scene (sprites placed in the world, the 
 `tools/displaylist.py` implements section 4 instruction by instruction: the packed (y, x)
 arithmetic with carries, the half-pixel start, the V test that skips a row and its pattern
 rotation, the window, the expander's even/odd bytes (for FILL and LINE alike), the three patterns
-and their rotation, LINE 0 for outlines, and the image quad's scaling. `make somdump` captures, for each chosen frame:
+and their rotation, LINE 0 for outlines, and the image quad's scaling and checks, with its corners
+sign- or zero-extended as the buffer's commands before the 7 leave field 0 (section 4.4).
+`make somdump` captures, for each chosen frame:
 the page when the GSP reads the 7000 (before the list) and when it reads the word after the list
 (GSP read taps on those two command-buffer words; both reads are the dispatcher's `MOVE *A5+,A4,0`
 at FFF46F90, the CURPC that `meta.txt` records as `fb_som_pc`), the colour and image

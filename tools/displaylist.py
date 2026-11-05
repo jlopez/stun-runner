@@ -368,6 +368,22 @@ def window_of(w: Sequence[int], i: int) -> tuple[int, int, int, int]:
     return (min(x0, 0x1FF), min(max(y0, TOP), 0x117), min(x1, 0x1FF), min(max(y1, TOP), 0x117))
 
 
+# ST FE0, the extension of field 0 (16 bits), as the commands leave it. read_list_header runs
+# before every list (CALLA FFF4D940 at FFF41270) and sets it, `SETF 10h,1,0` at FFF4D990: each list
+# starts sign-extended (MAME: `make fieldext`, FFF46E30). These handlers run `SETF 10h,0,0` and
+# return with field 0 zero-extended: 4 (FFF48900), 5 (FFF47B20, FFF47E00), 6 (FFF47890), 8
+# (FFF48C00), 9 (FFF48C30), C (FFF4A420), E0 (FFF4A6F0). The others have no SETF of field 0 and
+# call nothing that sets it (B's CALLA FFF52060 is a bare RETS): 1, 2, 3, 7, A, B and D keep the
+# mode the previous command left; 0, F and E1-E3 end the list.
+FE0_RESET_CODES = frozenset({0x4, 0x5, 0x6, 0x8, 0x9, 0xC, 0xE})
+
+
+def field0_sign_extended(cmds: Sequence[GspCommand], k: int) -> bool:
+    """ST FE0 when the GSP starts cmds[k]: True (sign-extended) unless an earlier command of the
+    same list ran one of the handlers that reset it (FE0_RESET_CODES)."""
+    return not any(c.code in FE0_RESET_CODES for c in cmds[:k])
+
+
 def decode_gsp_buffer(w: Sequence[int], header_bits: int = GSP_HEADER_BITS) -> list[GspCommand]:
     """The commands of a GSP command buffer (from the flag word + 10h) up to and including the
     command that ends it; words after it are stale and not part of the list."""
@@ -554,20 +570,26 @@ def read_images(data: bytes) -> dict[int, Image]:
     return out
 
 
-def draw_image(canvas: Canvas, c: Command, images: dict[int, Image], loose: bool) -> bool:
+def draw_image(canvas: Canvas, c: Command, images: dict[int, Image], loose: bool,
+               sign_extended: bool = False) -> bool:
     """FFF48FC0: scale image cmd & 3Fh into the box from p0 to (p1.x, p2.y), 8 bits per pixel,
     pixel 0 transparent (CONTROL = E0h: T set). `loose` is FFF77E60 bit 4 (no size limits).
     False when the GSP's checks reject it (FFF49230-FFF49650; it then only skips the words).
-    The corners are read with field 0 = 16 bits, zero-extended (ST FE0 = 0, MAME), so no corner
-    is ever negative: a "negative" p0.x or p0.y fails the 200h/117h tests, and a p1.x of 8000h
-    or more is a very wide box that only the 15Eh limit rejects (drawn, clipped, when loose)."""
+    The corners are read with field 0 (`MOVE *A5+,An,0`) and the handler has no SETF: they are
+    sign-extended when `sign_extended` (ST FE0 = 1, see field0_sign_extended). Zero-extended, no
+    corner is negative: a p0.x or p0.y of 8000h or more fails the 200h/117h tests, and a p1.x of
+    8000h or more is a very wide box that only the 15Eh limit rejects (drawn, clipped, when
+    loose). Sign-extended, such a p0 passes them (the box starts left of or above the window,
+    which clips it: PIXT XY with W = 3) and such a p1.x is rejected by the JRNN at FFF49390."""
     if len(c.points) < 3:
         return False
     img = images.get(c.cmd & 0x3F)
+    ext = s16 if sign_extended else (lambda v: v)
     (x0, y0), (x1, y1), (_, y2) = c.points[0], c.points[1], c.points[2]
+    x0, y0, x1, y1, y2 = ext(x0), ext(y0), ext(x1), ext(y1), ext(y2)
     width = x1 - x0 + 1  # SUB A0,A1 (FFF493D0): rejected when x1 - x0 < 0, then INC
     height = y2 - y1 + 1
-    ok = (img is not None and x0 < 0x200 and y0 < 0x117 and width > 0 and y2 >= TOP
+    ok = (img is not None and x0 < 0x200 and y0 < 0x117 and x1 >= 0 and width > 0 and y2 >= TOP
           and height > 0 and (loose or (width < 0x15E and height < 0xC8)))
     if not ok or img is None:
         return False
@@ -594,9 +616,14 @@ def draw_image(canvas: Canvas, c: Command, images: dict[int, Image], loose: bool
 
 def render(som: SomList, colours: Sequence[int],
            window: tuple[int, int, int, int] = FULL_WINDOW,
-           images: dict[int, Image] | None = None, loose: bool = False) -> Canvas:
+           images: dict[int, Image] | None = None, loose: bool = False,
+           sign_extended: bool = False) -> Canvas:
     """Draw the list in table order into an empty 512 x 240 page (rows = GSP y 28h-117h),
-    clipped to `window` (the last command 5 before the list sets it, FFF47AF0)."""
+    clipped to `window` (the last command 5 before the list sets it, FFF47AF0). `sign_extended`
+    is ST FE0 when the list's command 7 starts (field0_sign_extended); nothing in the SOM loop
+    (FFF44BF0-FFF45FB0) sets field 0, and only the image quads depend on it: the polygon code
+    keeps the low 16 bits of its x reads (MOVY into B0/A6, FFF453B0-FFF453D0) and shifts y
+    left by 16 (FFF453A0)."""
     if len(colours) < 0x400:
         raise DisplayListError(f"{len(colours)} colour words, need 400h")
     canvas = Canvas(window)
@@ -604,7 +631,7 @@ def render(som: SomList, colours: Sequence[int],
         if c.skipped:
             canvas.skipped += 1
         elif c.is_image:
-            if images is None or not draw_image(canvas, c, images, loose):
+            if images is None or not draw_image(canvas, c, images, loose, sign_extended):
                 canvas.images += 1
         else:
             draw_polygon(canvas, c, colours)
@@ -830,17 +857,24 @@ def synthetic_colours() -> list[int]:
     return [((i * 7 + 1) & 0xFF) | ((((i * 13) + 2) & 0xFF) << 8) for i in range(0x400)]
 
 
-def capture_window(d: Path) -> tuple[int, int, int, int]:
-    """The clip window in force when the capture's GSP buffer reaches its SOM list."""
+def capture_state(d: Path) -> tuple[tuple[int, int, int, int], bool]:
+    """The clip window and ST FE0 (True: field 0 sign-extended) in force when the capture's GSP
+    buffer reaches its SOM list."""
     meta = read_meta(d / "meta.txt")
     buf = read_words(d / "cmdbuf.bin")
     window = FULL_WINDOW
-    for c in decode_gsp_buffer(buf, int(meta.get("FFF77F50", f"{GSP_HEADER_BITS:X}"), 16)):
+    cmds = decode_gsp_buffer(buf, int(meta.get("FFF77F50", f"{GSP_HEADER_BITS:X}"), 16))
+    for k, c in enumerate(cmds):
         if c.som is not None:
-            break
+            return window, field0_sign_extended(cmds, k)
         if c.code == 0x5:
             window = window_of(buf, c.offset)
-    return window
+    raise DisplayListError(f"{d}: no SOM list in the GSP buffer")
+
+
+def capture_window(d: Path) -> tuple[int, int, int, int]:
+    """The clip window in force when the capture's GSP buffer reaches its SOM list."""
+    return capture_state(d)[0]
 
 
 def export(d: Path, name: str, som: SomList) -> None:
@@ -913,13 +947,13 @@ def main(argv: list[str] | None = None) -> int:
             d = args.capture
             colours = read_words(d / "colors.bin")
             page = (d / "fb_som.bin").read_bytes()
-            window = capture_window(d)
+            window, sign_extended = capture_state(d)
             meta = read_meta(d / "meta.txt")
             images = None
             if (d / "images.bin").exists():
                 images = read_images((d / "images.bin").read_bytes())
             loose = bool(int(meta.get("FFF77E60", "0"), 16) & 0x10)
-            canvas = render(som, colours, window, images, loose)
+            canvas = render(som, colours, window, images, loose, sign_extended)
             before = (d / "fb_pre.bin").read_bytes() if (d / "fb_pre.bin").exists() else None
             agreement = compare(canvas, page, before)
             pal = struct.unpack(f"<{len((d / 'palette.bin').read_bytes()) // 4}I",
@@ -936,7 +970,12 @@ def main(argv: list[str] | None = None) -> int:
                 f"({100 * agreement.share:.3f}%); the list changed {agreement.changed} pixels of "
                 f"the page, {agreement.missed} of them not drawn; {canvas.images} image quads not drawn "
                 f"(no images, or rejected), "
-                f"{canvas.skipped} skipped")
+                f"{canvas.skipped} skipped; field 0 "
+                f"{'sign' if sign_extended else 'zero'}-extended at the list")
+            if agreement.equal != agreement.drawn or agreement.missed:
+                print("\n".join(lines))
+                print("displaylist: the redrawing differs from MAME's page", file=sys.stderr)
+                return 2
     except DisplayListError as e:
         print(f"displaylist: {e}", file=sys.stderr)
         return 1

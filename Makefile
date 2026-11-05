@@ -203,6 +203,11 @@ objtrace: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
 # Are the image-quad corners read zero-extended (ST FE0 = 0 at FFF49380, docs/08 section 4.4)?
 # Breakpoints count the GSP's field-0 extension mode from an empty private NVRAM/cfg state (as
 # somdump); writes build/mame/fieldext.txt.
+
+# How does the GSP extend field 0 (ST FE0, docs/08 section 4.4): at the start of every list
+# (FFF46E30, sign-extended after read_list_header), at command 7 and at the image-quad corner read
+# FFF49380 (zero-extended after a 9 or 5)? Breakpoints count the mode from an empty private
+# NVRAM/cfg state (as somdump); writes build/mame/fieldext.txt.
 FIELD_FRAMES ?= 3100
 
 fieldext:
@@ -217,7 +222,8 @@ fieldext:
 # tools/mame/somdump.lua captures, at each frame of SOM_ATTRACT (attract mode) and SOM_GAME (a game
 # started at frame 900), the SOM banks, ADSP data RAM, the GSP command buffer, the frame-buffer
 # page before and after the list and a screen snapshot into build/mame/som/<attract|game|dither>-f<N>/;
-# tools/displaylist.py decodes and redraws each one and compares it with MAME's page. Every MAME
+# tools/displaylist.py decodes and redraws each one and compares it with MAME's page; the target
+# fails when a capture does not decode or its redrawing differs from the page. Every MAME
 # run starts from an empty private state (SOM_STATE, removed first): no NVRAM file, so the game
 # boots from the set's own 200e/210e, and attract mode, which depends on the NVRAM history (high
 # scores, the attract cycle), is the same on every machine and every run.
@@ -243,8 +249,10 @@ somdump: $(PROGRAMS)
 	rm -rf $(SOM_STATE) && mkdir -p $(SOM_STATE)/nvram $(SOM_STATE)/cfg
 	SOM_DIR=$(SOM_DIR)/ SOM_SNAPDIR=$(BUILD)/mame/snap/ SOM_PREFIX=dither-f SOM_PLAY=0 SOM_DITHER=1 \
 		SOM_FRAMES=$(SOM_DITHER) $(SOM_MAME)
-	@for d in $(SOM_DIR)/*/; do echo "== $$d"; \
-		$(PYTHON) tools/displaylist.py $$d --render $$d/compare.png | grep -v 'written at'; done
+	@fail=0; for d in $(SOM_DIR)/*/; do echo "== $$d"; \
+		$(PYTHON) tools/displaylist.py $$d --render $$d/compare.png > $$d/render.txt \
+			|| { fail=1; echo "FAILED: $$d"; }; grep -v 'written at' $$d/render.txt; done; \
+		exit $$fail
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms
