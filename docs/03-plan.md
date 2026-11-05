@@ -35,7 +35,7 @@ Hardware map from MAME, toolchain proposal, this plan, `CLAUDE.md`, ROM location
 - `tools/objects/` decodes the 384 KB into a mesh file per object (a JSON or OBJ with vertices, faces, colours) plus a manifest, and re-encodes to bytes; round trip byte-identical for the whole region.
 - A viewer (Three.js or matplotlib dump) for eyeballing the tunnel segments and vehicles; not a product, a verification aid.
 
-**Check**: `make test` round-trips the six object ROMs through meshes with zero differences; docs/05 names every object and shows at least three rendered; the record layout cites the ADSP instructions that read each field.
+**Check**: `make test` round-trips the six object ROMs through meshes with zero differences; docs/07 names every object and shows at least three rendered; the record layout cites the ADSP instructions that read each field.
 
 ## M4. The 6502 sound program as source
 

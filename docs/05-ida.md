@@ -4,7 +4,7 @@
 
 ## 1. Databases are build artefacts; snapshots are committed
 
-Decision (coordinator, 2026-11-04, **pending Jesus**, attention card A1): an IDA database embeds every byte of the image it was made from, and this repository is public, so CLAUDE.md rule 2 wins over the earlier plan of committing the `.i64` through Git LFS (docs/02 section 3 as written at kickoff). The databases are build artefacts:
+Decision (Jesus, 2026-11-04, approving the M1b coordinator's card A1): an IDA database embeds every byte of the image it was made from, and this repository is public, so CLAUDE.md rule 2 wins over the earlier plan of committing the `.i64` through Git LFS (docs/02 section 3 as written at kickoff). The databases are build artefacts:
 
 ```
 build/stunrun-68k.bin ──┐                           ┌── data/stunrun-68k.i64   (gitignored)
