@@ -223,7 +223,8 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert blobs["adsp_program"][1:4] == ["1702E", "8270", "../../build/adsp/program.bin"]
     assert blobs["gsp_program"][1:4] == ["1907C", "24408", "../../build/gsp/program.bin"]
     # the object image has no blob: the residue word is a dc.w like the rest
-    summary = json.loads(r.stdout.splitlines()[-1])
+    # the JSON line is the last of tools/coverage's output (GNU make 4 may print more after it)
+    summary = json.loads(next(x for x in reversed(r.stdout.splitlines()) if x.startswith("{")))
     assert summary["images"]["stunrun-obj"]["blob"] == 0
     assert summary["blob"] == 1118208
     assert "build/stunrun-obj.bin" not in r.stdout
