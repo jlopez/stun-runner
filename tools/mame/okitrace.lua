@@ -17,19 +17,28 @@
 --
 -- Which command played a phrase: the 6502's main loop (4171-4189) takes each command from its
 -- queue at 0200 and calls the dispatcher at 4371 with Y = the command, which reads the handler
--- type at 6100+Y (and its parameter at 616D+Y). The OKI handler (type 13h, 5BFE) reads the
--- phrase of its effect at 6532+effect (5C43) before the first command byte. A read tap on
--- 6100-616C records the command being dispatched and one on 6532-6566 the effect; both are the
--- program's own reads (the taps observe them, they read nothing themselves), so a start is
--- attributed to the command whose dispatch led to it, not guessed from timing.
+-- type at 6100+Y (4375 LDA $6100,Y; and its parameter at 616D+Y). The OKI handler (type 13h,
+-- 5BFE) reads the phrase of its effect at 6532+effect (5C43) before the first command byte. A
+-- read tap on 6100-616C records the command being dispatched, only when the read's PC is 4375.
+-- The tap sees other reads, tallied as "lookup" lines and never taken for a dispatch: the
+-- handlers of types 5 (43F1) and 0Ah (4462) and the code at 451F read the table to test another
+-- command for type 08, and LDA $61E4,X at 4570 and LDA $61E5,X at 457C, when X carries them into
+-- page 62, make the dummy read of an indexed read that crosses a page at 61xx (MAME's m6502 does
+-- it; the 6502 discards the byte). A tap on 6532-6566 records the effect (5C43 LDA $6532,Y,
+-- which never crosses a page). Both are the program's own reads (the taps observe them,
+-- they read nothing themselves), so a start is attributed to the command whose dispatch led to
+-- it, not guessed from timing.
 --
 -- Output, <OKI_NAME>.txt in OKI_DIR: "# key value" header lines, then aggregated lines
 --   start <phrase> <voices> <attenuation> <pc> <command> <effect> <count> <first frame>
 --   stop <mask> <pc> <count>
 --   wrio <value> <count>        (pin 7 = bit 3, OKI reset = bit 2 low)
 --   mix <value> <count>
---   dispatch <command> <count>  (every command the main loop dispatched)
---   muted <command> <count>     (OKI play commands dispatched while RAM 1E is nonzero)
+--   dispatch <command> <count>  (every command the dispatcher read the type of at 4375)
+--   lookup <pc> <offset> <count>  (the other reads of the type table: 43F1, 4462, 451F and
+--                               the page-crossing dummy reads at 4570 and 457C)
+--   muted <command> <count> <first frame> <last frame>
+--                               (OKI play commands dispatched while RAM 1E is nonzero)
 -- PC is the 6502 address of the store (MAME's m6502 PC state holds the address of the
 -- instruction in progress; the opcode there is checked to be a store and "pc_unknown" counts
 -- the others). Command and effect are hex, "--" when none was read yet. Values written are the
@@ -61,8 +70,8 @@ local program = cpu.spaces["program"]
 local pc_state = cpu.state["PC"]
 local m68k = assert(machine.devices[":mainpcb:maincpu"], "no :mainpcb:maincpu").spaces["program"]
 
-local starts, stops, wrio, mix, dispatches, muted = {}, {}, {}, {}, {}, {}
-local first_frame = {}
+local starts, stops, wrio, mix, dispatches, lookups, muted = {}, {}, {}, {}, {}, {}, {}
+local first_frame, muted_frames = {}, {}
 local pending = nil -- phrase number of a command in progress
 local command, effect = nil, nil
 local frame = 0
@@ -113,15 +122,29 @@ OKITRACE_READ = program:install_read_tap(0x2800, 0x29FF, "okitrace_r", function(
   return value
 end)
 
+local DISPATCH_PC = 0x4375
+
 OKITRACE_DISPATCH = program:install_read_tap(0x6100, 0x616C, "okitrace_d", function(offset, value)
+  local pc = pc_state.value
+  if pc ~= DISPATCH_PC then
+    bump(lookups, string.format("lookup %04X %02X", pc, offset - 0x6100))
+    return value
+  end
   command = offset - 0x6100
   effect = nil
   bump(dispatches, string.format("dispatch %02X", command))
   -- an OKI play command (handler type 13h) while RAM 1E is nonzero: the handler returns at
-  -- 5C01 without touching the OKI (command 01 sets 1E to F0, 02 clears it; 1E is also a
-  -- threshold on YM2151 paths, 44C8 and 4EE6, docs/10 section 4)
+  -- 5C01 without touching the OKI (command 01 sets 1E to F0, 02 clears it; 1E is also the
+  -- threshold of a YM2151 path at 4EE6, docs/10 section 4)
   if value == 0x13 and program:read_u8(0x1E) ~= 0 then
-    bump(muted, string.format("muted %02X", command))
+    local key = string.format("muted %02X", command)
+    bump(muted, key)
+    local fl = muted_frames[key]
+    if fl then
+      muted_frames[key] = string.format("%s %d", fl:match("^%d+"), frame)
+    else
+      muted_frames[key] = string.format("%d %d", frame, frame)
+    end
     muted_count = muted_count + 1
   end
   return value
@@ -185,7 +208,8 @@ OKITRACE_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
     dump(f, wrio)
     dump(f, mix)
     dump(f, dispatches)
-    dump(f, muted)
+    dump(f, lookups)
+    dump(f, muted, muted_frames)
     f:close()
     local done = assert(io.open(OUT .. NAME .. "done", "w"))
     done:close()

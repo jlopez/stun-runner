@@ -53,7 +53,9 @@ recovers the bytes into `build/oki/bin/NN.bin` and writes `build/oki/samples.asm
 one `incbin` per sample, cut at each file boundary, and the zero tail as `dcb.b`. The image is
 byte-identical only if every sample survived WAV and back. The WAV step and the OKI assembly
 run on every `make` (cheap), so an edited WAV is never hidden by the whole-second mtimes of make
-3.81; `make OKI_WAV_DIR=dir` builds from edited WAVs. `make okitrace` (`-j3`: three MAME runs of
+3.81, and so does `tools/adpcm split --missing` on `build/oki/wav`, which writes back a WAV
+missing there (deleted, or a phrase renamed behind the split's stamp) and keeps the others;
+`tools/adpcm` is a package directory, run as `uv run python tools/adpcm <command>`; `make OKI_WAV_DIR=dir` builds from edited WAVs. `make okitrace` (`-j3`: three MAME runs of
 `tools/mame/okitrace.lua`) records what the 6502 tells the OKI and rewrites the manifest's play
 evidence; `make oki-pcm` decodes every phrase the manifest names to 16-bit PCM under `build/oki/pcm/` for
 listening (other WAVs there are removed, so a rename leaves no stale copy).
@@ -108,7 +110,8 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
 - `make lint`: ruff and mypy over the tools.
 - `make okitrace` (needs MAME and the ROMs; never in CI; `-j3` runs the three runs at once):
   `tools/mame/okitrace.lua` taps the 6502's OKI, /WRIO and /MIX writes and its reads of the
-  command dispatcher's type table and of the effect-to-phrase table, in attract mode, a game and
+  command dispatcher's type table (a dispatch only at PC 4375; other reads of the table are
+  `lookup` lines) and of the effect-to-phrase table, in attract mode, a game and
   attract mode with every OKI command injected, each from an empty private state
   (`build/mame/state-okitrace-<run>`), into `build/mame/okitrace-<run>.txt` (each run must
   write its done marker); then `tools/adpcm survey` rewrites `data/oki/samples.json` (layout,

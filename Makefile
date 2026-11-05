@@ -105,8 +105,15 @@ $(OKI_SPLIT): $(BUILD)/$(SET)-oki.bin $(OKI_MANIFEST) $(OKI_TOOLS)
 
 # The WAVs -> bytes step and the OKI tree's assembly run on every `make` (cheap, as the split):
 # an edited WAV saved in the same second as the last build, a removed WAV or another OKI_WAV_DIR
-# must never leave a stale image (make 3.81 on macOS compares whole-second mtimes).
+# must never leave a stale image (make 3.81 on macOS compares whole-second mtimes). So does
+# `split --missing` on build/oki/wav: the stamp above does not see its WAVs, so a WAV deleted
+# there, or a phrase renamed in the same second as the last split, is written again from the
+# image (the other WAVs there, edited or not, are kept).
+OKI_REFILL = $(PYTHON) tools/adpcm split --missing --image $(BUILD)/$(SET)-oki.bin \
+	--manifest $(OKI_MANIFEST) --out $(BUILD)/oki/wav
+
 $(OKI_ASM): $(OKI_SPLIT) $(OKI_MANIFEST) $(OKI_TOOLS) FORCE
+	@$(OKI_REFILL)
 	$(PYTHON) tools/adpcm asm --manifest $(OKI_MANIFEST) --wav $(OKI_WAV_DIR) --out $(BUILD)/oki
 
 .SECONDARY: $(OKI_SPLIT) $(OKI_ASM)
@@ -405,6 +412,7 @@ okitrace: $(OKI_RUNS:%=$(BUILD)/mame/okitrace-%.txt) $(BUILD)/$(SET)-oki.bin \
 # MAME plays them, into build/oki/pcm/NN-name.wav: for listening (Jesus's naming pass). Never
 # committed.
 oki-pcm: $(OKI_SPLIT)
+	@$(OKI_REFILL)
 	$(PYTHON) tools/adpcm pcm --manifest $(OKI_MANIFEST) --wav $(OKI_WAV_DIR) --out $(BUILD)/oki/pcm
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json

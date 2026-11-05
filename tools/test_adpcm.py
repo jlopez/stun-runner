@@ -243,15 +243,18 @@ def test_manifest_reader(tmp_path: Path) -> None:
     path = tmp_path / "m.json"
     write_manifest(path, layout)
     assert read_manifest(path) == layout
-    cases = {
-        "p2__start": ("00000", "starts at 00000"),
-        "p3__number": (7, "numbered 1, 2"),
-        "p1__name": ("1abc", "not a unique label"),
-        "p2__name": ("sample_01", "not a unique label"),
-        "p4__length": (1, "length is not end - start"),
-        "p4__end": ("40000", "outside"),
-    }
-    for key, (value, message) in cases.items():
+    cases = [
+        ("p2__start", "00000", "starts at 00000"),
+        ("p3__number", 7, "numbered 1, 2"),
+        ("p1__name", "1abc", "not a unique label"),
+        ("p2__name", "sample_01", "not a unique label"),
+        ("p3__name", "phrase_01", "the OKI tree's own labels"),
+        ("p1__name", "phrase_02_last", "the OKI tree's own labels"),
+        ("p4__name", "oki_tail", "the OKI tree's own labels"),
+        ("p4__length", 1, "length is not end - start"),
+        ("p4__end", "40000", "outside"),
+    ]
+    for key, value, message in cases:
         write_manifest(path, layout, **{key: value})
         with pytest.raises(FormatError, match=message):
             read_manifest(path)
@@ -284,6 +287,9 @@ def test_asm_source_cuts_at_chip_boundaries(tmp_path: Path) -> None:
     for address, name in chips()[1:]:
         assert f'\tassert\t*=${address:05X},"{name} misplaced"' in text
     assert text.count("\tincbin\t") == 52 + 3
+    # every phrase's name is a label next to phrase_NN (the reader refuses the tree's own labels)
+    for p in layout.phrases:
+        assert f"phrase_{p.number:02d}:\n{p.name}:\n" in text
     assert '\tincbin\t"../../build/oki/bin/11.bin",0,$358' in text
     assert '\tincbin\t"../../build/oki/bin/11.bin",$358' in text
     assert text.rstrip().endswith("\tdcb.b\t$358,0")

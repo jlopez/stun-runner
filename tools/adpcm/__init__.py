@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import struct
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,8 +31,9 @@ from pathlib import Path
 # atarijsa.cpp: JSA_MASTER_CLOCK = 3.579545 MHz; OKIM6295(config, m_oki1, JSA_MASTER_CLOCK/3, ...)
 CLOCK = 3_579_545 / 3
 # okim6295.cpp: divisor = m_pin7_state ? 132 : 165. JSA II's wrio_w drives pin 7 from bit 3 of
-# 2A04; the 6502 never sets it (make okitrace: every 2A04 write is 00, 01 or 05), so MAME plays
-# the samples at CLOCK / 165.
+# 2A04; the 6502 never sets it (CODE: the one write that could, 5903, is in the routine 5869,
+# reached only from handler type 10h, which no sound command has, docs/10 section 2; MAME: every
+# 2A04 write in make okitrace is 00, 01 or 05), so MAME plays the samples at CLOCK / 165.
 DIVISORS = {"low": 165, "high": 132}
 PIN7 = "low"
 
@@ -102,6 +104,17 @@ def parse_address(value: object, what: str) -> int:
         raise FormatError(f"{what}: {value!r} is not a hex address") from None
 
 
+# The OKI tree's own labels (asm/oki/samples.asm and the include tools/adpcm asm writes): a
+# sample name is a label alias next to them, so it may not be one of them.
+RESERVED_LABEL = re.compile(r"phrase_\d+(_last)?|oki_\w*")
+
+
+def reserved_label(name: str) -> bool:
+    """True for a name the OKI tree defines itself: phrase_NN, phrase_NN_last and every oki_
+    label (oki_phrases, oki_phrase_table, oki_phrase_table_end, oki_tail, oki_<chip>)."""
+    return RESERVED_LABEL.fullmatch(name) is not None
+
+
 def read_manifest(path: Path) -> Layout:
     """The layout data/oki/samples.json records, checked: phrases 1..n back to back from the end
     of the table, unique label names, inside the image."""
@@ -124,6 +137,11 @@ def read_manifest(path: Path) -> Layout:
         name = p.get("name")
         if not isinstance(name, str) or not is_label(name) or name in names:
             raise FormatError(f"{where}: name {name!r} is not a unique label")
+        if reserved_label(name):
+            raise FormatError(
+                f"{where}: name {name!r} is one of the OKI tree's own labels "
+                "(phrase_NN, phrase_NN_last, oki_*)"
+            )
         names.add(name)
         start = parse_address(p.get("start"), where)
         end = parse_address(p.get("end"), where)

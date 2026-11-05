@@ -247,8 +247,11 @@ def check_oki_relayout_and_rename(
         names = sorted(f.name for f in directory.glob("03-*.wav"))
         assert names == ["03-renamed_03.wav"], names
         assert len(list(directory.glob("*.wav"))) == len(doc["phrases"])
+    # the name back as if in the same second as the last split (the stamp left newer than the
+    # manifest, so the split does not run): make still writes the WAV under the old name from
+    # the image and removes the renamed one
     manifest.write_text(original)
-    bump(manifest, 15)
+    (work / "build/oki/split.done").touch()
     r = run(*make, "all", "oki-pcm", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
     for directory in (wavs, work / "build/oki/pcm"):
@@ -390,6 +393,22 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     (edits / wav.name).unlink()
     r = run(*make, f"OKI_WAV_DIR={edits}", "all", env=env)
     assert r.returncode != 0 and "absent" in r.stdout + r.stderr
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+    # a WAV deleted from build/oki/wav comes back from the image (the split stamp does not see
+    # its WAVs), and an edited one there is kept
+    gone = work / f"build/oki/wav/{oki_layout.phrases[5].stem}.wav"
+    gone_bytes = gone.read_bytes()
+    wav.write_bytes(bytes(edited))
+    gone.unlink()
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert gone.read_bytes() == gone_bytes and wav.read_bytes() == bytes(edited)
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 1 and "136070-2124.1fh: 1 differing bytes" in r.stdout, r.stdout
+    wav.write_bytes(original)
     r = run(*make, "all", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
     r = run(sys.executable, work / "tools/bytecheck", env=env)
