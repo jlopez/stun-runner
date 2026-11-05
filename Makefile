@@ -204,21 +204,26 @@ objtrace: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
 # tools/mame/somdump.lua captures, at each frame of SOM_ATTRACT (attract mode) and SOM_GAME (a game
 # started at frame 900), the SOM banks, ADSP data RAM, the GSP command buffer, the frame-buffer
 # page before and after the list and a screen snapshot into build/mame/som/<attract|game>-f<N>/;
-# tools/displaylist.py decodes and redraws each one and compares it with MAME's page. MAME_STATE
-# passes private -nvram/-cfg directories when several runs share a machine.
+# tools/displaylist.py decodes and redraws each one and compares it with MAME's page. Every MAME
+# run starts from an empty private state (SOM_STATE, removed first): no NVRAM file, so the game
+# boots from the set's own 200e/210e, and attract mode, which depends on the NVRAM history (high
+# scores, the attract cycle), is the same on every machine and every run.
 SOM_ATTRACT ?= 1200,1500,1800,2100,2700,3000
-SOM_GAME ?= 2400,3000,3600,4200,4800
+SOM_GAME ?= 1000,2400,3000,3600,4200,4800
 SOM_DIR := $(BUILD)/mame/som
-MAME_STATE ?=
+SOM_STATE := $(BUILD)/mame/somstate
+SOM_MAME = $(MAME) stunrun $(MAME_FLAGS) -nvram_directory $(SOM_STATE)/nvram \
+	-cfg_directory $(SOM_STATE)/cfg -snapshot_directory $(BUILD)/mame/snap \
+	-autoboot_script tools/mame/somdump.lua
 
 somdump: $(PROGRAMS)
 	@mkdir -p $(SOM_DIR) $(BUILD)/mame/snap
+	rm -rf $(SOM_STATE) && mkdir -p $(SOM_STATE)/nvram $(SOM_STATE)/cfg
 	SOM_DIR=$(SOM_DIR)/ SOM_SNAPDIR=$(BUILD)/mame/snap/ SOM_PREFIX=attract-f SOM_PLAY=0 \
-		SOM_FRAMES=$(SOM_ATTRACT) $(MAME) stunrun $(MAME_FLAGS) $(MAME_STATE) \
-		-snapshot_directory $(BUILD)/mame/snap -autoboot_script tools/mame/somdump.lua
+		SOM_FRAMES=$(SOM_ATTRACT) $(SOM_MAME)
+	rm -rf $(SOM_STATE) && mkdir -p $(SOM_STATE)/nvram $(SOM_STATE)/cfg
 	SOM_DIR=$(SOM_DIR)/ SOM_SNAPDIR=$(BUILD)/mame/snap/ SOM_PREFIX=game-f SOM_PLAY=1 \
-		SOM_FRAMES=$(SOM_GAME) $(MAME) stunrun $(MAME_FLAGS) $(MAME_STATE) \
-		-snapshot_directory $(BUILD)/mame/snap -autoboot_script tools/mame/somdump.lua
+		SOM_FRAMES=$(SOM_GAME) $(SOM_MAME)
 	@for d in $(SOM_DIR)/*/; do echo "== $$d"; \
 		$(PYTHON) tools/displaylist.py $$d --render $$d/compare.png | grep -v 'written at'; done
 

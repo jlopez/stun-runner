@@ -294,11 +294,14 @@ def gsp_command_length(w: Sequence[int], i: int) -> tuple[int, str, SomList | No
         return 1, name, None  # FFF47050: leaves the list
     if code == 0xE:
         if c & 3:
-            return 1, "end", None  # E1-E3: FFF47390 table -> FFF47050
+            # E1-E3: cmd_E's own CALL A0 (FFF47370) reaches FFF47050 one call deeper, whose
+            # ADDK 20h,SP drops only one return address: the stack is unbalanced (docs/08 3.2)
+            raise DisplayListError(f"command {c:04X} at {i:04X}: E1-E3 do not end a list cleanly")
         _need(w, i, 3, "image table")
         start, count = w[i + 1], w[i + 2]
-        if start > 0x3F or start + count > 0x40:
-            raise DisplayListError(f"image table {start:X}+{count:X} out of range at {i:04X}")
+        if start > 0x3F or start + count > 0x40:  # JAHI FFF40000 at FFF4A730 / FFF4A7C0
+            raise DisplayListError(
+                f"image table {start:X}+{count:X} out of range at {i:04X}: restarts gsp_main")
         return 3 + 2 * count, name, None  # FFF4A6F0: count longs into FFF78150
     if code == 0x1:  # FFF48FC0: six words, then longs up to FFFFFFFF (FFF499D0)
         j = i + 7

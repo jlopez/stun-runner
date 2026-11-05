@@ -1,9 +1,10 @@
 """The SOM display list decoder and the reference renderer (tools/displaylist.py, docs/08).
 
 Synthetic tests run everywhere (CI): hand-built lists through the decoder, truncated and malformed
-lists rejected, a GSP command buffer around a list, the renderer on known shapes. The committed
-captures under artifacts/display-list/ (SOM lists as MAME's ADSP wrote them: runtime RAM state)
-are decoded in CI too, and redrawn against a recorded checksum. The capture tests run on
+lists rejected, a GSP command buffer around a list, the clamp of a command-5 window, the renderer
+on known shapes (the stipple phase at an odd row included), and the image-quad scaler on a made-up
+image. The committed captures under artifacts/display-list/ (SOM lists as MAME's ADSP wrote them:
+runtime RAM state) are decoded in CI too, and their polygons redrawn against a recorded checksum. The capture tests run on
 `make somdump` output (build/mame/som/) and skip without it: every capture decodes with no word
 unexplained, the rebuilt bank equals the 68k's view, the GSP buffer carries the same list, and the
 redrawing equals MAME's frame buffer on every pixel it draws and misses none the list changed.
@@ -25,10 +26,13 @@ from displaylist import (
     Canvas,
     Command,
     DisplayListError,
+    Image,
     Segment,
+    capture_window,
     compare,
     decode_gsp_buffer,
     decode_som,
+    draw_image,
     draw_polygon,
     encode_som,
     field_writers,
@@ -38,6 +42,7 @@ from displaylist import (
     render,
     snapshot_agreement,
     synthetic_colours,
+    window_of,
 )
 
 TOOLS = Path(__file__).resolve().parent
@@ -144,6 +149,30 @@ def test_gsp_buffer_errors():
         decode_gsp_buffer([0] * 0x44 + [0xC000, 0xF0, 0x20] + [0] * 0x20)  # past 100h
     with pytest.raises(DisplayListError):
         decode_gsp_buffer([0] * 0x44 + [0x4013, 0, 1, 2, 0x4141])  # no NUL, no end
+    for start, count in ((0x40, 0), (0x3F, 2)):  # E0 out of range: JAHI FFF40000 (FFF4A730/A7C0)
+        with pytest.raises(DisplayListError):
+            decode_gsp_buffer([0] * 0x44 + [0xE000, start, count] + [0] * 8 + [0xF000])
+    for e in (0xE001, 0xE002, 0xE003):  # FFF47050 one call deeper: not a clean end
+        with pytest.raises(DisplayListError):
+            decode_gsp_buffer([0] * 0x44 + [e, 0xF000])
+    ok = decode_gsp_buffer([0] * 0x44 + [0xE000, 0x3E, 2, 1, 2, 3, 4, 0xF000])
+    assert [(c.code, c.length) for c in ok] == [(0xE, 7), (0xF, 1)]
+
+
+def test_window_command_is_clamped(tmp_path):
+    """Command 5 clamps x to 1FFh at most and y into 28h-117h (FFF47B60-FFF47DA0, unsigned)."""
+    som_words = encode_som([square()])
+    cmds = [0x5000, 5, 0x10, 0x250, 0x200, 0x5000, 0x300, 0x30, 0x40, 0x50]
+    buf = [0] * 0x44 + cmds + [0x7000] + som_words[1:] + [0xF000]
+    assert window_of(buf, 0x44) == (5, 0x28, 0x1FF, 0x117)
+    assert window_of(buf, 0x49) == (0x1FF, 0x30, 0x40, 0x50)
+    # a capture directory: the last command 5 before the list is the window it is drawn in
+    (tmp_path / "cmdbuf.bin").write_bytes(struct.pack(f"<{len(buf)}H", *buf))
+    (tmp_path / "meta.txt").write_text("FFF77F50 0440\n")
+    assert capture_window(tmp_path) == (0x1FF, 0x30, 0x40, 0x50)
+    buf[0x49 : 0x49 + 5] = [0x5000, 0, 0, 0xFFFF, 0xFFFF]
+    (tmp_path / "cmdbuf.bin").write_bytes(struct.pack(f"<{len(buf)}H", *buf))
+    assert capture_window(tmp_path) == (0, 0x28, 0x1FF, 0x117)
 
 
 # --------------------------------------------------------------------------------- the renderer
@@ -175,6 +204,25 @@ def test_expander_dither_and_stipple():
     assert sum(three.drawn) * 4 == sum(solid.drawn) * 3
 
 
+def test_stipple_phase_at_an_odd_row():
+    """The pattern is rotated left by 4y bits at the top row (FFF45370-FFF45390) and by 4 after
+    each row (FFF454F0); pixel x is written when bit 2x mod 16 is set. Top row y = 41h: 4y mod 32
+    = 4."""
+    colours = synthetic_colours()
+
+    def columns(cmd: int) -> list[list[int]]:
+        c = Canvas()
+        draw_polygon(c, Command(0, cmd, 0, 10, 19, 0x41, (Segment(0, 0, 0, 10),)), colours)
+        rows = (0x41, 0x42, 0x43)
+        return [[x for x in range(WIDTH) if c.drawn[(y - TOP) * WIDTH + x]] for y in rows]
+
+    # 25%: 01010101h rotated by 4, 8, 12: bits {4, 12}, {0, 8}, {4, 12} of the low half
+    assert columns(0x0800 | 0x0140) == [[10, 14, 18], [12, 16], [10, 14, 18]]
+    # 75%: 15151515h rotated by 4 = 51515151h (bits 0 4 6 8 12 14), then by 8 (0 2 4 8 10 12)
+    assert columns(0x0400 | 0x0140)[:2] == [[10, 11, 12, 14, 15, 16, 18, 19],
+                                             [10, 12, 13, 14, 16, 17, 18]]
+
+
 def test_window_clips():
     c = Canvas(window=(0, 0x41, 14, 0x117))
     draw_polygon(c, square(), synthetic_colours())
@@ -200,6 +248,62 @@ def test_compare_counts():
     assert compare(c, bytes(wrong), before).missed == 1
 
 
+# A made-up 4 x 3 image (not the game's): pixel 0 is transparent (CONTROL E0h, T set).
+PICTURE = Image(3, 4, bytes([1, 2, 3, 4,
+                             5, 0, 7, 8,
+                             9, 10, 11, 12]))
+
+
+def quad(x0: int, y0: int, x1: int, y2: int, cmd: int = 0x1003) -> Command:
+    """An image command: the box from p0 to (p1.x, p2.y), height p2.y - p1.y + 1."""
+    return Command(0, cmd, 0, points=((x0, y0), (x1, y0), (x1, y2), (x0, y2)))
+
+
+def test_image_quad_scaling():
+    """FFF48FC0: a 6 x 5 box over the 4 x 3 image. Steps (DIVU, FFF496E0/FFF49760): u = 4 << 16
+    / 6 = AAAAh, v = 3 << 16 / 5 = 9999h; each accumulator starts at one step (FFF49710,
+    FFF49790), so the source columns are 0 1 1 2 3 3 and the rows 0 1 1 2 2 (from zero they would
+    be 0 0 1 2 2 3 and 0 0 1 1 2)."""
+    canvas = Canvas()
+    assert draw_image(canvas, quad(100, 0x50, 105, 0x54), {3: PICTURE}, False)
+    got = [[canvas.pixels[(y - TOP) * WIDTH + x] if canvas.drawn[(y - TOP) * WIDTH + x] else None
+            for x in range(100, 106)] for y in range(0x50, 0x55)]
+    assert got == [
+        [1, 2, 2, 3, 4, 4],
+        [5, None, None, 7, 8, 8],  # pixel 0: transparent, the page keeps its value
+        [5, None, None, 7, 8, 8],
+        [9, 10, 10, 11, 12, 12],
+        [9, 10, 10, 11, 12, 12],
+    ]
+    assert sum(canvas.drawn) == 30 - 4
+
+
+def test_image_quad_rejections():
+    """FFF49230-FFF49650: no image, x >= 200h, y >= 117h, a far corner left of or above the near
+    one, and, without FFF77E60 bit 4, a box 15Eh wide or C8h high or more."""
+    images = {3: PICTURE}
+    rejected = {
+        "no image": quad(100, 0x50, 105, 0x54, cmd=0x1005),
+        "x >= 200h": quad(0x200, 0x50, 0x205, 0x54),
+        "y >= 117h": quad(100, 0x117, 105, 0x118),
+        "far corner left": quad(100, 0x50, 99, 0x54),
+        "far corner above": quad(100, 0x50, 105, 0x4E),
+    }
+    for name, c in rejected.items():
+        canvas = Canvas()
+        assert not draw_image(canvas, c, images, True), name
+        assert not draw_image(canvas, c, images, False), name
+        assert sum(canvas.drawn) == 0, name
+    for c in (quad(0x10, 0x30, 0x10 + 0x15D, 0x31), quad(0x10, 0x30, 0x11, 0x30 + 0xC7)):
+        assert not draw_image(Canvas(), c, images, False)  # the size limits
+        assert draw_image(Canvas(), c, images, True)  # bit 4: none
+    for c in (quad(0x10, 0x30, 0x10 + 0x15C, 0x31), quad(0x10, 0x30, 0x11, 0x30 + 0xC6)):
+        assert draw_image(Canvas(), c, images, False)  # one less passes
+    som = decode_som(encode_som([quad(100, 0x50, 105, 0x54), quad(0x200, 0x50, 0x205, 0x54)]))
+    canvas = render(som, synthetic_colours(), images=images)
+    assert canvas.images == 1 and sum(canvas.drawn) == 26
+
+
 # ------------------------------------------------------------------ committed captures (CI too)
 
 
@@ -218,6 +322,9 @@ def test_committed_captures_decode_and_redraw(path):
     expected = json.loads((ARTIFACTS / "expected.json").read_text())[path.stem]
     assert len(som.commands) == expected["commands"]
     canvas = render(som, synthetic_colours(), tuple(expected["window"]))
+    # no images in CI (the game's data): the image quads are the commands left undrawn, and the
+    # scaler is test_image_quad_scaling's
+    assert canvas.images == sum(c.is_image for c in som.commands) and canvas.skipped == 0
     masked = bytes(p if d else 0 for p, d in zip(canvas.pixels, canvas.drawn, strict=True))
     assert sum(canvas.drawn) == expected["drawn"]
     assert zlib.crc32(masked) == expected["crc32_synthetic_colours"]
@@ -230,10 +337,24 @@ def captures() -> list[Path]:
     return sorted(p for p in CAPTURES.glob("*/") if (p / "som.bin").exists())
 
 
+# docs/08 section 1.1: the ADSP instructions whose SOMLATCH writes store each field
+WRITERS = {
+    "header N": {0x00BE}, "header T": {0x00C0}, "separator FFFF": {0x00B5},
+    "table entry": {0x0828}, "end FFFF": {0x082B}, "command word": {0x0515, 0x066A},
+    "polygon xl": {0x0565}, "polygon xr": {0x0567}, "polygon y": {0x056B},
+    "right slope low": {0x0580, 0x05A0, 0x05BA}, "right slope high": {0x0582, 0x05A2, 0x05BC},
+    "left slope low": {0x0584, 0x05A4, 0x05BE}, "left slope high": {0x0586, 0x05A6, 0x05C0},
+    "segment count": {0x0588, 0x05A8, 0x05C2},
+    "command end FFFF FFFF": {0x05D2, 0x05D4, 0x0680, 0x0682},
+    "image x": {0x0678}, "image y": {0x067A},
+}
+IMAGE_WRITERS = {"command word": 0x066A, "command end FFFF FFFF": 0x0680,
+                 "image x": 0x0678, "image y": 0x067A}
+
+
 @pytest.mark.skipif(not captures(), reason="no captures: run make somdump (needs MAME and ROMs)")
 def test_captures_against_mame():
-    from displaylist import capture_window
-
+    seen: dict[str, set[int]] = {}
     for d in captures():
         words = read_words(d / "som.bin")
         som = decode_som(words)
@@ -259,6 +380,13 @@ def test_captures_against_mame():
         raw = (d / "palette.bin").read_bytes()
         pal = struct.unpack(f"<{len(raw) // 4}I", raw)
         assert snapshot_agreement(d / "snap_1.png", final, pal) == FB_PAGE_BYTES, d
-        writers = field_writers(som, read_words(d / "som_pc.bin"))
-        assert writers["header N"] == [0x00BE] and writers["header T"] == [0x00C0], d
-        assert writers["table entry"] == [0x0828] and writers["end FFFF"] == [0x082B], d
+        pcs = read_words(d / "som_pc.bin")
+        assert all(pcs[k] != 0xFFFF for k in range(som.words)), d  # every word has a writer
+        writers = field_writers(som, pcs)
+        has_images = any(c.is_image for c in som.commands)
+        for kind, addrs in writers.items():
+            assert set(addrs) <= WRITERS[kind], (d, kind, addrs)
+            seen.setdefault(kind, set()).update(addrs)
+        for kind, addr in IMAGE_WRITERS.items():
+            assert (addr in writers.get(kind, [])) == has_images, (d, kind)
+    assert seen == WRITERS  # over the captures, every writer of the table occurs

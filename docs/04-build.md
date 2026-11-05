@@ -89,8 +89,12 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   frame 900) into `build/mame/som/<attract|game>-f<N>/` (SOM banks, ADSP data RAM, the GSP command
   buffer, the frame-buffer page before and after the list, colour and image tables, palette,
   snapshots, the frame's protocol events), then runs `tools/displaylist.py` on each: decode,
-  redraw, compare with MAME's page (docs/08-display-list.md). `MAME_STATE="-nvram_directory ...
-  -cfg_directory ..."` keeps parallel runs apart. `make test` then also checks the captures
+  redraw, compare with MAME's page (docs/08-display-list.md). Each of its two MAME runs starts
+  from an empty private state, `build/mame/somstate` (removed first, then `-nvram_directory` and
+  `-cfg_directory` there): the game boots from the set's own 200e/210e, attract mode (which
+  follows the NVRAM's history) shows the same scenes on every run and machine, the user's
+  `~/.mame` state is never read or written, and parallel worktrees stay apart. `make test` then
+  also checks the captures
   (`tools/test_displaylist.py`, which skips without them); the three lists committed under
   `artifacts/display-list/` are decoded and redrawn in CI.
 

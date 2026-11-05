@@ -364,7 +364,8 @@ loop reading at 01B1, 01E4, 01EC and 01FC. The SOM writes start at 0034/0035 (/S
 SOMLATCH) and run through 0515-0682. `wait_frame_trigger` is the idle read of DM 1FFF that MAME's
 speedup hooks (`init_stunrun`, harddriv.cpp:5096: `hdadsp_speedup_r` on DM 1FFF). PM 1000-1028
 is a workspace that `copy_frame_parameters` fills from DM 1FE9-1FFD; the loaded PM 1029-1235
-disassembles as noise (HYP: tables).
+disassembles as noise (HYP: tables). M3b: PM 1036-1235 is `reciprocal_table`, the slopes' 1/dy
+(docs/08 section 1.3); PM 1029-1035 stays open.
 
 ### 6.2 TMS34010 (bit addresses)
 
