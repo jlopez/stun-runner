@@ -730,13 +730,12 @@ def comparison_picture(canvas: Canvas, page: bytes, palette: Sequence[int]) -> b
 
 
 def field_writers(som: SomList, pcs: Sequence[int]) -> dict[str, list[int]]:
-    """For a capture with som_pc.bin: which ADSP instruction wrote each kind of field (MAME
-    reports the PC after the writing instruction; the result is the instruction's address)."""
+    """For a capture with som_pc.bin: which ADSP instructions wrote each kind of field."""
     kinds: dict[str, set[int]] = {}
 
     def note(kind: str, addr: int) -> None:
         if pcs[addr] != 0xFFFF:
-            kinds.setdefault(kind, set()).add((pcs[addr] - 1) & 0xFFFF)
+            kinds.setdefault(kind, set()).add(pcs[addr])
 
     note("header N", 0)
     note("header T", 1)

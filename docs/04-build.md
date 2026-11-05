@@ -84,6 +84,15 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
 - `make coverage`: `tools/coverage` reads the five listings (vasm `-L`: a `Sections:` header, `Source:` blocks, `SS:AAAAAAAA hex  \t N: source` lines and `*` for repeated runs; 64tass `-L`: `>addr\thex\t...\tsource` lines and `Processing file` markers) and attributes to each statement the bytes from its address to the next statement's (or the section's / image's end), classified as `instr`, `data` (`dc.*`, `.byte`, `.word`, `.text`...), `blob` (`incbin`, `.binary`) or `fill` (`ds.*`, `dcb.*`, `blk.*`, `.fill`). Per source file, per image, the total, the blob share and a JSON line; it fails unless the total is the set's size, 1,511,424. The blob share only goes down (CLAUDE.md section 2).
 - `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/`, `tools/` and `data/objects` fed with a synthetic set (this is how CI exercises the real trees without ROMs; since M3a the synthetic set carries the object image the committed meshes encode to, with a random residue word, and an edited mesh must change the built chip). `tools/test_objects.py` adds the object format's tests (docs/07 section 8.3), among them one that runs in CI against the real hashes: the committed meshes encode to the four chips of pages 1 and 2 with MAME's CRC-32 and SHA-1.
 - `make lint`: ruff and mypy over the tools.
+- `make somdump` (needs MAME and the ROMs; never in CI): `tools/mame/somdump.lua` captures the
+  SOM display list at the frames of `SOM_ATTRACT` (attract mode) and `SOM_GAME` (a game started at
+  frame 900) into `build/mame/som/<attract|game>-f<N>/` (SOM banks, ADSP data RAM, the GSP command
+  buffer, the frame-buffer page before and after the list, colour and image tables, palette,
+  snapshots, the frame's protocol events), then runs `tools/displaylist.py` on each: decode,
+  redraw, compare with MAME's page (docs/08-display-list.md). `MAME_STATE="-nvram_directory ...
+  -cfg_directory ..."` keeps parallel runs apart. `make test` then also checks the captures
+  (`tools/test_displaylist.py`, which skips without them); the three lists committed under
+  `artifacts/display-list/` are decoded and redrawn in CI.
 
 ## 5. Coverage at the zero point (M1)
 

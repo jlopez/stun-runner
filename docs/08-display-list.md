@@ -1,0 +1,398 @@
+# The SOM display list: from the ADSP to pixels
+
+**Date**: 2026-11-04 (milestone 3, leg M3b). What the ADSP writes into the SOM output buffer each
+frame, how it reaches the GSP, and how the GSP turns it into pixels. Addresses are ADSP program
+words (PM, 4 hex digits), 68010 addresses (0x......) and GSP bit addresses (8 hex digits). **CODE**
+means read off the disassembly (`make dasm`) at the addresses given, **MAME** means a MAME 0.289
+run that `make somdump` reproduces confirms it, **HYP** is a hypothesis. MAME citations are
+`file:line` in `~/.local/src/mame/src/mame/atari/` unless another directory is named. The object
+ROM records that feed the ADSP are docs/07 (leg M3a); this document starts where a record has
+become a projected polygon.
+
+## 0. Summary and the strength of the evidence
+
+- The ADSP builds one list per frame in the SOM bank the 68k does not see: a two-word header, the
+  commands (polygons and image quads, back to back), FFFF, a depth-sorted table with one entry per
+  command, FFFF (section 1). Every word of 11 captured lists (attract mode and a game, `make
+  somdump`) is accounted for by the decoder, and MAME's own write log (the ADSP PC of every
+  SOMLATCH write) assigns each field to the instruction section 1 names (MAME).
+- After the ADSP flips the bank, the 68k copies the list verbatim through the GSP host port into
+  one of two GSP command buffers, as command 7000 among its own commands (section 2, MAME).
+- The GSP's command interpreter has 16 command codes (section 3); code 7 walks the table and fills
+  each polygon span by span through the 2 bpp expander, with dithered colours, stipple patterns,
+  outlines and scaled images (section 4).
+- **The reference renderer in `tools/displaylist.py` redraws all 11 captured lists and equals
+  MAME's frame buffer on every pixel it draws: 706,706 pixels over 11 frames, 0 different; and
+  every pixel the list changed in MAME's page (page before the list vs after) is one it drew: 0
+  missed.** The screen MAME shows a frame later is that page pixel for pixel (122,880 of 122,880
+  in all 11 captures). Section 5 says what this proves and what it does not.
+
+## 1. The SOM buffer, word by word
+
+The SOM memory is two banks of 0x2000 words (`m_som_memory`, harddriv.h:386). The ADSP writes
+with /SOMCLK (DM 2003, sets the address) and SOMLATCH (DM 2002, stores a word into bank
+`m68k_bank ^ 1` and advances; `hdadsp_special_w`, harddriv_m.cpp:803-818); the 68k reads bank
+`m68k_bank` at 810000-813FFF (`hd68k_adsp_buffer_r`, harddriv_m.cpp:612) and sets `m68k_bank` with
+ADSP control line 3 (`hd68k_adsp_control_w` case 3, harddriv_m.cpp:699-701; 0x02C3FA writes 818006 =
+bank 0, 0x02C408 writes 818016 = bank 1).
+
+### 1.1 Layout (CODE, MAME)
+
+| Word | Content | Written by (ADSP) | Read by |
+|---|---|---|---|
+| 0 | **N**, the address of the last word (an FFFF) | 0034/0035 write 0 at frame start; 00BE writes DM 001E + 1 at the end | 68k 0x02F0C2 (`move.w (A2)+,D2`: the copy length), 0x02F0E2 (`cmpi.w #-1` on word N, else `soft_reset`) |
+| 1 | **T**, the address of the FFFF that ends the commands | 0039 writes 0; 00C0 writes DM 0109 | GSP FFF44CA0 (A3 = word 1 + T words: the first table entry) |
+| 2 .. T-1 | the commands, back to back (1.2-1.4) | 04EB `emit_polygon`, 0663 `emit_image` | GSP via the table only |
+| T | FFFF | 00B5 | nobody: the GSP jumps over it |
+| T+1 .. N-1 | the draw order: entry e names the command at word e + 1 | 0828 in `write_draw_order` (080B) | GSP FFF45000-FFF45050 |
+| N | FFFF | 082B | GSP FFF45020 (ends the walk); 68k 0x02F0E2 |
+
+DM 001E holds the address of the last word written (1 after the two placeholders, 0032); each
+command adds its length (05D7-05DA, 0685-0688), 080B adds the table and its FFFF (082E-0831). The
+writers in the table are MAME's: `tools/mame/somdump.lua` records the ADSP PC of every SOMLATCH
+write (CURPC, the writing instruction), and `tools/displaylist.py` maps each decoded field to
+its writers. Over the 11 captures, every word of every field comes from exactly these
+instructions and no other:
+
+```
+header N        PM 00BE      polygon xl/xr/y   PM 0565 0567 056B
+header T        PM 00C0      right slope       PM 0580/0582 05A0/05A2 05BA/05BC
+separator FFFF  PM 00B5      left slope        PM 0584/0586 05A4/05A6 05BE/05C0
+table entry     PM 0828      segment count     PM 0588 05A8 05C2
+end FFFF        PM 082B      command end       PM 05D2 05D4 (polygons), 0680 0682 (images)
+command word    PM 0515 (polygons), 066A (images)
+image x, y      PM 0678, 067A (attract-f1200, -f2700, -f3000)
+```
+
+### 1.2 The command word (CODE; MAME for the cases marked)
+
+Written at 0515 (polygons) or 066A (images) from DM 0036, which the record reader builds (docs/07):
+the record's colour (the low 6 bits of its second word, 01A0), lit at 0214 (`colour << 4 | 10h`
+plus a shade 0-Fh from the normal and the light, 0221-0236; colours 1Fh and up are not lit,
+021C-021F), 1000h for image records (01C9-01CC) and the object's flags DM 002F (the object list
+entry's bits 8-11, 0082-0084).
+
+| Bits | Meaning | GSP |
+|---|---|---|
+| 0-9 | colour index into the colour table FFF71D20 (400h words) | FFF452D0-FFF45320 |
+| 10-11 | fill: 0 solid, 1 three pixels in four, 2 one in four, 3 outline (MAME: 0, 2, 3 seen) | FFF45150-FFF452A0 |
+| 12 | image quad instead of a polygon (MAME: seen in attract mode) | FFF450D0 -> FFF48FC0 |
+| 15 | the GSP skips the command (never seen; nothing in 0214/01C9/01CD sets it, HYP) | FFF450A0 |
+
+### 1.3 Polygon command (CODE, MAME)
+
+```
+cmd                          0515
+xl  xr  y                    0565 0567 056B: the top row; xl the left chain's x, xr the right's
+{ right slope (lo, hi)       0580/0582 (or 05A0/05A2, 05BA/05BC)
+  left slope  (lo, hi)       0584/0586 (05A4/05A6, 05BE/05C0)
+  count }*                   0588 (05A8, 05C2)
+FFFF FFFF                    05D2 05D4
+```
+
+`emit_polygon` (04EB) clamps every projected coordinate into 0-1FFh (0509-050D), finds the top
+vertex (smallest y; on a flat top the left chain starts at the leftmost and the right chain at
+the rightmost top vertex, 052B-0544), then walks the two chains down. Each segment ends at the next
+vertex of either chain (057A: both, 059D: the left one first, 05B7: the right one first) and
+recomputes the slope of the chain that turned: `right_slope` (05DD) and `left_slope` (0607) give
+`dx * PM(1036 + dy)`, where PM 1036-1235 (`reciprocal_table`, the loaded record 1036/200) holds
+8000h/dy for dy <= 40h and 200000h/dy above; the ADSP's fractional multiply doubles the product
+and dy > 40h shifts it right by 6 (0602), so the slope is `dx * 10000h / dy`, a signed 16.16 x
+step per row, truncated. The count is dy + 1 (057D-057E); the segment advances count - 1 rows
+(section 4.1). A slope is two words, low word first, as the GSP reads a 32-bit field (FFF45510:
+`MOVE *A5+,A8,1`).
+
+`emit_polygon` refuses a polygon when DM 001E plus the polygon count DM 002D reaches 1FA4h, or
+after 1EAh polygons (04ED-04FB): it sets DM 002E, and the frame loop then stops reading objects
+(00AC-00AE) and ends the frame. The bound keeps the list, its table and its two FFFF inside the
+2000h-word bank (HYP on the intent).
+
+### 1.4 Image command (CODE; MAME through the redrawing)
+
+```
+cmd (bit 12; bits 0-5 the image)   066A
+{ x  y }*                          0678 067A: the projected corners, unclamped
+FFFF FFFF                          0680 0682
+```
+
+Written by `emit_image` (0663) for records whose type sets DM 0038 (docs/07). Four corners in
+every capture. The GSP uses the first point as the box's origin, the second's x and the third's y
+as its far corner (section 4.4).
+
+### 1.5 The draw order (CODE, MAME)
+
+Every command gets a node in a doubly linked list in PM, sorted by a 32-bit key: `insert_depth_node`
+(07A2, called at 051D and 0672 before the command's body is written) takes the key from DM 08EA
+(the object's depth, set by the record reader at 01C3) shifted by DM 0033, plus the object's
+32-bit bias DM 0027/0028 from its list entry; the first object of the frame gets 10000000h
+(07B4-07B5). A node is six PM words at DM 0956 (+0/+1 key, +2/+3 links, +4 the object number
+DM 0108, +5 the value: DM 001E, the command's address - 1). The head is PM 123C, the tail PM 1242.
+`write_draw_order` (080B) walks head to tail and writes each node's value (0828), then FFFF.
+MAME: in every capture the table is a permutation of the commands (the decoder checks it), so
+every command is drawn exactly once; the GSP draws in table order, so the head end is behind (HYP
+that larger keys are farther: the redrawing only needs the order, not its meaning).
+
+### 1.6 MAME's LOG_COMMANDS reading (`deferred_adsp_bank_switch`, harddriv_m.cpp:632-680)
+
+| MAME | This document | Verdict |
+|---|---|---|
+| `end = base + base[0]` | N, the final FFFF; the loop stops before it | right |
+| `table = base + 1 + base[1]` | T + 1, the first table entry | right |
+| `current = base + 2`, `while (current + 5 < table)` | commands from word 2 | right for polygons; a list whose last command is shorter than 6 words would lose it (none can be: a polygon is at least 6, an image with no point 3, HYP) |
+| `Cmd @ off = c1 c2-c3 @ c4` | cmd, xl - xr @ y | right (xl, xr on the top row y) |
+| `rslope` = first long, `lslope` = second, then `count` | right slope, left slope, count | right; the first long is the right edge's (GSP A6, FFF45540) |
+| `rslope == 0xffffffff` ends the command | FFFF FFFF | right (as the GSP, which tests only the first long, FFF45520) |
+| every command is a polygon | bit 12 commands are image quads: their (x, y) pairs would print as slopes | **incomplete**: image commands mis-read |
+| `c1` printed raw | bits 0-9 colour, 10-11 fill, 12 image, 15 skip | **incomplete** |
+| table entries printed raw | entry e = the command at word e + 1 (relative to the list, not to `base + 1`) | **incomplete** (no meaning given) |
+
+## 2. The frame protocol (CODE, MAME)
+
+The game runs 20 lists a second: the GSP's main loop waits until three display interrupts have
+passed per list (FFF40ED0-FFF40F90, the header word 12h = 3 in every capture, section 3.1). One
+list goes through three such periods: the ADSP builds list k in period n, the 68k copies it into a
+GSP buffer in period n + 1, the GSP draws it in period n + 2, the page is shown in n + 3.
+
+Observed order (MAME, `make somdump`, game-f3600's `meta.txt`: write taps on the addresses named,
+each event with the writing instruction (CURPC) and the emulated time in seconds):
+
+| Time | Who | What | Instruction |
+|---|---|---|---|
+| 59.79970 | GSP | flag FFFCFC00 = 0: buffer done | FFF418A0 (`command_buffer_done`) |
+| 59.79970 | GSP | HSTCTLL INTOUT set: the 68k's level 3 | FFF41910 |
+| 59.79971 | 68k | HSTCTL &= FF7F: INTOUT cleared (FFDB48 = FFFF at 0x02143C) | `h_level3_gsp` 0x021446 |
+| 59.79981 | 68k | FFFF ends the other buffer, its flag FFF9FC00 = FFFF: the GSP starts on it | 0x02F218, 0x02F240 |
+| 59.80016 | 68k | ADSP control line 3 = 1: the 68k sees the bank the ADSP just finished | 0x02C408 (after `tst.w $ff9bb4` at 0x02C3D6 saw the ADSP done) |
+| 59.80045 | 68k | /BR = 0 (ADSP held), the parameters DM 1FE6-1FFE (docs/07), DM 1FFF = 0: the frame trigger, /BR = 1 | 0x02E0FA, 0x02E1C2, 0x02E1D4 |
+| 59.80076 | ADSP | /SOMCLK = 0 into the other bank: list k + 1 starts | 0034 (after `wait_frame_trigger` 0013-0015) |
+| 59.80079 | ADSP | /GINT with DM 1FE3 = 1 (an object asked for a handshake, 0047-0049) | 004C |
+| 59.80083-85 | 68k | `h_level2_adsp` -> 0x02E418: /BR = 0, DM 1FE3 = 0, /BR = 1 | 0x02E41C, 0x02E442, 0x02E45E |
+| 59.80091 | 68k | host address FFFCFC10: a new command list in the buffer the GSP just finished | 0x02F1AC (`0x02F126`) |
+| 59.80219 | 68k | HSTDATA 7000, then words 1..N of the SOM bank (N = 3310) | 0x02F0BA, then 0x02247A (called at 0x02F0D2) |
+| 59.83189 | ADSP | /SOMCLK = 0, header, /GINT with DM 1FE3 = 0: list k + 1 complete | 00BB, 00BE, 00C0, 00C1 |
+| 59.83193 | 68k | `h_level2_adsp` -> FF9BB4 = 1 (the 68k's "ADSP done") | 0x02E44A |
+| 59.84953 | GSP | flag FFF9FC00 = 0, INTOUT; the cycle repeats with the buffers swapped | FFF418A0, FFF41910 |
+
+The 68k's frame routine is 0x02C372: it waits for FF9BB4 (0x02C3D6), flips the bank by the
+parity FF9BB2 (0x02C3F2-0x02C40E), starts the ADSP's next frame (0x02E064 or 0x02DD9E at 0x02C424
+/0x02C438), begins a GSP command list (0x02F126 at 0x02C454), adds its own commands, copies the
+SOM list (`jsr $2f0ae` with 810000 at 0x02C5EA-0x02C5F0) and returns; the end of the list (0x02F1BE)
+waits for the GSP's level-3 interrupt (0x02FC60 polls FFDB48) and makes the buffer ready. The two
+buffers' flag and list addresses are the table at 0x04A88C (FFF9FC00, FFF9FC10, FFFCFC00,
+FFFCFC10), selected by FFDB3A (0x02F126-0x02F14E). If a buffer's flag is still set the 68k waits
+once more and then reports "OUT OF SYNC" (0x02F164-0x02F198, `soft_reset`); a copied list whose
+word N is not FFFF resets the game (0x02F0E2-0x02F0E8).
+
+The copy is word for word: in every capture the bank rebuilt from the ADSP's writes equals what
+the 68k reads at 810000 at the copy, and the GSP buffer's code-7 command holds the same list
+(`make somdump`; `test_captures_against_mame`). HYP from docs/06 confirmed: the 68k copies the list
+through the host port; it does not interpret it.
+
+## 3. The GSP command set (CODE; MAME for the lengths of the codes seen)
+
+### 3.1 The command buffer
+
+Two buffers, flag words FFF9FC00 and FFFCFC00, lists from FFF9FC10 and FFFCFC10 (`poll_command_buffers`
+FFF41010). The list starts with a header block that `process_command_buffer` (FFF411A0) skips by
+the 16-bit word at FFF77F50 (FFF411D0-FFF41200): 440h bits, 44h words, in every capture (who
+writes FFF77F50 is open, section 6). `read_list_header` (FFF4D940) reads three of its words: 11h
+-> FFF77E60 (flags: bit 3 every polygon as an outline, FFF45130; bit 4 no size limits for image
+quads, FFF49460; bit 5 outlines without right edges, FFF45B50; bit 2 a debug overlay, FFF44890),
+12h -> FFF77E80 (the display frames per list, 3), 13h -> FFF77E70. The rest of the header is M5d.
+
+`run_command_list` (FFF46E30) sets B4 = page - A000h, the window (0, 28h)-(1FFh, 117h) and
+CONTROL = C0h (window clipping, W = 3), then reads a command word, dispatches on its top nibble
+through `command_table` (FFF470E0, 16 longs) and loops (FFF46F90-FFF47040).
+
+### 3.2 The codes
+
+Lengths in words, the command word included. "Seen" = present in the 11 captured buffers, whose
+commands the decoder walks to the end command with no word left over (MAME); the others are CODE.
+
+| Code | Handler | Operands | Length | Seen |
+|---|---|---|---|---|
+| 0, F, E1-E3 | FFF47050 `end_command_list` | none: leaves the list | 1 | F |
+| 1 | FFF48FC0 `cmd_1_image_quad` | image = low 6 bits; 4 points; longs to FFFFFFFF | 7 + 2k | |
+| 2 | FFF47E20 `cmd_2_line` | colour = low byte; x0 y0 x1 y1 (PSIZE 8) | 5 | |
+| 3 | FFF47900 `cmd_3_rectangle` | colour = low byte; (y, x) long, (dy, dx) long; FILL in the 2 bpp window | 5 | yes |
+| 4 | FFF48650 `cmd_4_text` | colour = low byte; font, x, y (FFFF: previous); NUL-terminated string padded to a word | 4 + ceil((len + 1) / 2) | yes |
+| 5 | FFF47AF0 `cmd_5_window` | x0 y0 x1 y1, clamped to x <= 1FFh, 28h <= y <= 117h | 5 | yes |
+| 6 | FFF477C0 `cmd_6` | low byte; words to an FFFF (FFF595B0 consumes them: M5d) | to FFFF | |
+| 7 | FFF44BF0 `cmd_7_som_list` | the SOM list from its word 1 (section 1) | 1 + N | yes |
+| 8 | FFF489E0 `cmd_8_image` | three words, one long (FFF58950: M5d) | 6 | yes |
+| 9 | FFF48C20 `cmd_9_palette` | start = low byte; count n; 3 words per two entries, 2 for an odd last | 2 + 3(n div 2) + 2(n mod 2) | yes |
+| A | FFF49AF0 `cmd_A_dissolve` | a step word | 2 | |
+| B | FFF4A040 `cmd_B` | none (FFF52060: M5d) | 1 | |
+| C | FFF4A420 `cmd_C_colour_table` | quarter = low 2 bits; start; count; count words into FFF71D20 + quarter * 1000h bits | 3 + count | |
+| D | FFF4A5C0 `cmd_D_fb_entry` | entry = low 2 bits; two longs into FFF71C20 | 5 | yes |
+| E0 | FFF4A6F0 `cmd_E0_image_table` | start <= 3Fh; count; count longs into FFF78150 | 3 + 2 count | |
+
+Codes C and E0 abandon the list when start + count is out of range (FFF4A550, FFF4A7C0); the
+decoder rejects such a buffer. In every capture the order is D, 9, 5, (3, 8, 8,) 7, D, 5, 4..., F:
+the background (rectangle, images), the window, the SOM list, then the dashboard text. The
+colour table (C) and the image table (E0) were loaded before the captured frames (HYP: at mode
+changes).
+
+### 3.3 Command 7 (CODE, MAME)
+
+`cmd_7_som_list` (FFF44BF0): A5 = the list's word 1, A1 = A5 (the base of the table entries), A3 =
+A5 + 10h * T (FFF44CA0-FFF44CC0). `som_next_entry` (FFF45000): A5 = *A3++; FFFF ends the list
+(CMPXY with FFFFFFFF, FFF45020) and the dispatcher continues after the list (FFF44D10: A5 = A3);
+else A5 = A1 + 10h * entry (FFF45040-FFF45050: the command at word 1 + entry) and
+`som_draw_command` (FFF45090) draws it: bit 15 returns (FFF450A0), bit 12 goes to the image quad
+(FFF450D0 -> FFF44D60 -> FFF48FC0), otherwise a polygon (section 4).
+
+## 4. The rasteriser (CODE, MAME)
+
+### 4.1 Screen, page and window
+
+The frame buffer is 8 bits per pixel in VRAM, two pages of 512 x 240 bytes at VRAM 000000 and
+01E000. The polygons are drawn through the **2 bpp expander** window at GSP 02000000 (PSIZE 2,
+DPTCH 400h bits per row), where pixel n of a page is VRAM byte n (`hdgsp_vram_2bpp_w`,
+harddriv_v.cpp:300: each 2-bit pixel whose low bit is set writes one byte of
+`gsp_control_lo[0]`). B4 holds the page being drawn, 02000000 or 0203C000, and flips after each
+list (FFF412F0-FFF41690); `run_command_list` subtracts A000h (40 rows) from it (FFF46E70), so GSP
+y 28h is the page's row 0: the coordinates the ADSP writes are x 0-1FFh, y 28h-117h on screen.
+MAME: the screen is 512 x 240 (the TMS34010 sets the visible area from its own timing registers,
+tms34010.cpp:1060-1080, replacing harddriv.cpp:1869's initial 228 lines), and the snapshot one
+frame after a list equals the page it drew, row 0 at the top, through palette bank 0, in all 11
+captures (122,880 of 122,880 pixels each).
+
+The clip window is the hardware's (CONTROL W = 3: FILL and LINE skip what falls outside WSTART-
+WEND, `apply_window` and `line` in `src/devices/cpu/tms34010/34010gfx.hxx`). Command 5 sets it;
+in every capture the SOM list is drawn inside (0, 28h)-(1FFh, F7h), rows 0-207, which leaves the
+dashboard rows alone. The ADSP's own clamp (0-1FFh, 0509) is the only clipping of the polygon
+coordinates themselves; the near-plane clipping before projection (from 0271) is docs/07's.
+
+### 4.2 A polygon (FFF45090-FFF45630)
+
+```
+B0 = (y, xl)            left edge, packed (y in the high 16 bits)      FFF453D0
+A6 = (y, xr) + (1, 1)   right edge, exclusive, one row down            FFF453E0
+A0 = A4 = 80000000h     both fractions start at one half                FFF453F0-FFF45410
+rows = 1
+loop:
+    fill the row y from B0.x to A6.x - 1 (FILL XY, DYDX = A6 - B0)    FFF454A0-FFF454E0
+        skipped with the pattern unrotated if xl > xr + 1 (SUBXY V)    FFF454D0
+    rotate the pattern left by 4                                       FFF454F0
+    if --rows == 0: read the next segment (FFFFFFFF: done)             FFF45500-FFF45620
+        A7 = right slope << 16, A8 = (right slope >> 16) + 10000h
+        A9 = left slope << 16,  B1 = (left slope >> 16) + 10000h
+        rows = count, then --rows
+    step: A0 += A9, B0 += B1 + carry; A4 += A7, A6 += A8 + carry      FFF45460-FFF45490
+```
+
+The slope is signed 16.16 x per row. The integer part plus 10000h is added to the packed (y, x)
+as one 32-bit number, so the same add steps y by one and x by the integer part; the fraction
+accumulates in A0/A4 from one half (round to nearest at the start). The first segment's count
+includes the top row, which is filled before any step: a polygon covers 1 + sum(count - 1) rows.
+The right edge is exclusive (A6 = xr + 1), so a row spans xl..xr inclusive.
+
+### 4.3 Colour, dithering and fills
+
+The colour is the word at FFF71D20 + 10h * (command & 3FFh), written to F4000000
+(`gsp_control_lo[0]`, FFF452D0-FFF45330). The expander replicates it as `color | color << 16`
+and writes byte i of that long to pixel i of each group of four (harddriv_v.cpp:300-318, the
+mask table at :32-56): **even pixels get the low byte, odd pixels the high byte**, so each colour
+is a two-index dither (MAME: the redrawing writes them so and matches).
+
+The pattern COLOR1 (B9) decides which 2-bit pixels are written: FFFFFFFF (solid), 15151515h
+(01 01 01 00: three pixels in four; also for colour byte 4 with fill 0 or 2, FFF45230-FFF45290),
+01010101h (one in four). It is rotated left by 4y bits at the top row (FFF45370-FFF45390) and by 4
+after each row, so the stipple shifts two pixels per row: pixel x of a row is written when bit
+(2x mod 16) of the rotated pattern is set (MAME's FILL takes COLOR1's low 16 bits for every word,
+34010gfx.hxx:1797-1960; the patterns repeat every 8 bits, so the real chip's alternating halves
+would give the same result). The 25% fill is the shadow under the player's ship (game captures).
+
+### 4.4 Outlines and image quads
+
+**Outline** (fill 3, or FFF77E60 bit 3; `draw_outline` FFF45800): the top row, then for each
+segment of count n > 1 both edges as LINE 0 Bresenham lines from the current vertex by (dx, n - 1),
+dx = the integer part of slope * (n - 1) (MPYS with a 12-bit field, FFF45A80-FFF45AF0, no
+rounding), then the bottom row (FFF45BF0). `draw_edge_line` (FFF45C60) sets up LINE 0 (decision
+2 minor - major, a diagonal step when it is >= 0). MAME's LINE writes COLOR1's low pixel
+(`line`, 34010gfx.hxx:21-60); the pattern is all ones here. The attract mode's wireframe tunnel
+(attract-f1800, 94 outlines) is drawn this way (MAME, redrawn exactly).
+
+**Image quad** (bit 12; `cmd_1_image_quad` FFF48FC0, also top-level command 1): PSIZE 8, CONTROL
+E0h (pixel 0 transparent), the image (command & 3Fh) from the table FFF78150 (loaded by command
+E0): height, width, then pixels from 60h bits on. The box is from point 0 to (point 1's x, point
+2's y); its height is point 2's y - point 1's y + 1 (FFF494E0-FFF495C0). Each axis is scaled by a
+16.16 step (DIVU: image size << 16 / box size, FFF496E0, FFF49760) whose fraction accumulator
+starts at one step, not zero (FFF49710, FFF49790). Boxes are rejected when the image is missing,
+x >= 200h, y >= 117h, the far corner is left of or above the near one, or (without FFF77E60 bit
+4) the box is 15Eh wide or C8h high or more (FFF49230-FFF49650). The text panel of the attract
+mode's story screen is one such quad (attract-f2700, attract-f3000). The images are the 68k's
+packed images (pairs U-V, M5d); `somdump.lua` dumps them for the redrawing, never committed.
+
+### 4.5 What is not in the SOM list
+
+Everything 2D comes from the 68k's own commands in the same buffer (section 3.2): the sky and
+ground rectangles (3), backgrounds and the dashboard (8, D: images, M5d), the window (5), palette
+loads (9), the dashboard text and digits (4). The SOM list carries only the ADSP's polygons and
+the image quads that are part of the 3D scene (sprites placed in the world, the text panel).
+
+## 5. The reference renderer and what it proves
+
+`tools/displaylist.py` implements section 4 instruction by instruction: the packed (y, x)
+arithmetic with carries, the half-pixel start, the V test that skips a row and its pattern
+rotation, the window, the expander's even/odd bytes, the three patterns and their rotation, LINE 0
+for outlines, and the image quad's scaling. `make somdump` captures, for each chosen frame:
+the page when the GSP reads the 7000 (before the list) and when it reads the word after the list
+(GSP read taps on those two command-buffer words, PC FFF46FA0 both times), the colour and image
+tables at that moment, and the window the buffer set. The renderer draws the list on an empty
+page and is compared with MAME's page after the list:
+
+| Capture | Frame | List words | Commands | Pixels drawn | Equal | Changed by the list | Missed | Snapshot = page |
+|---|---|---|---|---|---|---|---|---|
+| attract-f1200 | 1206 | 5197 | 296 solid, 5 25%, 3 image | 44127 | 44127 | 44127 | 0 | 122880 |
+| attract-f1500 | 1504 | 6174 | 316 solid, 5 25%, 9 outline | 106496 | 106496 | 106496 | 0 | 122880 |
+| attract-f1800 | 1804 | 5758 | 213 solid, 5 25%, 94 outline | 13064 | 13064 | 13064 | 0 | 122880 |
+| attract-f2100 | 2105 | 1852 | 94 solid | 5547 | 5547 | 5547 | 0 | 122880 |
+| attract-f2700 | 2718 | 67 | 3 solid, 1 image | 91794 | 91794 | 91794 | 0 | 122880 |
+| attract-f3000 | 3024 | 67 | 3 solid, 1 image | 91794 | 91794 | 91794 | 0 | 122880 |
+| game-f2400 | 2406 | 4396 | 233 solid, 3 25% | 82350 | 82350 | 82350 | 0 | 122880 |
+| game-f3000 | 3005 | 2616 | 128 solid, 3 25% | 106496 | 106496 | 106496 | 0 | 122880 |
+| game-f3600 | 3606 | 3311 | 178 solid, 3 25% | 60332 | 60332 | 60332 | 0 | 122880 |
+| game-f4200 | 4232 | 4973 | 257 solid, 5 25% | 59993 | 59993 | 59993 | 0 | 122880 |
+| game-f4800 | 4806 | 4770 | 243 solid, 5 25% | 44713 | 44713 | 44713 | 0 | 122880 |
+
+"Pixels drawn" counts the pixels the renderer writes (last writer wins), "Equal" those equal to
+MAME's page after the list, "Changed" the pixels that differ between MAME's page before and after
+the list, "Missed" the changed pixels the renderer did not draw. "Snapshot = page" compares the
+screen snapshot one frame later with the final page through palette bank 0. Pictures (MAME's page
+| the redrawing | green equal, red different, grey not drawn): ![wireframe](../artifacts/display-list/compare-attract-f1800.png)
+![game](../artifacts/display-list/compare-game-f2400.png)
+![image quad](../artifacts/display-list/compare-attract-f3000.png)
+
+**What this proves.** For these 11 frames the format of section 1 is complete (no word
+unexplained, the table a permutation), and the description of section 4 reproduces MAME's TMS34010
+pixel for pixel on every pixel the list touches, including the dithered colours, the stipple
+phase, the window, the outlines' Bresenham lines and the scaled image; nothing the list changed
+is missing from the redrawing. **What it does not prove.** MAME is the oracle, not the board: where
+MAME's TMS34010 simplifies (FILL's COLOR1 halves, LINE's pixel colour) the redrawing follows MAME.
+The fill 1 pattern (75%), colour byte 4, bit 15 and commands 1, 2, 6, A, B, C and E0 do not occur
+in the captures: their description is CODE only. The colour table, the palette and the images are
+inputs taken from MAME's memory; how they are loaded is M5d. "Changed" equals "drawn" in every
+capture because the polygon colours never match the background they cover; a pixel the list
+writes with the value it already had would be invisible to the "missed" test.
+
+CI cannot run MAME: it decodes the three lists committed under `artifacts/display-list/`
+(attract-f2100, attract-f3000, game-f3000; runtime SOM memory, 3.7 KB, 134 bytes and 5.2 KB) and
+redraws them with a synthetic colour table against checksums recorded when the same redrawing
+matched MAME (`expected.json`, written by `tools/displaylist.py CAPTURE --export NAME`). The
+colour table itself is not committed: it is the game's data.
+
+## 6. Open questions
+
+1. Who writes FFF77F50 (440h in every capture) and what the rest of the 44h-word header holds (M5d).
+2. Commands 6, 8, B and D's targets (FFF595B0, FFF58950, FFF52060, the entries at FFF71C20) and
+   the palette packing of command 9 (M5d).
+3. The meaning of the depth key's direction and of DM 0033 (the object's shift) (docs/07, M3a).
+4. The object handshake: 0047-004F raise /GINT mid-frame when an object entry has bit 14 set; the
+   68k answers at 0x02E418 and, with FF9C74 set, defers it to 0x02E3E0, which calls 0x02DFFE before
+   releasing the ADSP (HYP: the 68k recomputes something per object; M5).
+5. ADSP control lines 2 and 4 (toggled around every ADSP access, 0x02E100/0x02E1D4, 0x02E422/
+   0x02E45E): no function in MAME (docs/06 section 9).
+6. Bit 15 of the command word, the 75% fill and colour byte 4: whether any object uses them (docs/07
+   can answer from the records).

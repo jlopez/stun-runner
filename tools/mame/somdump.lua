@@ -10,8 +10,9 @@
 -- ADSP data 2002-2003 follows /SOMCLK (the SOM address) and SOMLATCH (a word into bank
 -- m68k_bank ^ 1 at the address, which then advances; hdadsp_special_w, harddriv_m.cpp:803), and a
 -- write tap on the 68k's ADSP control latch 818000-81801F follows line 3, the 68k's bank
--- (hd68k_adsp_control_w, harddriv_m.cpp:685). For every word it also keeps the ADSP PC of the
--- write (MAME reports the address after the writing instruction). When the 68k starts the copy
+-- (hd68k_adsp_control_w, harddriv_m.cpp:685). For every word it also keeps the address of the
+-- writing instruction (CURPC, the state MAME's debugger shows as the current instruction; "PC"
+-- is already past it). Every event below names its instruction the same way. When the 68k starts the copy
 -- into the GSP (the word 7000 to HSTDATA, 0x02F0BA) it also reads 810000-813FFF through the 68k's
 -- own window, which the decoder test compares with the rebuilt bank.
 --
@@ -22,7 +23,8 @@
 --                 the header block process_command_buffer (FFF411A0) skips by the word at
 --                 FFF77F50 (meta.txt "FFF77F50", in bits), then the commands it read
 --   som.bin       the SOM bank the 68k copied into that buffer, rebuilt (0x2000 words, 16-bit LE)
---   som_pc.bin    for each SOM word, the ADSP PC after the SOMLATCH write that stored it (FFFF: none)
+--   som_pc.bin    for each SOM word, the address of the ADSP instruction whose SOMLATCH write
+--                 stored it (FFFF: none)
 --   som68k.bin    810000-813FFF read through the 68k at the copy (0x2000 words): the same bank
 --   som_other.bin the other bank as rebuilt at the same moment (the ADSP is filling it)
 --   adsp_dm.bin   ADSP data RAM 0000-1FFF at the ADSP's end-of-frame /GINT (00C1) of that list
@@ -110,16 +112,16 @@ TAPS[#TAPS + 1] = m68:install_write_tap(0x818000, 0x81801F, "som_ctl", function(
   local line, val = w & 7, (w >> 3) & 1
   if line == 3 then
     bank68 = val
-    ev(string.format("68k %06X: ADSP control line 3 = %d (68k sees bank %d)", maincpu.state["PC"].value, val, val))
+    ev(string.format("68k %06X: ADSP control line 3 = %d (68k sees bank %d)", maincpu.state["CURPC"].value, val, val))
   elseif line == 5 then
-    ev(string.format("68k %06X: ADSP /BR = %d", maincpu.state["PC"].value, val))
+    ev(string.format("68k %06X: ADSP /BR = %d", maincpu.state["CURPC"].value, val))
   end
 end)
 TAPS[#TAPS + 1] = m68:install_write_tap(0x80BFC6, 0x80BFC7, "som_1fe3", function(off, data, mask)
-  ev(string.format("68k %06X: DM 1FE3 = %04X (handshake)", maincpu.state["PC"].value, data))
+  ev(string.format("68k %06X: DM 1FE3 = %04X (handshake)", maincpu.state["CURPC"].value, data))
 end)
 TAPS[#TAPS + 1] = m68:install_write_tap(0x80BFFE, 0x80BFFF, "som_1fff", function(off, data, mask)
-  ev(string.format("68k %06X: DM 1FFF = %04X (frame trigger)", maincpu.state["PC"].value, data))
+  ev(string.format("68k %06X: DM 1FFF = %04X (frame trigger)", maincpu.state["CURPC"].value, data))
 end)
 
 -- 68k: the copy into the GSP. Per buffer: which list went in.
@@ -130,7 +132,7 @@ local building = nil
 local fb_page -- forward: the frame buffer page reader, defined below
 TAPS[#TAPS + 1] = m68:install_write_tap(0xC00000, 0xC0000F, "som_host", function(off, data, mask)
   if off == 0xC00008 then
-    ev(string.format("68k %06X: HSTCTL = %04X%s", maincpu.state["PC"].value, data,
+    ev(string.format("68k %06X: HSTCTL = %04X%s", maincpu.state["CURPC"].value, data,
       (data & 0x80) == 0 and " (INTOUT cleared)" or ""))
   elseif off == 0xC00002 then
     hostadr = (data << 16) | (hostadr & 0xFFFF)
@@ -140,17 +142,17 @@ TAPS[#TAPS + 1] = m68:install_write_tap(0xC00000, 0xC0000F, "som_host", function
     hostptr = hostadr
     if hostadr == 0xFFF9FC10 or hostadr == 0xFFFCFC10 then
       building = hostadr - 0x10
-      ev(string.format("68k %06X: host address %08X, start of a command list", maincpu.state["PC"].value, hostadr))
+      ev(string.format("68k %06X: host address %08X, start of a command list", maincpu.state["CURPC"].value, hostadr))
     end
   elseif off == 0xC0000C or off == 0xC0000E then
     -- a long write (move.l to C0000C) is two word writes, C0000C then C0000E, both HSTDATA
     local at = hostptr
     hostptr = hostptr + 0x10
-    -- 0x02F0BA `move.w #$7000,$c0000c`: the MAME PC is the next instruction's, 0x02F0C2
-    if off == 0xC0000C and data == 0x7000 and maincpu.state["PC"].value == 0x02F0C2 then
+    -- 0x02F0BA `move.w #$7000,$c0000c` in 0x02F0AE, the SOM copy
+    if off == 0xC0000C and data == 0x7000 and maincpu.state["CURPC"].value == 0x02F0BA then
       local f = FRAMES[next_capture]
       ev(string.format("68k %06X: HSTDATA 7000 at %08X, SOM copy from bank %d (%d words)",
-        maincpu.state["PC"].value, at, bank68, som[bank68][0]))
+        maincpu.state["CURPC"].value, at, bank68, som[bank68][0]))
       if f and frame >= f - 1 and building then
         local t, p = copy_bank(bank68)
         local v = {}
@@ -173,7 +175,7 @@ TAPS[#TAPS + 1] = m68:install_write_tap(0xC00000, 0xC0000F, "som_host", function
         c.tap = gs:install_read_tap(after, after + 0xF, "som_after", function(o2, d2, m2)
           if not c.fb_som then
             c.fb_som = fb_page()
-            c.fb_som_pc = gsp.state["PC"].value
+            c.fb_som_pc = gsp.state["CURPC"].value
             c.fb_som_b4 = gsp.state["B4"].value
             c.colors = {}
             for i = 0, 0x3FF do c.colors[i] = gs:read_u16(0xFFF71D20 + 16 * i) end
@@ -187,7 +189,7 @@ end)
 
 -- ADSP: SOMCLK, SOMLATCH, /GINT
 TAPS[#TAPS + 1] = dm:install_write_tap(0x2002, 0x2006, "som_adsp", function(off, data, mask)
-  local pc = adsp.state["PC"].value
+  local pc = adsp.state["CURPC"].value
   if off == 0x2003 then
     somaddr = data
     ev(string.format("ADSP %04X: /SOMCLK = %04X (writes go to bank %d)", pc, data, bank68 ~ 1))
@@ -309,7 +311,7 @@ end
 -- GSP: HSTCTLL, where command_buffer_done sets INTOUT (FFF41910), the 68k's level-3 interrupt
 TAPS[#TAPS + 1] = gs:install_write_tap(0xC00000F0, 0xC00000FF, "som_intout", function(off, data, mask)
   if (data & 0x80) ~= 0 then
-    ev(string.format("GSP %08X: HSTCTLL = %04X (INTOUT set)", gsp.state["PC"].value, data))
+    ev(string.format("GSP %08X: HSTCTLL = %04X (INTOUT set)", gsp.state["CURPC"].value, data))
   end
 end)
 
@@ -317,7 +319,7 @@ end)
 for _, flag in ipairs({ 0xFFF9FC00, 0xFFFCFC00 }) do
   TAPS[#TAPS + 1] = gs:install_write_tap(flag, flag + 0xF, "som_flag", function(off, data, mask)
     if data == 0 then
-      ev(string.format("GSP %08X: flag %08X = 0, buffer done", gsp.state["PC"].value, flag))
+      ev(string.format("GSP %08X: flag %08X = 0, buffer done", gsp.state["CURPC"].value, flag))
       local f = FRAMES[next_capture]
       local c = copies[flag]
       if f and frame >= f and c then
@@ -325,7 +327,7 @@ for _, flag in ipairs({ 0xFFF9FC00, 0xFFFCFC00 }) do
         capture(flag, c)
       end
     else
-      ev(string.format("68k %06X: flag %08X = %04X, buffer ready", maincpu.state["PC"].value, flag, data))
+      ev(string.format("68k %06X: flag %08X = %04X, buffer ready", maincpu.state["CURPC"].value, flag, data))
     end
   end)
 end
