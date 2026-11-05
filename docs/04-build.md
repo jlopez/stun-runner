@@ -27,10 +27,12 @@ Since M3 the object image is not an incbin of `build/stunrun-obj.bin` any more: 
 `data/objects` (a manifest and one mesh file per object, docs/07-objects.md), which
 `tools/objects asm` turns into `build/obj/page0.asm`-`page2.asm` (one per /MP page of 0x10000
 words: `dc.w` for every decoded word, `dcb.w` for the zero fill), and `asm/obj/objects.asm`
-includes them with an assert at every page boundary. The image still feeds the step, for one
-word only: the residue word 0:019E the format does not explain, which the generated source takes
-with an incbin slice (2 bytes, `residue_0_019E`), and through it the checksum word of page 0.
-The generated sources depend on the mesh files and on `build/obj/data.list`, the list of their
+includes them with an assert at every page boundary. Since 2026-11-05 (Jesus, card A2) the image
+does not feed the step at all: the one word the format does not explain, the residue word
+0:019E, is a named constant in the manifest (`residue_0_019E`, a `dc.w`; docs/07 section 5.3),
+so the object tree's output depends on the committed data and the tools only, never on
+`build/stunrun-obj.bin` (`make` builds the object image with that file absent; the other four
+trees depend on the blobs they incbin). The generated sources depend on the mesh files and on `build/obj/data.list`, the list of their
 names, rewritten only when it changes, so a deleted or added mesh file regenerates them (and a
 missing one fails the build).
 `make objects` re-decodes the image into `data/objects` (after a decoder change; `make test`
@@ -86,7 +88,7 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   ```
 
 - `make coverage`: `tools/coverage` reads the five listings (vasm `-L`: a `Sections:` header, `Source:` blocks, `SS:AAAAAAAA hex  \t N: source` lines and `*` for repeated runs; 64tass `-L`: `>addr\thex\t...\tsource` lines and `Processing file` markers) and attributes to each statement the bytes from its address to the next statement's (or the section's / image's end), classified as `instr`, `data` (`dc.*`, `.byte`, `.word`, `.text`...), `blob` (`incbin`, `.binary`) or `fill` (`ds.*`, `dcb.*`, `blk.*`, `.fill`). Per source file, per image, the total, the blob share and a JSON line; it fails unless the total is the set's size, 1,511,424. The blob share only goes down (CLAUDE.md section 2).
-- `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/`, `tools/` and `data/objects` fed with a synthetic set (this is how CI exercises the real trees without ROMs; since M3a the synthetic set carries the object image the committed meshes encode to, with a random residue word, and an edited mesh must change the built chip). `tools/test_objects.py` adds the object format's tests (docs/07 section 8.3), among them one that runs in CI against the real hashes: the committed meshes encode to the four chips of pages 1 and 2 with MAME's CRC-32 and SHA-1.
+- `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/`, `tools/` and `data/objects` fed with a synthetic set (this is how CI exercises the real trees without ROMs; since M3a the synthetic set carries the object image the committed data encodes to, `make all` must rebuild it, also with `build/stunrun-obj.bin` deleted, and an edited mesh must change the built chip). `tools/test_objects.py` adds the object format's tests (docs/07 section 8.3), among them one that runs in CI against the real hashes: the committed data/objects (meshes and the residue constant) encodes to all six object chips with MAME's CRC-32 and SHA-1.
 - `make lint`: ruff and mypy over the tools.
 - `make somdump` (needs MAME and the ROMs; never in CI): `tools/mame/somdump.lua` captures the
   SOM display list at the frames of `SOM_ATTRACT` (attract mode), `SOM_GAME` (a game started at
@@ -153,6 +155,18 @@ After M3a (`make coverage`, 2026-11-04) the object image comes from the generate
 `blob: 74.0% of 1511424 bytes come from incbin/.binary`. Decision (M3a): bytes generated from
 committed data count as `data`/`fill` under the generated file's name (a path under `build/`
 in the coverage table says where they come from); no separate coverage class.
+
+Since the residue word became a constant (`make coverage`, 2026-11-05), page 0 has no blob and
+the object image none at all:
+
+| Source file | Bytes | instr | data | blob | fill |
+|---|---|---|---|---|---|
+| `../../build/obj/page0.asm` | 131,072 | 0 | 126,680 | 0 | 4,392 |
+| `../../build/obj/page1.asm` | 131,072 | 0 | 130,288 | 0 | 784 |
+| `../../build/obj/page2.asm` | 131,072 | 0 | 39,304 | 0 | 91,768 |
+
+`blob: 74.0% of 1511424 bytes come from incbin/.binary` (1,118,208 blob bytes, 2 fewer than
+after M3a; 73.98% in the JSON line before and after).
 
 ## 6. Tools and versions
 
