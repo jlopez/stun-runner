@@ -1,11 +1,21 @@
 ; io.asm: 5CB8-5DB4, RDIO inputs and coin counters, two immediate commands.
 ;
-; Generated once from the recursive descent and the MAME trace (docs/09-sound-program.md);
-; hand-maintained from here on.
+; sub_5CE8 (every timed IRQ, from h_irq) reads the four low RDIO bits (coins 1-3 and an unused
+; one in MAME's jsa_ii_ioports; stunrun's coins go to the main board, so they read 0 there),
+; keeps their state in zp_75 and pulses the WRIO coin counters (bits 5-4, 5D95-5DA9). Two of
+; h_nmi's immediate commands: imm_04 (command 08), a loop-back of one byte, and imm_01 (command
+; 03), which sends zp_75.
+;
+; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
+; program.md section 3); hand-maintained from here on. sub_/loc_/tbl_/dat_/_lXXXX labels are
+; neutral address labels for later legs to rename.
 
     .cerror * != $5CB8, "io.asm must start at $5CB8"
 
 ; imm_handlers entry 4; not executed in the make sndtrace runs
+; Command 08 (cmd_class 03), inside the NMI: send AA, take the next byte the 68010 writes into
+; zp_63 (sub_5CC5: nmi_mode 0, nmi_data_ptr = zp_63, wait until nmi_data_count is 1; h_nmi
+; nests, the NMI being an edge), send that byte back, return to the command mode (loc_4548).
 imm_04
     lda #$01
     jsr sub_5CC5
@@ -32,7 +42,7 @@ _l5CE0
     bne _l5CE0
     rts
 
-; from 4211
+; from 4211 (h_irq, every timed IRQ)
 sub_5CE8
     bit RDIO_M
     bpl loc_5D11
@@ -161,6 +171,7 @@ _l5D95
     rts
 
 ; imm_handlers entry 1; not executed in the make sndtrace runs
+; Command 03 (cmd_class 00), inside the NMI: send zp_75.
 imm_01
     lda zp_75
     jsr send_response

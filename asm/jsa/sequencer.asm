@@ -1,7 +1,16 @@
-; sequencer.asm: 4759-57E2, the track interpreter and its YM2151 output.
+; sequencer.asm: 4759-57E2, the stream interpreter and its YM2151 output.
 ;
-; Generated once from the recursive descent and the MAME trace (docs/09-sound-program.md);
-; hand-maintained from here on.
+; Up to 30 entries (the X of the 1E-byte arrays of ram.asm) each read a byte stream of
+; data/music.asm through zp_06 (4859-486E: the pointer from ram_0266/ram_0284, which cmdtype_08
+; sets from tbl_633E). A byte below 80 is handled at 487E on; a byte 80-BA is an op, run by
+; sub_505D through op_handlers with the next byte in A; BB and up ends the entry (ram_0248 =
+; FF). The YM2151 register writes go through ym_wait. h_irq reaches this file through sub_4229
+; (loc_5043, X = 0 and 1 on alternate ticks). What the ops and the bytes mean is for a later leg;
+; the labels name the dispatch only.
+;
+; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
+; program.md section 3); hand-maintained from here on. sub_/loc_/tbl_/dat_/_lXXXX labels are
+; neutral address labels for later legs to rename.
 
     .cerror * != $4759, "sequencer.asm must start at $4759"
 
@@ -1188,6 +1197,8 @@ _l5019
 ; from 427A, 4286, 428E, 4295, 42A6, 42AE, 439A, 4EAF, 4EC1, 4ED7, 4EFC, 4FAB, 4FB2, 4FE7, 4FF2,
 ; 4FFC, 55B8, 55D0, 55F2, 5613, 56A8, 58A3, 58D3, 591A, 5925, 5938, 5943, 594E, 5959, 5964, 596F,
 ; 597A, 5985, 599C, 59A8, 59B5, 59D6, 59E1, 5A4D, 5A5E, 5A6A, 5A77, 5A88, 5A93, 5AA2, 5AAD, 5B66
+; Wait until the YM2151 is not busy (status bit 7), at most 255 reads: on a time-out set zp_0E
+; (later calls return at once) and zp_02 bit 1 (the status imm_03 sends). Keeps A.
 ym_wait
     bit zp_0E
     bmi _l5042
@@ -1224,6 +1235,8 @@ _l505A
     jmp loc_500E
 
 ; from 485F
+; A stream byte A of 80 and up: BB and up ends the entry (C clear); else op_handlers entry
+; A - 80, entered by RTS with Y at the next byte, A that byte and C set.
 sub_505D
     cmp #$BB
     bcc _l5068

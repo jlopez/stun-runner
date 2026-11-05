@@ -1,7 +1,11 @@
 ; lookup.asm: AB48-AC47, the 256-byte table read at 4F69.
 ;
-; Generated once from the recursive descent and the MAME trace (docs/09-sound-program.md);
-; hand-maintained from here on.
+; Read at 4F69 with Y = ram_0895 OR ram_08A2,y (4F62-4F68), so 256 bytes. The byte after it,
+; AC48, is checksum_adjust (jsa.asm).
+;
+; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
+; program.md section 3); hand-maintained from here on. sub_/loc_/tbl_/dat_/_lXXXX labels are
+; neutral address labels for later legs to rename.
 
     .cerror * != $AB48, "lookup.asm must start at $AB48"
 

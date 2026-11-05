@@ -1,7 +1,15 @@
-; music.asm: 65E6-AB47, the byte streams of the track interpreter and the data they point to.
+; music.asm: 65E6-AB47, the byte streams of the stream interpreter and the data they point to.
 ;
-; Generated once from the recursive descent and the MAME trace (docs/09-sound-program.md);
-; hand-maintained from here on.
+; tbl_633E (data/sounds.asm) gives the address of each of the 125 streams: the dat_XXXX labels.
+; Between and after them are the bytes the streams point to: the readers at 4DB6, 5565, 5570,
+; 55F8, 5619 and 57A4 (voice data, read through pointers the streams carry) read 6BD4-6F3F and
+; 9924-AAC3 in the make sndtrace runs. The streams carry addresses of their own (the op AE
+; lists, for one); until a later leg structures the streams with macros, the bytes stay .byte
+; rows, so this region is not relocatable yet (docs/09-sound-program.md section 4).
+;
+; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
+; program.md section 3); hand-maintained from here on. sub_/loc_/tbl_/dat_/_lXXXX labels are
+; neutral address labels for later legs to rename.
 
     .cerror * != $65E6, "music.asm must start at $65E6"
 

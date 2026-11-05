@@ -1,7 +1,18 @@
 ; ymtimer.asm: 585E-5BAB, YM2151 channels 6-7 driven by the YM2151 timer interrupt.
 ;
-; Generated once from the recursive descent and the MAME trace (docs/09-sound-program.md);
-; hand-maintained from here on.
+; h_irq calls sub_59C0 when the YM2151's status has the timer A flag (41C5-41D1). loc_5869, the
+; way in (from cmdtype_10, 44CC), writes the registers of YM2151 channels 6 and 7 from dat_5B82
+; (sub_55B4 with zp_0D = 6, then 7: key off, total levels 7F, then the channel's registers from
+; 20 on out of (zp_19)) and points zp_49 at the address a word of tbl_65DD gives. Then each
+; timer A interrupt (sub_59C0) takes the next byte at (zp_49) as the timer A period (registers
+; 10, 11 and 14, 5A59-5A7C) and keys channel 6 or 7 on (register 08, by zp_4D); a 0 byte keys
+; both off and ends it (59CB-59FB). Nothing of this ran in the make sndtrace runs: no command
+; has type 10, so loc_5869 is never entered, and imm_00 only resets the state (sub_585E).
+; Whether the 68010 has a use for it is a question for M5.
+;
+; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
+; program.md section 3); hand-maintained from here on. sub_/loc_/tbl_/dat_/_lXXXX labels are
+; neutral address labels for later legs to rename.
 
     .cerror * != $585E, "ymtimer.asm must start at $585E"
 
