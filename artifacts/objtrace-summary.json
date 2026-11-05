@@ -6,7 +6,8 @@
       "run": "objtrace-attract",
       "frames": 3600,
       "play": "no",
-      "sequences": 1036284,
+      "sequences": 1036283,
+      "open_at_end": 1,
       "kinds": {
         "directory": {
           "sequences": 13914,
@@ -19,9 +20,9 @@
           "words_read": 1759767
         },
         "record": {
-          "sequences": 238983,
+          "sequences": 238982,
           "start_addresses": 2177,
-          "words_read": 477966
+          "words_read": 477964
         },
         "polygon": {
           "sequences": 225070,
@@ -41,7 +42,8 @@
       "run": "objtrace-play",
       "frames": 7200,
       "play": "yes",
-      "sequences": 3113317,
+      "sequences": 3113316,
+      "open_at_end": 1,
       "kinds": {
         "directory": {
           "sequences": 45086,
@@ -59,9 +61,9 @@
           "words_read": 1461684
         },
         "polygon": {
-          "sequences": 683507,
+          "sequences": 683506,
           "start_addresses": 2073,
-          "words_read": 4029560
+          "words_read": 4029554
         },
         "reciprocal": {
           "sequences": 1610866,

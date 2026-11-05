@@ -30,6 +30,9 @@ words: `dc.w` for every decoded word, `dcb.w` for the zero fill), and `asm/obj/o
 includes them with an assert at every page boundary. The image still feeds the step, for one
 word only: the residue word 0:019E the format does not explain, which the generated source takes
 with an incbin slice (2 bytes, `residue_0_019E`), and through it the checksum word of page 0.
+The generated sources depend on the mesh files and on `build/obj/data.list`, the list of their
+names, rewritten only when it changes, so a deleted or added mesh file regenerates them (and a
+missing one fails the build).
 `make objects` re-decodes the image into `data/objects` (after a decoder change; `make test`
 fails while the two disagree), `make objtrace` records the ADSP's object-ROM reads in MAME
 (docs/07 section 7).

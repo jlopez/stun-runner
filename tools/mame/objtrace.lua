@@ -2,7 +2,11 @@
 --
 --   TRACE_DIR=build/mame/ TRACE_NAME=objtrace-play TRACE_FRAMES=3600 TRACE_PLAY=1 \
 --     mame stunrun -video none -sound none -nothrottle -autoboot_delay 0 -seconds_to_run 900 \
---     -autoboot_script tools/mame/objtrace.lua
+--     -nvram_directory <empty dir> -cfg_directory <empty dir> -autoboot_script tools/mame/objtrace.lua
+--
+-- The play run depends on the NVRAM it starts from (the archive's, from mame.ini, by default):
+-- `make objtrace` gives each run its own empty NVRAM and cfg directories, so both start from the
+-- factory state and the trace is reproducible.
 --
 -- The ADSP reaches the object ROMs only through its I/O at DM 2000-2007 (hdadsp_special_r/w,
 -- harddriv_m.cpp:776-838): a write to DM 2001 (/SIMCLK) sets the word address, a write to DM 2007
@@ -18,7 +22,10 @@
 -- Sequences are aggregated as "pc page address reads count" lines into <TRACE_NAME>.txt in
 -- TRACE_DIR, preceded by a few "# key value" header lines: the frames, whether a game was
 -- started, and two anomaly counters (a /MP write between two reads of one sequence; a read with
--- no /SIMCLK write before it). PC is the address of the /SIMCLK write instruction. With TRACE_PLAY=1 the script inserts a coin at frame 900, presses
+-- no /SIMCLK write before it). PC is the address of the /SIMCLK write instruction. The run stops
+-- at a frame boundary, where the ADSP is usually inside a sequence: that last sequence may be
+-- cut short, so it is dropped, not recorded, and "# open_at_end" says whether there was one
+-- (it is not counted in "# sequences"). With TRACE_PLAY=1 the script inserts a coin at frame 900, presses
 -- start at 960 and the trigger at 1020, as tools/mame/pcwatch.lua does, so the run covers a game.
 
 local OUT = os.getenv("TRACE_DIR") or "./"
@@ -34,7 +41,7 @@ local pc_state = adsp.state["PC"]
 local page = 0
 local seq = nil -- { pc, page, address, reads, mp }
 local counts = {}
-local mp_inside, orphan_reads, sequences = 0, 0, 0
+local mp_inside, orphan_reads, sequences, open_at_end = 0, 0, 0, 0
 
 local function close()
   if seq then
@@ -90,15 +97,17 @@ OBJTRACE_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
     if frame == 1020 then trigger:set_value(1) elseif frame == 1025 then trigger:clear_value() end
   end
   if frame == FRAMES then
-    close()
+    -- the sequence in flight may be incomplete: drop it rather than record a short read
+    if seq then open_at_end = 1 end
+    seq = nil
     local keys = {}
     for k in pairs(counts) do keys[#keys + 1] = k end
     table.sort(keys)
     local f = assert(io.open(OUT .. NAME .. ".txt", "w"))
     f:write(string.format("# frames %d\n# play %s\n# sequences %d\n", FRAMES,
       PLAY and "yes" or "no", sequences))
-    f:write(string.format("# mp_inside_sequence %d\n# orphan_reads %d\n", mp_inside,
-      orphan_reads))
+    f:write(string.format("# mp_inside_sequence %d\n# orphan_reads %d\n# open_at_end %d\n",
+      mp_inside, orphan_reads, open_at_end))
     f:write("# pc page address reads count\n")
     for _, k in ipairs(keys) do f:write(k, " ", counts[k], "\n") end
     f:close()
