@@ -555,6 +555,10 @@ def test_committed_captures_decode_and_redraw(path):
     # no images in CI (the game's data): the image quads are the commands left undrawn, and the
     # scaler is test_image_quad_scaling's
     assert canvas.images == sum(c.is_image for c in som.commands) and canvas.skipped == 0
+    # docs/08 section 5: rows skipped by the V test occur in the captures (game-f3000: command
+    # @07AB, rows 74h-77h of a solid fill; attract-f2100: the top or bottom row of the outline
+    # @0E5A, FFF459F0/FFF45C30), never followed by a drawn row of a stippled polygon
+    assert canvas.v_skipped == {"game-f3000": 4, "attract-f2100": 1}.get(path.stem, 0)
     masked = bytes(p if d else 0 for p, d in zip(canvas.pixels, canvas.drawn, strict=True))
     assert sum(canvas.drawn) == expected["drawn"]
     assert zlib.crc32(masked) == expected["crc32_synthetic_colours"]

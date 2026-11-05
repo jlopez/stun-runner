@@ -29,7 +29,7 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
-	dasm oracle pcwatch objects objtrace somdump fieldext depthkeys FORCE
+	dasm oracle pcwatch objects objtrace somdump fieldext depthkeys vskip FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -230,6 +230,27 @@ depthkeys:
 		-cfg_directory $(BUILD)/mame/depthstate/cfg -autoboot_script tools/mame/depthkeys.lua \
 		|| exit 1; done
 	@grep -h summary $(BUILD)/mame/depthkeys-attract.txt $(BUILD)/mame/depthkeys-game.txt
+
+# Which polygon rows does the GSP skip by the V test (docs/08 4.2 and section 5)?
+# tools/mame/vskip.lua breaks at FFF454C0/FFF454D0 under the debugger, from frame 0 to VSKIP_TO
+# in attract mode and to VSKIP_GAME_TO in a game, each from an empty private NVRAM/cfg state (as
+# somdump); writes build/mame/vskip-{attract,game}.txt (one line per skipped row, then a summary).
+VSKIP_TO ?= 1700
+VSKIP_GAME_TO ?= 6600
+
+vskip:
+	for play in 0 1; do rm -rf $(BUILD)/mame/vskipstate && mkdir -p $(BUILD)/mame/vskipstate/nvram \
+		$(BUILD)/mame/vskipstate/cfg && \
+		VSKIP_OUT=$(BUILD)/mame/vskip-$$( [ $$play = 1 ] && echo game || echo attract ).txt \
+		VSKIP_PLAY=$$play \
+		VSKIP_TO=$$( [ $$play = 1 ] && echo $(VSKIP_GAME_TO) || echo $(VSKIP_TO) ) \
+		$(MAME) stunrun -debug -debugger none $(MAME_FLAGS) \
+		-nvram_directory $(BUILD)/mame/vskipstate/nvram \
+		-cfg_directory $(BUILD)/mame/vskipstate/cfg -autoboot_script tools/mame/vskip.lua \
+		|| exit 1; done
+	@grep -h summary $(BUILD)/mame/vskip-attract.txt $(BUILD)/mame/vskip-game.txt
+	@echo "patterns of the skipped rows:"; grep -ho 'B9=[0-9A-F]*' $(BUILD)/mame/vskip-attract.txt \
+		$(BUILD)/mame/vskip-game.txt | sort | uniq -c
 
 # The SOM display list on its way from the ADSP to the GSP (docs/08-display-list.md):
 # tools/mame/somdump.lua captures, at each frame of SOM_ATTRACT (attract mode) and SOM_GAME (a game

@@ -447,6 +447,7 @@ class Canvas:
     drawn: bytearray = field(default_factory=lambda: bytearray(FB_PAGE_BYTES))  # 1 = written
     images: int = 0  # image quads not drawn (no images given, or rejected by the GSP's checks)
     skipped: int = 0
+    v_skipped: int = 0  # rows skipped by the V test (FFF454D0), FILL and pattern rotation both
 
     def put(self, x: int, y: int, value: int) -> None:
         x0, y0, x1, y1 = self.window
@@ -459,6 +460,7 @@ class Canvas:
         """FILL XY of one row from x0 to x1 - 1 (DADDR = (y, x0), DYDX = (1, x1 - x0)): False
         when SUBXY sets V (x0 > x1; the caller skips the FILL and the pattern rotation)."""
         if x0 > x1:
+            self.v_skipped += 1
             return False
         wx0, wy0, wx1, wy1 = self.window
         if not wy0 <= y <= wy1:
@@ -998,7 +1000,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"({100 * agreement.share:.3f}%); the list changed {agreement.changed} pixels of "
                 f"the page, {agreement.missed} of them not drawn; {canvas.images} image quads not drawn "
                 f"(no images, or rejected), "
-                f"{canvas.skipped} skipped; field 0 "
+                f"{canvas.skipped} skipped, {canvas.v_skipped} rows skipped by the V test; field 0 "
                 f"{'sign' if sign_extended else 'zero'}-extended at the list")
             if agreement.equal != agreement.drawn or agreement.missed:
                 print("\n".join(lines))

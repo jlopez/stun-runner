@@ -139,7 +139,10 @@ Written by `emit_image` (0663) for the records whose type sets DM 0038: type 1 (
 0187 -> 0197), which in the ROM are the 13 faces of objects 335 and 353-363 (docs/07 section 4),
 so bits 0-5 are the face's record colour, unlit. The clipper sends them to 068B instead of the
 polygon path (0273-0276), which drops the whole image when any corner's z is below C8h (0695-069E,
-HYP: a near-plane cull), before 0663 (01D9). Four corners in every capture. The GSP draws the box at the first point, the second's x - the first's x + 1
+HYP: a near-plane cull), before 0663 (01D9). 068B runs between `save_index_regs` (064A, called at
+068B: I0-I7, M0-M7, L0-L7 into DM 0929-0940) and `restore_index_regs` (0631, called at 069F: the
+same registers back from there); the same pair brackets `emit_image` (0663, 0689),
+`emit_polygon` (04EB; 0631 at 04F4, 04FA and 05DB) and 00C3-00E6 (CODE). Four corners in every capture. The GSP draws the box at the first point, the second's x - the first's x + 1
 pixels wide and the third's y - the second's y + 1 rows high (section 4.4); its far corner is
 (p1.x, p2.y) only when p1.y = p0.y.
 
@@ -520,7 +523,19 @@ redrawing. The expander's even/odd bytes, for fills and for outlines, rest on th
 `dither-f*` captures with their modified table: the game's own table gives no two-byte colour in
 any capture, so no frame the game draws shows a dither. **What it does not prove.** MAME is the oracle, not the board: where
 MAME's TMS34010 simplifies (FILL's COLOR1 halves, LINE's pixel colour) the redrawing follows MAME.
-A row skipped by the V test, bit 15, FFF77E60 bits 3
+Rows skipped by the V test do occur, but not in a way that shows the rule they exist for, the
+pattern left unrotated. MAME skips them (`make vskip`: `tools/mame/vskip.lua` breaks at FFF454C0
+and, on V, at FFF454D0, from an empty state: `skipped=1AF tests=DAEB4` in attract frames 0-1700,
+`skipped=790 tests=4BFFBD` in a game to frame 6600, hex), 2356 of the 2367 with B9 = FFFFFFFF, a
+solid fill. In the captures they are in solid fills (game-f3000, command @07AB, rows 74h-77h;
+game-f6600, @0032 and @0072, 11 rows; game-f1100 @1562; game-f4200 @039F), in outlines' top or
+bottom rows (FFF459F0/FFF45C30; attract-f1200 @0551, attract-f2100 @0E5A) and, for 6 of the 11
+stippled rows MAME logged, captured by `make somdump SOM_ATTRACT=1066 SOM_GAME=5058,5340` (frames
+1071, 5062, 5345; MAME's log at 1070, 5061 and 5344 names the same rows, B9h, B7h and 93h-94h),
+in the polygon's last row or before rows of width 0 only. Those captures redraw equal to MAME, and
+redrawn with the pattern rotated on every skipped row, every capture gives the same pixels. So
+the no-rotation rule is CODE plus the CI test only (the other five stippled skips, at frames 5065,
+5347, 6305 and 6592, were not captured). Bit 15, FFF77E60 bits 3
 and 5 (word 11h is 0000 or 0010 in every capture), colour byte 4 under fill 2 and commands 1, 2, 6, A, B, C and E0 do not
 occur in the captures: their description is CODE only (all but the commands have synthetic CI
 tests of the renderer, which pin the code reading, not MAME). The colour table, the palette and the images are
@@ -570,5 +585,6 @@ command-5 window run in CI on synthetic inputs (`tools/test_displaylist.py`).
    section 3.1), and the ship is drawn with fill 2 at frame 6303 and fill 1 at 6605 of the same
    game (M5).
 7. The clipper (0271-04B1): the polygon path from 0278 (the edge moves at 02C8, 031F, 0385, 03EB
-   and 0452 that `project_vertices` 04B2 follows) and what 064A and 0631, called around the image
-   cull at 068B, do. docs/07 leaves the clipper to docs/08 and docs/08 does not decode it.
+   and 0452 that `project_vertices` 04B2 follows). docs/07 leaves the clipper to docs/08 and
+   docs/08 does not decode it. (064A and 0631 around the image cull at 068B are answered: they
+   save and restore the index registers, section 1.4.)

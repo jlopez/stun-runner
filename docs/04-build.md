@@ -116,6 +116,12 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   `DEPTH_GAME_TO` in a game, each from an empty private state (`build/mame/depthstate`), and
   writes `build/mame/depthkeys-{attract,game}.txt`: per frame the adjacent pairs whose key rises
   and the largest rise (docs/08 section 1.5: never above 10h, the bias of 07C1-07C5).
+- `make vskip` (needs MAME and the ROMs; never in CI): `tools/mame/vskip.lua`, under
+  `-debug -debugger none` and from an empty private state (`build/mame/vskipstate`), counts the
+  GSP's polygon row tests (FFF454C0) and the rows its V test skips (FFF454D0, ST bit 28), each
+  skipped row logged with its frame, B2 (y, xl) and the stipple pattern B9, from frame 0 to
+  `VSKIP_TO` in attract mode and to `VSKIP_GAME_TO` in a game, into
+  `build/mame/vskip-{attract,game}.txt` (docs/08 section 5).
 
 ## 5. Coverage at the zero point (M1)
 
