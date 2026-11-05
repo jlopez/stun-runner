@@ -779,6 +779,25 @@ def descriptor_columns(descs: Sequence[tuple[int, int]], objects: int) -> dict[i
     }
 
 
+def far_name_problems(descs: Sequence[tuple[int, int]], names: Mapping[int, str]) -> list[str]:
+    """The `_far` naming rule (docs/07 section 11.2) against the descriptor pairs: the far object
+    of every descriptor whose near and far differ is named its near object's name + "_far", and
+    no other object's name ends in "_far". Returns the violations (empty when the rule holds)."""
+    problems = []
+    far_of: dict[int, set[int]] = {}
+    for n, f in descs:
+        if n >= 0 and f >= 0 and f != n:
+            far_of.setdefault(f, set()).add(n)
+    for f, nears in sorted(far_of.items()):
+        wanted = sorted(names[n] + "_far" for n in nears)
+        if names.get(f) not in wanted:
+            problems.append(f"{f} {names.get(f)}: want {' or '.join(wanted)}")
+    for o, name in sorted(names.items()):
+        if name.endswith("_far") and o not in far_of:
+            problems.append(f"{o} {name}: ends in _far but is no descriptor's far object")
+    return problems
+
+
 def run_columns(summary: Mapping[str, object], objects: int) -> dict[int, str]:
     """Per object, the initials of the runs that loaded it (objtrace-attract -> A,
     objtrace-play -> P) in run order, or "-"."""
@@ -879,3 +898,85 @@ def trace_summary(decoded: Decoded, runs: Sequence[TraceRun]) -> dict[str, objec
     out["objects_loaded"] = len(touched_all)
     out["objects_never_loaded"] = sorted(set(decoded.meshes) - touched_all)
     return out
+
+
+# --- the per-level runs (tools/mame/objlevels.lua, `make objlevels`) ----------------------------
+
+
+@dataclass
+class LevelRun:
+    name: str
+    header: dict[str, str]
+    rows: list[tuple[int, int, int, int]]  # object, level word, first frame, count
+
+
+def read_levels(path: Path) -> LevelRun:
+    header: dict[str, str] = {}
+    rows = []
+    for line in path.read_text().splitlines():
+        if line.startswith("#"):
+            k, _, v = line[1:].strip().partition(" ")
+            header[k] = v
+        elif line.strip():
+            o, lv, f, c = (int(x) for x in line.split())
+            rows.append((o, lv, f, c))
+    return LevelRun(path.stem, header, rows)
+
+
+def levels_summary(objects: int, runs: Sequence[LevelRun]) -> dict[str, object]:
+    """Counts and object numbers only: per run (one start level each) the frames, the writes the
+    level select replaced, the first frame counted, the frame of a machine reset that ended the
+    run (null if none: the watchdog resets the game from start level 23 on, docs/07 section 11.4)
+    and the objects loaded at each level word; then, per level, the objects loaded at it in any
+    run, and the objects no run loaded (the objtrace runs aside)."""
+    per_level: dict[int, set[int]] = {}
+    out_runs = []
+    for run in runs:
+        levels: dict[int, set[int]] = {}
+        for o, lv, _, _ in run.rows:
+            levels.setdefault(lv, set()).add(o)
+            per_level.setdefault(lv, set()).add(o)
+        out_runs.append(
+            {
+                "run": run.name,
+                "frames": int(run.header.get("frames", "0")),
+                "start_level": int(run.header.get("start_level", "0")),
+                "replaced_writes": int(run.header.get("replaced_writes", "0")),
+                "counted_from": int(run.header.get("counted_from", "0")),
+                "reset_at_frame": (
+                    int(run.header["reset_at_frame"]) if "reset_at_frame" in run.header else None
+                ),
+                "levels": {str(k): sorted(v) for k, v in sorted(levels.items())},
+            }
+        )
+    loaded = set().union(*per_level.values()) if per_level else set()
+    return {
+        "format": "objlevels summary 1",
+        "doc": "docs/07-objects.md section 11.4",
+        "runs": out_runs,
+        "levels": {str(k): sorted(v) for k, v in sorted(per_level.items())},
+        "objects_loaded": len(loaded),
+        "objects_never_loaded": sorted(set(range(objects)) - loaded),
+    }
+
+
+def _ranges(values: Iterable[int]) -> str:
+    vs = sorted(set(values))
+    out: list[str] = []
+    i = 0
+    while i < len(vs):
+        j = i
+        while j + 1 < len(vs) and vs[j + 1] == vs[j] + 1:
+            j += 1
+        out.append(str(vs[i]) if i == j else f"{vs[i]}-{vs[j]}")
+        i = j + 1
+    return ",".join(out)
+
+
+def level_columns(summary: Mapping[str, object], objects: int) -> dict[int, str]:
+    """Per object, the level words at which a level run loaded it ("0-3,7"), or "-"."""
+    at: dict[int, set[int]] = {}
+    for lv, objs in summary["levels"].items():  # type: ignore[attr-defined]
+        for o in objs:
+            at.setdefault(o, set()).add(int(lv))
+    return {o: _ranges(at[o]) if o in at else "-" for o in range(objects)}

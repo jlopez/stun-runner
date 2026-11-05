@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -49,13 +50,17 @@ from objects import (
     descriptors,
     encode,
     encode_words,
+    far_name_problems,
     layout_from_manifest,
+    level_columns,
+    levels_summary,
     manifest_json,
     mesh_from_json,
     mesh_json,
     part_sum,
     place,
     read_data,
+    read_levels,
     read_trace,
     reciprocal,
     run_columns,
@@ -504,6 +509,203 @@ def test_descriptor_and_run_columns() -> None:
     assert run_columns(summary, 5) == {0: "A", 1: "-", 2: "AP", 3: "P", 4: "-"}
 
 
+def test_far_name_rule() -> None:
+    """CI: the `_far` rule is checked against the descriptor pairs, not only the names' form."""
+    descs = [(0, 1), (2, 3), (4, 4), (-1, -1)]
+    names = {0: "a", 1: "a_far", 2: "b", 3: "b_far", 4: "c"}
+    assert far_name_problems(descs, names) == []
+    swapped = {**names, 1: "b_far", 3: "a_far"}
+    assert len(far_name_problems(descs, swapped)) == 2
+    assert far_name_problems(descs, {**names, 1: "ax"}) == ["1 ax: want a_far"]
+    assert far_name_problems(descs, {**names, 4: "c_far"}) == [
+        "4 c_far: ends in _far but is no descriptor's far object"
+    ]
+
+
+@pytest.mark.skipif(
+    not IMAGE_68K.exists(), reason="build/stunrun-68k.bin absent (no reference set)"
+)
+def test_names_follow_the_descriptor_pairs() -> None:
+    """With the reference set: every far object of the table at 0x048F9C is named its near
+    object's name + _far, and no other name ends in _far (docs/07 section 11.2)."""
+    _, _, names = read_data(DATA)
+    assert far_name_problems(descriptors(IMAGE_68K.read_bytes()), names) == []
+
+
+LEVEL_RUN_00 = """# frames 8000
+# start_level 0
+# replaced_writes 0
+# counted_from 1020
+# object level first_frame count
+0 0 1073 589
+0 1 2967 880
+5 1 3363 786
+"""
+LEVEL_RUN_03 = """# frames 6000
+# start_level 3
+# replaced_writes 8
+# counted_from 1020
+# reset_at_frame 6000
+# object level first_frame count
+0 3 1030 12
+2 3 1030 4
+2 4 4000 1
+7 3 1100 2
+"""
+
+
+def test_levels_summary_and_columns(tmp_path: Path) -> None:
+    """CI: `tools/objects levels` and the inventory's levels column from two synthetic runs."""
+    (tmp_path / "objlevels-00.txt").write_text(LEVEL_RUN_00)
+    (tmp_path / "objlevels-03.txt").write_text(LEVEL_RUN_03)
+    runs = [read_levels(tmp_path / f"objlevels-{n}.txt") for n in ("00", "03")]
+    assert runs[0].name == "objlevels-00"
+    assert runs[0].header["counted_from"] == "1020"
+    assert runs[1].rows == [(0, 3, 1030, 12), (2, 3, 1030, 4), (2, 4, 4000, 1), (7, 3, 1100, 2)]
+    summary = levels_summary(9, runs)
+    assert summary["runs"] == [
+        {
+            "run": "objlevels-00",
+            "frames": 8000,
+            "start_level": 0,
+            "replaced_writes": 0,
+            "counted_from": 1020,
+            "reset_at_frame": None,
+            "levels": {"0": [0], "1": [0, 5]},
+        },
+        {
+            "run": "objlevels-03",
+            "frames": 6000,
+            "start_level": 3,
+            "replaced_writes": 8,
+            "counted_from": 1020,
+            "reset_at_frame": 6000,
+            "levels": {"3": [0, 2, 7], "4": [2]},
+        },
+    ]
+    assert summary["levels"] == {"0": [0], "1": [0, 5], "3": [0, 2, 7], "4": [2]}
+    assert summary["objects_loaded"] == 4
+    assert summary["objects_never_loaded"] == [1, 3, 4, 6, 8]
+    columns = level_columns(summary, 9)
+    assert columns == {
+        0: "0-1,3",
+        1: "-",
+        2: "3-4",
+        3: "-",
+        4: "-",
+        5: "1",
+        6: "-",
+        7: "3",
+        8: "-",
+    }
+    # the CLI writes the same summary
+    out = tmp_path / "summary.json"
+    r = run_cli(
+        "levels", "--summary", str(out), *(str(p) for p in sorted(tmp_path.glob("objlevels-*")))
+    )
+    assert r.returncode == 0, r.stderr
+    written = json.loads(out.read_text())
+    assert written["levels"] == summary["levels"]
+
+
+LEVEL_RUNS = sorted((REPO / "build/mame").glob("objlevels-[0-9][0-9].txt"))
+
+
+@pytest.mark.skipif(not LEVEL_RUNS, reason="no `make objlevels` runs in build/mame (MAME)")
+def test_level_runs_count_play_only() -> None:
+    """With `make objlevels` runs: each counts from frame 1020 (LEVELS_FROM), inside the gap
+    between the attract demo's last load (frame 965) and the game's first (docs/07 section 11.4:
+    1026 or later), and the committed summary is the summary of these runs."""
+    runs = [read_levels(p) for p in LEVEL_RUNS]
+    for run in runs:
+        assert run.header["counted_from"] == "1020", run.name
+        assert min(f for _, _, f, _ in run.rows) >= 1026, run.name
+    assert min(min(f for _, _, f, _ in run.rows) for run in runs) == 1026
+    committed = json.loads((REPO / "artifacts/objlevels-summary.json").read_text())
+    assert levels_summary(413, runs) == committed
+
+
+def test_names_table_level_clauses_are_the_summary() -> None:
+    """CI: each row of docs/07 section 11.2's table opens its MAME cell with "level runs n/m,
+    levels R": n of the row's m objects loaded in the level runs, at the level words R (written
+    as the inventory's levels column writes them), exactly as artifacts/objlevels-summary.json
+    has them."""
+    summary = json.loads((REPO / "artifacts/objlevels-summary.json").read_text())
+    columns = level_columns(summary, 413)
+    doc = (REPO / "docs/07-objects.md").read_text().splitlines()
+    start = doc.index("| Objects | Names | Render | 68k | MAME | Status |") + 2
+    rows = 0
+    for line in doc[start:]:
+        if not line.startswith("|"):
+            break
+        cells = [c.strip() for c in line.split("|")[1:-1]]
+        first, _, last = cells[0].partition("-")
+        objs = range(int(first), int(last or first) + 1)
+        at = [o for o in objs if columns[o] != "-"]
+        levels: set[int] = set()
+        for o in at:
+            for part in columns[o].split(","):
+                a, _, b = part.partition("-")
+                levels.update(range(int(a), int(b or a) + 1))
+        expected = f"level runs {len(at)}/{len(objs)}, levels "
+        expected += level_columns({"levels": {str(lv): [0] for lv in levels}}, 1)[0]
+        rest = cells[4].removeprefix(expected)
+        assert rest != cells[4] and rest[:1] in ("", ";"), (cells[0], expected, cells[4][:60])
+        rows += 1
+    assert rows == 17
+
+
+def _objects_named(text: str) -> set[int]:
+    out: set[int] = set()
+    for part in text.replace(" and ", ",").split(","):
+        a, _, b = part.strip().partition("-")
+        out.update(range(int(a), int(b or a) + 1))
+    return out
+
+
+def test_names_table_objtrace_clauses_are_the_summary() -> None:
+    """CI: the objtrace clauses of docs/07 section 11.2's MAME cells agree with
+    artifacts/objtrace-summary.json and artifacts/objlevels-summary.json: "loaded in both objtrace
+    runs" (every object of the row in each), "n of m in the objtrace runs (k in attract; X only in
+    the level runs)" (n in either run, k in the attract run, X in the level runs but neither
+    objtrace run) and "n of m with the objtrace runs (X only there)" (n in the level runs or an
+    objtrace run, X in an objtrace run only)."""
+    trace = {
+        r["run"]: set(r["objects_loaded"])
+        for r in json.loads((REPO / "artifacts/objtrace-summary.json").read_text())["runs"]
+    }
+    traced = set().union(*trace.values())
+    levels = json.loads((REPO / "artifacts/objlevels-summary.json").read_text())["levels"]
+    leveled = {o for objs in levels.values() for o in objs}
+    doc = (REPO / "docs/07-objects.md").read_text().splitlines()
+    start = doc.index("| Objects | Names | Render | 68k | MAME | Status |") + 2
+    seen = 0
+    for line in doc[start:]:
+        if not line.startswith("|"):
+            break
+        cells = [c.strip() for c in line.split("|")[1:-1]]
+        first, _, last = cells[0].partition("-")
+        objs = set(range(int(first), int(last or first) + 1))
+        cell = cells[4]
+        before = seen
+        if "loaded in both objtrace runs" in cell:
+            assert all(objs <= t for t in trace.values()), cells[0]
+            seen += 1
+        for m in re.finditer(r"(\d+) of (\d+) in the objtrace runs \(([^)]*)\)", cell):
+            assert (int(m[1]), int(m[2])) == (len(objs & traced), len(objs)), cells[0]
+            k = re.match(r"(\d+) in attract", m[3])
+            assert k and int(k[1]) == len(objs & trace["objtrace-attract"]), cells[0]
+            x = re.search(r"; ([\d, and-]+) only in the level runs", m[3])
+            assert x and _objects_named(x[1]) == (objs & leveled) - traced, cells[0]
+            seen += 1
+        for m in re.finditer(r"(\d+) of (\d+) with the objtrace runs \(([^)]*) only there\)", cell):
+            assert (int(m[1]), int(m[2])) == (len(objs & (leveled | traced)), len(objs)), cells[0]
+            assert _objects_named(m[3]) == (objs & traced) - leveled, cells[0]
+            seen += 1
+        assert ("objtrace" in cell) == (seen > before), cells[0]
+    assert seen == 4
+
+
 @pytest.mark.skipif(
     not IMAGE_68K.exists(), reason="build/stunrun-68k.bin absent (no reference set)"
 )
@@ -516,6 +718,8 @@ def test_inventory_table_is_the_docs_table() -> None:
         str(IMAGE_68K),
         "--summary",
         str(REPO / "artifacts/objtrace-summary.json"),
+        "--levels",
+        str(REPO / "artifacts/objlevels-summary.json"),
     )
     assert r.returncode == 0, r.stderr
     assert "0 in no descriptor" in r.stderr
