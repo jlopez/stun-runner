@@ -1,0 +1,146 @@
+# The 6502 sound program as source
+
+**Date**: 2026-11-05 (milestone 4, leg M4a, issue #11). `136070-2123.10c`, the JSA II board's 64 KB 6502 program, is rebuilt entirely from the 64tass tree `asm/jsa/`: no `.binary` is left, `make check` is byte-identical, `make coverage` reports 0 blob bytes for `stunrun-jsa`. This document gives the hardware facts the source relies on (section 1), the partition and its evidence (sections 2 and 3), the tree (section 4), the command protocol with the 68010 as far as this leg proves it (section 5), attract-mode sound (section 6), the trace (section 7) and the checks (section 8). The ADPCM samples are leg M4b; the YM2151 patch tables and the stream data structured as data are a later leg.
+
+## 1. Hardware facts, verified against MAME 0.289
+
+Source: `src/mame/atari/atarijsa.cpp` (`atarijsa2_map`, `atari_jsa_ii_device`, `atari_jsa_oki_base_device`), `atariscom.cpp`, `harddriv.cpp` (stunrun's machine config and `init_multisync`), `src/devices/sound/okim6295.cpp`, `src/devices/cpu/m6502/m6502.cpp`.
+
+| 6502 address | What | Evidence |
+|---|---|---|
+| 0000-1FFF | RAM | `atarijsa2_map` |
+| 2000-2001 | YM2151, no mirror; read: status (bit 7 busy, 1 timer B, 0 timer A) | `atarijsa2_map`; `ym_wait` (5026) polls bit 7, `h_irq` (41C5) tests bit 0 |
+| 2800 | /RDV, OKI M6295 status: bits 3-0 channel 4-1 playing (bits 7-4 read 1) | `oki_r`, `okim6295_device::read` |
+| 2802 | /RDP, the command byte; reading clears the 6502's NMI | `sound_command_r` |
+| 2804 | /RDIO: 7 self-test, 6 NMI pending (active low), 5 output buffer full, 4-3 unused, 2-0 coins 3-1 | `jsa_ii_ioports`, `rdio_r` |
+| 2806 | /IRQACK, read or write: clears the timed IRQ | `sound_irq_ack_r/_w` |
+| 2A00 | /WRV, OKI command byte | `oki_w` |
+| 2A02 | /WRP, the response byte | `sound_response_w` |
+| 2A04 | /WRIO: 7-6 page at 3000, 5-4 coin counters 2-1, 3 OKI pin 7, 2 OKI reset (low), 1 OKI bank (JSA III only), 0 YM2151 reset (low) | `wrio_w` |
+| 2A06 | /MIX: 5 low-pass filter (not emulated), 4 OKI bank (JSA III only), 3-1 YM2151 volume 0-7, 0 OKI volume (half/full) | `mix_w` |
+| 3000-3FFF | bank: four 4 KB pages from file 0000-3FFF | `configure_entries(0, 4, base, 0x1000)` |
+| 4000-FFFF | ROM, file 4000-FFFF | `map(0x4000, 0xffff).rom()` |
+
+- Every port 2800-2A06 decodes with mirror mask 01F9 (reads and writes). The program reads only through the +8 mirrors (2808, 280A, 280C, 280E: the `_M` names of docs/05 section 4) and writes at the base addresses.
+- Clocks: the 6502 runs at 3.579545 MHz / 2; the YM2151 at 3.579545 MHz; the M6295 at 3.579545 MHz / 3 with pin 7 high. The 6502's IRQ is the OR of the timed interrupt (3.579545 MHz / 4 / 16 / 16 / 14, about 249.7 Hz, held until /IRQACK) and the YM2151's IRQ; its NMI is held from a command write until /RDP is read.
+- The 68010 side (`harddriv.cpp` `init_multisync`): a write at 600000-603FFF with byte mask FF00 (the high byte) is the command (`main_command_w`, which raises the NMI); a read there returns the response and clears the 68010's sound interrupt (`main_response_r`); a read at 604000-607FFF resets the sound board (`hd68k_sound_reset_r`). The 68010 tests "may I write" with bit 15 of A80000 (023EB0, 023EEC).
+- RDIO bit 7 always reads 0 in MAME 0.289: the port gives `main_test_read_line()`, which is the inverted test line, and `rdio_r` inverts bit 7 again when the test line is low. Reset's self-test (bit 7 set, 4016-401B) therefore never runs in MAME.
+- **Corrections to docs/01 section 6** (not edited by this leg; for the coordinator): WRIO bit 3 is the OKI's pin 7 and bit 2 the OKI reset, bits 5-4 the coin counters; MIX bit 0 is the OKI volume and bit 5 the low-pass filter (docs/01 says "bit 7-5 OKI volume"); RDIO bits 4-2 are unused and coin 3 in `jsa_ii_ioports` (the "+5V" of docs/01 is the comment in `rdio_r`, which the port definition contradicts). The header comment of `atarijsa.cpp` ("Interrupt acknowledge 2A00") describes the JSA I.
+
+The coordinator's hypotheses (issue #11), checked: file 0000-3FFF zero, yes; vectors NMI 57E3, reset 4000, IRQ 41C1, yes; AC49-FFF9 zero, yes; 4000-AC48 program and data, yes, but the code ends at 5DB4, not 609B, and the run of FF at 609C-60FF is not padding: it is `cmd_class` for the commands 09-6C (section 5).
+
+## 2. The partition
+
+Every byte of the file belongs to one statement of one file; the region files are the ownership units of the later legs.
+
+| Range | File | Class | Content and evidence |
+|---|---|---|---|
+| file 0000-3FFF | `jsa.asm` | fill | the four bank pages, zero; no instruction refers to 3000-3FFF; the self-test adds them into the ROM checksum (4094-40D5) |
+| 4000-4237 | `system.asm` | code (282 instructions) | reset, self-test, initialisation, `main_loop`, `h_irq` |
+| 4238-4758 | `commands.asm` | code (644), `cmdtype_handlers` | `imm_00`, `dispatch_command`, the 21 command-type handlers, `send_response`, `queue_response` |
+| 4759-57E2 | `sequencer.asm` | code (1950), `op_handlers`, 8 small tables | the stream interpreter, its ops, the YM2151 writes, `ym_wait` |
+| 57E3-585D | `nmi.asm` | code (62) | `h_nmi`, the command byte |
+| 585E-5BAB | `ymtimer.asm` | code (362), `dat_5B82` | YM2151 channels 6-7 driven by timer A (never run) |
+| 5BAC-5CB7 | `oki.asm` | code (131), 3 tables | the M6295 driver |
+| 5CB8-5DB4 | `io.asm` | code (124), 2 tables | RDIO inputs and coin counters, commands 03 and 08 |
+| 5DB5-61E3 | `tables.asm` | data | 7 lookup tables of the code, `cmd_class`, `cmd_type`, `cmd_param`, `imm_handlers` |
+| 61E4-65E5 | `data/sounds.asm` | data | the tables the command handlers index with their parameter, `tbl_633E` (125 stream addresses as `.word dat_XXXX`) |
+| 65E6-AB47 | `data/music.asm` | data | the 125 byte streams and the data they point to, `.byte` rows under `dat_XXXX` labels |
+| AB48-AC47 | `lookup.asm` | data | a 256-byte table read at 4F69 |
+| AC48 | `jsa.asm` | data | `checksum_adjust`: no instruction reads it; it makes the byte sum of the file FF, which the self-test checks (40E4) |
+| AC49-FFF9 | `jsa.asm` | fill | zero, unreferenced |
+| FFFA-FFFF | `jsa.asm` | data | the vectors `.word h_nmi, reset, h_irq` |
+
+`hardware.asm` and `ram.asm` hold equates only. `make coverage` (2026-11-05):
+
+| Source file | Bytes | instr | data | blob | fill |
+|---|---|---|---|---|---|
+| `asm/jsa/jsa.asm` | 37,816 | 0 | 7 | 0 | 37,809 |
+| `asm/jsa/system.asm` | 568 | 568 | 0 | 0 | 0 |
+| `asm/jsa/commands.asm` | 1,313 | 1,271 | 42 | 0 | 0 |
+| `asm/jsa/sequencer.asm` | 4,234 | 4,084 | 150 | 0 | 0 |
+| `asm/jsa/nmi.asm` | 123 | 123 | 0 | 0 | 0 |
+| `asm/jsa/ymtimer.asm` | 846 | 804 | 42 | 0 | 0 |
+| `asm/jsa/oki.asm` | 268 | 256 | 12 | 0 | 0 |
+| `asm/jsa/io.asm` | 253 | 245 | 8 | 0 | 0 |
+| `asm/jsa/tables.asm` | 1,071 | 0 | 1,071 | 0 | 0 |
+| `asm/jsa/data/sounds.asm` | 1,026 | 0 | 1,026 | 0 | 0 |
+| `asm/jsa/data/music.asm` | 17,762 | 0 | 17,762 | 0 | 0 |
+| `asm/jsa/lookup.asm` | 256 | 0 | 256 | 0 | 0 |
+| **stunrun-jsa** | **65,536** | **7,351** | **20,376** | **0** | **37,809** |
+
+The file names follow the code, not the coordinator's proposal word for word: the protocol pieces are spread over the address space (`h_nmi` at 57E3, the immediate commands at 4533, 4543, 5CB8 and 5DAD, `send_response` at 4553), so they stay in the region files their addresses fall in, and the contiguous blocks got their own files (`commands.asm`, `nmi.asm`, `ymtimer.asm`, `io.asm`, `lookup.asm`). Every file is one contiguous range included once, in address order, so a file's bytes are its range and nothing else.
+
+## 3. How the classification was made
+
+1. **Recursive descent** (a throwaway disassembler in the session scratchpad, not committed) from the three vectors, following `JSR`, `JMP abs` and branches. The program has no `JMP (ind)`; it dispatches by pushing a table word and returning (RTS), from three tables the descent found by their users:
+   - `cmdtype_handlers` 472F, 21 words (`dispatch_command`, 4371-4389: `cmp #$15`);
+   - `op_handlers` 50AF, 59 words, stream bytes 80-BA (`sub_505D`, 505D-507A: `cmp #$BB`, `asl`; the 59 words end where the code at 5125 starts, which entry 08 points to);
+   - `imm_handlers` 61DA, 5 words (`h_nmi` 584F-585D for `cmd_class` 0-3, and `cmdtype_03` 43CA-43D4 for entry 0).
+   With these, the descent reaches 3,555 instructions (7,351 bytes) in 4000-5DB4 and no overlap, no illegal opcode, no fall into data. The rest of 4000-5DB4 is tables the code indexes (472F, 50AF, 57C3-57E2, 5C63-5C6E, 5D09-5D10) and two blocks reached only through `#<`/`#>` immediates (`dat_5B82` from 5892-5898 and 58C2-58C8, `dat_5DB5` from 4718-4725).
+2. **Tables**: each data region's tables start at an address an instruction reads (absolute, indexed, or through `(zp),y` with a base loaded as immediates: `tbl_6244`, `tbl_62C1`, `tbl_633E`, `tbl_6438` at 45AB-468E). A table's length is what the code's index can reach where it is bounded (an `AND`, a compare: `cmd_*` 6D bytes at 583C and 4371, `tbl_5EDF` 256, `tbl_5FE3` 16 words), else up to the next table; each table's comment in the source gives its readers and the bound. The 125 stream addresses of `tbl_633E` are the only pointers in the data that the code proves; they are `.word dat_XXXX`.
+3. **The MAME trace** (section 7) confirms it: every one of the 1,961 instruction addresses the 6502 fetched an opcode from is an instruction of the descent, and every data read (outside the instructions' own bytes) falls inside a data statement, never inside an instruction or a `.fill`: `tools/sndtrace.py summary` checks both, and fails otherwise. No opcode is ever fetched from the bank window.
+4. **Bytes the trace never executes but the descent calls code** (1,594 instructions; `never_executed` in `artifacts/sndtrace-summary.json`): the self-test (402A-4112, 418C-41BC, unreachable in MAME, section 1), the immediate commands (none sent in the runs), the command types no command uses (02, 03, 04, 06, 07, 0D, 10, 11 and the shared return 0C/0F/12), all of `ymtimer.asm` but its reset (no command has type 10), and stream ops the traced sounds do not use. Each is reached by a `JSR`, a branch or a dispatch table entry from code that is itself reached, which is the argument that they are code.
+5. **Bytes neither reaches**: none in 4000-5DB4. In the data regions, the bytes of `data/music.asm` between and after the streams that no trace read, `tbl_65DD` (only dead code reads it) and `checksum_adjust` (read by no instruction, explained by the checksum) are data by position: they lie inside the data regions, and no instruction could execute them.
+6. **Relocation test** (scratch, not committed): the tree assembled with one byte inserted before `reset` (guards removed) moves every absolute operand into 4000-AC48 by one, every RTS-table word and `tbl_633E` word by one, and changes nothing else in the code but the nine `#<` immediates; so no instruction holds a hard-coded ROM address. The stream bytes of `data/music.asm` do hold addresses (the op AE lists of addresses, for one: 536F-5398 picks a word from the list after the op and jumps the stream there) and are not relocatable yet; structuring them is the later data leg.
+
+## 4. The tree
+
+`asm/jsa/jsa.asm` includes `hardware.asm`, `ram.asm`, then the region files in address order; each region file starts and ends with a `.cerror` on `*`, and `jsa.asm` guards the bank pages, `checksum_adjust`, the vectors and the wrap to 0000. Conventions (Spindizzy's docs/26 section 5): lowercase mnemonics, `$` hex, labels alone on their line, four-space indentation, comments at column 40, `@w` on the 11 instructions whose operand is a zero-page address in the 3-byte form (402E-404C, 53D2, 54EE, 5BFE, 5C8D, 5CC9, 5CCE), every branch and jump to a symbol.
+
+Labels: the IDA names are carried in (`reset`, `h_irq`, `h_nmi`, `vec_nmi`, `vec_reset`, `vec_irq`, and the I/O names with their `_M` mirrors in `hardware.asm`; `tools/test_jsa.py` checks every name of `data/ida/stunrun-jsa.json` against the source). This leg names what the code proves: `main_loop`, `dispatch_command`, `send_response`, `queue_response`, `ym_wait`, `checksum_adjust`; the dispatch tables and their entries (`cmdtype_handlers` and `cmdtype_XX`, `op_handlers` and `op_XX`, `imm_handlers` and `imm_XX`, a handler shared by several entries keeping a neutral `loc_XXXX`); the command tables `cmd_class`, `cmd_type`, `cmd_param`; and in `ram.asm` the queues (`cmd_queue`, `resp_queue` and their indexes), `nmi_mode`, `nmi_data_ptr`, `nmi_data_count` and the register shadows `wrio_shadow`, `mix_shadow`, `ym_1b_shadow`. Everything else has a neutral address label for the later legs to rename: `sub_XXXX` (a `JSR` target), `loc_XXXX` (a jump target reached from more than one routine), `_lXXXX` (a branch or jump target inside one routine, a 64tass local), `tbl_XXXX` and `dat_XXXX`, `zp_XX` and `ram_XXXX`. A label never claims a role the code does not show; the comments say what the code does with addresses.
+
+Each region file's header says what is in it and how the code reaches it; each global label's comment lists its callers and dispatch entries, and whether the trace executed it. The source was generated once by the scratch disassembler and is hand-maintained from now on; no generator is committed.
+
+## 5. The command protocol (what the code shows)
+
+- **Reset handshake**: after a reset the 6502 drops any pending command (reads 280A, 4139) and writes FF (413C-413E). In the traces every one of the 68010's sound resets (604000 reads: frames 0, 367, 410 and then 3964 and 8668 in attract mode, 965, 981, 1779 and 4726 in the game run) is followed by one FF, and FF is the only response the runs saw.
+- **A command byte** raises the NMI. `h_nmi` waits until the 68010 has read the last response (RDIO bit 5 clear), then, in the command mode (`nmi_mode` FF), looks the byte up in `cmd_class`: bit 7 set, the byte goes into `cmd_queue` (48 entries, the oldest dropped when full); 00-03, the byte is an immediate command, run inside the NMI through `imm_handlers` entry class+1; a byte 6D or above queues 6D, which does nothing.
+- **Queued commands**: `main_loop` takes one per pass and `dispatch_command` runs `cmdtype_handlers[cmd_type]` with A = `cmd_param`. The 109 commands 00-6C use 10 types and FF: 08 (32 commands, parameters 00-1F: `cmdtype_08`, which starts the streams of `data/sounds.asm` number N), 13 (53 commands, parameters 00-34: `cmdtype_13`, an OKI sample, `oki.asm`), 01 (commands 1E-23: `zp_23` = 0-5), 0A (5), 0B (2), 05 (2), 00 (01 and 02: `zp_1E` = F0 or 0, section 6), 03 (00: `imm_00`, the sound initialisation), 09 (09: queues the response 55), 14 (66: stops an OKI channel), and FF, the four immediate commands. What each type does to the sound is for the later legs.
+- **Immediate commands** (none was sent in the traced runs; the 68010's "SOUND*BOARD*TESTS" screen, text at 0x006918, may be what sends them, not traced): 03, `imm_01`, sends `zp_75` (the RDIO input state, `io.asm`); 06, `imm_02`, sends 6D; 07, `imm_03`, sends the status byte `zp_02` (bit 7 ROM checksum, 4 and 3 RAM, 2 no timed IRQ, 1 YM2151 time-out) and then sets its bits 0 and 2, which `main_loop` and the timed IRQ clear, so the next 07 tells whether both still run; 08, `imm_04`, sends AA, takes the next byte the 68010 writes and sends it back (a loop-back).
+- **Responses**: the immediate commands write through `send_response` (waits for the 68010 to read each byte); `queue_response` (command 09, and stream op 96 with its operand) leaves a byte in `resp_queue` (16 entries; `resp_queue_full` = 80 when a byte is dropped) for `main_loop`, which sends one per pass when the 68010 has read the last. The self-test's fatal RAM error writes 10 and stops (41A1).
+- **The 68010 side**, as far as the trace shows it: every command byte in the three runs was written by the instruction at 0x023EF6 (`move.b d0,$600000`, in the routine at 0x023EDA/0x023EDE that tests A80000 bit 15 first). Two scratch probes (write taps with the 68010's stack, not committed) showed it called from 0x030170, which empties a queue at FFDB64 that the game fills through 0x0301CA. The 68010's names for the commands are M5's; this table is what they will name.
+
+## 6. Attract mode and its sound
+
+With the set's factory NVRAM (the empty private NVRAM of every `make` MAME run boots from the set's 200e/210e), **attract mode is silent**: in the 10,800-frame `sndtrace-attract` run the 6502 writes the YM2151 113,529 times but keys on no channel (0 writes of register 08 with a slot bit) and sends the M6295 no command. The reason, traced: when attract mode starts (frame 822) the 68010 queues command 01 if bit 11 of its option word FF94EE is clear and 02 if it is set (0x028362-0x02837E); the option word is 0 after boot (scratch taps, not committed: written 0 at 0x021302, frame 36, and 0x0243BE, frame 410; read at 0x028364, frame 822). Command 01 is type 00 with parameter 3C: `zp_1E` = F0, and with that the OKI start returns at once (5BFE-5C01) and the key-on at 4EE3-4EF0 is skipped unless `ram_088E` reaches F0. Command 02 sets `zp_1E` to 0; the game run sends 01 at frame 831 and 02 when the game starts (frame 1047), and keys on 1,444 times.
+
+The 68010's operator menu has the option "SOUNDS IN ATTRACT" (OFF/ON, text at 0x020F52 in the game-options table at 0x020ED0, referenced from 0x0432D4). That this entry is bit 11 of FF94EE is an inference, not traced: the table's entries start with a byte whose low nibble would be the bit (BB before "SOUNDS IN ATTRACT", CC and AA around it). The machine evidence is the effect: `sndtrace-sound`, the same attract run with bit 11 forced on (a write tap that ORs 0800 into every value the game writes to FF94EE, `TRACE_ATTRACT_SOUND=1`), sends 02 instead of 01, keys on YM2151 channels 643 times from frame 831 and sends the M6295 966 commands.
+
+`make listen` uses the same tap (`tools/mame/listen.lua`) so that attract mode plays without touching the NVRAM or the operator menu; `LISTEN_ATTRACT_SOUND=0` leaves the factory setting (silent attract mode). The sound starts about 14 seconds after boot (frame 831). On a real board the operator menu's "SOUNDS IN ATTRACT: ON" is the equivalent, if the inference above holds.
+
+## 7. The trace (`make sndtrace`)
+
+`tools/mame/sndtrace.lua` taps, headless (`SDL_VIDEODRIVER=dummy`, `-video none -sound none`), from an empty private NVRAM/cfg per run:
+
+- every 6502 read of 3000-FFFF. MAME's 6502 sets NPC (the "PC" state) to the instruction's address just before the opcode fetch (`prefetch_start`), so a read at PC is an opcode fetch, a read at PC+1 or PC+2 an operand, and any other read a data read, recorded with the instruction's PC (PC 0 for the vectors). The core's dummy reads are left out: those of a taken branch and of RTS, and the wrong-page read of an indexed access that crosses a page (the next data read of the instruction 100 higher). Counted over the play run: 64,847,639 fetches, 94,208,524 operand reads, 2,989,843 dummy reads dropped, 934,495 data reads;
+- the 6502's writes of 2000-2FFF (YM2151 register and value, OKI, response, WRIO, MIX) and reads of the command latch;
+- the 68010's writes of the command byte (600000-603FFF, high byte) with the frame and the instruction's address (CURPC), its reads of the response and of 604000 (sound resets).
+
+The raw traces stay in `build/mame/` (the YM2151 and OKI streams carry values from the ROM). `tools/sndtrace.py summary` checks each against the source (section 3) and writes `artifacts/sndtrace-summary.json`: per run the counters, the executed instructions and the data reads as address ranges (with the instructions that read), the command values (count, first frame, the 68010 instruction), the response values, the YM2151 writes and key-ons, the OKI commands; over all runs the instructions never executed, per file and as ranges. Results (`make -j3 sndtrace`, 2026-11-05, MAME 0.289, the reference set):
+
+| Run | Frames | Instructions executed | Data bytes read | Commands (values) | Responses | YM2151 writes / key-ons | OKI commands |
+|---|---|---|---|---|---|---|---|
+| `sndtrace-attract` (factory) | 10,800 | 1,708 | 3,186 | 558 (26) | FF ×5 | 113,529 / 0 | 0 |
+| `sndtrace-sound` (bit 11 on) | 10,800 | 1,927 | 3,464 | 558 (27) | FF ×5 | 147,572 / 643 | 966 |
+| `sndtrace-play` (coin 900, start 960, trigger 1020) | 7,200 | 1,961 | 5,813 | 391 (40) | FF ×7 | 253,010 / 1,444 | 312 |
+
+10,800 frames cover the first attract cycle and a whole second one: the 68010 resets the sound board at frames 3964 and 8668, 4,704 frames apart. Over the three runs 1,961 of the 3,555 instructions execute; per file, executed of total: `system.asm` 121/282, `commands.asm` 412/644, `sequencer.asm` 1,231/1,950, `nmi.asm` 35/62, `ymtimer.asm` 6/362, `oki.asm` 110/131, `io.asm` 46/124.
+
+## 8. Build and checks
+
+- `make check`: 25 files, 0 differences; the 6502 tree depends on its own files only (`EXTRA_stunrun-jsa` is `asm/jsa/data/*.asm`; `build/stunrun-jsa.bin` is still made by `tools/merge-roms` for `make ida`).
+- `make coverage`: `stunrun-jsa` instr 7,351, data 20,376, blob 0, fill 37,809; the set's blob share goes from 74.0% to 69.6% (1,052,672 bytes).
+- `tools/test_jsa.py` (CI, no ROMs): `asm/jsa/jsa.asm` assembles with 64tass to MAME's size, CRC-32 and SHA-1 of `136070-2123.10c`; one operand changed (reset's `ldx #$FF` to `#$FE`) changes exactly byte 4003 and the hash; a byte inserted in `commands.asm` fails the assembly at its end guard; the tree has no `.binary` and nothing from `build/`; every IDA name is in the source at its address; the committed summary's executed ranges are whole instructions of the source, its data reads lie in data statements, and executed plus never-executed are exactly the instructions; `tools/sndtrace.py` on synthetic traces of a synthetic program; and the `make sndtrace` traces against the source when they are present. `tools/test_build.py`'s synthetic set carries the 6502 image the source assembles to, and the synthetic `make all` checks that an operand edited in the copy's source reaches 10c (bytecheck: `136070-2123.10c: 1 differing bytes, first at file offset $04003 = 6502 $4003`).
+- `make sndtrace` (`-j3` runs the three side by side, about 3 minutes): section 7.
+- `make soundcheck`: after `make check`, MAME's `-verifyroms` on `build/roms` (a `-rompath` on the command line replaces `mame.ini`'s, so the rebuilt run reads nothing else), then `SOUNDCHECK_FRAMES` (3000) frames of attract mode with its sound on from the reference set and from the rebuilt one, headless; the YM2151 and OKI write streams, the commands and the responses must be equal and the reference must key on. 2026-11-05: `OK soundcheck: 3000 frames, 62115 YM2151 writes (261 key-ons), 405 OKI commands, equal in both runs`.
+- `make listen`: Jesus's listening check, the one target that opens a window: `make check`, `-verifyroms`, then MAME on `build/roms` with sound, from an empty private state under `build/mame/listen/`, attract mode with its sound on (section 6). Never run by an agent.
+
+## 9. Not verified, open
+
+- The self-test path (402A-4112) cannot run in MAME 0.289 (section 1); it is code by the descent alone.
+- No immediate command (03, 06, 07, 08) was sent in the traced runs; their handlers are code by the descent. Running the 68010's sound-board test in MAME would trace them (M5).
+- That "SOUNDS IN ATTRACT" is bit 11 of FF94EE is inferred from the option table, not traced through the operator menu.
+- `ymtimer.asm` never runs (no command of type 10); whether any 68010 path sends such a command is M5's question.
+- `tbl_65DD`'s extent (9 bytes up to the first stream) is the space left, not a bound in the code.
+- 64tass 1.59 (CI) was not run locally on the new tree; the CI job assembles it.

@@ -132,6 +132,8 @@ Decision (M1b): **bank n at linear `(n+1)<<16 | 0x3000`, segment base 0.** IDA c
 
 Finding: in rev 6, all four bank pages (file 0x0000-0x3FFF) are zero bytes, so the bank scheme carries no code or data for this set; the 29 functions of section 5 are all in 4000-FFFF.
 
+Since M4a (docs/09-sound-program.md) the 6502 program is source in `asm/jsa/`, which carries every name of this snapshot (`tools/test_jsa.py` checks them against the source) and adds its own (`main_loop`, `dispatch_command`, the dispatch tables and their entries, neutral `sub_`/`loc_`/`tbl_`/`dat_` labels); the snapshot is unchanged and still round-trips. The write ports decode with the same mirror mask 01F9 as the read ports (`atarijsa2_map`); the program writes them at their base addresses only. Writing the source's names and comments into the database is a later leg (the IDA sync).
+
 ## 5. First numbers (2026-11-04, IDA 9.1, `make ida` from a clean `data/`)
 
 | Database | Functions | User names | Comments | Data items at names | Size |
