@@ -9,12 +9,13 @@
 -- trigger at 1020), then the trigger is pressed every 20 frames (5 frames down) so that the
 -- vehicle shoots. The yoke is left centred: the game keeps the vehicle in the tunnel.
 --
--- Level select (a scratch poke, not a game feature): the level is the word at 0xFF9578, with a
--- copy at 0xFF9556. The game clears both (clr.w at 0x02B95E and 0x02B964; 0xFF9578 also at
--- 0x024322); in 0x02543A a compiled-out debug switch at 0x025712 (`moveq #0,d1` at 0x0256FC selects case 0) would set them to 0Fh, 0Dh, 0Ch or 04h
--- (cases 1, 2, 4, 8 at 0x02572C-0x02581C). With LEVELS_START=N the script replaces every write
--- of 0 to either word by N (a write tap that returns the new value), and nothing else: the level
--- still advances when one is completed, and LEVELS_START=0 changes nothing.
+-- Level select (a poke, not a game feature; committed pending Jesus, CLAUDE.md section 5): the
+-- level is the word at 0xFF9578, with a copy at 0xFF9556. The game clears both (clr.w at 0x02B95E
+-- and 0x02B964; 0xFF9578 also at 0x024322); in 0x02543A a compiled-out debug switch at 0x025712
+-- (`moveq #0,d1` at 0x0256FC selects case 0) would set them to 0Fh, 0Dh, 0Ch or 04h (cases 1, 2, 4,
+-- 8 at 0x02572C-0x02581C). With LEVELS_START=N the script replaces every write of 0 to either word
+-- by N (a write tap that returns the new value), and nothing else: the level still advances when
+-- one is completed, and LEVELS_START=0 changes nothing.
 --
 -- Every object the ADSP loads starts with a /SIMCLK write of its number at PC 009E (docs/07
 -- section 2). The script taps that write and counts, per (object, level word at that moment), the
@@ -22,11 +23,12 @@
 -- value" header lines (frames, start level, the number of replaced writes, the first frame
 -- counted). Object numbers, levels, frames and counts only: no ROM or RAM contents.
 --
--- Attract mode is not counted: the attract demo goes on loading objects until frame 963, three
--- frames after the start press (94-99, 201 and 226 among them), and the level select already
+-- Attract mode is not counted: the attract demo goes on loading objects until frame 965, when
+-- the start button is released (94-99, 201 and 226 among them), and the level select already
 -- turns the level word to N there. Only loads from the first trigger press on (LEVELS_FROM,
--- frame 1020) are counted; no object is loaded from frame 964 to 1026 at any start level, and
--- the game's first load is at frame 1027 or later.
+-- frame 1020) are counted; no object is loaded from frame 966 to 1025 (start levels 0, 5 and
+-- 12 checked frame by frame), and the game's first load is at frame 1026 or later
+-- (tools/test_objects.py checks it on the runs in build/mame/).
 --
 -- LEVELS_SNAP=f1,f2,... also saves a snapshot (manager.machine.video:snapshot(), headless) at
 -- each of those frames into the -snapshot_directory (`make objlevels` gives each run its own,

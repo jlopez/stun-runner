@@ -604,6 +604,23 @@ def test_levels_summary_and_columns(tmp_path: Path) -> None:
     assert written["levels"] == summary["levels"]
 
 
+LEVEL_RUNS = sorted((REPO / "build/mame").glob("objlevels-[0-9][0-9].txt"))
+
+
+@pytest.mark.skipif(not LEVEL_RUNS, reason="no `make objlevels` runs in build/mame (MAME)")
+def test_level_runs_count_play_only() -> None:
+    """With `make objlevels` runs: each counts from frame 1020 (LEVELS_FROM), inside the gap
+    between the attract demo's last load (frame 965) and the game's first (docs/07 section 11.4:
+    1026 or later), and the committed summary is the summary of these runs."""
+    runs = [read_levels(p) for p in LEVEL_RUNS]
+    for run in runs:
+        assert run.header["counted_from"] == "1020", run.name
+        assert min(f for _, _, f, _ in run.rows) >= 1026, run.name
+    assert min(min(f for _, _, f, _ in run.rows) for run in runs) == 1026
+    committed = json.loads((REPO / "artifacts/objlevels-summary.json").read_text())
+    assert levels_summary(413, runs) == committed
+
+
 @pytest.mark.skipif(
     not IMAGE_68K.exists(), reason="build/stunrun-68k.bin absent (no reference set)"
 )
