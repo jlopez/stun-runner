@@ -98,6 +98,11 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   also checks the captures
   (`tools/test_displaylist.py`, which skips without them); the three lists committed under
   `artifacts/display-list/` are decoded and redrawn in CI.
+- `make fieldext` (needs MAME and the ROMs; never in CI): `tools/mame/fieldext.lua` counts, under
+  `-debug -debugger none` and from an empty private state (`build/mame/fieldstate`), the GSP's
+  ST FE0 at the image-quad corner read FFF49380 and at the SOM command loop FFF45010 over
+  `FIELD_FRAMES` attract frames, into `build/mame/fieldext.txt` (docs/08 section 4.4: the
+  corners are read zero-extended).
 
 ## 5. Coverage at the zero point (M1)
 

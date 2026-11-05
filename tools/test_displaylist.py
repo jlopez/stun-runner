@@ -31,6 +31,7 @@ from displaylist import (
     DisplayListError,
     Image,
     Segment,
+    adsp_slope,
     capture_window,
     compare,
     decode_gsp_buffer,
@@ -330,9 +331,9 @@ def test_image_quad_scaling():
 
 
 def test_image_quad_rejections():
-    """FFF49230-FFF49650: no image, p0.x >= 200h, p0.y >= 117h, p1.x left of p0.x, p2.y below
-    28h (FFF49510) or above p1.y (FFF49570), and, without FFF77E60 bit 4, a box 15Eh wide or C8h
-    high or more."""
+    """FFF49230-FFF49650: no image, p0.x >= 200h, p0.y >= 117h, p1.x left of p0.x (FFF493D0),
+    p2.y below 28h (FFF49510) or above p1.y (FFF49570), and, without FFF77E60 bit 4, a box 15Eh
+    wide or C8h high or more. The corners are read zero-extended: none is ever negative."""
     images = {3: PICTURE}
     rejected = {
         "no image": quad(100, 0x50, 105, 0x54, cmd=0x1005),
@@ -359,6 +360,19 @@ def test_image_quad_rejections():
                       images, False)
     assert {y for y in range(TOP, TOP + 240) for x in range(100, 106)
             if canvas.drawn[(y - TOP) * WIDTH + x]} == set(range(0x60, 0x69))
+    # the corners are 16-bit unsigned (field 0 zero-extended, ST FE0 = 0): a p1.x of FFF0h is
+    # never negative (the JRNN at FFF49390 is always taken), so the box is FF8Dh wide; only the
+    # 15Eh limit rejects it, and with bit 4 it is drawn, clipped by the window to x 100-1FFh
+    wide = quad(100, 0x50, 0xFFF0, 0x54)
+    assert not draw_image(Canvas(), wide, images, False)
+    canvas = Canvas()
+    assert draw_image(canvas, wide, images, True)
+    cols = {x for y in range(0x50, 0x55) for x in range(WIDTH)
+            if canvas.drawn[(y - TOP) * WIDTH + x]}
+    assert min(cols) == 100 and max(cols) == WIDTH - 1
+    # a "negative" p0.x or p0.y reads as 8000h or more and fails the 200h/117h tests
+    for c in (quad(0xFFF0, 0x50, 105, 0x54), quad(100, 0xFFF0, 105, 0x54)):
+        assert not draw_image(Canvas(), c, images, True)
     som = decode_som(encode_som([quad(100, 0x50, 105, 0x54), quad(0x200, 0x50, 0x205, 0x54)]))
     canvas = render(som, synthetic_colours(), images=images)
     assert canvas.images == 1 and sum(canvas.drawn) == 26
@@ -388,6 +402,19 @@ def test_committed_captures_decode_and_redraw(path):
     masked = bytes(p if d else 0 for p, d in zip(canvas.pixels, canvas.drawn, strict=True))
     assert sum(canvas.drawn) == expected["drawn"]
     assert zlib.crc32(masked) == expected["crc32_synthetic_colours"]
+
+
+def test_slopes_are_the_adsps_reciprocal_products():
+    """docs/08 section 1.3: every slope in the committed captures is adsp_slope(dx, dy) for some
+    |dx| <= 1FFh and dy 1-1FFh, and some are not trunc(dx * 10000h / dy) for any: the reciprocal
+    is truncated before the multiply (05F1, 0601-0603)."""
+    assert adsp_slope(1, 3) == 0x5554 and adsp_slope(37, 3) == 0x000C5524
+    assert adsp_slope(-1, 1) == -0x10000 and adsp_slope(-3, 0x41) == (-3 * 2 * 0x7E07) >> 6
+    seen = {v for path in committed() for c in decode_som(read_words(path)).commands
+            for s in c.segments for v in (s.right_slope, s.left_slope)}
+    pairs = [(dx, dy) for dx in range(-0x1FF, 0x200) for dy in range(1, 0x200)]
+    assert seen <= {adsp_slope(dx, dy) for dx, dy in pairs}
+    assert seen - {int(dx * 0x10000 / dy) for dx, dy in pairs}
 
 
 # --------------------------------------------------------------- `make somdump` captures (local)

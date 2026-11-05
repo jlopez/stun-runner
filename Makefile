@@ -29,7 +29,7 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
-	dasm oracle pcwatch objects objtrace somdump FORCE
+	dasm oracle pcwatch objects objtrace somdump fieldext FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -199,6 +199,19 @@ objtrace: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
 		-autoboot_script tools/mame/objtrace.lua
 	$(PYTHON) tools/objects trace --image $< --summary artifacts/objtrace-summary.json \
 		$(BUILD)/mame/objtrace-attract.txt $(BUILD)/mame/objtrace-play.txt
+
+# Are the image-quad corners read zero-extended (ST FE0 = 0 at FFF49380, docs/08 section 4.4)?
+# Breakpoints count the GSP's field-0 extension mode from an empty private NVRAM/cfg state (as
+# somdump); writes build/mame/fieldext.txt.
+FIELD_FRAMES ?= 3100
+
+fieldext:
+	rm -rf $(BUILD)/mame/fieldstate && mkdir -p $(BUILD)/mame/fieldstate/nvram \
+		$(BUILD)/mame/fieldstate/cfg
+	FIELD_DIR=$(BUILD)/mame/ FIELD_FRAMES=$(FIELD_FRAMES) $(MAME) stunrun -debug -debugger none \
+		$(MAME_FLAGS) -nvram_directory $(BUILD)/mame/fieldstate/nvram \
+		-cfg_directory $(BUILD)/mame/fieldstate/cfg -autoboot_script tools/mame/fieldext.lua
+	@cat $(BUILD)/mame/fieldext.txt
 
 # The SOM display list on its way from the ADSP to the GSP (docs/08-display-list.md):
 # tools/mame/somdump.lua captures, at each frame of SOM_ATTRACT (attract mode) and SOM_GAME (a game

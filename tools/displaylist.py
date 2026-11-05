@@ -80,6 +80,18 @@ class DisplayListError(ValueError):
     pass
 
 
+def adsp_slope(dx: int, dy: int) -> int:
+    """The slope `right_slope` (05DD) and `left_slope` (0607) write for a chain segment dx
+    across and dy (1-1FFh) down: MY0 = PM(1036 + dy) is floor(8000h/dy) for dy <= 40h and
+    floor(200000h/dy) above (reciprocal_table), the fractional multiply `MR = AR * MY0 (SU)`
+    (05F1/0601) doubles it, and above 40h `ASHIFT ... BY -6` (0602-0603) shifts the product right
+    arithmetically. About dx * 10000h / dy, but the reciprocal is truncated before the multiply:
+    dx = 1, dy = 3 gives 5554h, not 5555h."""
+    if dy <= 0x40:
+        return dx * 2 * (0x8000 // dy)
+    return (dx * 2 * (0x200000 // dy)) >> 6
+
+
 @dataclass(frozen=True)
 class Segment:
     offset: int  # word address of the first slope word
@@ -545,12 +557,15 @@ def read_images(data: bytes) -> dict[int, Image]:
 def draw_image(canvas: Canvas, c: Command, images: dict[int, Image], loose: bool) -> bool:
     """FFF48FC0: scale image cmd & 3Fh into the box from p0 to (p1.x, p2.y), 8 bits per pixel,
     pixel 0 transparent (CONTROL = E0h: T set). `loose` is FFF77E60 bit 4 (no size limits).
-    False when the GSP's checks reject it (FFF49230-FFF49650; it then only skips the words)."""
+    False when the GSP's checks reject it (FFF49230-FFF49650; it then only skips the words).
+    The corners are read with field 0 = 16 bits, zero-extended (ST FE0 = 0, MAME), so no corner
+    is ever negative: a "negative" p0.x or p0.y fails the 200h/117h tests, and a p1.x of 8000h
+    or more is a very wide box that only the 15Eh limit rejects (drawn, clipped, when loose)."""
     if len(c.points) < 3:
         return False
     img = images.get(c.cmd & 0x3F)
     (x0, y0), (x1, y1), (_, y2) = c.points[0], c.points[1], c.points[2]
-    width = x1 - x0 + 1 if not x1 & 0x8000 else -1
+    width = x1 - x0 + 1  # SUB A0,A1 (FFF493D0): rejected when x1 - x0 < 0, then INC
     height = y2 - y1 + 1
     ok = (img is not None and x0 < 0x200 and y0 < 0x117 and width > 0 and y2 >= TOP
           and height > 0 and (loose or (width < 0x15E and height < 0xC8)))
