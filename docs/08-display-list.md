@@ -129,16 +129,25 @@ FFFF FFFF                          0680 0682
 ```
 
 Written by `emit_image` (0663) for records whose type sets DM 0038 (docs/07). Four corners in
-every capture. The GSP uses the first point as the box's origin, the second's x and the third's y
-as its far corner (section 4.4).
+every capture. The GSP draws the box at the first point, the second's x - the first's x + 1
+pixels wide and the third's y - the second's y + 1 rows high (section 4.4); its far corner is
+(p1.x, p2.y) only when p1.y = p0.y.
 
 ### 1.5 The draw order (CODE, MAME)
 
 Every command gets a node in a doubly linked list in PM, sorted by a 32-bit key: `insert_depth_node`
 (07A2, called at 051D and 0672 before the command's body is written) takes the key from DM 08EA
-(the object's depth, set by the record reader at 01C3) shifted by DM 0033, plus the object's
-32-bit bias DM 0027/0028 from its list entry; the first object of the frame gets 10000000h
-(07B4-07B5). A node is six PM words at DM 0956 (+0/+1 key, +2/+3 links, +4 the object number
+shifted right arithmetically by DM 0033 (0516-051A, 066B-066F), plus the object's 32-bit bias
+DM 0027/0028 from its list entry (07B7-07BB); the first object of the frame (DM 0030 = 0) gets
+10000000h instead (07B4-07B5). DM 08EA is a value per polygon, not per object: the face loop
+(01A8-01E3, DM 0035 faces per record) calls 01E8 for every face, which clears it (01EA-01EB),
+reads the face's normal and first vertex and keeps that vertex's z when it is not negative
+(020A-020E); 01B0-01C1 copy each further vertex (x, y, z from DM 010A + its index) and keep the
+largest z (01BD-01BF), and 01C3 stores it. So the key is the face's largest vertex z, clamped at
+0, scaled by DM 0033 and biased by its object, and the table is sorted command by command, a
+painter's sort of faces, not of objects (CODE). MAME: neighbouring commands interleave in the
+table (game-f3000's first entries are the commands at words 993h, 9A3h, 98Dh, 929h, 943h, 919h),
+which one key per object, inserted in order, could not give. A node is six PM words at DM 0956 (+0/+1 key, +2/+3 links, +4 the object number
 DM 0108, +5 the value: DM 001E, the command's address - 1). The head is PM 123C, the tail PM 1242.
 `write_draw_order` (080B) walks head to tail and writes each node's value (0828), then FFFF.
 MAME: in every capture the table is a permutation of the commands (the decoder checks it), so
@@ -217,8 +226,13 @@ quads, FFF49460; bit 5 outlines without right edges, FFF45B50; bit 2 a debug ove
 CONTROL = C0h (window clipping, W = 3), then reads a command word, dispatches on its top nibble
 through `command_table` (FFF470E0, 16 longs) and loops (FFF46F90-FFF47040). Field 0 starts
 every list sign-extended (`read_list_header` leaves ST FE0 = 1, FFF4D990) until a handler resets
-it; the handlers that read 16-bit operands without their own SETF (1, 2, 3, 7, A, D) see the mode
-the commands before them left (section 4.4).
+it. 1, 2, 3, 7, A, B and D have no SETF of field 0 and keep the mode the commands before them
+left, but only some of their reads depend on it: 3 and D read 32-bit longs (`MOVE *A5+,An,1`:
+FFF47A20/FFF47A40, FFF4A630/FFF4A6D0); 2 keeps the low 16 bits of its x reads (`MOVY` over them
+at FFF480C0, FFF48100) and shifts its y reads left by 16; the polygon code of 7 does the same
+(section 4.4). What can depend on FE0 is the image quad's corners (command 1 and 7's bit-12
+commands, section 4.4) and A's step word (`MOVE *A5+,A6,0` at FFF49E10, added as 32 bits at
+FFF49F10).
 
 ### 3.2 The codes
 
@@ -336,11 +350,19 @@ The pattern COLOR1 (B9) decides which 2-bit pixels are written: FFFFFFFF (solid)
 after each row, so the stipple shifts two pixels per row: pixel x of a row is written when bit
 (2x mod 16) of the rotated pattern is set (MAME's FILL takes COLOR1's low 16 bits for every word,
 34010gfx.hxx:1797-1960; the patterns repeat every 8 bits, so the real chip's alternating halves
-would give the same result). The 25% fill is the shadow under the player's ship (game captures).
+would give the same result). The fill bits come only from the object: the record reader stores
+the record colour masked to 6 bits (019C-01A0), lighting builds bits 0-8 (0214-0236), and bits 8-11
+are DM 002F, the object list entry's bits 8-11 (0082-0084, docs/07), ORed in at 01CD-01CF, so an
+object is filled one way in all its faces (CODE). In the six game captures of section 5 only 3 or 5
+faces use fill 2, all colour 14h (a shadow under the player's ship, HYP); at frame 6303 of the same
+game run (`make somdump SOM_GAME=1000,2400,3000,3600,4200,4800,6300`, game-f6300: 109 25% and 219
+solid commands, redrawn equal on all 106496 pixels) the 109 fill-2 faces have 21 colours (13h-17h,
+85h-8Ch, B9h, E3h-ECh) and the snapshot shows the player's ship drawn stippled (MAME).
 
 ### 4.4 Outlines and image quads
 
-**Outline** (fill 3, or FFF77E60 bit 3; `draw_outline` FFF45800): the top row, then for each
+**Outline** (fill 3, or FFF77E60 bit 3 whatever the fill, colour byte 4 included: `BTST 3h,A13`
+at FFF45130 branches before the fill is read at FFF45150; `draw_outline` FFF45800): the top row, then for each
 segment of count n > 1 both edges as LINE 0 Bresenham lines from the current vertex by (dx, n - 1),
 dx = the integer part of slope * (n - 1) (MPYS with a 12-bit field, FFF45A80-FFF45AF0, no
 rounding), then the bottom row (FFF45BF0). `draw_edge_line` (FFF45C60) sets up LINE 0 (decision
@@ -354,8 +376,11 @@ exactly).
 
 **Image quad** (bit 12; `cmd_1_image_quad` FFF48FC0, also top-level command 1): PSIZE 8, CONTROL
 E0h (pixel 0 transparent), the image (command & 3Fh) from the table FFF78150 (loaded by command
-E0): height, width, then pixels from 60h bits on. The box is from point 0 to (point 1's x, point
-2's y); its height is point 2's y - point 1's y + 1 (FFF494E0-FFF495C0). Each axis is scaled by a
+E0): height, width, then pixels from 60h bits on. The box starts at point 0 (B2 = (p0.y, p0.x),
+FFF49350-FFF49370); it is p1.x - p0.x + 1 wide (`SUB A0,A1` FFF493D0, `INC A1` FFF49420) and
+p2.y - p1.y + 1 high (A0 = p1.y at FFF494E0, A2 = p2.y at FFF49500, `SUB A0,A2` FFF49570, `INC A2`
+FFF495C0; the rows run from p0.y, `DSJS A2` at FFF499C0), so its far corner is
+(p1.x, p0.y + p2.y - p1.y), which is (p1.x, p2.y) only when p1.y = p0.y. Each axis is scaled by a
 16.16 step (DIVU: image size << 16 / box size, FFF496E0, FFF49760) whose fraction accumulator
 starts at one step, not zero (FFF49710, FFF49790). The corners are read with field 0
 (`MOVE *A5+,An,0`, 16 bits), and the handler has no SETF of its own: whether they are sign- or
@@ -404,8 +429,10 @@ the image quads that are part of the 3D scene (sprites placed in the world, the 
 `tools/displaylist.py` implements section 4 instruction by instruction: the packed (y, x)
 arithmetic with carries, the half-pixel start, the V test that skips a row and its pattern
 rotation, the window, the expander's even/odd bytes (for FILL and LINE alike), the three patterns
-and their rotation, LINE 0 for outlines, and the image quad's scaling and checks, with its corners
-sign- or zero-extended as the buffer's commands before the 7 leave field 0 (section 4.4).
+and their rotation, LINE 0 for outlines, the skip of a bit-15 command (FFF450A0), the header word
+FFF77E60's bits 3 (every polygon an outline), 4 (no image size limits) and 5 (no right edges), and
+the image quad's scaling and checks, with its corners sign- or zero-extended as the buffer's
+commands before the 7 leave field 0 (section 4.4).
 `make somdump` captures, for each chosen frame:
 the page when the GSP reads the 7000 (before the list) and when it reads the word after the list
 (GSP read taps on those two command-buffer words; both reads are the dispatcher's `MOVE *A5+,A4,0`
@@ -454,9 +481,10 @@ redrawing. The expander's even/odd bytes, for fills and for outlines, rest on th
 `dither-f*` captures with their modified table: the game's own table gives no two-byte colour in
 any capture, so no frame the game draws shows a dither. **What it does not prove.** MAME is the oracle, not the board: where
 MAME's TMS34010 simplifies (FILL's COLOR1 halves, LINE's pixel colour) the redrawing follows MAME.
-The fill 1 pattern (75%), colour byte 4, a row skipped by the V test, bit 15 and commands 1, 2,
-6, A, B, C and E0 do not occur in the captures: their description is CODE only (the first three
-have synthetic CI tests of the renderer, which pin the code reading, not MAME). The colour table, the palette and the images are
+The fill 1 pattern (75%), colour byte 4, a row skipped by the V test, bit 15, FFF77E60 bits 3
+and 5 (word 11h is 0000 or 0010 in every capture) and commands 1, 2, 6, A, B, C and E0 do not
+occur in the captures: their description is CODE only (all but the commands have synthetic CI
+tests of the renderer, which pin the code reading, not MAME). The colour table, the palette and the images are
 inputs taken from MAME's memory; how they are loaded is M5d. "Changed" equals "drawn" in 11 of the 12
 captures; in attract-f1800 the list writes 81 pixels with the value they already had (drawn and
 equal, not changed). A pixel written so is invisible to the "missed" test.
@@ -477,8 +505,9 @@ attract-f3000's image quad: the test asserts it is the one command left undrawn.
 scaler (16.16 steps, the accumulators' start at one step, the transparent pixel, every rejection
 of section 4.4, the box limits with and without FFF77E60 bit 4), the stipple phase at an odd y,
 a row skipped by the V test (no rotation) against an empty row (rotated), colour byte 4 as 75%,
-the outline's odd-x pixels taking the high byte and the clamp of a command-5 window run in CI on
-synthetic inputs (`tools/test_displaylist.py`).
+a bit-15 command left undrawn beside a drawn one, FFF77E60 bit 3 (every fill an outline) and bit 5
+(outlines without right edges), the outline's odd-x pixels taking the high byte and the clamp of a
+command-5 window run in CI on synthetic inputs (`tools/test_displaylist.py`).
 
 ## 6. Open questions
 
@@ -493,5 +522,9 @@ synthetic inputs (`tools/test_displaylist.py`).
    start, 0x02E422/0x02E458 in `h_level2_adsp`; the /BR writes beside them are 0x02E0FA/0x02E1D4
    and 0x02E41C/0x02E45E), and line 2, set once at the ADSP restart (0x02C248) and at 0x02142C:
    no function in MAME (docs/06 section 9).
-6. Bit 15 of the command word, the 75% fill and colour byte 4: whether any object uses them (docs/07
-   can answer from the records).
+6. Bit 15 of the command word, the 75% fill and colour byte 4: whether anything produces them. The
+   fill is the object entry's bits 10-11 (0082-0084, 01CD-01CF), which the 68k builds from the
+   entity's +38h bits 3-4 (docs/07), so the 75% fill is a question for the 68k's entities (M5);
+   colour byte 4 is a lit record colour 0Fh at shade 4 ((0Fh + 1) << 4 | 4 = 104h, 0231-0235) or
+   an unlit 24h (021A-021F); nothing in 019C-01D0 or 0214-0236 sets bit 15 (HYP that it is never
+   produced).
