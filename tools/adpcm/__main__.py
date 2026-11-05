@@ -4,6 +4,7 @@
     tools/adpcm split  [--image build/stunrun-oki.bin] [--manifest data/oki/samples.json]
                        --out build/oki/wav
     tools/adpcm asm    [--manifest data/oki/samples.json] [--wav build/oki/wav] --out build/oki
+    tools/adpcm pcm    [--manifest data/oki/samples.json] [--wav build/oki/wav] --out build/oki/pcm
     tools/adpcm wav    IN.bin OUT.wav [--name NAME]
     tools/adpcm unwav  IN.wav OUT.bin
     tools/adpcm decode IN.wav OUT.wav
@@ -14,13 +15,17 @@
 
 info     checks the image against the manifest and prints the phrase table (numbers, names,
          addresses, lengths, durations, the chips each sample lies on).
-split    checks the image against the manifest and writes one WAV per phrase, NN-name.wav, the
-         sample's ADPCM bytes verbatim in a Dialogic OKI ADPCM WAV (format tag 0x0017).
+split    writes one WAV per phrase of the image's own phrase table, NN-name.wav (names from the
+         manifest), the sample's ADPCM bytes verbatim in a Dialogic OKI ADPCM WAV (format tag
+         0x0017), and removes any other *.wav in --out (a renamed phrase's old file). The
+         addresses are the image's, so a manifest edited for a relayout does not stop it.
 asm      reads NN-name.wav for every phrase of the manifest from --wav, recovers its bytes into
          <out>/bin/NN.bin and writes <out>/samples.asm, the vasm include asm/oki/samples.asm
          assembles (`make`): one labelled incbin per sample, cut at each chip boundary, asserts
          at every sample and chip boundary, the zero tail as dcb.b. Fails when a WAV is missing,
          not the format, or not the length the manifest gives.
+pcm      decodes NN-name.wav for every phrase of the manifest from --wav to 16-bit PCM in
+         --out (as decode) and removes any other *.wav there (`make oki-pcm`).
 wav      one sample's bytes -> its verbatim ADPCM WAV;  unwav  the inverse (the data chunk).
 decode   an ADPCM WAV (or a raw .bin) -> 16-bit PCM WAV, through MAME's M6295 decoder
          (okiadpcm.cpp), for listening and editing.
@@ -133,13 +138,47 @@ def cmd_info(args: argparse.Namespace) -> int:
     return 0
 
 
+def remove_stale(directory: Path, keep: set[str]) -> list[str]:
+    """Remove the *.wav files in directory that are not in keep (a renamed phrase's old WAV)."""
+    stale = sorted(f.name for f in directory.glob("*.wav") if f.name not in keep)
+    for name in stale:
+        (directory / name).unlink()
+    return stale
+
+
 def cmd_split(args: argparse.Namespace) -> int:
+    """One WAV per phrase of the image's own table, named from the manifest. The addresses come
+    from the image, not the manifest, so a manifest edited for a relayout (other lengths, built
+    from WAVs in another OKI_WAV_DIR) does not stop the split of the unchanged reference image;
+    `make check` and `tools/adpcm info` compare the image with the manifest."""
+    image = read_image(args.image)
+    if len(image) != IMAGE_SIZE:
+        raise FormatError(f"image is {len(image)} bytes, not {IMAGE_SIZE}")
+    names = {p.number: p.name for p in read_manifest(args.manifest).phrases}
+    _, spans = table_layout(image)
+    args.out.mkdir(parents=True, exist_ok=True)
+    keep = set()
+    for n, (s, e) in enumerate(spans, 1):
+        name = names.get(n, f"sample_{n:02d}")
+        keep.add(f"{n:02d}-{name}.wav")
+        (args.out / f"{n:02d}-{name}.wav").write_bytes(adpcm_wav(image[s : e + 1], name))
+    stale = remove_stale(args.out, keep)
+    print(f"{len(spans)} WAVs -> {args.out}" + (f" ({len(stale)} stale removed)" if stale else ""))
+    return 0
+
+
+def cmd_pcm(args: argparse.Namespace) -> int:
+    """Every phrase the manifest names, decoded to 16-bit PCM from its WAV in --wav (oki-pcm)."""
     layout = read_manifest(args.manifest)
-    samples = split(read_image(args.image), layout)
     args.out.mkdir(parents=True, exist_ok=True)
     for p in layout.phrases:
-        (args.out / f"{p.stem}.wav").write_bytes(adpcm_wav(samples[p.number], p.name))
-    print(f"{len(samples)} WAVs -> {args.out}")
+        wav = args.wav / f"{p.stem}.wav"
+        if not wav.exists():
+            raise FormatError(f"phrase {p.number}: {wav} absent")
+        (args.out / f"{p.stem}.wav").write_bytes(pcm_wav(decode(unwav(wav.read_bytes()))))
+    stale = remove_stale(args.out, {f"{p.stem}.wav" for p in layout.phrases})
+    print(f"{len(layout.phrases)} PCM WAVs -> {args.out}"
+          + (f" ({len(stale)} stale removed)" if stale else ""))
     return 0
 
 
@@ -170,7 +209,8 @@ def asm_source(layout: Layout, wav_dir: Path, bin_dir: str) -> tuple[str, dict[i
             raise FormatError(
                 f"{wav}: {len(data)} bytes, data/oki/samples.json says {p.length} for phrase "
                 f"{p.number} ({p.start:05X}-{p.end:05X}); a sample of another length needs the "
-                "manifest's addresses changed"
+                "manifest's addresses changed and the WAVs in a directory of your own "
+                "(make OKI_WAV_DIR=dir)"
             )
         samples[p.number] = data
         label = f"phrase_{p.number:02d}"
@@ -388,6 +428,11 @@ def main(argv: list[str] | None = None) -> int:
         help="the bin directory as the incbin statements name it (relative to asm/oki)",
     )
     p.set_defaults(func=cmd_asm)
+    p = sub.add_parser("pcm")
+    p.add_argument("--manifest", type=Path, default=MANIFEST)
+    p.add_argument("--wav", type=Path, default=REPO / "build/oki/wav")
+    p.add_argument("--out", type=Path, required=True)
+    p.set_defaults(func=cmd_pcm)
     for name, func in (("wav", cmd_wav), ("unwav", cmd_unwav), ("decode", cmd_decode),
                        ("encode", cmd_encode)):
         p = sub.add_parser(name)

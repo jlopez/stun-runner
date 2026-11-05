@@ -88,8 +88,11 @@ $(BUILD)/obj/%0.asm $(BUILD)/obj/%1.asm $(BUILD)/obj/%2.asm: $(OBJECT_DATA) $(OB
 # WAV per phrase in OKI_WAV_DIR: it recovers each sample's bytes from its WAV into
 # build/oki/bin/NN.bin and incbins them. The WAVs come from the merged image (tools/adpcm split
 # into build/oki/wav, the default OKI_WAV_DIR), so the image is byte-identical only if every
-# sample survived WAV and back. `make OKI_WAV_DIR=dir` builds from edited WAVs (same names, same
-# lengths as the manifest gives). Sample bytes, WAVs and decoded audio stay under build/.
+# sample survived WAV and back. `make OKI_WAV_DIR=dir` builds from edited WAVs (the manifest's
+# names; a sample of another length needs its start/end, and every later phrase's, moved in the
+# manifest). The split cuts the merged image by the image's own phrase table, never the
+# manifest's, so an edited manifest does not stop it. Sample bytes, WAVs and decoded audio stay
+# under build/.
 OKI_MANIFEST := data/oki/samples.json
 OKI_TOOLS := tools/adpcm/__init__.py tools/adpcm/__main__.py $(ROMSET_TOOLS)
 OKI_WAV_DIR ?= $(BUILD)/oki/wav
@@ -370,7 +373,8 @@ somdump: $(PROGRAMS)
 # the 6502's OKI, /WRIO and /MIX writes and its command dispatch, in three runs, each from its own
 # empty NVRAM and cfg: attract mode, a game (coin at 900, start at 960, the trigger every 20
 # frames) and attract mode with every OKI command written to the sound latch in turn (each after
-# command 02, which lifts the OKI mute that attract mode sets with 01), into
+# command 02, which clears RAM 1E: attract mode sets it with 01 and the OKI play handler
+# does nothing while it is nonzero), into
 # build/mame/okitrace-<run>.txt; then tools/adpcm survey rewrites data/oki/samples.json (the
 # table's layout, names kept, the commands that play each phrase by the 6502's tables, the starts
 # each run saw; commit it when it changes) and fails if MAME saw a phrase started by a command the
@@ -396,14 +400,12 @@ okitrace: $(OKI_RUNS:%=$(BUILD)/mame/okitrace-%.txt) $(BUILD)/$(SET)-oki.bin \
 	$(PYTHON) tools/adpcm survey --image $(BUILD)/$(SET)-oki.bin --jsa $(BUILD)/$(SET)-jsa.bin \
 		--manifest $(OKI_MANIFEST) $(OKI_RUNS:%=$(BUILD)/mame/okitrace-%.txt)
 
-# Every sample decoded to 16-bit PCM by MAME's M6295 decoder (tools/adpcm decode), at the rate
+# Every phrase the manifest names decoded to 16-bit PCM by MAME's M6295 decoder (tools/adpcm pcm;
+# a renamed phrase's old file is removed), at the rate
 # MAME plays them, into build/oki/pcm/NN-name.wav: for listening (Jesus's naming pass). Never
 # committed.
 oki-pcm: $(OKI_SPLIT)
-	@mkdir -p $(BUILD)/oki/pcm
-	@for w in $(OKI_WAV_DIR)/*.wav; do \
-		$(PYTHON) tools/adpcm decode $$w $(BUILD)/oki/pcm/$$(basename $$w) || exit 1; done
-	@echo "PCM WAVs -> $(BUILD)/oki/pcm"
+	$(PYTHON) tools/adpcm pcm --manifest $(OKI_MANIFEST) --wav $(OKI_WAV_DIR) --out $(BUILD)/oki/pcm
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms

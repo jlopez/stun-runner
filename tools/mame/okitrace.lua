@@ -29,7 +29,7 @@
 --   wrio <value> <count>        (pin 7 = bit 3, OKI reset = bit 2 low)
 --   mix <value> <count>
 --   dispatch <command> <count>  (every command the main loop dispatched)
---   muted <command> <count>     (OKI play commands dispatched while RAM 1E, the mute, is set)
+--   muted <command> <count>     (OKI play commands dispatched while RAM 1E is nonzero)
 -- PC is the 6502 address of the store (MAME's m6502 PC state holds the address of the
 -- instruction in progress; the opcode there is checked to be a store and "pc_unknown" counts
 -- the others). Command and effect are hex, "--" when none was read yet. Values written are the
@@ -118,7 +118,8 @@ OKITRACE_DISPATCH = program:install_read_tap(0x6100, 0x616C, "okitrace_d", funct
   effect = nil
   bump(dispatches, string.format("dispatch %02X", command))
   -- an OKI play command (handler type 13h) while RAM 1E is nonzero: the handler returns at
-  -- 5C01 without touching the OKI (1E is the mute that command 01 sets and 02 clears)
+  -- 5C01 without touching the OKI (command 01 sets 1E to F0, 02 clears it; 1E is also a
+  -- threshold on YM2151 paths, 44C8 and 4EE6, docs/10 section 4)
   if value == 0x13 and program:read_u8(0x1E) ~= 0 then
     bump(muted, string.format("muted %02X", command))
     muted_count = muted_count + 1
@@ -162,7 +163,7 @@ OKITRACE_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
     local k = (frame - INJECT_FROM) // INJECT_EVERY + 1
     local at = (frame - INJECT_FROM) % INJECT_EVERY
     if k <= #INJECT then
-      -- command 02 first (clears the OKI mute 0x1E that command 01 sets in attract mode), the
+      -- command 02 first (clears RAM 1E, which command 01 sets in attract mode and which stops the OKI play handler), the
       -- command itself four frames later, once the 6502 has taken 02 from the latch
       if at == 0 then m68k:write_u16(0x600000, INJECT_UNMUTE << 8) end
       if at == 4 then

@@ -23,12 +23,15 @@ phrase table as source.
   image by `tools/adpcm info`.
 - The 6502 asks for phrases 1-52 and no other: its OKI play handler (5BFE) takes the phrase
   from a 53-entry effect table at 6532 that holds each of 1-52 (effects 0 and 1 both play
-  phrase 1), and every effect is reached by a sound command (05, 38-65, 67-6C; 66 stops phrase
-  42). **CODE**. MAME saw each of the 52 phrases start by exactly the command the tables give,
-  16 of them in a played game; attract mode starts none (the 68k mutes the OKI there).
+  phrase 1), and every effect is reached by a sound command (05, 38-65, 67-6C). Command 66 is
+  the stop handler (5C6F), whose parameter is a phrase number, not an effect: it stops phrase 48
+  (the phrase of command 65). **CODE, MAME**. MAME saw each of the 52 phrases start by exactly
+  the command the tables give, 16 of them in a played game; attract mode starts none (the 68k
+  sends command 01, which sets RAM 1E, and the play handler does nothing while 1E is nonzero).
   **MAME**
 - MAME plays the samples at 3.579545 MHz / 3 / 165 = 7231.4 Hz, not / 132: JSA II's /WRIO bit 3
-  drives the M6295's pin 7, and the 6502 only ever writes 00, 01 or 05 there. **SRC, MAME**
+  drives the M6295's pin 7 (**SRC**), and in the three okitrace runs /WRIO only took the values
+  00, 01 and 05 (**MAME**). The code alone does not rule out bit 3 (section 2).
 - `tools/adpcm` keeps each sample as a WAV whose data chunk is the sample's ADPCM bytes
   verbatim (format tag 0x0017, Dialogic OKI ADPCM, 4 bits, high nibble first), so WAV -> bytes
   is a copy. `make` goes image -> WAVs -> bytes -> vasm, and `make check` is byte-identical
@@ -53,9 +56,13 @@ Citations are `file:line` under `~/.local/src/mame/src/`.
   (`:509`) on every write, and `set_pin7` re-derives the stream rate as
   `clock() / (m_pin7_state ? 132 : 165)` (`devices/sound/okim6295.cpp:168`, `:202`). The 6502
   writes /WRIO at 4007, 400C, 4011, 409D, 40AD, 40BD, 40CD, 411E, 5903, 5BB0, 5BB7 and 5DA9
-  (**CODE**), and the MAME runs saw only the values 00, 01 and 05 (section 4): bit 3 is never
-  set, so MAME plays every sample at 1,193,181.67 / 165 = **7231.40 Hz** (9039.26 Hz with pin
-  7 high). Whether the real board's pin 7 follows /WRIO bit 3 with the same polarity is MAME's
+  (**CODE**), and the MAME runs saw only the values 00, 01 and 05 (section 4): bit 3 was never
+  set in them, so MAME played every sample at 1,193,181.67 / 165 = **7231.40 Hz** (9039.26 Hz
+  with pin 7 high). That is an observation, not a property shown from the code: most sites
+  cannot set bit 3 (the self-test path ORs 40, 80 or C0 into RAM 45 at 40A9-40CD, 5DA3-5DA9
+  toggles bits 5-4), but 58FA-5903 ORs the table byte 65E1+X into RAM 45, with X from RAM 4E
+  (58D9, stored at 5888 from Y on entry to 5869), and some bytes of that table have bit 3 set.
+  Which X that path can take is not shown here (the 6502 leg, docs/09). Whether the real board's pin 7 follows /WRIO bit 3 with the same polarity is MAME's
   claim (its comment calls bit 3 "voice frequency"); nothing here checks the hardware.
 - **Commands.** `okim6295_device::write` (`okim6295.cpp:232`): a byte with bit 7 set starts a
   command whose low 7 bits are the phrase number; the next byte's high nibble selects the
@@ -156,7 +163,8 @@ starts = how many times each MAME run saw the 6502 start the phrase):
 (4171-4186) and calls the dispatcher at 4371 with Y = the command: commands 6D and up are
 ignored (`CPY #$6D`), the handler type is 6100+Y (21 types, jump table at 472F, pushed for an
 RTS), the handler's parameter 616D+Y. Type 13h is the OKI play handler at 5BFE, type 14h the
-OKI stop handler at 5C6F; both take an **effect** number as parameter. Per effect, three tables
+OKI stop handler at 5C6F. The play handler's parameter is an **effect** number, the stop
+handler's a **phrase** number (below). Per effect, three tables
 of 53 bytes: 6532 the phrase, 6567 the voice (bits 5-4), the attenuation (bits 3-0) and a
 "do not interrupt" flag (bit 7), 659C a level the handler stores per voice (5C59) and turns into
 the YM2151 volume of /MIX (5C87-5CB4, the music ducks under the samples).
@@ -165,17 +173,30 @@ The play handler (5BFE-5C62): returns at once when RAM 1E is nonzero (5BFE); pic
 from 6567; if the voice is playing (status at 2808) an effect whose 6567 bit 7 is set, returns
 (5C1C-5C21); otherwise stops the voice (stop byte 5C6B+X, 5C26) and waits until the status shows
 it stopped, then writes 80h | phrase (5C48) and attenuation | voice bit 5C63+X (5C53). The stop
-handler (5C6F) stops the voice whose current effect plays the effect's phrase.
+handler (5C6F-5C86) compares its parameter itself with a phrase: for X = 3 down to 0 it loads the
+voice's last effect from RAM 52+X (5C73) and compares A with that effect's phrase, 6532+Y (5C75);
+nothing converts the parameter through 6532. On the first match it writes the stop byte 5C6B+X
+to the OKI (5C7F-5C82) and returns, so it stops at most one voice, the highest-numbered one whose
+last effect plays that phrase.
 
 Commands of type 13h: 05 (effect 0) and 38-6C except 66 (effects 1-52, in an order that is not
-the phrase order, see the table above); 66 is type 14h on effect 48 (phrase 42). The 53 effects
+the phrase order, see the table above); 66 is type 14h with parameter 48 (616D+66), read as
+phrase 48: it stops the voice of command 65 (effect 46, phrase 48, voice 2 by 6567), not that
+of effect 48 (phrase 42, voice 3). MAME agrees: the one stop at 5C82 in the `inject` run has
+voice mask 4 (voice 2, where command 65 started phrase 48 in that run); phrase 42 started there
+on voice mask 8 (voice 3). The 53 effects
 name every phrase 1-52 and nothing else. `tools/adpcm survey` reads these tables
 (JSA_TYPES/JSA_PARAMS/JSA_EFFECT_PHRASE in tools/adpcm/__main__.py) into the manifest's
 `commands`.
 
-**The mute.** Command 01 (type 0, parameter 3C) runs 438A, which stores 3C << 2 = F0 into RAM
-1E; command 02 (parameter 0) stores 0. While 1E is nonzero the play handler returns without
-touching the OKI.
+**RAM 1E.** Command 01 (type 0, parameter 3C) runs 438A, which stores 3C << 2 = F0 into RAM
+1E; command 02 (parameter 0) stores 0; 412B clears it at init. The OKI play handler treats any
+nonzero value as a mute: it returns without touching the OKI (5BFE-5C01). 1E is not only an OKI
+switch, though: two YM2151 paths compare against it as a threshold, 44C5-44CC (a byte of the
+table 65E0+Y below 1E returns, otherwise it jumps to 5869) and 4EE6 (the byte at RAM 088E below
+1E skips the path whose key-on writes are at 4ED3-4EDF). So with 1E = F0 some YM2151 events are
+suppressed too. What 1E is (a level or priority floor) is named by the 6502 leg (docs/09); here
+it is "RAM 1E" and "muted" means only that the OKI play handler returned at 5C01.
 
 **The MAME runs** (`make -j3 okitrace`, tools/mame/okitrace.lua, each from an empty private
 NVRAM and cfg). The script taps the 6502's writes to 2A00-2BFF (OKI, /WRP, /WRIO, /MIX) and its
@@ -192,7 +213,7 @@ handler read, not guessed from timing; it records no ROM byte.
 In all three runs /WRIO took only the values 00, 01, 05 (pin 7 low throughout), /MIX 07-0F (the
 OKI volume bit set, the YM2151 volume ducked by the handler), every phrase start's second byte
 was written at 5C53, every stop at 5C26 (the play handler stopping the voice it is about to use)
-except one at 5C82 (command 66, the stop handler). Each of the 52 phrases started in the
+except one at 5C82 (command 66, the stop handler, on voice mask 4: phrase 48's voice). Each of the 52 phrases started in the
 `inject` run under exactly the command and effect the tables give.
 
 The attribution check: `tools/adpcm survey` fails if any run saw a phrase started by a command
@@ -221,9 +242,10 @@ that carries its ADPCM bytes verbatim.
   tag other than 0x0017, not mono, not 4 bits, block align not 1, no or several `fmt `/`data`
   chunks, a chunk running past the RIFF body, a `fact` count that is not twice the data
   length; it skips chunks it does not know (an editor may add some).
-- **The build** (`Makefile`, docs/04 section 1): `tools/adpcm split` checks
-  `build/stunrun-oki.bin` against the manifest (every table entry, the zero tail) and writes
-  `build/oki/wav/NN-name.wav`; `tools/adpcm asm` reads `$(OKI_WAV_DIR)/NN-name.wav` for every
+- **The build** (`Makefile`, docs/04 section 1): `tools/adpcm split` cuts
+  `build/stunrun-oki.bin` by the image's own phrase table (names from the manifest) into
+  `build/oki/wav/NN-name.wav` and removes any other WAV there (a renamed phrase's old file);
+  `tools/adpcm info` and `make check` compare the image with the manifest; `tools/adpcm asm` reads `$(OKI_WAV_DIR)/NN-name.wav` for every
   phrase (default `build/oki/wav`), recovers the bytes into `build/oki/bin/NN.bin` (failing on
   a missing WAV, a malformed one, or a length other than the manifest's) and writes
   `build/oki/samples.asm`; `asm/oki/samples.asm` (committed) is the phrase table as `dc.b`
@@ -234,8 +256,11 @@ that carries its ADPCM bytes verbatim.
   every `make` (make 3.81 compares whole-second mtimes; an edit in the same second must count).
 - **Editing.** `make OKI_WAV_DIR=dir` builds from a directory of edited WAVs (the same file
   names; copy `build/oki/wav` there first). A sample of another length needs the manifest's
-  start/end changed (the asserts and `tools/adpcm asm` say so); the tail then absorbs the
-  difference, within the 256 KB.
+  start/end changed, for that phrase and every later one (the asserts and `tools/adpcm asm`
+  say so), and its WAVs in a directory of your own: the split still cuts the reference image by
+  its own table into `build/oki/wav`, which then no longer matches the manifest. The tail
+  absorbs the difference, within the 256 KB. `tools/test_build.py` builds such a relayout
+  through `make`.
 - **Proof.** `make check`: 25 files, 0 differences, with the OKI image built through the 52
   WAVs. `tools/test_build.py` (CI, synthetic set: the manifest's table over random sample
   bytes) changes one data byte of phrase 2's WAV and `bytecheck` reports exactly
@@ -249,8 +274,9 @@ that carries its ADPCM bytes verbatim.
 
 `tools/adpcm decode IN.wav OUT.wav` writes 16-bit mono PCM at 7231 Hz: the 12-bit decoder
 output shifted left by 4 (MAME's stream divides by 2048: the same scale), at full volume (the
-attenuation is a play-time choice of the 6502, section 4). `make oki-pcm` decodes every WAV of
-`OKI_WAV_DIR` into `build/oki/pcm/` for listening.
+attenuation is a play-time choice of the 6502, section 4). `make oki-pcm` (`tools/adpcm pcm`)
+decodes the WAV of every phrase the manifest names from `OKI_WAV_DIR` into `build/oki/pcm/` for
+listening, and removes any other WAV there, so a rename leaves no copy under the old name.
 
 **The decoder is MAME's.** Two independent checks, both in `tools/test_adpcm.py`:
 
@@ -292,7 +318,7 @@ plays each sample; naming those commands is the 6502 leg's (docs/09).
 | `tools/adpcm info` | the table, checked against the image |
 | `tools/adpcm split --out dir` | one verbatim ADPCM WAV per phrase |
 | `tools/adpcm wav` / `unwav` | one sample's bytes to its WAV and back |
-| `tools/adpcm decode in.wav out.wav`, `make oki-pcm` | 16-bit PCM for listening |
+| `tools/adpcm decode in.wav out.wav`, `make oki-pcm` (`tools/adpcm pcm`) | 16-bit PCM for listening |
 | `tools/adpcm encode`, `tools/adpcm encoder-check` | the greedy encoder (section 6) |
 | `make -j3 okitrace` | the three MAME runs, then `tools/adpcm survey` rewrites the manifest |
 

@@ -25,8 +25,8 @@ import sys
 from pathlib import Path
 
 import pytest
+from adpcm import adpcm_wav, read_manifest, unwav
 from adpcm import build as build_oki
-from adpcm import read_manifest
 from objects import checksum_address, encode, place, read_data
 from romset import IMAGES, compare, layout, load_snapshot, merge, split
 from test_programs import plant_programs
@@ -195,6 +195,68 @@ def tool(env: str, default: str) -> str | None:
     return shutil.which(os.path.expanduser(os.environ.get(env, default)))
 
 
+OKI_FILES = ["136070-2124.1fh", "136070-2125.1ef", "136070-2126.1de", "136070-2127.1cd"]
+
+
+def bump(path: Path, seconds: int) -> None:
+    """Move path's mtime into the future (make 3.81 on macOS compares whole seconds)."""
+    later = path.stat().st_mtime + seconds
+    os.utime(path, (later, later))
+
+
+def check_oki_relayout_and_rename(
+    work: Path, make: list[object], env: dict[str, str], files: dict[str, bytes]
+) -> None:
+    """The two manifest edits docs/10 section 5 and 7 document, through make: a sample of
+    another length (the manifest's addresses moved, the WAVs in an OKI_WAV_DIR of their own) and
+    a rename (no WAV left under the old name in build/oki/wav or build/oki/pcm)."""
+    manifest = work / "data/oki/samples.json"
+    original = manifest.read_text()
+    doc = json.loads(original)
+    wavs = work / "build/oki/wav"
+    # relayout: phrase 1 one byte longer, every later phrase one byte later
+    relaid = work / "relaid-wavs"
+    shutil.copytree(wavs, relaid)
+    first = doc["phrases"][0]
+    one = relaid / f"01-{first['name']}.wav"
+    one.write_bytes(adpcm_wav(unwav(one.read_bytes()) + b"\x5a", first["name"]))
+    for i, p in enumerate(doc["phrases"]):
+        start, end = int(p["start"], 16) + (i > 0), int(p["end"], 16) + 1
+        p.update(start=f"{start:05X}", end=f"{end:05X}", length=end - start + 1)
+    manifest.write_text(json.dumps(doc))
+    bump(manifest, 5)
+    r = run(*make, f"OKI_WAV_DIR={relaid}", "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    layout = read_manifest(manifest)
+    samples = {
+        p.number: unwav((relaid / f"{p.stem}.wav").read_bytes()) for p in layout.phrases
+    }
+    built = b"".join((work / "build/roms/stunrun" / n).read_bytes() for n in OKI_FILES)
+    assert built == build_oki(layout, samples)
+    assert built != b"".join(files[n] for n in OKI_FILES)
+    # rename: phrase 3 under another name, then back; build/oki/wav and build/oki/pcm keep one
+    # WAV per phrase, under the current name
+    doc = json.loads(original)
+    old = doc["phrases"][2]["name"]
+    doc["phrases"][2]["name"] = "renamed_03"
+    manifest.write_text(json.dumps(doc))
+    bump(manifest, 10)
+    r = run(*make, "all", "oki-pcm", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    for directory in (wavs, work / "build/oki/pcm"):
+        names = sorted(f.name for f in directory.glob("03-*.wav"))
+        assert names == ["03-renamed_03.wav"], names
+        assert len(list(directory.glob("*.wav"))) == len(doc["phrases"])
+    manifest.write_text(original)
+    bump(manifest, 15)
+    r = run(*make, "all", "oki-pcm", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    for directory in (wavs, work / "build/oki/pcm"):
+        assert sorted(f.name for f in directory.glob("03-*.wav")) == [f"03-{old}.wav"]
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+
+
 @pytest.mark.skipif(
     tool("VASM", "vasmm68k_mot") is None or tool("TASS", "64tass") is None,
     reason="vasm or 64tass not available",
@@ -332,6 +394,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert r.returncode == 0, r.stdout + r.stderr
     r = run(sys.executable, work / "tools/bytecheck", env=env)
     assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+    check_oki_relayout_and_rename(work, make, env, files)
     # an edited mesh reaches the object ROMs: the vertex's x word and its page's checksum word,
     # both on page 0 (the low bytes, chip 90k), and nothing else in the 25 files
     obj = images["stunrun-obj"]

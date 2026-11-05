@@ -44,8 +44,9 @@ start level 0-23 loads (docs/07 section 11.4), `make pictures` redraws the objec
 `tools/objects/viewer.html` (docs/07 section 11.5).
 
 Since M4b the OKI image goes through one WAV per sample (docs/10-adpcm.md): `tools/adpcm split`
-checks `build/stunrun-oki.bin` against `data/oki/samples.json` (the phrase table, the zero
-tail) and writes `build/oki/wav/NN-name.wav`, each a WAV whose data chunk is the sample's ADPCM
+cuts `build/stunrun-oki.bin` by the image's own phrase table (names from `data/oki/samples.json`;
+`tools/adpcm info` and `make check` compare the image with the manifest) into
+`build/oki/wav/NN-name.wav`, removing any other WAV there, each a WAV whose data chunk is the sample's ADPCM
 bytes verbatim; `tools/adpcm asm` reads the WAVs of `OKI_WAV_DIR` (default `build/oki/wav`),
 recovers the bytes into `build/oki/bin/NN.bin` and writes `build/oki/samples.asm`, which
 `asm/oki/samples.asm` (the phrase table as `dc.b`, computed from the samples' labels) includes:
@@ -54,7 +55,8 @@ byte-identical only if every sample survived WAV and back. The WAV step and the 
 run on every `make` (cheap), so an edited WAV is never hidden by the whole-second mtimes of make
 3.81; `make OKI_WAV_DIR=dir` builds from edited WAVs. `make okitrace` (`-j3`: three MAME runs of
 `tools/mame/okitrace.lua`) records what the 6502 tells the OKI and rewrites the manifest's play
-evidence; `make oki-pcm` decodes every WAV to 16-bit PCM under `build/oki/pcm/` for listening.
+evidence; `make oki-pcm` decodes every phrase the manifest names to 16-bit PCM under `build/oki/pcm/` for
+listening (other WAVs there are removed, so a rename leaves no stale copy).
 Sample bytes, WAVs and PCM stay under `build/`.
 
 `make` (= `make all`) runs the three steps. The images are rebuilt only when the layout tools or the snapshot change (`make clean` re-reads the archive); the trees reassemble when their sources or blobs change; the split always runs (cheap, and make 3.81 on macOS compares whole-second mtimes, so a stamp could hide a reassembly in the same second).
