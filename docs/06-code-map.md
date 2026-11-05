@@ -404,8 +404,12 @@ list at FFFCFC10); MAME's speedup sits on exactly this loop (`init_stunrun`, har
 GSP clears its flag and sets INTOUT, which is the 68k's level-3 interrupt (`h_level3_gsp` clears
 it). The frame counter FFF716A0 is incremented by `display_interrupt` (FFF41C00, trap vector 10,
 DI), at FFF41F80. Of the 32 trap vectors, 0 (reset) is FFF59920, 10 is FFF41C00, 29 is FFF45FC0
-(`trap29_delay`, a busy wait) and the other 29 are FFF40000. The command format, who fills the
-buffers (HYP: the 68k through the host port), and what sections 1 and 2 hold are M5d/M6.
+(`trap29_delay`, a busy wait) and the other 29 are FFF40000. The 68k fills the
+buffers through the host port, copying the SOM list verbatim as command 7000 among its own
+commands (docs/08 section 2, MAME: in every `make somdump` capture the bank rebuilt from the
+ADSP's writes equals what the 68k reads at 810000, and the buffer's code-7 command equals it);
+the command set is docs/08 section 3. The rest of the buffer header and what sections 1 and 2
+hold are M5d/M6.
 
 ## 7. Does 68k code run from RAM? No (MAME)
 
@@ -462,8 +466,9 @@ the CPUs (harddriv_m.cpp:595-601).
 1. The object list entry format at DM 0A00 and the object ROM pointer (`read_object_pointer`
    shifts the /SIMBUF word left by 2 into a page and an address: is the pointer in units of four
    words?) and the record types behind the table at PM 0187 (M3).
-2. The SOM display list: header words written at 00BB-00C0, the end marker FFFF at 00B5, the
-   routine 080B (M3).
+2. The SOM display list: answered by docs/08 sections 1 and 2 (the header words written at
+   00BB-00C0, the FFFF at 00B5 that ends the commands, `write_draw_order` 080B and the frame
+   protocol); what it leaves open is docs/08 section 6.
 3. GSP sections 1 and 2: confirm the `.cinit` reading of section 1 by decoding FFF59C70 (M6), and
    the command-buffer format at FFF9FC10/FFFCFC10 and its writer (M5d).
 4. The packed image format of pairs U-V, and when the images of 0x09F1C5-0x0B10EB (table entries

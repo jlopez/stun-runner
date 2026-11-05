@@ -43,7 +43,10 @@
 -- table the SOM polygons index, GSP FFF452D0) as lo | (lo ^ 80h) << 8: the game's own table has
 -- equal bytes in every word, and this makes the expander's even/odd byte rule visible in the
 -- page (docs/08 section 4.3). The GSP only reads the table, so the game runs as without it. It
--- exits after the last capture. Everything here is runtime RAM state.
+-- exits after the last capture. The SOM banks, ADSP data RAM, the colour table and the GSP
+-- buffer are runtime RAM state; images.bin is ROM-derived, and fb*.bin and the snapshots hold
+-- pages those images were drawn into. All of it stays under build/: only the bare SOM list (a
+-- .som, through tools/displaylist.py --export) is ever committed.
 
 local OUT = os.getenv("SOM_DIR") or "./"
 local PLAY = os.getenv("SOM_PLAY") == "1"

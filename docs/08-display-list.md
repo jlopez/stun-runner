@@ -17,8 +17,9 @@ become a projected polygon.
   command, FFFF (section 1). Every word of 12 captured lists (attract mode and a game, `make
   somdump`) is accounted for by the decoder, and MAME's own write log (the ADSP PC of every
   SOMLATCH write) assigns each field to the instruction section 1 names (MAME).
-- After the ADSP flips the bank, the 68k copies the list verbatim through the GSP host port into
-  one of two GSP command buffers, as command 7000 among its own commands (section 2, MAME).
+- When the ADSP signals the list complete (/GINT, 00C1), the 68k flips the bank (ADSP control
+  line 3, 0x02C3FA/0x02C408) and copies the list verbatim through the GSP host port into one of
+  two GSP command buffers, as command 7000 among its own commands (section 2, MAME).
 - The GSP's command interpreter has 16 command codes (section 3); code 7 walks the table and fills
   each polygon span by span through the 2 bpp expander (whose even and odd pixels take the two
   bytes of the colour word), with stipple patterns, outlines and scaled images (section 4).
@@ -101,9 +102,16 @@ the rightmost top vertex, 052B-0544), then walks the two chains down. Each segme
 vertex of either chain (057A: both, 059D: the left one first, 05B7: the right one first) and
 recomputes the slope of the chain that turned: `right_slope` (05DD) and `left_slope` (0607) give
 `dx * PM(1036 + dy)`, where PM 1036-1235 (`reciprocal_table`, the loaded record 1036/200) holds
-8000h/dy for dy <= 40h and 200000h/dy above; the ADSP's fractional multiply doubles the product
-and dy > 40h shifts it right by 6 (0602), so the slope is `dx * 10000h / dy`, a signed 16.16 x
-step per row, truncated. The count is dy + 1 (057D-057E); the segment advances count - 1 rows
+floor(8000h/dy) for dy <= 40h and floor(200000h/dy) above; the ADSP's fractional multiply
+(`MR = AR * MY0 (SU)`, 05F1/0601 and 061B/062B) doubles the product and dy > 40h shifts it right
+arithmetically by 6 (0602-0603). The slope, a signed 16.16 x step per row, is therefore
+`dx * 2*floor(8000h/dy)` for dy <= 40h and `(dx * 2*floor(200000h/dy)) >> 6` above: about
+`dx * 10000h / dy`, but with the reciprocal truncated before the multiply, so the low bits
+differ whenever 8000h/dy (200000h/dy) is not exact (dx = 1, dy = 3 gives 5554h, not 5555h;
+`adsp_slope` in `tools/displaylist.py`). Every one of the 468 distinct slopes in the committed
+captures is this formula's for some dx and dy, and 264 of them are not `trunc(dx * 10000h / dy)`
+for any (`test_slopes_are_the_adsps_reciprocal_products`; game-f3000's command at word 000D has
+000C5524h = 37 * 5554h, dy = 3). The count is dy + 1 (057D-057E); the segment advances count - 1 rows
 (section 4.1). A slope is two words, low word first, as the GSP reads a 32-bit field (FFF45510:
 `MOVE *A5+,A8,1`).
 
@@ -346,9 +354,16 @@ E0h (pixel 0 transparent), the image (command & 3Fh) from the table FFF78150 (lo
 E0): height, width, then pixels from 60h bits on. The box is from point 0 to (point 1's x, point
 2's y); its height is point 2's y - point 1's y + 1 (FFF494E0-FFF495C0). Each axis is scaled by a
 16.16 step (DIVU: image size << 16 / box size, FFF496E0, FFF49760) whose fraction accumulator
-starts at one step, not zero (FFF49710, FFF49790). Boxes are rejected (FFF49230-FFF49650) when
-the image is missing (FFF49230), point 0's x >= 200h (FFF49280) or its y >= 117h (FFF492F0),
-point 1's x is negative (FFF49380) or left of point 0's (`SUB A0,A1`, FFF493D0), point 2's y is
+starts at one step, not zero (FFF49710, FFF49790). The corners are read with field 0
+(`MOVE *A5+,An,0`), 16 bits zero-extended: ST FE0 is 0 (`SETF 10h,0,0`, FFF40000 and the other
+handlers; MAME: `make fieldext`, `tools/mame/fieldext.lua`, counts 0 hits with FE0 = 1 and 83h
+with FE0 = 0 at FFF49380 over attract frames 0-3100, last ST 00200010, and 0 against 2274Ch at
+the SOM command loop FFF45010), so no corner is ever negative. Boxes are rejected
+(FFF49230-FFF49650) when the image is missing (FFF49230), point 0's x >= 200h (FFF49280) or its
+y >= 117h (FFF492F0) (a "negative" p0.x or p0.y reads as 8000h or more and is rejected here),
+point 1's x is left of point 0's (`SUB A0,A1`, FFF493D0; the `JRNN` after the read at FFF49390
+is always taken, and a p1.x of 8000h or more is a very wide box that only the 15Eh limit
+rejects, so with bit 4 it is drawn, clipped by the window), point 2's y is
 below 28h (`CMPI 28h,A2`, FFF49510) or above point 1's y (`SUB A0,A2` with A0 = point 1's y
 from FFF494E0, FFF49570; the height is p2.y - p1.y + 1), or (without FFF77E60 bit 4) the box is
 15Eh wide or C8h high or more (FFF49480, FFF495F0). The text panel of the attract
