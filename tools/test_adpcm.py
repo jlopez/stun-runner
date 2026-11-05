@@ -42,7 +42,7 @@ from adpcm import (
     split,
     unwav,
 )
-from adpcm.__main__ import asm_source, chips, jsa_commands, read_trace, table_layout
+from adpcm.__main__ import asm_source, chip_label, chips, jsa_commands, read_trace, table_layout
 
 TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
@@ -306,14 +306,73 @@ def test_asm_source_cuts_at_chip_boundaries(tmp_path: Path) -> None:
         asm_source(layout, tmp_path, "bin")
 
 
+def shifted_layout(number: int, grow: int) -> Layout:
+    """The committed layout with phrase `number` grown by `grow` bytes and the rest moved up."""
+    layout = read_manifest(MANIFEST)
+    phrases = [
+        p if p.number < number
+        else Phrase(p.number, p.name, p.start, p.end + grow) if p.number == number
+        else Phrase(p.number, p.name, p.start + grow, p.end + grow)
+        for p in layout.phrases
+    ]
+    return Layout(layout.entries, phrases)
+
+
+def boundary_layout() -> Layout:
+    """Phrase 11 starts at 10000 (the first byte of the second ROM file), phrase 52 ends at
+    3FFFF: the relayout of a sample grown by 856 bytes."""
+    layout = read_manifest(MANIFEST)
+    p11 = layout.phrases[10]
+    out = shifted_layout(10, 0x10000 - p11.start)
+    assert out.phrases[10].start == 0x10000 and out.tail == 0x40000
+    return out
+
+
+def test_asm_source_labels_a_file_starting_at_a_sample(tmp_path: Path) -> None:
+    layout = boundary_layout()
+    samples = synthetic_samples(layout, 11)
+    for p in layout.phrases:
+        (tmp_path / f"{p.stem}.wav").write_bytes(adpcm_wav(samples[p.number], p.name))
+    text, _ = asm_source(layout, tmp_path, "bin")
+    for address, name in chips()[1:]:
+        assert f"{chip_label(name)}:\n\tassert\t*=${address:05X},\"{name} misplaced\"" in text
+    # the file at the sample's start is labelled before the whole-sample incbin, not split
+    first = chip_label(chips()[1][1])
+    assert f'{first}:\n\tassert\t*=$10000,"{chips()[1][1]} misplaced"\n\tincbin\t"bin/11.bin"\n' \
+        in text
+    assert text.count("\tincbin\t") == 52 + 2
+    assert text.rstrip().endswith("\tdcb.b\t$0,0")
+
+
+def test_asm_source_refuses_a_file_in_the_zero_tail(tmp_path: Path) -> None:
+    layout = read_manifest(MANIFEST)
+    short = Layout(layout.entries, layout.phrases[:10])  # the samples end before 10000
+    samples = synthetic_samples(short, 12)
+    for p in short.phrases:
+        (tmp_path / f"{p.stem}.wav").write_bytes(adpcm_wav(samples[p.number], p.name))
+    with pytest.raises(FormatError, match="inside the zero tail"):
+        asm_source(short, tmp_path, "bin")
+
+
 def vasm() -> str | None:
     return shutil.which(os.path.expanduser(os.environ.get("VASM", "vasmm68k_mot")))
 
 
 @pytest.mark.skipif(vasm() is None, reason="vasm not available")
-def test_tree_assembles_a_synthetic_image(tmp_path: Path) -> None:
-    """asm/oki/samples.asm + the generated include rebuild the image tools/adpcm builds."""
-    layout = read_manifest(MANIFEST)
+@pytest.mark.parametrize("relayout", [False, True])
+def test_tree_assembles_a_synthetic_image(tmp_path: Path, relayout: bool) -> None:
+    """asm/oki/samples.asm + the generated include rebuild the image tools/adpcm builds, for the
+    committed layout and for one with a sample starting on a ROM file boundary."""
+    layout = boundary_layout() if relayout else read_manifest(MANIFEST)
+    manifest = tmp_path / "samples.json"
+    if relayout:
+        doc = json.loads(MANIFEST.read_text())
+        for entry, p in zip(doc["phrases"], layout.phrases, strict=True):
+            entry.update(start=f"{p.start:05X}", end=f"{p.end:05X}", length=p.length)
+        manifest.write_text(json.dumps(doc))
+        assert read_manifest(manifest) == layout
+    else:
+        manifest = MANIFEST
     samples = synthetic_samples(layout, 10)
     wavs = tmp_path / "wav"
     wavs.mkdir()
@@ -321,7 +380,7 @@ def test_tree_assembles_a_synthetic_image(tmp_path: Path) -> None:
         (wavs / f"{p.stem}.wav").write_bytes(adpcm_wav(samples[p.number], p.name))
     shutil.copytree(REPO / "asm/oki", tmp_path / "asm/oki")
     out = tmp_path / "build/oki"
-    r = run(sys.executable, TOOLS / "adpcm", "asm", "--manifest", MANIFEST, "--wav", wavs,
+    r = run(sys.executable, TOOLS / "adpcm", "asm", "--manifest", manifest, "--wav", wavs,
             "--out", out)
     assert r.returncode == 0, r.stderr
     r = run(vasm(), "-quiet", "-Fbin", "-no-opt", "-m68010", "-o", tmp_path / "oki.out",

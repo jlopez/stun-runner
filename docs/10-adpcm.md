@@ -252,8 +252,11 @@ that carries its ADPCM bytes verbatim.
   tags as `adpcm_ima_oki` (ffprobe on a synthetic file: "adpcm_ima_oki ([23][0][0][0] / 0x0017),
   7231 Hz, 1 channels"), so audio tools built on ffmpeg play the files; ffmpeg's decoder rounds
   the difference as ((2 * delta + 1) * step) >> 3, not MAME's sum of truncated quarters, so its
-  output differs from the M6295's by up to 3 units of 4096 on about a quarter of the samples
-  (measured on 4000 random bytes, never on ROM data). For the exact sound use `tools/adpcm decode`.
+  output differs from the M6295's on about a quarter of the outputs (0.22-0.23 on six files of
+  4000 random bytes, never ROM data), by a few units of 4096 (per-file maxima 3 to 5 there, up
+  to 8 in a model of both formulas over 40 random files): the per-nibble difference is at most
+  2 but accumulates through the predictor, so it has no fixed bound. For the exact sound use
+  `tools/adpcm decode`.
 - **Lossless by construction.** `wav` writes the bytes into the data chunk; `unwav` returns the
   data chunk. No arithmetic touches them. `unwav` rejects anything else: not RIFF WAVE, a format
   tag other than 0x0017, not mono, not 4 bits, block align not 1, no or several `fmt `/`data`
@@ -268,8 +271,10 @@ that carries its ADPCM bytes verbatim.
   `build/oki/samples.asm`; `asm/oki/samples.asm` (committed) is the phrase table as `dc.b`
   statements computed from the include's labels `phrase_NN` (first byte) and `phrase_NN_last`
   (last byte), entry 0 explicit, and includes the generated file: one labelled `incbin` per
-  sample with an assert at its start, cut at each file boundary (`oki_1ef`, `oki_1de`,
-  `oki_1cd` with their asserts), the tail as `dcb.b`. The WAV step and the OKI assembly run on
+  sample with an assert at its start, cut at each file boundary inside a sample, every file
+  labelled (`oki_1ef`, `oki_1de`, `oki_1cd` with their asserts, before the incbin when a file
+  starts at a sample's first byte; `asm` fails if a file would start in the zero tail), the
+  tail as `dcb.b`. The WAV step and the OKI assembly run on
   every `make` (make 3.81 compares whole-second mtimes; an edit in the same second must count),
   and so does `tools/adpcm split --missing` on `build/oki/wav`: the split's stamp
   (`build/oki/split.done`) does not see the WAVs, so a WAV deleted there, or a phrase renamed in
