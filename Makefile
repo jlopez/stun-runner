@@ -30,7 +30,7 @@ ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
 	dasm oracle pcwatch objects objtrace objlevels pictures view somdump fieldext depthkeys vskip \
-	FORCE
+	okitrace oki-pcm FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -83,11 +83,37 @@ $(BUILD)/obj/%0.asm $(BUILD)/obj/%1.asm $(BUILD)/obj/%2.asm: $(OBJECT_DATA) $(OB
 
 .SECONDARY: $(OBJECT_ASM)
 
+# The OKI image's source (docs/10-adpcm.md): asm/oki/samples.asm holds the phrase table and
+# includes build/oki/samples.asm, which tools/adpcm asm writes from data/oki/samples.json and one
+# WAV per phrase in OKI_WAV_DIR: it recovers each sample's bytes from its WAV into
+# build/oki/bin/NN.bin and incbins them. The WAVs come from the merged image (tools/adpcm split
+# into build/oki/wav, the default OKI_WAV_DIR), so the image is byte-identical only if every
+# sample survived WAV and back. `make OKI_WAV_DIR=dir` builds from edited WAVs (same names, same
+# lengths as the manifest gives). Sample bytes, WAVs and decoded audio stay under build/.
+OKI_MANIFEST := data/oki/samples.json
+OKI_TOOLS := tools/adpcm/__init__.py tools/adpcm/__main__.py $(ROMSET_TOOLS)
+OKI_WAV_DIR ?= $(BUILD)/oki/wav
+OKI_SPLIT := $(BUILD)/oki/split.done
+OKI_ASM := $(BUILD)/oki/samples.asm
+
+$(OKI_SPLIT): $(BUILD)/$(SET)-oki.bin $(OKI_MANIFEST) $(OKI_TOOLS)
+	$(PYTHON) tools/adpcm split --image $< --manifest $(OKI_MANIFEST) --out $(BUILD)/oki/wav
+	@touch $@
+
+# The WAVs -> bytes step and the OKI tree's assembly run on every `make` (cheap, as the split):
+# an edited WAV saved in the same second as the last build, a removed WAV or another OKI_WAV_DIR
+# must never leave a stale image (make 3.81 on macOS compares whole-second mtimes).
+$(OKI_ASM): $(OKI_SPLIT) $(OKI_MANIFEST) $(OKI_TOOLS) FORCE
+	$(PYTHON) tools/adpcm asm --manifest $(OKI_MANIFEST) --wav $(OKI_WAV_DIR) --out $(BUILD)/oki
+
+.SECONDARY: $(OKI_SPLIT) $(OKI_ASM)
+
 # image -> the files its tree includes: its blob (the merged image) and any others; the object
-# tree includes only the generated page sources, never build/stunrun-obj.bin
+# tree includes only the generated page sources, never build/stunrun-obj.bin, and the OKI tree
+# the generated include and the sample bytes recovered from the WAVs
 EXTRA_stunrun-68k   := $(BUILD)/stunrun-68k.bin $(PROGRAMS)
 EXTRA_stunrun-obj   := $(OBJECT_ASM)
-EXTRA_stunrun-oki   := $(BUILD)/stunrun-oki.bin
+EXTRA_stunrun-oki   := $(OKI_ASM) FORCE
 EXTRA_stunrun-nvram := $(BUILD)/stunrun-nvram.bin
 EXTRA_stunrun-jsa   := $(BUILD)/stunrun-jsa.bin
 
@@ -122,6 +148,7 @@ lint:
 	uv run --frozen mypy --scripts-are-modules $(PYTOOLS)
 	uv run --frozen mypy -p ida
 	uv run --frozen mypy -p objects
+	uv run --frozen mypy -p adpcm
 
 # The IDA databases (docs/05-ida.md): build artefacts, never committed (they embed the ROM bytes).
 # They need idalib (`uv sync --group ida`, IDA installed and activated), so neither target is part
@@ -338,6 +365,45 @@ somdump: $(PROGRAMS)
 		$(PYTHON) tools/displaylist.py $$d --render $$d/compare.png > $$d/render.txt \
 			|| { fail=1; echo "FAILED: $$d"; }; grep -v 'written at' $$d/render.txt; done; \
 		exit $$fail
+
+# What the 6502 tells the OKI M6295 (docs/10-adpcm.md section 4): tools/mame/okitrace.lua taps
+# the 6502's OKI, /WRIO and /MIX writes and its command dispatch, in three runs, each from its own
+# empty NVRAM and cfg: attract mode, a game (coin at 900, start at 960, the trigger every 20
+# frames) and attract mode with every OKI command written to the sound latch in turn (each after
+# command 02, which lifts the OKI mute that attract mode sets with 01), into
+# build/mame/okitrace-<run>.txt; then tools/adpcm survey rewrites data/oki/samples.json (the
+# table's layout, names kept, the commands that play each phrase by the 6502's tables, the starts
+# each run saw; commit it when it changes) and fails if MAME saw a phrase started by a command the
+# tables do not map to it. One target per run: `make -j3 okitrace`. Needs MAME and the ROMs.
+OKI_RUNS := attract game inject
+OKI_INJECT := 05,$(shell seq 56 108 | xargs printf '%02X,' | sed 's/,$$//')
+
+$(BUILD)/mame/okitrace-attract.txt: OKI_ENV = OKI_FRAMES=10800 OKI_PLAY=0
+$(BUILD)/mame/okitrace-game.txt: OKI_ENV = OKI_FRAMES=10800 OKI_PLAY=1
+$(BUILD)/mame/okitrace-inject.txt: OKI_ENV = OKI_FRAMES=21000 OKI_PLAY=0 \
+	OKI_INJECT=$(OKI_INJECT) OKI_INJECT_EVERY=360
+
+$(OKI_RUNS:%=$(BUILD)/mame/okitrace-%.txt): $(BUILD)/mame/okitrace-%.txt: tools/mame/okitrace.lua FORCE
+	$(call TRACE_STATE,okitrace-$*)
+	rm -f $@ $(BUILD)/mame/okitrace-$*done
+	OKI_DIR=$(BUILD)/mame/ OKI_NAME=okitrace-$* $(OKI_ENV) SDL_VIDEODRIVER=dummy $(MAME) stunrun \
+		$(MAME_FLAGS) $(call TRACE_DIRS,okitrace-$*) -autoboot_script tools/mame/okitrace.lua
+	@test -f $(BUILD)/mame/okitrace-$*done || { echo "okitrace: the $* run did not finish"; \
+		exit 1; }
+
+okitrace: $(OKI_RUNS:%=$(BUILD)/mame/okitrace-%.txt) $(BUILD)/$(SET)-oki.bin \
+		$(BUILD)/$(SET)-jsa.bin $(OKI_TOOLS)
+	$(PYTHON) tools/adpcm survey --image $(BUILD)/$(SET)-oki.bin --jsa $(BUILD)/$(SET)-jsa.bin \
+		--manifest $(OKI_MANIFEST) $(OKI_RUNS:%=$(BUILD)/mame/okitrace-%.txt)
+
+# Every sample decoded to 16-bit PCM by MAME's M6295 decoder (tools/adpcm decode), at the rate
+# MAME plays them, into build/oki/pcm/NN-name.wav: for listening (Jesus's naming pass). Never
+# committed.
+oki-pcm: $(OKI_SPLIT)
+	@mkdir -p $(BUILD)/oki/pcm
+	@for w in $(OKI_WAV_DIR)/*.wav; do \
+		$(PYTHON) tools/adpcm decode $$w $(BUILD)/oki/pcm/$$(basename $$w) || exit 1; done
+	@echo "PCM WAVs -> $(BUILD)/oki/pcm"
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms
