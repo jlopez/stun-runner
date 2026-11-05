@@ -29,7 +29,7 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
-	dasm oracle pcwatch
+	dasm oracle pcwatch objects objtrace FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -57,8 +57,34 @@ $(BUILD)/adsp/%.bin $(BUILD)/gsp/%.bin: $(BUILD)/$(SET)-68k.bin $(PROGRAM_TOOLS)
 
 .SECONDARY: $(PROGRAMS)
 
-# image -> blobs it incbins besides its own image
+# The object image's source (docs/07-objects.md): data/objects, turned into one vasm source per
+# /MP page by tools/objects. The image supplies only the residue words the format does not
+# explain (incbin slices). Three targets, one recipe: a pattern rule (stem "page"), as above.
+OBJECT_DATA := $(wildcard data/objects/*.json)
+OBJECT_TOOLS := tools/objects/__init__.py tools/objects/__main__.py
+OBJECT_ASM := $(BUILD)/obj/page0.asm $(BUILD)/obj/page1.asm $(BUILD)/obj/page2.asm
+
+# A deleted or added mesh file leaves nothing newer than the generated sources, so they also
+# depend on the list of file names, rewritten (and so touched) only when the list changes.
+OBJECT_LIST := $(BUILD)/obj/data.list
+
+$(OBJECT_LIST): FORCE
+	@mkdir -p $(@D)
+	@printf '%s\n' $(sort $(OBJECT_DATA)) > $@.tmp; \
+	if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+
+FORCE:
+
+$(BUILD)/obj/%0.asm $(BUILD)/obj/%1.asm $(BUILD)/obj/%2.asm: $(OBJECT_DATA) $(OBJECT_LIST) \
+		$(OBJECT_TOOLS) $(BUILD)/$(SET)-obj.bin
+	$(PYTHON) tools/objects asm --data data/objects --image $(BUILD)/$(SET)-obj.bin \
+		--out $(BUILD)/obj
+
+.SECONDARY: $(OBJECT_ASM)
+
+# image -> files it includes besides its own image
 EXTRA_stunrun-68k := $(PROGRAMS)
+EXTRA_stunrun-obj := $(OBJECT_ASM)
 
 # The listing is a co-target of the assembly (a pattern rule with two targets is one recipe for
 # both, in every make version), so a missing or stale listing reassembles its image.
@@ -90,6 +116,7 @@ lint:
 	uv run --frozen ruff check tools ida
 	uv run --frozen mypy --scripts-are-modules $(PYTOOLS)
 	uv run --frozen mypy -p ida
+	uv run --frozen mypy -p objects
 
 # The IDA databases (docs/05-ida.md): build artefacts, never committed (they embed the ROM bytes).
 # They need idalib (`uv sync --group ida`, IDA installed and activated), so neither target is part
@@ -140,6 +167,38 @@ pcwatch:
 	WATCH_DIR=$(BUILD)/mame/ WATCH_FRAMES=$(WATCH_FRAMES) WATCH_PLAY=$(WATCH_PLAY) $(MAME) stunrun \
 		-debug -debugger none $(MAME_FLAGS) -autoboot_script tools/mame/pcwatch.lua
 	@cat $(BUILD)/mame/pcwatch.txt
+
+# Re-decode the object image into data/objects (docs/07-objects.md): run after changing the
+# decoder; `make test` fails while the committed data and the image disagree.
+objects: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
+	$(PYTHON) tools/objects decode --image $< --out data/objects
+
+# Every object-ROM access of the ADSP (docs/07-objects.md section 7): tools/mame/objtrace.lua over
+# attract mode and over a started game, into build/mame/objtrace-{attract,play}.txt; then
+# `tools/objects trace --summary` checks them against the decoder and rewrites
+# artifacts/objtrace-summary.json (addresses and counts only; commit it when it changes), and
+# `make test` checks them again (tools/test_objects.py). Each run starts from its own empty NVRAM
+# and cfg directories (not the archive's NVRAM that mame.ini names): the play run depends on the
+# NVRAM, and the factory state makes it reproducible. Needs MAME and the ROMs.
+TRACE_FRAMES_ATTRACT ?= 3600
+TRACE_FRAMES_PLAY ?= 7200
+TRACE_STATE = rm -rf $(BUILD)/mame/state-$(1) && mkdir -p $(BUILD)/mame/state-$(1)/nvram \
+	$(BUILD)/mame/state-$(1)/cfg $(BUILD)/mame/state-$(1)/snap
+TRACE_DIRS = -nvram_directory $(BUILD)/mame/state-$(1)/nvram \
+	-cfg_directory $(BUILD)/mame/state-$(1)/cfg -snapshot_directory $(BUILD)/mame/state-$(1)/snap
+
+objtrace: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
+	@mkdir -p $(BUILD)/mame
+	$(call TRACE_STATE,objtrace-attract)
+	TRACE_DIR=$(BUILD)/mame/ TRACE_NAME=objtrace-attract TRACE_FRAMES=$(TRACE_FRAMES_ATTRACT) \
+		TRACE_PLAY=0 $(MAME) stunrun $(MAME_FLAGS) $(call TRACE_DIRS,objtrace-attract) \
+		-autoboot_script tools/mame/objtrace.lua
+	$(call TRACE_STATE,objtrace-play)
+	TRACE_DIR=$(BUILD)/mame/ TRACE_NAME=objtrace-play TRACE_FRAMES=$(TRACE_FRAMES_PLAY) \
+		TRACE_PLAY=1 $(MAME) stunrun $(MAME_FLAGS) $(call TRACE_DIRS,objtrace-play) \
+		-autoboot_script tools/mame/objtrace.lua
+	$(PYTHON) tools/objects trace --image $< --summary artifacts/objtrace-summary.json \
+		$(BUILD)/mame/objtrace-attract.txt $(BUILD)/mame/objtrace-play.txt
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms

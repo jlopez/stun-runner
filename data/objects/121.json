@@ -1,0 +1,35 @@
+{
+  "object": 121,
+  "vertices": [
+    [-494, -1561, 3254],
+    [-490, -1561, -3210],
+    [490, -1561, -3081],
+    [494, -1561, 3254],
+    [490, -1433, -3081],
+    [494, -1561, 3255],
+    [494, -1433, 3255],
+    [-494, -1433, 3255],
+    [-494, -1561, 3255],
+    [-490, -1433, -3210]
+  ],
+  "normals": [
+    [0, 16384, 0],
+    [16384, 0, -11],
+    [-16384, 0, 11],
+    [-16384, 0, -11],
+    [16384, 0, 11]
+  ],
+  "faces": [
+    {"type": 15, "colour": 60, "normal": 0, "vertices": [3, 2, 1, 0]},
+    {"type": 15, "colour": 12, "normal": 1, "vertices": [6, 5, 2, 4]},
+    {"type": 15, "colour": 12, "normal": 2, "vertices": [4, 2, 5, 6]},
+    {"type": 15, "colour": 12, "normal": 2, "vertices": [4, 2, 5, 6]},
+    {"type": 15, "colour": 12, "normal": 1, "vertices": [6, 5, 2, 4]},
+    {"type": 15, "colour": 12, "normal": 2, "vertices": [4, 2, 5, 6]},
+    {"type": 15, "colour": 12, "normal": 1, "vertices": [6, 5, 2, 4]},
+    {"type": 15, "colour": 12, "normal": 1, "vertices": [6, 5, 2, 4]},
+    {"type": 15, "colour": 12, "normal": 2, "vertices": [4, 2, 5, 6]},
+    {"type": 15, "colour": 12, "normal": 3, "vertices": [9, 1, 8, 7]},
+    {"type": 15, "colour": 12, "normal": 4, "vertices": [7, 8, 1, 9]}
+  ]
+}

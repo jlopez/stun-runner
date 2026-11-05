@@ -1,0 +1,21 @@
+{
+  "object": 229,
+  "vertices": [
+    [20, 0, -2561],
+    [12, 0, 0],
+    [28, 0, 0],
+    [-21, 0, 0],
+    [-5, 0, 0],
+    [-13, 0, -2561]
+  ],
+  "normals": [
+    [0, 16384, 0],
+    [0, -16384, 0]
+  ],
+  "faces": [
+    {"type": 15, "colour": 51, "normal": 0, "vertices": [0, 1, 2]},
+    {"type": 15, "colour": 51, "normal": 0, "vertices": [3, 4, 5]},
+    {"type": 15, "colour": 51, "normal": 1, "vertices": [2, 1, 0]},
+    {"type": 15, "colour": 51, "normal": 1, "vertices": [5, 4, 3]}
+  ]
+}

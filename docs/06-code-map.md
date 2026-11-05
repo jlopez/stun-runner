@@ -358,7 +358,7 @@ harddriv.cpp:692): /SIMBUF read DM 2000 (case 0, :780), /SIMCLK DM 2001 (:807), 
 2002 (:811), /SOMCLK DM 2003 (:815), /XOUT DM 2005 (:819), /GINT DM 2006 (:823), /MP DM 2007
 (:829). The sidecar comments every access in the program (58 lines). The /SIMBUF readers are
 `read_object_pointer` (00A3), `read_object_header` (0114: three reads at 011C, 011F, 0123) and
-`read_object_record` (0174: /SIMCLK at 017B, reads at 017F and 0182, then `JUMP (I4)` at 0186
+`read_object_records` (0174: /SIMCLK at 017B, reads at 017F and 0182, then `JUMP (I4)` at 0186
 through the record-type table at 0187 on the top four bits of the second word), with the record
 loop reading at 01B1, 01E4, 01EC and 01FC. The SOM writes start at 0034/0035 (/SOMCLK 0, first
 SOMLATCH) and run through 0515-0682. `wait_frame_trigger` is the idle read of DM 1FFF that MAME's
