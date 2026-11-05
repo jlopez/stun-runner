@@ -1,17 +1,19 @@
 -- MAME autoboot script: what the JSA II 6502 executes and reads, and what the 68010 and the
 -- 6502 say to each other (`make sndtrace`, `make soundcheck`; docs/09-sound-program.md).
 --
---   TRACE_DIR=build/mame/ TRACE_NAME=sndtrace-attract TRACE_FRAMES=7200 TRACE_PLAY=0 \
---     SDL_VIDEODRIVER=dummy mame stunrun -video none -sound none -nothrottle -autoboot_delay 0 \
---     -seconds_to_run 900 -nvram_directory <empty dir> -cfg_directory <empty dir> \
---     -autoboot_script tools/mame/sndtrace.lua
+--   TRACE_DIR=build/mame/ TRACE_NAME=sndtrace-attract TRACE_FRAMES=10800 TRACE_PLAY=0 \
+--     TRACE_ATTRACT_SOUND=0 SDL_VIDEODRIVER=dummy mame stunrun -video none -sound none \
+--     -nothrottle -autoboot_delay 0 -seconds_to_run 600 -nvram_directory <empty dir> \
+--     -cfg_directory <empty dir> -autoboot_script tools/mame/sndtrace.lua
 --
--- Taps observe; they never change a value. On the 6502's program space:
+-- Taps observe; they never change a value (the one exception, TRACE_ATTRACT_SOUND=1, is below).
+-- On the 6502's program space:
 --   * every read of 3000-FFFF (the banked page and the fixed ROM). MAME's 6502 core sets its
 --     NPC to the instruction's address just before the opcode fetch (m6502.cpp prefetch_start),
 --     and the "PC" state entry is NPC, so a read at the address PC holds is an opcode fetch; a
 --     read at PC+1 or PC+2 is an operand byte (or the dummy read of a one-byte instruction);
---     any other read is a data read, recorded with the PC of the instruction that made it. Two
+--     any other read is a data read, recorded with the PC of the instruction that made it (PC 0 for the
+--     vectors FFFA-FFFF, read on the way into an interrupt or out of reset). Two
 --     kinds of dummy read the core models are not data and are left out: the reads a taken
 --     branch or an RTS makes at its own target, and the read at the wrong page that an indexed
 --     access crossing a page makes just before the real one 100h higher (dropped when the next
@@ -26,8 +28,8 @@
 --
 -- Output, TRACE_DIR..TRACE_NAME..".txt" (a build artefact: the YM2151 and OKI streams carry
 -- values the program takes from its ROM, so the file never leaves build/; the committed summary
--- tools/jsa-trace writes keeps addresses, counts and command/response values only):
---   # key value          header (frames, play, counters)
+-- tools/sndtrace.py writes keeps addresses, counts and command/response values only):
+--   # key value          header (frames, play, attract_sound, counters)
 --   F addr count         opcode fetches per address (bank page reads as B<n>:3xxx)
 --   D addr pc count      data reads per (address, instruction PC)
 --   C frame pc value     a command byte written by the 68010 (pc = its instruction)
@@ -36,6 +38,12 @@
 --   O frame value        an OKI M6295 command byte
 --   W frame value / X frame value   /WRIO and /MIX writes
 --   S frame              a sound-board reset by the 68010 (read of 604000)
+-- With TRACE_ATTRACT_SOUND=1 the script sets bit 11 of the 68010's option word FF94EE in every
+-- write the game makes to it (a write tap that returns the value with the bit set): the 68010
+-- then sends command 02 instead of 01 when attract mode starts (0x028362-0x02837E), so attract
+-- mode plays its sounds, as with "SOUNDS IN ATTRACT" set in the operator menu (docs/09 section
+-- 6). The ROMs and the NVRAM are not touched.
+--
 -- With TRACE_PLAY=1 the script inserts a coin at frame 900, presses start at 960 and the trigger
 -- at 1020, as tools/mame/objtrace.lua does, so the run covers a started game. The last line is
 -- "# done": the make target fails without it (MAME exits 0 when a Lua callback raises).
@@ -44,6 +52,7 @@ local OUT = os.getenv("TRACE_DIR") or "./"
 local NAME = os.getenv("TRACE_NAME") or "sndtrace"
 local FRAMES = tonumber(os.getenv("TRACE_FRAMES") or "7200")
 local PLAY = os.getenv("TRACE_PLAY") == "1"
+local ATTRACT_SOUND = os.getenv("TRACE_ATTRACT_SOUND") == "1"
 
 local machine = manager.machine
 local jsa = machine.devices[":mainpcb:jsa:cpu"]
@@ -106,7 +115,8 @@ SNDTRACE_ROM = prog:install_read_tap(0x3000, 0xFFFF, "sndtrace_rom", function(ad
     else
       commit()
     end
-    pend_addr, pend_pc, pend_raw = k, pc, addr
+    -- the vectors are read on the way into an interrupt or out of reset, not by an instruction
+    pend_addr, pend_pc, pend_raw = k, (addr >= 0xFFFA) and 0 or pc, addr
   end
   return value
 end)
@@ -164,6 +174,11 @@ SNDTRACE_RESET = mprog:install_read_tap(0x604000, 0x607FFF, "sndtrace_reset",
     return value
   end)
 
+if ATTRACT_SOUND then
+  SNDTRACE_OPTION = mprog:install_write_tap(0xFF94EE, 0xFF94EF, "sndtrace_option",
+    function(addr, value, mask) return value | (0x0800 & mask) end)
+end
+
 local function field(port, name)
   local p = machine.ioport.ports[port]
   return p and p.fields[name]
@@ -190,7 +205,8 @@ SNDTRACE_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
   if frame == FRAMES then
     commit()
     local f = assert(io.open(OUT .. NAME .. ".txt", "w"))
-    f:write(string.format("# frames %d\n# play %s\n", FRAMES, PLAY and "yes" or "no"))
+    f:write(string.format("# frames %d\n# play %s\n# attract_sound %s\n", FRAMES,
+      PLAY and "yes" or "no", ATTRACT_SOUND and "yes" or "no"))
     for _, k in ipairs(sorted_keys(counts)) do f:write("# ", k, " ", counts[k], "\n") end
     for _, k in ipairs(sorted_keys(fetch)) do f:write("F ", k, " ", fetch[k], "\n") end
     for _, k in ipairs(sorted_keys(data)) do f:write("D ", k, " ", data[k], "\n") end

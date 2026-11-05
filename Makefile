@@ -30,7 +30,7 @@ ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
 	dasm oracle pcwatch objects objtrace objlevels pictures view somdump fieldext depthkeys vskip \
-	okitrace oki-pcm FORCE
+	okitrace oki-pcm sndtrace soundcheck listen FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -152,7 +152,8 @@ test: selftest
 
 PYTOOLS := tools/romset.py tools/listings.py tools/programs.py tools/test_*.py \
 	tools/check-roms tools/merge-roms tools/split-roms tools/bytecheck tools/coverage \
-	tools/extract-programs tools/dasm-programs tools/annotate-listing tools/displaylist.py
+	tools/extract-programs tools/dasm-programs tools/annotate-listing tools/displaylist.py \
+	tools/sndtrace.py
 
 lint:
 	uv run --frozen ruff check tools ida
@@ -415,6 +416,77 @@ okitrace: $(OKI_RUNS:%=$(BUILD)/mame/okitrace-%.txt) $(BUILD)/$(SET)-oki.bin \
 oki-pcm: $(OKI_SPLIT)
 	@$(OKI_REFILL)
 	$(PYTHON) tools/adpcm pcm --manifest $(OKI_MANIFEST) --wav $(OKI_WAV_DIR) --out $(BUILD)/oki/pcm
+
+
+# The JSA II sound program in MAME (docs/09-sound-program.md). tools/mame/sndtrace.lua records
+# what the 6502 executes and reads, the command bytes of the 68010 and the 6502's responses, and
+# the YM2151 and OKI writes (build/mame/<run>.txt, build artefacts: they carry values the program
+# takes from its ROM). Three runs of the reference set, each from its own empty NVRAM and cfg
+# (TRACE_STATE): attract mode as the factory NVRAM has it (SND_FRAMES, two attract cycles),
+# attract mode with "SOUNDS IN ATTRACT" on (TRACE_ATTRACT_SOUND=1, docs/09 section 6) and a
+# started game (SND_PLAY_FRAMES). `make -j3 sndtrace` runs them side by side. Then
+# tools/sndtrace.py checks every opcode fetch and data read against the source (the listing of
+# asm/jsa) and rewrites artifacts/sndtrace-summary.json (addresses, counts, command and response
+# values; commit it when it changes). Needs MAME and the ROMs; headless (SDL dummy driver).
+REF_ROMPATH ?= $(or $(STUNRUN_ROMS),$(HOME)/archive/261104-stun-runner/roms)
+SND_FRAMES ?= 10800
+SND_PLAY_FRAMES ?= 7200
+SND_TRACES := $(BUILD)/mame/sndtrace-attract.txt $(BUILD)/mame/sndtrace-sound.txt \
+	$(BUILD)/mame/sndtrace-play.txt
+
+# snd_run(run, rompath, frames, play, attract sound): one headless MAME run from an empty private
+# state; the target fails unless the run wrote its "# done" line (MAME exits 0 when a Lua
+# callback raises)
+define snd_run
+	@mkdir -p $(BUILD)/mame
+	rm -f $(BUILD)/mame/$(1).txt
+	$(call TRACE_STATE,$(1))
+	SDL_VIDEODRIVER=dummy TRACE_DIR=$(BUILD)/mame/ TRACE_NAME=$(1) TRACE_FRAMES=$(3) \
+		TRACE_PLAY=$(4) TRACE_ATTRACT_SOUND=$(5) $(MAME) stunrun $(MAME_FLAGS) -rompath $(2) \
+		$(call TRACE_DIRS,$(1)) -autoboot_script tools/mame/sndtrace.lua
+	@tail -1 $(BUILD)/mame/$(1).txt 2>/dev/null | grep -qx '# done' || \
+		{ echo "sndtrace: the $(1) run did not finish"; exit 1; }
+endef
+
+$(BUILD)/mame/sndtrace-attract.txt: FORCE
+	$(call snd_run,sndtrace-attract,$(REF_ROMPATH),$(SND_FRAMES),0,0)
+
+$(BUILD)/mame/sndtrace-sound.txt: FORCE
+	$(call snd_run,sndtrace-sound,$(REF_ROMPATH),$(SND_FRAMES),0,1)
+
+$(BUILD)/mame/sndtrace-play.txt: FORCE
+	$(call snd_run,sndtrace-play,$(REF_ROMPATH),$(SND_PLAY_FRAMES),1,0)
+
+sndtrace: $(SND_TRACES) $(BUILD)/stunrun-jsa.lst
+	$(PYTHON) tools/sndtrace.py summary --listing $(BUILD)/stunrun-jsa.lst \
+		--out artifacts/sndtrace-summary.json $(SND_TRACES)
+
+# The machine half of M4's acceptance: the reference set and the rebuilt one (build/roms, after
+# `make check`; MAME's -verifyroms confirms it finds the set there, and -rompath on the command
+# line replaces mame.ini's, so nothing else is read) each run SOUNDCHECK_FRAMES frames of attract
+# mode with its sounds on, headless; their YM2151 and OKI write streams, commands and responses
+# must be equal, and the reference must key on YM2151 channels (attract mode made sound).
+SOUNDCHECK_FRAMES ?= 3000
+
+soundcheck: check
+	$(MAME) -rompath $(BUILD)/roms -verifyroms $(SET)
+	$(call snd_run,soundcheck-reference,$(REF_ROMPATH),$(SOUNDCHECK_FRAMES),0,1)
+	$(call snd_run,soundcheck-rebuilt,$(BUILD)/roms,$(SOUNDCHECK_FRAMES),0,1)
+	$(PYTHON) tools/sndtrace.py soundcheck --frames $(SOUNDCHECK_FRAMES) \
+		$(BUILD)/mame/soundcheck-reference.txt $(BUILD)/mame/soundcheck-rebuilt.txt
+
+# The listening half (Jesus's check, the one target that opens a window and plays sound): MAME on
+# the REBUILT set (build/roms, after `make check`) from an empty private state, attract mode with
+# "SOUNDS IN ATTRACT" on (tools/mame/listen.lua; LISTEN_ATTRACT_SOUND=0 leaves the factory
+# setting, under which attract mode is silent). The music starts about 14 seconds after boot.
+LISTEN_ATTRACT_SOUND ?= 1
+
+listen: check
+	$(MAME) -rompath $(BUILD)/roms -verifyroms $(SET)
+	rm -rf $(BUILD)/mame/listen && mkdir -p $(BUILD)/mame/listen/nvram $(BUILD)/mame/listen/cfg
+	$(MAME) stunrun -rompath $(BUILD)/roms -window -skip_gameinfo -autoboot_delay 0 \
+		-nvram_directory $(BUILD)/mame/listen/nvram -cfg_directory $(BUILD)/mame/listen/cfg \
+		$(if $(filter 1,$(LISTEN_ATTRACT_SOUND)),-autoboot_script tools/mame/listen.lua)
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms
