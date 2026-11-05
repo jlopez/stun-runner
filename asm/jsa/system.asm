@@ -15,8 +15,9 @@
 ; --- The reset vector. A pulse of WRIO bit 0 (YM2151 reset, active low) with every other WRIO bit
 ; 0 (bank 0, OKI reset held low). RDIO bit 7, the self-test request: clear, the normal start,
 ; which clears the zero page and goes to the initialisation (_l4113); set, the self-test
-; (_l402A): zero page and stack page with a walking bit, then pages 02-1F, the ROM checksum and
-; the timed IRQ, each failure a bit in zp_02 (the byte imm_03 sends the 68010, 4533). The
+; (_l402A): the zero page with a walking bit (402A-4052), then pages 01-1F through (zp_19)
+; (405B-408A; page 01, the stack, fails fatally through sub_418C), the ROM checksum and the timed
+; IRQ, each failure a bit in zp_02 (the byte imm_03 sends the 68010, 4533). The
 ; self-test cannot run in MAME 0.289, where RDIO bit 7 is always 0 (hardware.asm).
 reset
     sei
@@ -41,7 +42,7 @@ _l401F
     jsr sub_41BD                        ; acknowledge the timed IRQ
     jmp _l4113
 _l402A
-    ldy #$00                            ; self-test: zero page and stack page, a walking bit
+    ldy #$00                            ; self-test: the zero page (Y 00-FF), a walking bit
     lda #$01
 _l402E
     sta @w zp_00,y
@@ -63,7 +64,7 @@ _l4046
     rol a
     iny
     bne _l402E
-    lda #$00                            ; pages 02-1F through (zp_19), X = the page
+    lda #$00                            ; pages 01-1F through (zp_19), X = the page (0 since 4014)
     sta zp_19
     lda #$00
     sta zp_02                           ; the self-test result bits
@@ -255,8 +256,9 @@ _l419D
     pla
     rts
 
-; from 4036, 4043; not executed in the make sndtrace runs
-; Self-test: zero page or stack page bad. Sends 10 to the 68010 and stops.
+; from 4036, 4043, 418E; not executed in the make sndtrace runs
+; Self-test: zero page (4036, 4043) or stack page (418E, from sub_418C) bad. Sends 10 to the
+; 68010 and stops.
 loc_41A1
     lda #$10
     sta RESP_TO_68K

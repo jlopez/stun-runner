@@ -5,8 +5,9 @@
 ; with mirror mask 01F9 (bits 0 and 3-8 are don't-cares). This program reads them only through
 ; the +8 mirrors (the _M names) and writes them at their base addresses.
 
-; YM2151 (atarijsa.cpp: 2000-2001, no mirror). Write: 2000 the register, 2001 its value. Read
-; (either address): the status, bit 7 busy, bit 1 timer B, bit 0 timer A.
+; YM2151 (atarijsa.cpp: 2000-2001, no mirror). Write: 2000 the register, 2001 its value. Read:
+; the status at 2001 (offset 1), bit 7 busy, bit 1 timer B, bit 0 timer A; a read of 2000 returns
+; FF in MAME 0.289 (ymfm ym2151::read). The program reads only 2001 (41C5, 502E).
 YM2151_REG      = $2000
 YM2151_DATA     = $2001
 
@@ -22,7 +23,9 @@ IRQ_ACK_M       = IRQ_ACK + 8           ; mirror of IRQ_ACK (mask 01F9)
 
 ; RDIO (atari_jsa_ii_device::rdio_r, jsa_ii_ioports): bit 7 self-test, 6 NMI state (low: a
 ; command is waiting), 5 output buffer full (the 68010 has not read RESP_TO_68K yet), 4-3 unused,
-; 2-0 coins 3-1 (stunrun takes its coins on the main board: 0 in MAME). In MAME 0.289 bit 7 is
+; 2-0 coins 3-1. In MAME 0.289 these are IPT_COIN3-1 (jsa_ii_ioports): harddriv.cpp's "stunrun
+; has its own coins" override is a commented-out todo, so a coin key sets them as well as the
+; main board's coin inputs; how the real board is wired is not established. In MAME 0.289 bit 7 is
 ; always 0: the port gives the inverted test line (main_test_read_line) and rdio_r inverts it
 ; again when the line is low, so reset's self-test (bit 7 set) never runs there.
 
@@ -34,7 +37,9 @@ MIX             = $2A06                 ; /MIX, below
 
 ; WRIO (atari_jsa_oki_base_device::wrio_w): bits 7-6 the page at 3000-3FFF, 5-4 coin counters
 ; 2 and 1, 3 OKI pin 7 (sample rate), 2 OKI reset (low), 1 OKI bank (JSA III only), 0 YM2151
-; reset (low).
+; reset (low). MAME configures pin 7 high at power-on, but every WRIO write of this program has
+; bit 3 clear (4005 on), so the M6295 runs with pin 7 low: 3.579545 MHz / 3 / 165, about
+; 7,231 Hz, not / 132.
 ; MIX (mix_w): bit 5 low-pass filter (not emulated), 4 OKI bank (JSA III only), 3-1 YM2151
 ; volume 0-7, 0 OKI volume (half or full).
 

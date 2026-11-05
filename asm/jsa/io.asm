@@ -1,7 +1,7 @@
 ; io.asm: 5CB8-5DB4, RDIO inputs and coin counters, two immediate commands.
 ;
 ; sub_5CE8 (every timed IRQ, from h_irq) reads the four low RDIO bits (coins 1-3 and an unused
-; one in MAME's jsa_ii_ioports; stunrun's coins go to the main board, so they read 0 there),
+; one in MAME's jsa_ii_ioports, live in MAME 0.289 for stunrun: hardware.asm),
 ; keeps their state in zp_75 and pulses the WRIO coin counters (bits 5-4, 5D95-5DA9). Two of
 ; h_nmi's immediate commands: imm_04 (command 08), a loop-back of one byte, and imm_01 (command
 ; 03), which sends zp_75.

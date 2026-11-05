@@ -11,9 +11,11 @@
 
 * = $0000
 
-; File 0000-3FFF: the four bank pages are zero in this set. No instruction refers to 3000-3FFF;
-; the power-up self-test adds them into the ROM checksum (4094-40D5: WRIO bits 7-6 = 0-3, then
-; sub_41A9 over 3000-3FFF).
+; File 0000-3FFF: the four bank pages are zero in this set. No absolute operand refers to
+; 3000-3FFF; the power-up self-test adds them into the ROM checksum (4094-40D5: WRIO bits 7-6 =
+; 0-3, then sub_41A9 over 3000-3FFF), and the dormant ymtimer path selects a page (loc_5869,
+; 58FA-5905: WRIO bits 7-6 from tbl_65DD+4) before it reads through zp_49, the only other code
+; that could read a page.
 bank0
     .fill $1000, 0                      ; page 0, at 3000-3FFF when WRIO bits 7-6 = 0
     .cerror * != $1000, "bank 1 misplaced"

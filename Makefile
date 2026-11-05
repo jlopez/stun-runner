@@ -478,7 +478,10 @@ soundcheck: check
 # The listening half (Jesus's check, the one target that opens a window and plays sound): MAME on
 # the REBUILT set (build/roms, after `make check`) from an empty private state, attract mode with
 # "SOUNDS IN ATTRACT" on (tools/mame/listen.lua; LISTEN_ATTRACT_SOUND=0 leaves the factory
-# setting, under which attract mode is silent). The music starts about 14 seconds after boot.
+# setting, under which attract mode is silent). Sound plays only during each attract demo: the
+# 68010 sends 02 at the demo's start (frames 831, 5534, 10238: about 14 s, 92 s, 170 s after boot)
+# and 01 at its end (2301, 7005: about 38 s, 116 s) whatever the option is, so a silence from
+# about 38 s to 92 s is expected (docs/09-sound-program.md section 6).
 LISTEN_ATTRACT_SOUND ?= 1
 
 listen: check

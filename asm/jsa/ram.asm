@@ -44,7 +44,8 @@ zp_23 = $23
 zp_43 = $43
 ; the value last written to MIX (written at 42CB and 4729)
 mix_shadow = $44
-; the value last written to WRIO (written at 4092, 409B, 411C, 5901, 5BB5, 5DA7)
+; the value last written to WRIO (written at 4092, 409B, 411C, 5901, 5BB5, 5DA7); bits 7-6
+; select the page at 3000, which only the self-test and the dormant ymtimer path (5901) change
 wrio_shadow = $45
 ; the value last written to YM2151 register 1B (written at 4123, 4396, 43A5, 5674)
 ym_1b_shadow = $46

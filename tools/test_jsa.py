@@ -37,9 +37,11 @@ needs_tass = pytest.mark.skipif(tass() is None, reason="64tass not available")
 
 
 def assemble(tree: Path, out: Path) -> subprocess.CompletedProcess[str]:
-    """64tass as the Makefile runs it, from the tree's directory; writes out and out.lst."""
+    """64tass as the Makefile runs it, from the tree's directory; writes out, out.lst (the listing)
+    and out.labels (every global symbol and its value, as 64tass resolved it)."""
+    args = ["-q", "-C", "-b", "-L", f"{out}.lst", "-l", f"{out}.labels", "-o", str(out), "jsa.asm"]
     return subprocess.run(
-        [tass(), "-q", "-C", "-b", "-L", f"{out}.lst", "-o", str(out), "jsa.asm"],  # type: ignore[list-item]
+        [tass(), *args],  # type: ignore[list-item]
         cwd=tree,
         capture_output=True,
         text=True,
@@ -112,33 +114,67 @@ def test_tree_is_all_source() -> None:
         assert "build/" not in code and "archive" not in code, path
 
 
-def equates(text: str) -> dict[str, int]:
+def symbols(text: str) -> dict[str, int]:
+    """64tass's -l output: `name = value`, the value in $hex or decimal."""
     out = {}
     for line in text.splitlines():
-        m = re.match(r"^([A-Za-z_]\w*)\s*=\s*\$([0-9A-Fa-f]+)\b", line)
+        m = re.match(r"^([A-Za-z_]\w*)\s*=\s*(\$[0-9A-Fa-f]+|\d+)\s*$", line)
         if m:
-            out[m.group(1)] = int(m.group(2), 16)
+            v = m.group(2)
+            out[m.group(1)] = int(v[1:], 16) if v.startswith("$") else int(v)
     return out
+
+
+MIRRORS = ("OKI_READ", "CMD_FROM_68K", "RDIO", "IRQ_ACK")
 
 
 @needs_tass
 def test_ida_names_carried_in(tmp_path: Path) -> None:
     """Every name of the IDA snapshot is in the source at the same address: the I/O ports and
-    their mirrors as equates in hardware.asm, the vectors and their targets as labels."""
+    their _M mirrors as equates in hardware.asm, the vectors and their targets as labels. The
+    values are the ones the assembler resolved (its -l output), so an _M equate missing or wrong
+    in hardware.asm fails here, whether or not the code still uses it."""
     r = assemble(TREE, tmp_path / "jsa.bin")
     assert r.returncode == 0, r.stdout + r.stderr
-    listing = (tmp_path / "jsa.bin.lst").read_text()
-    labels = {}
-    for line in listing.splitlines():
-        m = re.match(r"^\.([0-9a-f]{4})\t\t\t\t\t([A-Za-z]\w*)$", line)
-        if m:
-            labels[m.group(2)] = int(m.group(1), 16)
-    io = equates((TREE / "hardware.asm").read_text())
-    io.update({k + "_M": io[k] + 8 for k in ("OKI_READ", "CMD_FROM_68K", "RDIO", "IRQ_ACK")})
+    syms = symbols((tmp_path / "jsa.bin.labels").read_text())
+    for base in MIRRORS:
+        assert syms.get(base + "_M") == syms[base] + 8, base + "_M"
     snapshot = json.loads((REPO / "data/ida/stunrun-jsa.json").read_text())
+    names = {entry["name"] for entry in snapshot["names"]}
+    assert {m + "_M" for m in MIRRORS} <= names
     for entry in snapshot["names"]:
         ea, name = int(entry["ea"], 16), entry["name"]
-        assert io.get(name, labels.get(name)) == ea, name
+        assert syms.get(name) == ea, name
+
+
+GLOBAL_LABEL = re.compile(r"^([A-Za-z]\w*)\s*$")
+
+
+def test_loc_labels_follow_the_rule() -> None:
+    """docs/09 section 4: a loc_XXXX target is reached from another file, from a dispatch table
+    (.word) or across another global label of its file (a 64tass local is visible only between
+    two global labels); every other branch or jump target is an _lXXXX local."""
+    files = {p: p.read_text().splitlines() for p in tree_sources()}
+    for path, lines in files.items():
+        globals_at = [i for i, t in enumerate(lines) if GLOBAL_LABEL.match(t)]
+        for at, line in enumerate(lines):
+            m = GLOBAL_LABEL.match(line)
+            if not m or not m.group(1).startswith("loc_"):
+                continue
+            name = m.group(1)
+            reasons = []
+            for other, olines in files.items():
+                for j, t in enumerate(olines):
+                    code = t.split(";", 1)[0]
+                    if GLOBAL_LABEL.match(t) or not re.search(rf"\b{name}\b", code):
+                        continue
+                    lo, hi = sorted((at, j))
+                    reasons.append(
+                        other != path
+                        or ".word" in code
+                        or any(lo < g < hi for g in globals_at if g != at)
+                    )
+            assert any(reasons), f"{path.name}: {name} could be an _l local"
 
 
 @needs_tass
@@ -232,6 +268,19 @@ def test_summary_of_a_trace(program: sndtrace.Source) -> None:
     assert s["responses"] == {"FF": 1}
     assert s["ym2151_key_ons"] == 1 and s["ym2151_writes"] == 3 and s["oki_commands"] == 1
     assert s["sound_resets_at_frame"] == [0]
+
+
+@needs_tass
+def test_summary_orders_runs_by_name(tmp_path: Path) -> None:
+    """The committed summary does not depend on the order make passes the traces in."""
+    (tmp_path / "jsa.asm").write_text(PROGRAM)
+    assert assemble(tmp_path, tmp_path / "p.bin").returncode == 0
+    listing = (tmp_path / "p.bin.lst").read_text()
+    t = sndtrace.parse(trace_text("F 4000 1\n"))
+    a = sndtrace.summary({"run-b": t, "run-a": t}, listing)
+    b = sndtrace.summary({"run-a": t, "run-b": t}, listing)
+    assert list(a["runs"]) == ["run-a", "run-b"]  # type: ignore[call-overload]
+    assert sndtrace.dumps(a) == sndtrace.dumps(b)
 
 
 def test_check_rejects_traces_the_source_contradicts(program: sndtrace.Source) -> None:

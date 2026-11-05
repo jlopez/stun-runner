@@ -7,9 +7,11 @@
 ; addresses of byte streams in data/music.asm, copied to ram_0266/ram_0284 (4632-463A), the
 ; pointer the stream reader at 4859 reads through zp_06 (4781-4786, 4864-486C). The 125 entries
 ; end where the next table starts: tbl_6244 + 7D = tbl_62C1, + 7D = tbl_633E, + FA = tbl_6438,
-; + FA = tbl_6532. cmdtype_13 (5BFE, the OKI start) and cmdtype_14 (5C6F) index the three
-; 53-entry tables tbl_6532, tbl_6567 and tbl_659C with their parameter (00-34; 5C43 ORs 80 into
-; tbl_6532's byte for the OKI's first command byte). cmdtype_01 (commands 1E-23, parameters
+; + FA = tbl_6532. cmdtype_13 (5BFE, the OKI start) indexes the three 53-entry tables
+; tbl_6532, tbl_6567 and tbl_659C with its parameter (00-34; 5C43 ORs 80 into tbl_6532's byte for
+; the OKI's first command byte) and keeps the entry in zp_52,x for the channel. cmdtype_14 (5C6F)
+; does not index with its parameter: it compares it with tbl_6532 of each channel's current entry
+; (zp_52,x, 5C73-5C76) and stops the channel that matches. cmdtype_01 (commands 1E-23, parameters
 ; 00-05) and cmdtype_02 (no command) index tbl_65D1 and tbl_65D7. What N, E and the bytes mean
 ; for the sound is for a later leg.
 ;
@@ -116,7 +118,9 @@ tbl_6532
     .byte $1C, $1D, $1E, $1F, $24, $25, $29, $26, $33, $2E, $28, $2C, $2F, $2D, $30, $27 ; 20-2F
     .byte $2A, $32, $31, $34, $2B       ; 30-34
 
-; 53 bytes: read at 5C08, 5C1E and 5C4B (bits 5-4: the OKI channel, 3-0 the second OKI byte).
+; 53 bytes: read at 5C08, 5C1E and 5C4B (bits 5-4: the OKI channel, 3-0 the second OKI byte;
+; bit 7, tested at 5C1E-5C20 on the entry playing on the channel: set, a new start does not
+; interrupt it).
 tbl_6567
     .byte $01, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $00, $80, $80 ; 00-0F
     .byte $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80 ; 10-1F

@@ -1,14 +1,14 @@
 ; oki.asm: 5BAC-5CB7, the OKI M6295 driver.
 ;
-; The M6295 (okim6295.cpp) takes a two-byte start, 80 + the phrase number then the channel
-; (bits 7-4, one bit per channel) and the attenuation (bits 3-0), and a one-byte stop (bits 6-3,
-; one bit per channel); its status read has bits 3-0 set for the channels playing. tbl_5C63,
-; tbl_5C67 and tbl_5C6B are those bits for channels 1-4. sub_5BAC resets it (WRIO bit 2 low,
-; then high: called by imm_00); sub_5BC6 (every eighth timed IRQ) counts down each playing
-; channel and stops it when its count runs out; cmdtype_13 (the commands of type 13, and stream
-; op 95 with cmd_param) starts phrase tbl_6532,y on the channel tbl_6567,y names; cmdtype_14
-; (command 66) stops the channel playing phrase A; sub_5C87 sets the YM2151 volume in MIX from
-; the zp_5E values of the playing channels.
+; The M6295 (okim6295.cpp) takes a two-byte start, 80 + the phrase number then the channel (bits
+; 7-4, one bit per channel) and the attenuation (bits 3-0), and a one-byte stop (bits 6-3, one bit
+; per channel); its status read has bits 3-0 set for the channels playing. tbl_5C63, tbl_5C67 and
+; tbl_5C6B are those bits for channels 1-4. sub_5BAC resets it (WRIO bit 2 low, then high: called by
+; imm_00); sub_5BC6 (every eighth timed IRQ) counts down each playing channel and stops it when its
+; count runs out; cmdtype_13 (the commands of type 13, and stream op 95 with cmd_param) starts
+; phrase tbl_6532,y on the channel tbl_6567,y names; cmdtype_14 (command 66) stops the channel whose
+; current entry (zp_52,x) has phrase A in tbl_6532; sub_5C87 sets the YM2151 volume in MIX from the
+; zp_5E values of the playing channels.
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
 ; program.md section 3); hand-maintained from here on. sub_/loc_/tbl_/dat_/_lXXXX labels are

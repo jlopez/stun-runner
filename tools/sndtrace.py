@@ -229,7 +229,8 @@ def summary(traces: dict[str, Trace], listing: str) -> dict[str, object]:
         "instructions_never_executed": len(never),
         "never_executed_by_file": dict(sorted(by_file.items())),
         "never_executed": ranges({a + k for a in never for k in range(src.instr[a])}),
-        "runs": {name: run_summary(t, src) for name, t in traces.items()},
+        # by run name, not by argument order, so the file does not depend on the command line
+        "runs": {name: run_summary(traces[name], src) for name in sorted(traces)},
     }
 
 
