@@ -43,6 +43,20 @@ start level 0-23 loads (docs/07 section 11.4), `make pictures` redraws the objec
 `make view` serves the repository on 127.0.0.1:8000 for the mesh viewer
 `tools/objects/viewer.html` (docs/07 section 11.5).
 
+Since M4b the OKI image goes through one WAV per sample (docs/10-adpcm.md): `tools/adpcm split`
+checks `build/stunrun-oki.bin` against `data/oki/samples.json` (the phrase table, the zero
+tail) and writes `build/oki/wav/NN-name.wav`, each a WAV whose data chunk is the sample's ADPCM
+bytes verbatim; `tools/adpcm asm` reads the WAVs of `OKI_WAV_DIR` (default `build/oki/wav`),
+recovers the bytes into `build/oki/bin/NN.bin` and writes `build/oki/samples.asm`, which
+`asm/oki/samples.asm` (the phrase table as `dc.b`, computed from the samples' labels) includes:
+one `incbin` per sample, cut at each file boundary, and the zero tail as `dcb.b`. The image is
+byte-identical only if every sample survived WAV and back. The WAV step and the OKI assembly
+run on every `make` (cheap), so an edited WAV is never hidden by the whole-second mtimes of make
+3.81; `make OKI_WAV_DIR=dir` builds from edited WAVs. `make okitrace` (`-j3`: three MAME runs of
+`tools/mame/okitrace.lua`) records what the 6502 tells the OKI and rewrites the manifest's play
+evidence; `make oki-pcm` decodes every WAV to 16-bit PCM under `build/oki/pcm/` for listening.
+Sample bytes, WAVs and PCM stay under `build/`.
+
 `make` (= `make all`) runs the three steps. The images are rebuilt only when the layout tools or the snapshot change (`make clean` re-reads the archive); the trees reassemble when their sources or blobs change; the split always runs (cheap, and make 3.81 on macOS compares whole-second mtimes, so a stamp could hide a reassembly in the same second).
 
 ## 2. The five images
@@ -53,7 +67,7 @@ Decision (M1a coordinator): the 68k image and the four data images are separate 
 |---|---|---|---|---|
 | `stunrun-68k` | `mainpcb:maincpu` | 786,432 (0x000000-0x0BFFFF) | six 200x/210x pairs interleaved; image offset = 68010 address | `asm/68k/stunrun.asm` (vasm) |
 | `stunrun-obj` | `mainpcb:user1` | 393,216 | `90h/90k` at 0x00000, `10h/10k` at 0x20000, `9h/9k` at 0x40000, interleaved; byte offset / 2 = the ADSP's object-ROM word index (/MP page = offset / 0x20000) | `asm/obj/objects.asm` (vasm) |
-| `stunrun-oki` | `mainpcb:jsa:oki1` | 262,144 | `1fh`, `1ef`, `1de`, `1cd` one after the other; offset = OKI M6295 address | `asm/oki/samples.asm` (vasm) |
+| `stunrun-oki` | `mainpcb:jsa:oki1` | 262,144 | `1fh`, `1ef`, `1de`, `1cd` one after the other; offset = OKI M6295 address | `asm/oki/samples.asm` (vasm) + `build/oki/samples.asm` (`tools/adpcm asm`) |
 | `stunrun-jsa` | `mainpcb:jsa:cpu` | 65,536 | `136070-2123.10c` as is: 0000-3FFF the four 4 KB pages banked at 3000-3FFF, 4000-FFFF at its own address | `asm/jsa/jsa.asm` (64tass) |
 | `stunrun-nvram` | `mainpcb:200e`, `mainpcb:210e` | 4,096 | `stunrun.200e` then `stunrun.210e` | `asm/nvram/nvram.asm` (vasm) |
 | | | **1,511,424** | the whole set | |
@@ -88,8 +102,16 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   ```
 
 - `make coverage`: `tools/coverage` reads the five listings (vasm `-L`: a `Sections:` header, `Source:` blocks, `SS:AAAAAAAA hex  \t N: source` lines and `*` for repeated runs; 64tass `-L`: `>addr\thex\t...\tsource` lines and `Processing file` markers) and attributes to each statement the bytes from its address to the next statement's (or the section's / image's end), classified as `instr`, `data` (`dc.*`, `.byte`, `.word`, `.text`...), `blob` (`incbin`, `.binary`) or `fill` (`ds.*`, `dcb.*`, `blk.*`, `.fill`). Per source file, per image, the total, the blob share and a JSON line; it fails unless the total is the set's size, 1,511,424. The blob share only goes down (CLAUDE.md section 2).
-- `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/`, `tools/` and `data/objects` fed with a synthetic set (this is how CI exercises the real trees without ROMs; since M3a the synthetic set carries the object image the committed data encodes to, `make all` must rebuild it, also with `build/stunrun-obj.bin` deleted, and an edited mesh must change the built chip). `tools/test_objects.py` adds the object format's tests (docs/07 section 8.3), among them one that runs in CI against the real hashes: the committed data/objects (meshes and the residue constant) encodes to all six object chips with MAME's CRC-32 and SHA-1.
+- `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/`, `tools/` and `data/objects` fed with a synthetic set (this is how CI exercises the real trees without ROMs; since M3a the synthetic set carries the object image the committed data encodes to, `make all` must rebuild it, also with `build/stunrun-obj.bin` deleted, and an edited mesh must change the built chip; since M4b it carries a valid OKI image, the manifest's phrase table over random sample bytes, and one data byte changed in a WAV, in `build/oki/wav` or in another `OKI_WAV_DIR`, must change the built file at that sample's address). `tools/test_adpcm.py` adds the WAV round trip, the phrase table, the malformed WAVs and the decoder (docs/10-adpcm.md sections 5-6). `tools/test_objects.py` adds the object format's tests (docs/07 section 8.3), among them one that runs in CI against the real hashes: the committed data/objects (meshes and the residue constant) encodes to all six object chips with MAME's CRC-32 and SHA-1.
 - `make lint`: ruff and mypy over the tools.
+- `make okitrace` (needs MAME and the ROMs; never in CI; `-j3` runs the three runs at once):
+  `tools/mame/okitrace.lua` taps the 6502's OKI, /WRIO and /MIX writes and its reads of the
+  command dispatcher's type table and of the effect-to-phrase table, in attract mode, a game and
+  attract mode with every OKI command injected, each from an empty private state
+  (`build/mame/state-okitrace-<run>`), into `build/mame/okitrace-<run>.txt` (each run must
+  write its done marker); then `tools/adpcm survey` rewrites `data/oki/samples.json` (layout,
+  names kept, commands, starts per run) and fails on a start the 6502's tables do not explain
+  (docs/10-adpcm.md section 4).
 - `make somdump` (needs MAME and the ROMs; never in CI): `tools/mame/somdump.lua` captures the
   SOM display list at the frames of `SOM_ATTRACT` (attract mode), `SOM_GAME` (a game started at
   frame 900) and `SOM_DITHER` (attract mode with every colour word's two bytes made different,
@@ -167,6 +189,16 @@ the object image none at all:
 
 `blob: 74.0% of 1511424 bytes come from incbin/.binary` (1,118,208 blob bytes, 2 fewer than
 after M3a; 73.98% in the JSON line before and after).
+
+After M4b (`make coverage`, 2026-11-05) the OKI image's phrase table is source and its tail a
+fill; the 52 samples stay blob (they are ROM content, recovered from the WAVs under `build/`):
+
+| Source file | Bytes | instr | data | blob | fill |
+|---|---|---|---|---|---|
+| `asm/oki/samples.asm` | 424 | 0 | 424 | 0 | 0 |
+| `../../build/oki/samples.asm` | 261,720 | 0 | 0 | 260,864 | 856 |
+
+`blob: 73.9% of 1511424 bytes come from incbin/.binary` (1,116,928 blob bytes, 1,280 fewer).
 
 ## 6. Tools and versions
 

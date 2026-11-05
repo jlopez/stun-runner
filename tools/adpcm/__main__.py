@@ -330,7 +330,8 @@ def cmd_survey(args: argparse.Namespace) -> int:
             "commands": [f"{c:02X}" for c in commands.get(n, [])],
             "starts": {run: sum(found.get(n, {}).values()) for run, found in runs.items()},
         }
-        traced = sorted({c for found in runs.values() for c in found.get(n, {})} - {"--"})
+        # "--": a start with no dispatch read before it, which no table explains either
+        traced = sorted({c for found in runs.values() for c in found.get(n, {})})
         stray = [c for c in traced if c not in entry["commands"]]
         if stray:
             raise FormatError(f"phrase {n}: MAME saw it started by command(s) {stray}, "
