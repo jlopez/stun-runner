@@ -1124,7 +1124,8 @@ city, then in a tunnel), loading 41 objects at level word 23 from frame 1026; at
 level word turns to 24 and 15 objects load (0-7, 100, 101, 213, 214, 222, 229, 309); at frame 2600
 the screen shows the course map with its picture garbled, and at frame 2709 the watchdog resets
 the machine. Start level 24 shows the same garbled map at frame 1200 and is reset at frame 1329
-after 12 loads at level word 24 (0, 49, 100, 102-104, 131, 204, 212, 215, 216, 309); start
+after loading 12 objects at level word 24 (0, 49, 100, 102-104, 131, 204, 212, 215, 216, 309;
+152 loads in all, 8 to 32 each, from frames 1026-1028; `LEVELS_START=24 LEVELS_FRAMES=3000`); start
 level 25 loads nothing from frame 1020 and is reset at frame 1479, start level 30 at frame 1481
 (scratch runs with private state directories). After a reset MAME runs the autoboot script again, so the script ends
 its run at the reset (`# reset_at_frame` in its output, `reset_at_frame` in the summary);
