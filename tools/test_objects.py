@@ -516,6 +516,8 @@ def test_inventory_table_is_the_docs_table() -> None:
         str(IMAGE_68K),
         "--summary",
         str(REPO / "artifacts/objtrace-summary.json"),
+        "--levels",
+        str(REPO / "artifacts/objlevels-summary.json"),
     )
     assert r.returncode == 0, r.stderr
     assert "0 in no descriptor" in r.stderr

@@ -29,7 +29,7 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
-	dasm oracle pcwatch objects objtrace FORCE
+	dasm oracle pcwatch objects objtrace objlevels pictures view FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -199,6 +199,39 @@ objtrace: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
 		-autoboot_script tools/mame/objtrace.lua
 	$(PYTHON) tools/objects trace --image $< --summary artifacts/objtrace-summary.json \
 		$(BUILD)/mame/objtrace-attract.txt $(BUILD)/mame/objtrace-play.txt
+
+# Which objects a game loads at each level (docs/07-objects.md section 11.4): one MAME run per
+# start level 0-22 (tools/mame/objlevels.lua: a level select by replacing the game's clear of the
+# level word, the trigger pressed every 20 frames), each from its own empty NVRAM and cfg, into
+# build/mame/objlevels-NN.txt; then `tools/objects levels` writes artifacts/objlevels-summary.json
+# (object numbers and counts; commit it when it changes). One target per run: `make -j6
+# objlevels` runs six at a time. Start levels 23 and up hang the game (no frame reaches
+# LEVELS_FRAMES). Needs MAME and the ROMs.
+LEVELS_FRAMES ?= 8000
+LEVEL_STARTS := $(shell seq -w 0 22)
+LEVEL_RUNS := $(LEVEL_STARTS:%=$(BUILD)/mame/objlevels-%.txt)
+
+$(BUILD)/mame/objlevels-%.txt: tools/mame/objlevels.lua $(BUILD)/$(SET)-obj.bin
+	$(call TRACE_STATE,objlevels-$*)
+	LEVELS_DIR=$(BUILD)/mame/ LEVELS_NAME=objlevels-$* LEVELS_START=$(patsubst 0%,%,$*) \
+		LEVELS_FRAMES=$(LEVELS_FRAMES) $(MAME) stunrun $(MAME_FLAGS) \
+		$(call TRACE_DIRS,objlevels-$*) -autoboot_script tools/mame/objlevels.lua
+
+objlevels: $(LEVEL_RUNS)
+	$(PYTHON) tools/objects levels --summary artifacts/objlevels-summary.json $(LEVEL_RUNS)
+
+# The object pictures docs/07 shows (section 11), drawn from data/objects by tools/objects
+# pictures into artifacts/objects (commit them: tools/test_render.py compares them pixel for
+# pixel with what the meshes draw).
+pictures:
+	$(PYTHON) tools/objects pictures --data data/objects --out artifacts/objects
+
+# The interactive mesh viewer (tools/objects/viewer.html): serves the repository root on
+# 127.0.0.1:8000 until interrupted.
+VIEW_PORT ?= 8000
+view:
+	@echo "open http://127.0.0.1:$(VIEW_PORT)/tools/objects/viewer.html#0 (Ctrl-C to stop)"
+	python3 -m http.server --bind 127.0.0.1 $(VIEW_PORT)
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms
