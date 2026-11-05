@@ -21,7 +21,8 @@
 -- section 2). The script taps that write and counts, per (object, level word at that moment), the
 -- loads; it writes "object level first_frame count" lines to <LEVELS_NAME>.txt after "# key
 -- value" header lines (frames, start level, the number of replaced writes, the first frame
--- counted). Object numbers, levels, frames and counts only: no ROM or RAM contents.
+-- counted, and the frame of a machine reset that ended the run, if one did: see the end of
+-- this file). Object numbers, levels, frames and counts only: no ROM or RAM contents.
 --
 -- Attract mode is not counted: the attract demo goes on loading objects until frame 965, when
 -- the start button is released (94-99, 201 and 226 among them), and the level select already
@@ -40,6 +41,9 @@
 -- from entity +14h, docs/07 section 2), one line per distinct (object, matrix) with its first
 -- frame and count: "object first_frame count m00 m01 m02 m10 ... m22". ADSP data RAM, run-time
 -- state, not ROM bytes.
+
+-- MAME runs the script again after a machine reset; the first run has already written its output.
+if LEVELS_DONE then return end
 
 local OUT = os.getenv("LEVELS_DIR") or "./"
 local NAME = os.getenv("LEVELS_NAME") or "objlevels"
@@ -103,6 +107,40 @@ local start = field(":mainpcb:a80000", "1 Player Start")
 local trigger = field(":mainpcb:a80000", "P1 Button 1")
 assert(coin and start and trigger, "stunrun input fields not found")
 
+local function finish(reset_frame)
+  if LEVELS_DONE then return end
+  LEVELS_DONE = true
+  local frames = reset_frame or FRAMES
+  local keys = {}
+  for k in pairs(counts) do keys[#keys + 1] = k end
+  table.sort(keys, function(a, b)
+    local a1, a2 = a:match("(%d+) (%d+)")
+    local b1, b2 = b:match("(%d+) (%d+)")
+    if tonumber(a1) ~= tonumber(b1) then return tonumber(a1) < tonumber(b1) end
+    return tonumber(a2) < tonumber(b2)
+  end)
+  local f = assert(io.open(OUT .. NAME .. ".txt", "w"))
+  f:write(string.format("# frames %d\n# start_level %d\n# replaced_writes %d\n# counted_from %d\n",
+    frames, START, replaced, FROM))
+  if reset_frame then f:write(string.format("# reset_at_frame %d\n", reset_frame)) end
+  if SNAP_LIST ~= "" then f:write(string.format("# snapshots %s\n", SNAP_LIST)) end
+  f:write("# object level first_frame count\n")
+  for _, k in ipairs(keys) do f:write(string.format("%s %d %d\n", k, first[k], counts[k])) end
+  f:close()
+  if #matrix_keys > 0 then
+    local g = assert(io.open(OUT .. NAME .. ".matrix.txt", "w"))
+    g:write("# object first_frame count m00 m01 m02 m10 m11 m12 m20 m21 m22\n")
+    for _, mk in ipairs(matrix_keys) do
+      local o, rest = mk:match("^(%d+) (.*)$")
+      g:write(string.format("%s %d %d %s\n", o, matrices[mk][1], matrices[mk][2], rest))
+    end
+    g:close()
+  end
+  io.write(string.format("objlevels.lua: %d frames%s, start %d, %d keys -> %s%s.txt\n", frames,
+    reset_frame and " (machine reset)" or "", START, #keys, OUT, NAME))
+  machine:exit()
+end
+
 LEVELS_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
   frame = frame + 1
   if SNAP[frame] then machine.video:snapshot() end
@@ -111,33 +149,11 @@ LEVELS_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
   if frame >= 1020 then
     if frame % 20 == 0 then trigger:set_value(1) elseif frame % 20 == 5 then trigger:clear_value() end
   end
-  if frame == FRAMES then
-    local keys = {}
-    for k in pairs(counts) do keys[#keys + 1] = k end
-    table.sort(keys, function(a, b)
-      local a1, a2 = a:match("(%d+) (%d+)")
-      local b1, b2 = b:match("(%d+) (%d+)")
-      if tonumber(a1) ~= tonumber(b1) then return tonumber(a1) < tonumber(b1) end
-      return tonumber(a2) < tonumber(b2)
-    end)
-    local f = assert(io.open(OUT .. NAME .. ".txt", "w"))
-    f:write(string.format("# frames %d\n# start_level %d\n# replaced_writes %d\n# counted_from %d\n",
-      FRAMES, START, replaced, FROM))
-    if SNAP_LIST ~= "" then f:write(string.format("# snapshots %s\n", SNAP_LIST)) end
-    f:write("# object level first_frame count\n")
-    for _, k in ipairs(keys) do f:write(string.format("%s %d %d\n", k, first[k], counts[k])) end
-    f:close()
-    if #matrix_keys > 0 then
-      local g = assert(io.open(OUT .. NAME .. ".matrix.txt", "w"))
-      g:write("# object first_frame count m00 m01 m02 m10 m11 m12 m20 m21 m22\n")
-      for _, mk in ipairs(matrix_keys) do
-        local o, rest = mk:match("^(%d+) (.*)$")
-        g:write(string.format("%s %d %d %s\n", o, matrices[mk][1], matrices[mk][2], rest))
-      end
-      g:close()
-    end
-    io.write(string.format("objlevels.lua: %d frames, start %d, %d keys -> %s%s.txt\n", FRAMES,
-      START, #keys, OUT, NAME))
-    machine:exit()
-  end
+  if frame == FRAMES then finish(nil) end
 end)
+
+-- A machine reset ends the run where it is, with "# reset_at_frame N" in the header: from start
+-- level 23 up the 68k stops servicing the watchdog and MAME resets the machine
+-- ("watchdog_fired: reset issued" in error.log with -log; docs/07 section 11.4), and MAME then
+-- runs this script again, whose frame count would start over and never reach LEVELS_FRAMES.
+LEVELS_RESET = emu.add_machine_reset_notifier(function() finish(frame) end)

@@ -35,8 +35,8 @@ names, rewritten only when it changes, so a deleted or added mesh file regenerat
 missing one fails the build).
 `make objects` re-decodes the image into `data/objects` (after a decoder change; `make test`
 fails while the two disagree), `make objtrace` records the ADSP's object-ROM reads in MAME
-(docs/07 section 7). `make objlevels` (`-j6` runs six at a time) records which objects each of
-the 23 levels loads (docs/07 section 11.4), `make pictures` redraws the object pictures under
+(docs/07 section 7). `make objlevels` (`-j6` runs six at a time) records which objects each
+start level 0-23 loads (docs/07 section 11.4), `make pictures` redraws the object pictures under
 `artifacts/objects/` from `data/objects` (docs/07 section 11.3; `make test` compares them), and
 `make view` serves the repository on 127.0.0.1:8000 for the mesh viewer
 `tools/objects/viewer.html` (docs/07 section 11.5).

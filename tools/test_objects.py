@@ -544,6 +544,7 @@ LEVEL_RUN_03 = """# frames 6000
 # start_level 3
 # replaced_writes 8
 # counted_from 1020
+# reset_at_frame 6000
 # object level first_frame count
 0 3 1030 12
 2 3 1030 4
@@ -568,6 +569,7 @@ def test_levels_summary_and_columns(tmp_path: Path) -> None:
             "start_level": 0,
             "replaced_writes": 0,
             "counted_from": 1020,
+            "reset_at_frame": None,
             "levels": {"0": [0], "1": [0, 5]},
         },
         {
@@ -576,6 +578,7 @@ def test_levels_summary_and_columns(tmp_path: Path) -> None:
             "start_level": 3,
             "replaced_writes": 8,
             "counted_from": 1020,
+            "reset_at_frame": 6000,
             "levels": {"3": [0, 2, 7], "4": [2]},
         },
     ]
@@ -619,6 +622,36 @@ def test_level_runs_count_play_only() -> None:
     assert min(min(f for _, _, f, _ in run.rows) for run in runs) == 1026
     committed = json.loads((REPO / "artifacts/objlevels-summary.json").read_text())
     assert levels_summary(413, runs) == committed
+
+
+def test_names_table_level_clauses_are_the_summary() -> None:
+    """CI: each row of docs/07 section 11.2's table opens its MAME cell with "level runs n/m,
+    levels R": n of the row's m objects loaded in the level runs, at the level words R (written
+    as the inventory's levels column writes them), exactly as artifacts/objlevels-summary.json
+    has them."""
+    summary = json.loads((REPO / "artifacts/objlevels-summary.json").read_text())
+    columns = level_columns(summary, 413)
+    doc = (REPO / "docs/07-objects.md").read_text().splitlines()
+    start = doc.index("| Objects | Names | Render | 68k | MAME | Status |") + 2
+    rows = 0
+    for line in doc[start:]:
+        if not line.startswith("|"):
+            break
+        cells = [c.strip() for c in line.split("|")[1:-1]]
+        first, _, last = cells[0].partition("-")
+        objs = range(int(first), int(last or first) + 1)
+        at = [o for o in objs if columns[o] != "-"]
+        levels: set[int] = set()
+        for o in at:
+            for part in columns[o].split(","):
+                a, _, b = part.partition("-")
+                levels.update(range(int(a), int(b or a) + 1))
+        expected = f"level runs {len(at)}/{len(objs)}, levels "
+        expected += level_columns({"levels": {str(lv): [0] for lv in levels}}, 1)[0]
+        rest = cells[4].removeprefix(expected)
+        assert rest != cells[4] and rest[:1] in ("", ";"), (cells[0], expected, cells[4][:60])
+        rows += 1
+    assert rows == 17
 
 
 @pytest.mark.skipif(

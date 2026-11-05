@@ -925,8 +925,10 @@ def read_levels(path: Path) -> LevelRun:
 
 def levels_summary(objects: int, runs: Sequence[LevelRun]) -> dict[str, object]:
     """Counts and object numbers only: per run (one start level each) the frames, the writes the
-    level select replaced, the first frame counted, and the objects loaded at each level word; then, per level, the
-    objects loaded at it in any run, and the objects no run loaded (the objtrace runs aside)."""
+    level select replaced, the first frame counted, the frame of a machine reset that ended the
+    run (null if none: the watchdog resets the game from start level 23 on, docs/07 section 11.4)
+    and the objects loaded at each level word; then, per level, the objects loaded at it in any
+    run, and the objects no run loaded (the objtrace runs aside)."""
     per_level: dict[int, set[int]] = {}
     out_runs = []
     for run in runs:
@@ -941,6 +943,9 @@ def levels_summary(objects: int, runs: Sequence[LevelRun]) -> dict[str, object]:
                 "start_level": int(run.header.get("start_level", "0")),
                 "replaced_writes": int(run.header.get("replaced_writes", "0")),
                 "counted_from": int(run.header.get("counted_from", "0")),
+                "reset_at_frame": (
+                    int(run.header["reset_at_frame"]) if "reset_at_frame" in run.header else None
+                ),
                 "levels": {str(k): sorted(v) for k, v in sorted(levels.items())},
             }
         )

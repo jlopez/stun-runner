@@ -201,14 +201,15 @@ objtrace: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
 		$(BUILD)/mame/objtrace-attract.txt $(BUILD)/mame/objtrace-play.txt
 
 # Which objects a game loads at each level (docs/07-objects.md section 11.4): one MAME run per
-# start level 0-22 (tools/mame/objlevels.lua: a level select by replacing the game's clear of the
+# start level 0-23 (tools/mame/objlevels.lua: a level select by replacing the game's clear of the
 # level word, the trigger pressed every 20 frames), each from its own empty NVRAM and cfg, into
 # build/mame/objlevels-NN.txt; then `tools/objects levels` writes artifacts/objlevels-summary.json
 # (object numbers and counts; commit it when it changes). One target per run: `make -j6
-# objlevels` runs six at a time. Start levels 23 and up hang the game (no frame reaches
-# LEVELS_FRAMES). Needs MAME and the ROMs.
+# objlevels` runs six at a time. From start level 23 up the watchdog resets the machine (run 23
+# at frame 2709, after level words 23 and 24); the script ends a run at a reset. Needs MAME and
+# the ROMs.
 LEVELS_FRAMES ?= 8000
-LEVEL_STARTS := $(shell seq -w 0 22)
+LEVEL_STARTS := $(shell seq -w 0 23)
 LEVEL_RUNS := $(LEVEL_STARTS:%=$(BUILD)/mame/objlevels-%.txt)
 
 $(BUILD)/mame/objlevels-%.txt: tools/mame/objlevels.lua $(BUILD)/$(SET)-obj.bin
