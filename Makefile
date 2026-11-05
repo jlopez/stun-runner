@@ -119,13 +119,14 @@ $(OKI_ASM): $(OKI_SPLIT) $(OKI_MANIFEST) $(OKI_TOOLS) FORCE
 .SECONDARY: $(OKI_SPLIT) $(OKI_ASM)
 
 # image -> the files its tree includes: its blob (the merged image) and any others; the object
-# tree includes only the generated page sources, never build/stunrun-obj.bin, and the OKI tree
-# the generated include and the sample bytes recovered from the WAVs
+# tree includes only the generated page sources, never build/stunrun-obj.bin, the OKI tree
+# the generated include and the sample bytes recovered from the WAVs, and the 6502 tree is all
+# source (docs/09-sound-program.md): its own files, data/ included, and nothing from build/
 EXTRA_stunrun-68k   := $(BUILD)/stunrun-68k.bin $(PROGRAMS)
 EXTRA_stunrun-obj   := $(OBJECT_ASM)
 EXTRA_stunrun-oki   := $(OKI_ASM) FORCE
 EXTRA_stunrun-nvram := $(BUILD)/stunrun-nvram.bin
-EXTRA_stunrun-jsa   := $(BUILD)/stunrun-jsa.bin
+EXTRA_stunrun-jsa   := $(wildcard asm/jsa/data/*.asm)
 
 # The listing is a co-target of the assembly (a pattern rule with two targets is one recipe for
 # both, in every make version), so a missing or stale listing reassembles its image.
