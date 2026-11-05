@@ -1,11 +1,21 @@
 ; commands.asm: 4238-4758, command execution: the command-type handlers and their table.
 ;
-; Generated once from the recursive descent and the MAME trace (docs/09-sound-program.md);
-; hand-maintained from here on.
+; A queued command byte (main_loop, from cmd_queue) goes to dispatch_command: cmd_type (tables.asm)
+; gives its type 00-14, cmdtype_handlers the handler, cmd_param the byte the handler gets in A.
+; Three immediate commands of h_nmi end here too (imm_00, imm_02, imm_03), with send_response,
+; which writes one byte to the 68010 and waits for it to be read, and queue_response, which
+; leaves one for main_loop. Some handlers are also stream ops of the sequencer (op_handlers).
+; What each type does to the sound is for a later leg: the labels name the dispatch, not the role.
+;
+; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
+; program.md section 3); hand-maintained from here on.
 
     .cerror * != $4238, "commands.asm must start at $4238"
 
 ; imm_handlers entry 0; from 4141
+; The sound initialisation: run at reset (loc_4141) and as command 00 (cmd_type 03, cmd_param 00:
+; cmdtype_03 picks imm_handlers entry 0). Resets the OKI (sub_5BAC), clears the response queue
+; and the tables in RAM, keys off the eight YM2151 channels (register 08) and sets MIX.
 imm_00
     php
     sei
@@ -189,6 +199,10 @@ _l436E
     rts
 
 ; from 4186
+; --- Run command Y (a byte main_loop took from cmd_queue): the handler cmdtype_handlers gives for
+; cmd_type,y, entered by RTS with A = cmd_param,y. Y 6D and up (6D is what h_nmi queues for a
+; byte that is not a command) or a type 15 and up (FF: commands 03, 06, 07 and 08, the immediate
+; ones) do nothing.
 dispatch_command
     cpy #$6D
     bcs _l4389
@@ -197,15 +211,18 @@ dispatch_command
     bcs _l4389
     asl a
     tax
-    lda cmdtype_handlers+1,x
+    lda cmdtype_handlers+1,x            ; the handler's address - 1, high byte first
     pha
     lda cmdtype_handlers,x
     pha
-    lda cmd_param,y
+    lda cmd_param,y                     ; A: the parameter
 _l4389
     rts
 
 ; cmdtype_handlers entry $00
+; zp_1E = 4 x the parameter: commands 01 (F0) and 02 (0). The OKI start (5BFE) needs zp_1E = 0,
+; the YM2151 key-on (4EE6) ram_088E >= zp_1E: the 68010 sends 01 when attract mode starts with
+; "SOUNDS IN ATTRACT" off and 02 otherwise (docs/09-sound-program.md section 6).
 cmdtype_00
     asl a
     asl a
@@ -255,6 +272,7 @@ cmdtype_02
     rts
 
 ; cmdtype_handlers entry $03; not executed in the make sndtrace runs
+; imm_handlers entry A, by RTS (command 00: entry 0, imm_00).
 cmdtype_03
     asl a
     tay
@@ -436,6 +454,9 @@ _l44CF
     rts
 
 ; cmdtype_handlers entry $09; from 550E; not executed in the make sndtrace runs
+; Queue A in resp_queue for main_loop to send; when the queue is full, the byte is dropped and
+; resp_queue_full set to 80. Command 09 (cmd_param 55) queues 55; stream op 96 (op_96, 550E)
+; queues its operand.
 queue_response
     ldy resp_queue_in
     sta resp_queue,y
@@ -496,6 +517,9 @@ _l4532
     rts
 
 ; imm_handlers entry 3; not executed in the make sndtrace runs
+; Command 07 (cmd_class 02): send zp_02, the status byte, then set its bits 0 and 2, which
+; main_loop (414C) and the timed IRQ (41F3) clear: the next 07 tells whether both still run.
+; Bit 1 is set by ym_wait on a YM2151 time-out, bits 7, 4, 3 and 2 by the self-test.
 imm_03
     lda zp_02
     jsr send_response
@@ -506,11 +530,13 @@ imm_03
     jmp loc_4548
 
 ; imm_handlers entry 2; not executed in the make sndtrace runs
+; Command 06 (cmd_class 01): send 6D, the number of command bytes the tables cover.
 imm_02
     lda #$6D
     jsr send_response
 
 ; from 4540, 5CC2; not executed in the make sndtrace runs
+; The way out of an immediate command (h_nmi pushed A, Y, X): back to the command mode.
 loc_4548
     pla
     tax
@@ -522,6 +548,9 @@ loc_4548
     rti
 
 ; from 4535, 4545, 5CBF, 5CDD, 5DAF; not executed in the make sndtrace runs
+; Send A to the 68010 now: wait until RDIO bit 5 (output buffer full) is clear, write
+; RESP_TO_68K, wait until the 68010 has read it. Used by the immediate commands only; main_loop
+; sends queued responses without waiting.
 send_response
     pha
     lda #$20
@@ -788,6 +817,8 @@ cmdtype_0E
     rts
 
 ; read at 437E, 4382
+; The 21 command-type handlers, each word the handler's address - 1 (dispatch_command pushes
+; it and returns into it). Types 0C, 0F and 12 share one handler, which returns at once.
 cmdtype_handlers
     .word cmdtype_00-1                  ; $00
     .word cmdtype_01-1                  ; $01
