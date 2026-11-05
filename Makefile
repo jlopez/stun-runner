@@ -29,7 +29,7 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
-	dasm oracle pcwatch objects objtrace FORCE
+	dasm oracle pcwatch objects objtrace somdump FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -110,7 +110,7 @@ test: selftest
 
 PYTOOLS := tools/romset.py tools/listings.py tools/programs.py tools/test_*.py \
 	tools/check-roms tools/merge-roms tools/split-roms tools/bytecheck tools/coverage \
-	tools/extract-programs tools/dasm-programs tools/annotate-listing
+	tools/extract-programs tools/dasm-programs tools/annotate-listing tools/displaylist.py
 
 lint:
 	uv run --frozen ruff check tools ida
@@ -199,6 +199,28 @@ objtrace: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
 		-autoboot_script tools/mame/objtrace.lua
 	$(PYTHON) tools/objects trace --image $< --summary artifacts/objtrace-summary.json \
 		$(BUILD)/mame/objtrace-attract.txt $(BUILD)/mame/objtrace-play.txt
+
+# The SOM display list on its way from the ADSP to the GSP (docs/08-display-list.md):
+# tools/mame/somdump.lua captures, at each frame of SOM_ATTRACT (attract mode) and SOM_GAME (a game
+# started at frame 900), the SOM banks, ADSP data RAM, the GSP command buffer, the frame-buffer
+# page before and after the list and a screen snapshot into build/mame/som/<attract|game>-f<N>/;
+# tools/displaylist.py decodes and redraws each one and compares it with MAME's page. MAME_STATE
+# passes private -nvram/-cfg directories when several runs share a machine.
+SOM_ATTRACT ?= 1200,1500,1800,2100,2700,3000
+SOM_GAME ?= 2400,3000,3600,4200,4800
+SOM_DIR := $(BUILD)/mame/som
+MAME_STATE ?=
+
+somdump: $(PROGRAMS)
+	@mkdir -p $(SOM_DIR) $(BUILD)/mame/snap
+	SOM_DIR=$(SOM_DIR)/ SOM_SNAPDIR=$(BUILD)/mame/snap/ SOM_PREFIX=attract-f SOM_PLAY=0 \
+		SOM_FRAMES=$(SOM_ATTRACT) $(MAME) stunrun $(MAME_FLAGS) $(MAME_STATE) \
+		-snapshot_directory $(BUILD)/mame/snap -autoboot_script tools/mame/somdump.lua
+	SOM_DIR=$(SOM_DIR)/ SOM_SNAPDIR=$(BUILD)/mame/snap/ SOM_PREFIX=game-f SOM_PLAY=1 \
+		SOM_FRAMES=$(SOM_GAME) $(MAME) stunrun $(MAME_FLAGS) $(MAME_STATE) \
+		-snapshot_directory $(BUILD)/mame/snap -autoboot_script tools/mame/somdump.lua
+	@for d in $(SOM_DIR)/*/; do echo "== $$d"; \
+		$(PYTHON) tools/displaylist.py $$d --render $$d/compare.png | grep -v 'written at'; done
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms
