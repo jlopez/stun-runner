@@ -8,6 +8,10 @@ The object image is built from the committed data/objects alone (docs/07-objects
 manifest, the residue constant), so the synthetic set carries, in place of random bytes there,
 the image the committed data encodes to: `make all` must rebuild it without reading
 build/stunrun-obj.bin, and a mesh edited in the copy must change the built object ROMs.
+
+The OKI image goes through one WAV per sample (docs/10-adpcm.md), split by the phrase table that
+data/oki/samples.json describes, so the synthetic set carries a valid OKI image: that table over
+random sample bytes and a zero tail. A WAV altered by one data byte must change the built file.
 """
 
 from __future__ import annotations
@@ -21,6 +25,8 @@ import sys
 from pathlib import Path
 
 import pytest
+from adpcm import adpcm_wav, read_manifest, unwav
+from adpcm import build as build_oki
 from objects import checksum_address, encode, place, read_data
 from romset import IMAGES, compare, layout, load_snapshot, merge, split
 from test_programs import plant_programs
@@ -45,6 +51,13 @@ def plant_objects() -> bytes:
     """The object image the committed data/objects encodes to."""
     layout_, meshes, _ = read_data(REPO / "data/objects")
     return encode(layout_, meshes)
+
+
+def plant_oki(seed: int) -> bytes:
+    """A valid OKI image: the committed manifest's phrase table over random sample bytes."""
+    layout = read_manifest(REPO / "data/oki/samples.json")
+    rng = random.Random(seed)
+    return build_oki(layout, {p.number: rng.randbytes(p.length) for p in layout.phrases})
 
 
 def run(*args: object, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -182,6 +195,71 @@ def tool(env: str, default: str) -> str | None:
     return shutil.which(os.path.expanduser(os.environ.get(env, default)))
 
 
+OKI_FILES = ["136070-2124.1fh", "136070-2125.1ef", "136070-2126.1de", "136070-2127.1cd"]
+
+
+def bump(path: Path, seconds: int) -> None:
+    """Move path's mtime into the future (make 3.81 on macOS compares whole seconds)."""
+    later = path.stat().st_mtime + seconds
+    os.utime(path, (later, later))
+
+
+def check_oki_relayout_and_rename(
+    work: Path, make: list[object], env: dict[str, str], files: dict[str, bytes]
+) -> None:
+    """The two manifest edits docs/10 section 5 and 7 document, through make: a sample of
+    another length (the manifest's addresses moved, the WAVs in an OKI_WAV_DIR of their own) and
+    a rename (no WAV left under the old name in build/oki/wav or build/oki/pcm)."""
+    manifest = work / "data/oki/samples.json"
+    original = manifest.read_text()
+    doc = json.loads(original)
+    wavs = work / "build/oki/wav"
+    # relayout: phrase 1 one byte longer, every later phrase one byte later
+    relaid = work / "relaid-wavs"
+    shutil.copytree(wavs, relaid)
+    first = doc["phrases"][0]
+    one = relaid / f"01-{first['name']}.wav"
+    one.write_bytes(adpcm_wav(unwav(one.read_bytes()) + b"\x5a", first["name"]))
+    for i, p in enumerate(doc["phrases"]):
+        start, end = int(p["start"], 16) + (i > 0), int(p["end"], 16) + 1
+        p.update(start=f"{start:05X}", end=f"{end:05X}", length=end - start + 1)
+    manifest.write_text(json.dumps(doc))
+    bump(manifest, 5)
+    r = run(*make, f"OKI_WAV_DIR={relaid}", "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    layout = read_manifest(manifest)
+    samples = {
+        p.number: unwav((relaid / f"{p.stem}.wav").read_bytes()) for p in layout.phrases
+    }
+    built = b"".join((work / "build/roms/stunrun" / n).read_bytes() for n in OKI_FILES)
+    assert built == build_oki(layout, samples)
+    assert built != b"".join(files[n] for n in OKI_FILES)
+    # rename: phrase 3 under another name, then back; build/oki/wav and build/oki/pcm keep one
+    # WAV per phrase, under the current name
+    doc = json.loads(original)
+    old = doc["phrases"][2]["name"]
+    doc["phrases"][2]["name"] = "renamed_03"
+    manifest.write_text(json.dumps(doc))
+    bump(manifest, 10)
+    r = run(*make, "all", "oki-pcm", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    for directory in (wavs, work / "build/oki/pcm"):
+        names = sorted(f.name for f in directory.glob("03-*.wav"))
+        assert names == ["03-renamed_03.wav"], names
+        assert len(list(directory.glob("*.wav"))) == len(doc["phrases"])
+    # the name back as if in the same second as the last split (the stamp left newer than the
+    # manifest, so the split does not run): make still writes the WAV under the old name from
+    # the image and removes the renamed one
+    manifest.write_text(original)
+    (work / "build/oki/split.done").touch()
+    r = run(*make, "all", "oki-pcm", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    for directory in (wavs, work / "build/oki/pcm"):
+        assert sorted(f.name for f in directory.glob("03-*.wav")) == [f"03-{old}.wav"]
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+
+
 @pytest.mark.skipif(
     tool("VASM", "vasmm68k_mot") is None or tool("TASS", "64tass") is None,
     reason="vasm or 64tass not available",
@@ -193,6 +271,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     images = merge(snapshot, synthetic_set(42))
     images["stunrun-68k"] = plant_programs(images["stunrun-68k"], 42)
     images["stunrun-obj"] = plant_objects()
+    images["stunrun-oki"] = plant_oki(42)
     files = split(snapshot, images)
     write_set(tmp_path / "archive" / "stunrun", files)
     work = tmp_path / "repo"
@@ -201,6 +280,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     shutil.copytree(REPO / "asm", work / "asm")
     shutil.copytree(TOOLS, work / "tools", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(REPO / "data/objects", work / "data/objects")
+    shutil.copytree(REPO / "data/oki", work / "data/oki")
     env = dict(os.environ, STUNRUN_ROMS=str(tmp_path / "archive"))
     make = [
         "make",
@@ -218,7 +298,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 74.0% of 1511424 bytes" in r.stdout
+    assert "blob: 73.9% of 1511424 bytes" in r.stdout
     blobs = {line.split()[0]: line.split() for line in r.stdout.splitlines() if line.strip()}
     assert blobs["adsp_program"][1:4] == ["1702E", "8270", "../../build/adsp/program.bin"]
     assert blobs["gsp_program"][1:4] == ["1907C", "24408", "../../build/gsp/program.bin"]
@@ -226,7 +306,9 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     # the JSON line is the last of tools/coverage's output (GNU make 4 may print more after it)
     summary = json.loads(next(x for x in reversed(r.stdout.splitlines()) if x.startswith("{")))
     assert summary["images"]["stunrun-obj"]["blob"] == 0
-    assert summary["blob"] == 1118208
+    # the OKI image: the phrase table is data, the tail fill, the 52 samples blob
+    assert summary["images"]["stunrun-oki"] == {"instr": 0, "data": 424, "blob": 260864, "fill": 856}
+    assert summary["blob"] == 1116928
     assert "build/stunrun-obj.bin" not in r.stdout
     # the merged blobs are kept (not deleted as intermediates of the pattern rules)
     assert sorted(p.name for p in (work / "build").glob("*.bin")) == sorted(
@@ -237,7 +319,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
         (work / f"build/{name}.lst").unlink()
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 74.0% of 1511424 bytes" in r.stdout
+    assert "blob: 73.9% of 1511424 bytes" in r.stdout
     assert (work / "build/stunrun-obj.lst").exists() and (work / "build/stunrun-jsa.lst").exists()
     # the object image needs nothing from the set: rebuilt with build/stunrun-obj.bin gone (and
     # its generated sources and output removed), it is still the same and the blob stays absent
@@ -267,7 +349,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert (
         "136070-2107.210u: 1 differing bytes, first at file offset $0FFFF = 68k $07FFFF" in r.stdout
     )
-    # undo the plant, so that the mesh edit below is the only difference
+    # undo the plant, so that the WAV and mesh edits below are the only differences
     data[0x7FFFF] ^= 0x01
     image.write_bytes(bytes(data))
     later = image.stat().st_mtime + 5
@@ -276,6 +358,62 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert r.returncode == 0, r.stdout + r.stderr
     r = run(sys.executable, work / "tools/bytecheck", env=env)
     assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+    # one data byte of a WAV reaches its OKI file, at the sample's address: phrase 2, byte 0x10
+    oki_layout = read_manifest(REPO / "data/oki/samples.json")
+    phrase = oki_layout.phrases[1]
+    wav = work / f"build/oki/wav/{phrase.stem}.wav"
+    original = wav.read_bytes()
+    edited = bytearray(original)
+    edited[original.index(b"data") + 8 + 0x10] ^= 0x01
+    # no mtime bump: the OKI step runs on every make, so an edit in the same second still counts
+    wav.write_bytes(bytes(edited))
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 1
+    address = phrase.start + 0x10
+    assert "1 problems over 25 files" in r.stdout, r.stdout
+    assert (
+        f"136070-2124.1fh: 1 differing bytes, first at file offset ${address:05X} = "
+        f"OKI ${address:05X}" in r.stdout
+    ), r.stdout
+    # the same edit from another directory (OKI_WAV_DIR), the build's own WAVs restored
+    edits = work / "edited-wavs"
+    shutil.copytree(work / "build/oki/wav", edits)
+    wav.write_bytes(original)
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+    r = run(*make, f"OKI_WAV_DIR={edits}", "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 1 and "136070-2124.1fh: 1 differing bytes" in r.stdout, r.stdout
+    # a WAV missing from that directory fails the build
+    (edits / wav.name).unlink()
+    r = run(*make, f"OKI_WAV_DIR={edits}", "all", env=env)
+    assert r.returncode != 0 and "absent" in r.stdout + r.stderr
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+    # a WAV deleted from build/oki/wav comes back from the image (the split stamp does not see
+    # its WAVs), and an edited one there is kept
+    gone = work / f"build/oki/wav/{oki_layout.phrases[5].stem}.wav"
+    gone_bytes = gone.read_bytes()
+    wav.write_bytes(bytes(edited))
+    gone.unlink()
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert gone.read_bytes() == gone_bytes and wav.read_bytes() == bytes(edited)
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 1 and "136070-2124.1fh: 1 differing bytes" in r.stdout, r.stdout
+    wav.write_bytes(original)
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+    check_oki_relayout_and_rename(work, make, env, files)
     # an edited mesh reaches the object ROMs: the vertex's x word and its page's checksum word,
     # both on page 0 (the low bytes, chip 90k), and nothing else in the 25 files
     obj = images["stunrun-obj"]

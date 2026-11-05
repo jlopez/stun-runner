@@ -10,7 +10,7 @@ S.T.U.N. Runner runs on Hard Drivin' hardware, not on a sprite/tilemap board (`h
 |---|---|---|---|
 | **Multisync** main board | A046901 | 68010 at 8 MHz (32 MHz / 4), TMS34010 GSP at 48 MHz, TMS34012 PSP (SCX6218UTP) pixel expander, ADC0809, MC68681 DUART, two 2 KB NVRAMs, 512 KB VRAM | `multisync_nomsp()` line 1538, `driver_nomsp()` line 1460, `stunrun_board_device_state::device_add_mconfig` line 1859 |
 | **ADSP II** board | A047046 | ADSP-2100 at 8 MHz (32 MHz / 4), 8K-word program RAM, 8K-word data RAM, serial object ROMs, serial output RAM | `adsp()` line 1595, `init_adsp()` line 4819 |
-| **JSA II** sound board | | 6502 at 1.789 MHz (3.579545 MHz / 2), YM2151 at 3.579545 MHz, OKI M6295 at 1.193 MHz (pin 7 high) | `atari_jsa_ii_device::device_add_mconfig`, `atarijsa.cpp` line 885 |
+| **JSA II** sound board | | 6502 at 1.789 MHz (3.579545 MHz / 2), YM2151 at 3.579545 MHz, OKI M6295 at 1.193 MHz (configured pin 7 high, but /WRIO bit 3 sets pin 7 at run time and MAME's runs keep it low, 7231 Hz: docs/10-adpcm.md section 2) | `atari_jsa_ii_device::device_add_mconfig`, `atarijsa.cpp` line 919 (the M6295 at 935) |
 
 No MSP (the second TMS34010 of the Hard Drivin' Compact): `multisync_nomsp`, and `hd68k_msp_io_r` returns 0xFFFF when the device is absent (`harddriv_m.cpp` line 171). **No security chip**: the base config instantiates slapstic 117 for Hard Drivin', and the stunrun board removes it (`config.device_remove("slapstic")`, line 1864); no `init_stunrun` handler installs a SLOOP or slapstic range (lines 5082-5096). The SLOOP in the same file belongs to Steel Talons (`steeltal_init_common`, line 5208; `136087-9001.bin GAL6001 … (SLOOP)` in the Steel Talons sets). The GSP "protection" write handler is only installed for Race Drivin' Compact, Steel Talons and Street Drivin' (lines 5144, 5172, 5230, 5279). What the driver does install for stunrun are **speedups**, MAME-side optimisations that spin the CPU when it idles at a known address, which are a useful map of hot loops: GSP writes at bit addresses 0xFFF9FC00 and 0xFFFCFC00 with the idle PC 0xFFF41070, and the ADSP read of data word 0x1FFF (lines 5088-5095).
 
@@ -124,8 +124,8 @@ So the pipeline is: the 68010 fills ADSP data RAM with the frame's scene (and wr
 | 2806 | IRQ acknowledge (read or write) |
 | 2A00 | OKI write (/WRV) |
 | 2A02 | response byte to the 68010 (/WRP) |
-| 2A04 | **/WRIO**: bits 7-6 ROM bank for 3000-3FFF, bit 0 YM2151 reset (active low), the rest coin counters and the LPF per `wrio_w` |
-| 2A06 | **/MIX**: bits 3-1 YM2151 volume 0-7, bit 4 OKI bank bit 1 (JSA III only), bit 7-5 OKI volume per `mix_w` |
+| 2A04 | **/WRIO**: bits 7-6 ROM bank for 3000-3FFF, 5-4 coin counters 2 and 1, 3 OKI pin 7 ("voice frequency", `set_pin7`), 2 OKI reset (active low), 1 OKI bank bit 0 (JSA III only), 0 YM2151 reset (active low), per `wrio_w` |
+| 2A06 | **/MIX**: bits 7-6 right OKI bank (JSA IIIs only), 5 low-pass filter enable (not emulated), 4 OKI bank bit 1 (JSA III only), 3-1 YM2151 volume 0-7, 0 OKI volume (1.0 when set, 0.5 when clear) per `mix_w` |
 | 3000-3FFF | banked ROM: 4 pages of 4 KB from the first 16 KB of `136070-2123.10c` (`configure_entries(0, 4, base, 0x1000)`) |
 | 4000-FFFF | ROM, file offset 0x4000-0xFFFF |
 
