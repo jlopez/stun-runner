@@ -21,6 +21,7 @@ board. Four instruction sets, no graphics ROMs. Details with MAME references in
 | [`docs/04-build.md`](docs/04-build.md) | the build: five images, assembler trees, split, byte check, coverage, CI |
 | [`docs/05-ida.md`](docs/05-ida.md) | the IDA databases: made by `make ida`, never committed; annotation snapshots in `data/ida/` |
 | [`docs/06-code-map.md`](docs/06-code-map.md) | the code map: boot and game programs, the GSP and ADSP programs and their loaders, the MAME proof, the partition of the 768 KB |
+| [`docs/07-objects.md`](docs/07-objects.md) | the object ROMs: how the ADSP reads them, the object format, the 413 objects, `data/objects` as their source |
 
 ## ROMs
 
@@ -40,11 +41,12 @@ Needs `vasmm68k_mot` (vasm 2.0f, built from source: `make CPU=m68k SYNTAX=mot`),
 
 ```bash
 uv sync             # ruff, mypy, pytest (UV_FROZEN=1 outside the canonical checkout, docs/04 section 6)
-make                # merge the set into five images, cut out the GSP/ADSP programs, assemble asm/*,
-                    # split into build/roms/stunrun/
+make                # merge the set into five images, cut out the GSP/ADSP programs, generate the
+                    # object ROM sources from data/objects, assemble asm/*, split into build/roms/stunrun/
 make check          # the 25 built files against MAME's hashes and byte for byte against the set
 make coverage       # bytes per source file: instructions, data, incbin blobs, fills; every blob by label
 make test           # tool self-tests on synthetic data (no ROMs needed)
+make objects        # re-decode the object ROMs into data/objects (the object image's source)
 make lint           # ruff + mypy
 make clean
 ```
@@ -66,6 +68,7 @@ make dasm           # build/{gsp,adsp}/program.lst and program.annotated.lst (si
 make oracle         # MAME runs the set and dumps GSP VRAM, ADSP program/data RAM into build/mame/
 make test           # now also compares the extracted programs with those dumps (skips without them)
 make pcwatch        # MAME -debug: highest and lowest 68k PC over 3,600 frames (code in RAM?)
+make objtrace       # every object-ROM read of the ADSP in attract mode and a game (docs/07 section 7)
 ```
 
 Without the reference set, `make check` prints `reference set absent, skipped` (this is what CI

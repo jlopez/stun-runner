@@ -23,6 +23,17 @@ programs out of `build/stunrun-68k.bin` into `build/adsp/program.bin` and
 `asm/68k/stunrun.asm` incbins them under `adsp_program` and `gsp_program` between two slices of
 the image (docs/06-code-map.md section 3.4, which also holds the partition of the 768 KB).
 
+Since M3 the object image is not an incbin of `build/stunrun-obj.bin` any more: its source is
+`data/objects` (a manifest and one mesh file per object, docs/07-objects.md), which
+`tools/objects asm` turns into `build/obj/page0.asm`-`page2.asm` (one per /MP page of 0x10000
+words: `dc.w` for every decoded word, `dcb.w` for the zero fill), and `asm/obj/objects.asm`
+includes them with an assert at every page boundary. The image still feeds the step, for one
+word only: the residue word 0:019E the format does not explain, which the generated source takes
+with an incbin slice (2 bytes, `residue_0_019E`), and through it the checksum word of page 0.
+`make objects` re-decodes the image into `data/objects` (after a decoder change; `make test`
+fails while the two disagree), `make objtrace` records the ADSP's object-ROM reads in MAME
+(docs/07 section 7).
+
 `make` (= `make all`) runs the three steps. The images are rebuilt only when the layout tools or the snapshot change (`make clean` re-reads the archive); the trees reassemble when their sources or blobs change; the split always runs (cheap, and make 3.81 on macOS compares whole-second mtimes, so a stamp could hide a reassembly in the same second).
 
 ## 2. The five images
@@ -68,7 +79,7 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   ```
 
 - `make coverage`: `tools/coverage` reads the five listings (vasm `-L`: a `Sections:` header, `Source:` blocks, `SS:AAAAAAAA hex  \t N: source` lines and `*` for repeated runs; 64tass `-L`: `>addr\thex\t...\tsource` lines and `Processing file` markers) and attributes to each statement the bytes from its address to the next statement's (or the section's / image's end), classified as `instr`, `data` (`dc.*`, `.byte`, `.word`, `.text`...), `blob` (`incbin`, `.binary`) or `fill` (`ds.*`, `dcb.*`, `blk.*`, `.fill`). Per source file, per image, the total, the blob share and a JSON line; it fails unless the total is the set's size, 1,511,424. The blob share only goes down (CLAUDE.md section 2).
-- `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/` and `tools/` fed with a synthetic set (this is how CI exercises the real trees without ROMs).
+- `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/`, `tools/` and `data/objects` fed with a synthetic set (this is how CI exercises the real trees without ROMs; since M3a the synthetic set carries the object image the committed meshes encode to, with a random residue word, and an edited mesh must change the built chip). `tools/test_objects.py` adds the object format's tests (docs/07 section 8.3), among them one that runs in CI against the real hashes: the committed meshes encode to the four chips of pages 1 and 2 with MAME's CRC-32 and SHA-1.
 - `make lint`: ruff and mypy over the tools.
 
 ## 5. Coverage at the zero point (M1)
@@ -85,6 +96,18 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
 | **total** | **1,511,424** | 0 | 0 | 1,511,424 | 0 |
 
 `blob: 100.0% of 1511424 bytes come from incbin/.binary`.
+
+After M3a (`make coverage`, 2026-11-04) the object image comes from the generated page sources:
+
+| Source file | Bytes | instr | data | blob | fill |
+|---|---|---|---|---|---|
+| `../../build/obj/page0.asm` | 131,072 | 0 | 126,678 | 2 | 4,392 |
+| `../../build/obj/page1.asm` | 131,072 | 0 | 130,288 | 0 | 784 |
+| `../../build/obj/page2.asm` | 131,072 | 0 | 39,304 | 0 | 91,768 |
+
+`blob: 74.0% of 1511424 bytes come from incbin/.binary`. Decision (M3a): bytes generated from
+committed data count as `data`/`fill` under the generated file's name (a path under `build/`
+in the coverage table says where they come from); no separate coverage class.
 
 ## 6. Tools and versions
 

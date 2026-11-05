@@ -73,10 +73,11 @@ CHIPS = (
     ("136070-2120.9h", "136070-2117.9k"),
 )
 
-# Record types [0187-0196]: 0 ends the list, 1 is a lit face (DM 0038 = 1 at 0197-0198: shaded
-# from its normal by 0214), 2-15 run through the NOPs to 0199 as unlit faces (colour | 1000h at
-# 01C9-01CC). Colour 0 skips the polygon [019F -> 01E4].
-TYPE_LIT = 1
+# Record types [0187-0196]: 0 ends the list; 1 sets DM 0038 = 1 [0197-0198]: the face is not
+# shaded (colour | 1000h at 01C9-01CC); 2-15 run through the NOPs to 0199 and are shaded from
+# their normal by 0214 [01C7]. The ROM uses 1 and 15. Colour 0 skips the polygon [019F -> 01E4].
+TYPE_UNSHADED = 1
+TYPE_SHADED = 15
 
 
 class FormatError(ValueError):
