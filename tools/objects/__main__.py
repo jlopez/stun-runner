@@ -3,7 +3,8 @@
     tools/objects decode [--image build/stunrun-obj.bin] [--out data/objects]
     tools/objects asm    [--data data/objects] [--image build/stunrun-obj.bin] [--out build/obj]
     tools/objects encode [--data data/objects] [--image IMAGE] --out FILE
-    tools/objects inventory [--data data/objects]
+    tools/objects inventory [--data data/objects] [--image68k build/stunrun-68k.bin]
+                            [--summary artifacts/objtrace-summary.json]
     tools/objects trace  [--image build/stunrun-obj.bin] [--summary artifacts/objtrace-summary.json]
                          build/mame/objtrace-attract.txt build/mame/objtrace-play.txt
 
@@ -15,7 +16,10 @@ asm      writes build/obj/page0.asm .. page2.asm, the vasm sources asm/obj/objec
          the image for each residue range. The image supplies only the residue words (and so the
          checksum word of their page).
 encode   writes the image itself (tests, experiments).
-inventory prints the object table of docs/07 (numbers, addresses, counts, bounding boxes).
+inventory prints the object table of docs/07 (numbers, addresses, counts, bounding boxes); with
+         --image68k the descriptor column (the 68k descriptors that select each object) and,
+         on stderr, how many objects are near objects, only far objects or in no descriptor;
+         with --summary the run column (the traced runs that loaded each object).
 trace    checks MAME traces of the ADSP's object-ROM reads (tools/mame/objtrace.lua) against the
          decoder and writes their summary (addresses and counts only) to --summary.
 
@@ -38,11 +42,14 @@ from objects import (  # noqa: E402
     check_trace,
     compact_lists,
     decode,
+    descriptor_columns,
+    descriptors,
     encode,
     inventory,
     layout_from_manifest,
     read_data,
     read_trace,
+    run_columns,
     trace_summary,
     write_data,
 )
@@ -70,6 +77,8 @@ def main() -> int:
     e.add_argument("--out", type=Path, required=True)
     i = sub.add_parser("inventory")
     i.add_argument("--data", type=Path, default=DATA)
+    i.add_argument("--image68k", type=Path, help="the 68k image: adds the descriptor column")
+    i.add_argument("--summary", type=Path, help="objtrace summary: adds the run column")
     t = sub.add_parser("trace")
     t.add_argument("--image", type=Path, default=IMAGE)
     t.add_argument("--summary", type=Path)
@@ -122,13 +131,42 @@ def main() -> int:
 
             layout, meshes, names = read_data(args.data)
             rows = inventory(Decoded(layout, meshes, place(layout, meshes)))
-            print("| # | page | address | vertices | normals | faces | x | y | z | name |")
-            print("|---|---|---|---|---|---|---|---|---|---|")
+            extra: list[tuple[str, dict[int, str]]] = []
+            if args.image68k:
+                if not args.image68k.exists():
+                    print(f"SKIP: {args.image68k} absent")
+                    return 2
+                desc = descriptor_columns(descriptors(args.image68k.read_bytes()), layout.objects)
+                extra.append(("descriptor", desc))
+                near = sum(1 for v in desc.values() if v and not v.split(", ")[0].endswith("f"))
+                none = sum(1 for v in desc.values() if not v)
+                print(
+                    f"{layout.objects} objects: {near} near objects of a descriptor, "
+                    f"{layout.objects - near - none} only far objects, {none} in no descriptor",
+                    file=sys.stderr,
+                )
+            if args.summary:
+                summary = json.loads(args.summary.read_text())
+                extra.append(("run", run_columns(summary, layout.objects)))
+            heads = [h for h, _ in extra]
+            name = "provisional name" if extra else "name"
+            print(
+                "| "
+                + " | ".join(
+                    ["#", "page", "address", "vertices", "normals", "faces"]
+                    + ["x", "y", "z"]
+                    + heads
+                    + [name]
+                )
+                + " |"
+            )
+            print("|---:|---:|---|---:|---:|---:|---|---|---|" + "---|" * len(heads) + "---|")
             for r in rows:
                 box = " | ".join(f"{r.lo[k]}..{r.hi[k]}" for k in range(3))
+                cols = "".join(f" {c[r.number]} |" for _, c in extra)
                 print(
                     f"| {r.number} | {r.page} | {r.address:04X} | {r.vertices} | {r.normals} "
-                    f"| {r.faces} | {box} | {names.get(r.number, '')} |"
+                    f"| {r.faces} | {box} |{cols} {names.get(r.number, '')} |"
                 )
         elif args.cmd == "trace":
             if not args.image.exists() or not all(p.exists() for p in args.traces):

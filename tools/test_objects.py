@@ -24,12 +24,17 @@ import pytest
 from objects import (
     CHIPS,
     CNTR_MAX,
+    DESCRIPTOR_BYTES,
+    DESCRIPTORS,
     PAGE_WORDS,
     RECIP_FAR,
     RECIP_NEAR,
     RECIP_SPLIT,
     RECIP_WORDS,
     SEQ_DIRECTORY,
+    SEQ_HEADER,
+    SEQ_POLYGON,
+    SEQ_RECORD,
     TERMINATOR,
     Face,
     FormatError,
@@ -40,6 +45,8 @@ from objects import (
     asm_pages,
     check_trace,
     decode,
+    descriptor_columns,
+    descriptors,
     encode,
     encode_words,
     layout_from_manifest,
@@ -51,6 +58,7 @@ from objects import (
     read_data,
     read_trace,
     reciprocal,
+    run_columns,
     sequences,
     to_bytes,
     to_words,
@@ -64,6 +72,7 @@ REPO = TOOLS.parent
 DATA = REPO / "data/objects"
 IMAGE = REPO / "build/stunrun-obj.bin"
 TRACES = [REPO / "build/mame/objtrace-attract.txt", REPO / "build/mame/objtrace-play.txt"]
+IMAGE_68K = REPO / "build/stunrun-68k.bin"
 
 
 def random_mesh(rng: random.Random, number: int) -> Mesh:
@@ -372,6 +381,120 @@ def test_trace_check_catches_planted_problems() -> None:
     )
     problems = check_trace(decoded, image, bad)
     assert len(problems) == 4, problems
+
+
+def adsp_walk(image: bytes) -> dict[tuple[int, int, int], int]:
+    """The read sequences of the ADSP's object path, from the image words alone (not from the
+    meshes, unlike `sequences`): 009E reads the directory word, 00A8 sends the object address
+    and the header, vertices, normals and record pointer are read on (0172 reads the pointer);
+    017B sends each record's address and reads its two words; a type-0 record ends the object;
+    colour 0 reads on from the record list to the first FFFF (019F -> 01E4); otherwise 01A7
+    sends the polygon address and the polygon is read up to its FFFF."""
+    words = to_words(image)
+    out: dict[tuple[int, int, int], int] = {}
+    n = 0
+    while words[n] != TERMINATOR:
+        out[(SEQ_DIRECTORY, 0, n)] = 1
+        page, a = words[n] >> 14, (words[n] << 2) & 0xFFFF
+        base = page * PAGE_WORDS
+        nv, nn = words[base + a + 1], words[base + a + 2]
+        pointer = a + 3 + 3 * (nv + nn)
+        out[(SEQ_HEADER, page, a)] = pointer + 1 - a
+        r = words[base + pointer]
+        while True:
+            r0, r1 = words[base + r], words[base + r + 1]
+            if r1 >> 12 == 0:
+                out[(SEQ_RECORD, page, r)] = 2
+                break
+            q = r0 if r1 & 0x3F else r + 2
+            while words[base + q] != TERMINATOR:
+                q += 1
+            if r1 & 0x3F:
+                out[(SEQ_RECORD, page, r)] = 2
+                out[(SEQ_POLYGON, page, r0)] = q + 1 - r0
+            else:
+                out[(SEQ_RECORD, page, r)] = q + 1 - r
+            r += 2
+        n += 1
+    return out
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3, 9])
+def test_trace_predictions_match_an_adsp_walk(seed: int) -> None:
+    """CI: the lengths the trace oracle expects (`sequences`) are the ones an independent walk of
+    the encoded words gives, for every kind: directory, header, records (colour 0 included),
+    polygons, end record."""
+    layout, meshes = synthetic(seed)
+    # one hand-made object on page 2 with a colour-0 face between two drawn faces
+    meshes[10] = Mesh(
+        10,
+        [(1, 2, 3), (4, 5, 6), (7, 8, 9)],
+        [(0, 0, 0x4000), (0x4000, 0, 0)],
+        [Face(15, 5, 0, [0, 1, 2]), Face(15, 0, 1, [2, 1]), Face(1, 7, 1, [0])],
+    )
+    layout = Layout(11, [*layout.pages[:2], [*layout.pages[2], 10]])
+    image = encode(layout, meshes)
+    decoded = decode(image)
+    expected = sequences(decoded, image)
+    assert expected == adsp_walk(image)
+    a = next(p.address for p in decoded.placed if p.number == 10)
+    # header 4 + 3 x 5 = 19 words; records at a + 19; polygons after 3 records and the end record
+    assert expected[(SEQ_HEADER, 2, a)] == 19
+    r, poly = a + 19, a + 19 + 8
+    assert expected[(SEQ_RECORD, 2, r)] == 2
+    assert expected[(SEQ_POLYGON, 2, poly)] == 5
+    # colour 0: its record, the next record, the end record, the first polygon (to its FFFF)
+    assert expected[(SEQ_RECORD, 2, r + 2)] == 6 + 5
+    assert (SEQ_POLYGON, 2, poly + 5) not in expected
+    assert expected[(SEQ_RECORD, 2, r + 4)] == 2
+    assert expected[(SEQ_POLYGON, 2, poly + 9)] == 3
+    assert expected[(SEQ_RECORD, 2, r + 6)] == 2
+
+
+def test_descriptor_and_run_columns() -> None:
+    """CI: the inventory's descriptor and run columns from a synthetic 68k image and summary."""
+    image = bytearray(DESCRIPTORS + DESCRIPTOR_BYTES * 0x13A)
+    table = {0: (0, 1), 1: (2, 2), 2: (3, 1), 0x139: (-1, -1)}
+    for d, (near, far) in table.items():
+        a = DESCRIPTORS + DESCRIPTOR_BYTES * d
+        image[a : a + 4] = (near & 0xFFFF).to_bytes(2, "big") + (far & 0xFFFF).to_bytes(2, "big")
+    descs = descriptors(bytes(image))
+    assert len(descs) == 0x13A and descs[0x139] == (-1, -1)
+    # descriptors 3..312 are all zero: object 0 is their near object too
+    columns = descriptor_columns(descs, 5)
+    assert columns[0].split(", ")[:2] == ["0", "3"]
+    assert columns[1] == "0f, 2f"
+    assert columns[2] == "1"
+    assert columns[3] == "2"
+    assert columns[4] == ""
+    summary = {
+        "runs": [
+            {"run": "objtrace-attract", "objects_loaded": [0, 2]},
+            {"run": "objtrace-play", "objects_loaded": [2, 3]},
+        ]
+    }
+    assert run_columns(summary, 5) == {0: "A", 1: "-", 2: "AP", 3: "P", 4: "-"}
+
+
+@pytest.mark.skipif(
+    not IMAGE_68K.exists(), reason="build/stunrun-68k.bin absent (no reference set)"
+)
+def test_inventory_table_is_the_docs_table() -> None:
+    """With the reference set: docs/07 section 10 is exactly what the inventory command prints,
+    and every object is selected by a descriptor."""
+    r = run_cli(
+        "inventory",
+        "--image68k",
+        str(IMAGE_68K),
+        "--summary",
+        str(REPO / "artifacts/objtrace-summary.json"),
+    )
+    assert r.returncode == 0, r.stderr
+    assert "0 in no descriptor" in r.stderr
+    doc = (REPO / "docs/07-objects.md").read_text().splitlines()
+    start = doc.index(r.stdout.splitlines()[0])
+    table = doc[start : start + len(r.stdout.splitlines())]
+    assert table == r.stdout.splitlines()
 
 
 if __name__ == "__main__":
