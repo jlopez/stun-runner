@@ -160,9 +160,11 @@ by data that is not a descriptor. **Every object 0-412 is the near or far object
 one of descriptors 0-312**, and 100 objects are only ever far objects (marked in
 the inventory): `tools/objects inventory --image68k build/stunrun-68k.bin` prints the counts
 on stderr, `413 objects: 313 near objects of a descriptor, 100 only far objects, 0 in no
-descriptor`. Examples of call sites: descriptors 1-10 and D2h are taken at 0x0254A4-0x02561A and
-0x02BDBA-0x02BEDE and passed with the vehicle entities (0xFF9C80 + 3Eh × k, k = 0-7) to
-0x02EC9C; descriptor 7Bh + D2 (0x031D68, 0x0323F0) steps through the iris rings 204-209; 0x0364D4 (A3h -> object 252), 0x03665A and 0x03BFDE (94h -> 230/231), 0x03BE02 (93h
+descriptor`. Examples of call sites: descriptors 0-10 (0 by `clr.l -(A7)` at 0x0254F2, the others
+by `pea` of a word) are taken at 0x0254A4-0x025610 and 0x02BDBA-0x02BED4 and passed with the
+vehicle entities 0xFF9C80 + 3Eh × k (k = 0-7: 9C80, 9CBE, 9CFC, 9D3A, 9D78, 9DB6, 9DF4, 9E32) to
+0x02EC9C, and D2h goes with 0xFF9E70 (0x02561A -> 0x025634, 0x02BEDE -> 0x02BEF8), the entity
+after them (= 0xFF9C80 + 3Eh × 8) that section 3.1 lists apart from the eight vehicles; descriptor 7Bh + D2 (0x031D68, 0x0323F0) steps through the iris rings 204-209; 0x0364D4 (A3h -> object 252), 0x03665A and 0x03BFDE (94h -> 230/231), 0x03BE02 (93h
 -> 229), 0x037D0C (C1h -> 292), 0x0380EA / 0x03819A (CBh / CAh -> 302 / 301), 0x027B60-0x02842C
 (CFh -> 306), 0x025616 / 0x028030 / 0x02BEDA (D2h -> 309). What these entities are in the game is M5's.
 
@@ -328,7 +330,7 @@ entities. Families:
 
 | Objects | Provisional family | Evidence |
 |---|---|---|
-| 0-10 | shapes of the eight vehicle entities and their variants | descriptors 0-10 (radius 1131), bound to the vehicle entities at 0x0254A4-0x02561A; 0, 7, 9, 10 have craft-like geometry |
+| 0-10 | shapes of the eight vehicle entities and their variants | descriptors 0-10 (radius 1131), bound to the vehicle entities at 0x0254A4-0x025610 and 0x02BDBA-0x02BED4 (section 3.2); 0, 7, 9, 10 have craft-like geometry |
 | 11-47 | craft (22-25, 30-31, 39-40), panels, wedges, boxes, slabs | geometry; LOD pairs 11/12, 13/14, 15/16, 22/23, 24/25, 30/31 |
 | 48-99, 128-129, 194-196, 350-352 | tunnel sections (open cylinders, straight, curved, tapered, with openings) | geometry; 30 loaded in at least one run (18 in both: 62-63, 68-69 and 86-93 in one only), 30 never loaded (54-55, 58-59, 64-67, 70-85, 194-196, 350-352; section 10's run column); near/far pairs such as 48/49, 60/61, 62/63 in the MAME list dump |
 | 74-77, 134-161 | tunnel sections with a second set of colours | geometry, colours |
@@ -481,7 +483,9 @@ chips of pages 1 and 2 with the CRC-32 and SHA-1 MAME lists; with the reference 
 reproduces data/objects file for file and encode reproduces the image; with the traces, section
 7. `tools/test_build.py` keeps `make all` on a synthetic set meaningful: the synthetic set
 carries the object image the committed data encodes to (with a random residue word), `make all`
-must rebuild it, and an edited mesh in the copy must change exactly two bytes of chip 90k.
+must rebuild it, and an edited mesh in the copy (object 100, first vertex x) must change exactly
+two bytes of chip 90k, at the vertex's x word and page 0's checksum word, and nothing else in the
+25 files (the test first undoes its planted 68k byte, then compares every built file).
 
 ## 9. Open questions
 
