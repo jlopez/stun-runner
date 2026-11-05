@@ -364,7 +364,8 @@ loop reading at 01B1, 01E4, 01EC and 01FC. The SOM writes start at 0034/0035 (/S
 SOMLATCH) and run through 0515-0682. `wait_frame_trigger` is the idle read of DM 1FFF that MAME's
 speedup hooks (`init_stunrun`, harddriv.cpp:5096: `hdadsp_speedup_r` on DM 1FFF). PM 1000-1028
 is a workspace that `copy_frame_parameters` fills from DM 1FE9-1FFD; the loaded PM 1029-1235
-disassembles as noise (HYP: tables).
+disassembles as noise (HYP: tables). M3b: PM 1036-1235 is `reciprocal_table`, the slopes' 1/dy
+(docs/08 section 1.3); PM 1029-1035 stays open.
 
 ### 6.2 TMS34010 (bit addresses)
 
@@ -403,8 +404,12 @@ list at FFFCFC10); MAME's speedup sits on exactly this loop (`init_stunrun`, har
 GSP clears its flag and sets INTOUT, which is the 68k's level-3 interrupt (`h_level3_gsp` clears
 it). The frame counter FFF716A0 is incremented by `display_interrupt` (FFF41C00, trap vector 10,
 DI), at FFF41F80. Of the 32 trap vectors, 0 (reset) is FFF59920, 10 is FFF41C00, 29 is FFF45FC0
-(`trap29_delay`, a busy wait) and the other 29 are FFF40000. The command format, who fills the
-buffers (HYP: the 68k through the host port), and what sections 1 and 2 hold are M5d/M6.
+(`trap29_delay`, a busy wait) and the other 29 are FFF40000. The 68k fills the
+buffers through the host port, copying the SOM list verbatim as command 7000 among its own
+commands (docs/08 section 2, MAME: in every `make somdump` capture the bank rebuilt from the
+ADSP's writes equals what the 68k reads at 810000, and the buffer's code-7 command equals it);
+the command set is docs/08 section 3. The rest of the buffer header and what sections 1 and 2
+hold are M5d/M6.
 
 ## 7. Does 68k code run from RAM? No (MAME)
 
@@ -460,11 +465,16 @@ the CPUs (harddriv_m.cpp:595-601).
 
 1. The object list entry format at DM 0A00 and the object ROM pointer (`read_object_pointer`
    shifts the /SIMBUF word left by 2 into a page and an address: is the pointer in units of four
-   words?) and the record types behind the table at PM 0187 (M3).
-2. The SOM display list: header words written at 00BB-00C0, the end marker FFFF at 00B5, the
-   routine 080B (M3).
-3. GSP sections 1 and 2: confirm the `.cinit` reading of section 1 by decoding FFF59C70 (M6), and
-   the command-buffer format at FFF9FC10/FFFCFC10 and its writer (M5d).
+   words?) and the record types behind the table at PM 0187 (M3): answered by docs/07 sections
+   3.1 (the entry), 3.3 (the pointer: page P >> 14, word (P << 2) & FFFF) and 4 (record types 1
+   and 15).
+2. The SOM display list: answered by docs/08 sections 1 and 2 (the header words written at
+   00BB-00C0, the FFFF at 00B5 that ends the commands, `write_draw_order` 080B and the frame
+   protocol); what it leaves open is docs/08 section 6.
+3. GSP sections 1 and 2: confirm the `.cinit` reading of section 1 by decoding FFF59C70 (M6). The
+   command-buffer format at FFF9FC10/FFFCFC10 and its writer (the 68k, through the host port) are
+   answered by docs/08 sections 2 and 3; the header block, the writer of FFF77F50 and the targets
+   of codes 6, 8, B and D stay open there (docs/08 section 6, M5d).
 4. The packed image format of pairs U-V, and when the images of 0x09F1C5-0x0B10EB (table entries
    47-68) are shown (M5d, M5f).
 5. The two longs at 0x017008, the word at 0x01702C, ADSP control lines 2 and 4, and 818040.

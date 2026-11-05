@@ -29,7 +29,8 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
-	dasm oracle pcwatch objects objtrace objlevels pictures view FORCE
+	dasm oracle pcwatch objects objtrace objlevels pictures view somdump fieldext depthkeys vskip \
+	FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -110,7 +111,7 @@ test: selftest
 
 PYTOOLS := tools/romset.py tools/listings.py tools/programs.py tools/test_*.py \
 	tools/check-roms tools/merge-roms tools/split-roms tools/bytecheck tools/coverage \
-	tools/extract-programs tools/dasm-programs tools/annotate-listing
+	tools/extract-programs tools/dasm-programs tools/annotate-listing tools/displaylist.py
 
 lint:
 	uv run --frozen ruff check tools ida
@@ -233,6 +234,106 @@ VIEW_PORT ?= 8000
 view:
 	@echo "open http://127.0.0.1:$(VIEW_PORT)/tools/objects/viewer.html#0 (Ctrl-C to stop)"
 	python3 -m http.server --bind 127.0.0.1 $(VIEW_PORT)
+
+# How does the GSP extend field 0 (ST FE0, docs/08 section 4.4): at the start of every list
+# (FFF46E30, sign-extended after read_list_header), at command 7 and at the image-quad corner read
+# FFF49380 (zero-extended after a 9 or 5)? Breakpoints count the mode from an empty private
+# NVRAM/cfg state (as somdump); writes build/mame/fieldext.txt.
+FIELD_FRAMES ?= 3100
+
+fieldext:
+	rm -rf $(BUILD)/mame/fieldstate && mkdir -p $(BUILD)/mame/fieldstate/nvram \
+		$(BUILD)/mame/fieldstate/cfg
+	FIELD_DIR=$(BUILD)/mame/ FIELD_FRAMES=$(FIELD_FRAMES) $(MAME) stunrun -debug -debugger none \
+		$(MAME_FLAGS) -nvram_directory $(BUILD)/mame/fieldstate/nvram \
+		-cfg_directory $(BUILD)/mame/fieldstate/cfg -autoboot_script tools/mame/fieldext.lua
+	@cat $(BUILD)/mame/fieldext.txt
+
+# How sorted is the draw order (docs/08 section 1.5)? tools/mame/depthkeys.lua walks the ADSP's
+# node list at every 7th frame of DEPTH_FROM-DEPTH_TO, in attract mode and in a game, each from an
+# empty private NVRAM/cfg state (as somdump); writes build/mame/depthkeys-{attract,game}.txt.
+DEPTH_FROM ?= 1000
+DEPTH_TO ?= 3000
+DEPTH_GAME_TO ?= 6600
+
+depthkeys:
+	for play in 0 1; do rm -rf $(BUILD)/mame/depthstate && mkdir -p $(BUILD)/mame/depthstate/nvram \
+		$(BUILD)/mame/depthstate/cfg && \
+		DEPTH_DIR=$(BUILD)/mame/ DEPTH_FROM=$(DEPTH_FROM) DEPTH_PLAY=$$play \
+		DEPTH_TO=$$( [ $$play = 1 ] && echo $(DEPTH_GAME_TO) || echo $(DEPTH_TO) ) \
+		$(MAME) stunrun $(MAME_FLAGS) -nvram_directory $(BUILD)/mame/depthstate/nvram \
+		-cfg_directory $(BUILD)/mame/depthstate/cfg -autoboot_script tools/mame/depthkeys.lua \
+		|| exit 1; done
+	@grep -h summary $(BUILD)/mame/depthkeys-attract.txt $(BUILD)/mame/depthkeys-game.txt
+
+# Which polygon rows does the GSP skip by the V test (docs/08 4.2 and section 5)?
+# tools/mame/vskip.lua breaks at FFF454C0/FFF454D0 under the debugger, from frame 0 to VSKIP_TO
+# in attract mode and to VSKIP_GAME_TO in a game, each from an empty private NVRAM/cfg state (as
+# somdump); writes build/mame/vskip-{attract,game}.txt (one line per skipped row, then a summary).
+VSKIP_TO ?= 1700
+VSKIP_GAME_TO ?= 6600
+
+vskip:
+	for play in 0 1; do rm -rf $(BUILD)/mame/vskipstate && mkdir -p $(BUILD)/mame/vskipstate/nvram \
+		$(BUILD)/mame/vskipstate/cfg && \
+		VSKIP_OUT=$(BUILD)/mame/vskip-$$( [ $$play = 1 ] && echo game || echo attract ).txt \
+		VSKIP_PLAY=$$play \
+		VSKIP_TO=$$( [ $$play = 1 ] && echo $(VSKIP_GAME_TO) || echo $(VSKIP_TO) ) \
+		$(MAME) stunrun -debug -debugger none $(MAME_FLAGS) \
+		-nvram_directory $(BUILD)/mame/vskipstate/nvram \
+		-cfg_directory $(BUILD)/mame/vskipstate/cfg -autoboot_script tools/mame/vskip.lua \
+		|| exit 1; done
+	@grep -h summary $(BUILD)/mame/vskip-attract.txt $(BUILD)/mame/vskip-game.txt
+	@echo "patterns of the skipped rows:"; grep -ho 'B9=[0-9A-F]*' $(BUILD)/mame/vskip-attract.txt \
+		$(BUILD)/mame/vskip-game.txt | sort | uniq -c
+
+# The SOM display list on its way from the ADSP to the GSP (docs/08-display-list.md):
+# tools/mame/somdump.lua captures, at each frame of SOM_ATTRACT (attract mode) and SOM_GAME (a game
+# started at frame 900), the SOM banks, ADSP data RAM, the GSP command buffer, the frame-buffer
+# page before and after the list and a screen snapshot into build/mame/som/<attract|game|dither>-f<N>/;
+# tools/displaylist.py decodes and redraws each one and compares it with MAME's page; the target
+# fails when a requested frame was not captured in this run (the old captures are removed
+# first), a capture does not decode or its redrawing differs from the page. Every MAME
+# run starts from an empty private state (SOM_STATE, removed first): no NVRAM file, so the game
+# boots from the set's own 200e/210e, and attract mode, which depends on the NVRAM history (high
+# scores, the attract cycle), is the same on every machine and every run.
+# attract 4000 is captured at frame 5531, an empty list (0003 0002 FFFF FFFF, docs/08 section 1.1)
+SOM_ATTRACT ?= 1200,1500,1800,2100,2700,3000,4000
+SOM_GAME ?= 1000,1100,2400,3000,3600,4200,4800,6600
+# attract mode again with every colour word's two bytes made different (SOM_DITHER, somdump.lua):
+# the game's table has equal bytes, so only these captures test the expander's even/odd bytes
+SOM_DITHER ?= 1200,1800,2100
+SOM_DIR := $(BUILD)/mame/som
+SOM_STATE := $(BUILD)/mame/somstate
+SOM_MAME = $(MAME) stunrun $(MAME_FLAGS) -nvram_directory $(SOM_STATE)/nvram \
+	-cfg_directory $(SOM_STATE)/cfg -snapshot_directory $(BUILD)/mame/snap \
+	-autoboot_script tools/mame/somdump.lua
+
+# som_run(prefix, frames, extra env): one MAME run from an empty private state, then every
+# requested frame must have left its capture and the run its done marker (somdump.lua writes it
+# just before machine:exit()): MAME exits 0 when a Lua callback raises, so a broken capture
+# script would otherwise run to -seconds_to_run and leave the previous run's directories behind
+define som_run
+	rm -rf $(SOM_STATE) && mkdir -p $(SOM_STATE)/nvram $(SOM_STATE)/cfg
+	SOM_DIR=$(SOM_DIR)/ SOM_SNAPDIR=$(BUILD)/mame/snap/ SOM_PREFIX=$(1) SOM_FRAMES=$(2) $(3) \
+		$(SOM_MAME)
+	@test -f $(SOM_DIR)/$(1)done || { echo "somdump: the $(1) run did not finish its captures"; \
+		exit 1; }
+	@for f in $$(echo $(2) | tr , ' '); do for x in som.bin fb_som.bin snap_1.png; do \
+		test -f $(SOM_DIR)/$(1)$$f/$$x || { echo "somdump: no $(1)$$f/$$x"; exit 1; }; \
+		done; done
+endef
+
+somdump: $(PROGRAMS)
+	@mkdir -p $(SOM_DIR) $(BUILD)/mame/snap
+	rm -rf $(SOM_DIR)/attract-f* $(SOM_DIR)/game-f* $(SOM_DIR)/dither-f*
+	$(call som_run,attract-f,$(SOM_ATTRACT),SOM_PLAY=0)
+	$(call som_run,game-f,$(SOM_GAME),SOM_PLAY=1)
+	$(call som_run,dither-f,$(SOM_DITHER),SOM_PLAY=0 SOM_DITHER=1)
+	@fail=0; for d in $(SOM_DIR)/*/; do echo "== $$d"; \
+		$(PYTHON) tools/displaylist.py $$d --render $$d/compare.png > $$d/render.txt \
+			|| { fail=1; echo "FAILED: $$d"; }; grep -v 'written at' $$d/render.txt; done; \
+		exit $$fail
 
 roms:            ## verify ~/archive/261104-stun-runner/roms/stunrun against tools/romsets/stunrun.json
 	$(PYTHON) tools/check-roms

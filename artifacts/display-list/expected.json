@@ -1,0 +1,38 @@
+{
+ "attract-f2100": {
+  "capture": "attract-f2100",
+  "commands": 322,
+  "crc32_synthetic_colours": 91407537,
+  "drawn": 11224,
+  "window": [
+   0,
+   40,
+   511,
+   247
+  ]
+ },
+ "attract-f3000": {
+  "capture": "attract-f3000",
+  "commands": 4,
+  "crc32_synthetic_colours": 3889120264,
+  "drawn": 91794,
+  "window": [
+   0,
+   40,
+   511,
+   247
+  ]
+ },
+ "game-f3000": {
+  "capture": "game-f3000",
+  "commands": 131,
+  "crc32_synthetic_colours": 1633331795,
+  "drawn": 106496,
+  "window": [
+   0,
+   40,
+   511,
+   247
+  ]
+ }
+}
