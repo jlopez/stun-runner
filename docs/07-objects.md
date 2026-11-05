@@ -23,7 +23,8 @@ the object path hands over to them.
   bytes each) gives each game entity a near and a far object number, cull and level-of-detail
   distances and a radius. **CODE, MAME**
 - An **object** is a header (point count, vertex count, normal count), the vertices and the
-  normals (three signed words each, normals of length 4000h), a pointer to the record list, one
+  normals (three signed words each; the normals are typically of length about 4000h, Q14, an
+  observation of the data, section 4), a pointer to the record list, one
   two-word record per face (polygon address; type, count, colour) ended by 0000 0000, and one
   polygon per face (normal point number, vertex point numbers, FFFF). **CODE, MAME**
 - Page 1 starts with a 32K-word **reciprocal table** the projection reads (1/z), an exact
@@ -95,11 +96,11 @@ the frame (0051-0053 -> 00B4).
 | 1 | 005A, & 0FFF | DM 001D | far object number | descriptor +2 (0x02E230, 0x02E368) |
 | 2-10 | 005D-0061 | DM 0000-0008 | the object's rotation matrix | entity +14h, copied by 0x022DD6 (0x02E23E, 0x02E332) |
 | 11-16 | 0062-0066 | DM 001F-0024 | position x, y, z, 32 bits each (high, low) | entity +08h, +0Ch, +10h (0x02E244-0x02E250) |
-| 17-18 | 0067-006B | DM 000A-000B | cull distance, 32 bits | descriptor +0Ch (0x02E220), or 1 for the camera's own entity when its flag bit 5 is set (0x02E20C: never drawn) |
+| 17-18 | 0067-006B | DM 000A-000B | cull distance, 32 bits | descriptor +0Ch (0x02E220); an entity with +38h bit 5 set (0x02E1FC) gets 1 if it is the one whose pointer is at 0xFFDC74 (0x02E204-0x02E20E; HYP: the camera's, never drawn) and is otherwise skipped: `fill_object_entry` returns 0 at 0x02E214 and `update_object_entry` returns 0 for any bit-5 entity at 0x02E318-0x02E320 |
 | 19-20 | 006C-0070 | DM 0025-0026 | level-of-detail distance, 32 bits | descriptor +08h (0x02E25A) |
 | 21 | 0071-0073 | DM 000F | bounding radius | descriptor +06h (0x02E264) |
 | 22 | 0074-0076 | DM 0027, sign into DM 0028 | (not decoded; no reader in the object path) | entity +36h (0x02E26A) |
-| 23 | 007E (not advanced), 0090-0094 | DM 002C, DM 002F | flags: bit 15 -> DM 002C (CALL 0887, HYP: an extra transform); bit 14 -> the batch handshake (0043-004F); bits 8-11 -> DM 002F, ORed into every face's colour word (01CE); bit 0 is written back by the ADSP: 1 = drawn, 0 = culled (DM 0013) | built from entity +38h bits 0, 3-4, 5-6, 7 (0x02E270-0x02E2F6); bit 0 kept |
+| 23 | 007E (not advanced), 0090-0094 | DM 002C, DM 002F | flags: bit 15 -> DM 002C (CALL 0887, HYP: an extra transform); bit 14 -> the batch handshake (0043-004F); bits 8-11 -> DM 002F, ORed into every face's colour word (01CE); bit 0 is written back by the ADSP: 1 = drawn, 0 = culled (DM 0013) | built from entity +38h: bit 7 -> flags bit 15 (0x02E2BE-0x02E2D2), bit 0 -> bit 14 (0x02E28A-0x02E2A2), bits 3-4 -> bits 10-11 (asl #3, lsr #6 at 0x02E274-0x02E276), bits 1-2 -> bits 8-9 (asl #5, lsr #6 at 0x02E2AA-0x02E2AC); bits 12-13 and 1-7 cleared (0x02E2D6-0x02E2F2), bit 0 kept; +38h bit 5 is not copied (tested at 0x02E1FC) |
 
 `cull_and_lod` (06A1, called at 0088) culls an entry whose distance from the camera reaches
 words 17-18 or that lies outside the view (with the radius), and sets DM 0017 when the distance
@@ -114,7 +115,7 @@ bit 14 (entry 1), bits 8-11 (0100h, 0800h, 0C00h) and bit 0 (entry 17).
 The 68k builds the list each frame in `build_object_list` (0x02DD9E): it stores 0x809400 (DM
 0A00, `hd68k_adsp_data_w` maps DM n to 0x808000 + 2n) in 0xFF9C6E (0x02DDAE), fills one entry
 per entity of its lists (the eight vehicles at 0xFF9C80 + 3Eh × k, 0xFF9E70, the list at
-0xFFDA96 and the entity at 0xFFDC74) through `fill_object_entry`, writes FFFF after the last
+0xFFDA96 and the entity whose pointer is the long at 0xFFDC74, 0x02DF00; HYP: the camera's) through `fill_object_entry`, writes FFFF after the last
 (0x02DFB6), calls `soft_reset` if the list passes 15E3h words (0x02DFC6), and starts the frame by
 clearing DM 1FFF (0x02DFD4). 0x02E064 is the same without rebuilding (it calls
 `update_object_entry` per entity). 0x02C85A walks the same entities with their entry index
@@ -130,7 +131,7 @@ sites pass a descriptor number. The 20-byte descriptor:
 |---|---|---|
 | +0 | word | near object number (entry word 0) |
 | +2 | word | far object number (entry word 1) |
-| +4 | word | the descriptor's own number (0x03DAB8 adds 1 to step to the next: animations) |
+| +4 | word | the descriptor number 0x03DAB8 steps from: it calls `object_descriptor`(+4 + 1) (animations); equal to the descriptor's own number except in 115 and 116, which hold each other's (so 115 steps to 117 and 116 to itself) |
 | +6 | word | radius (entry word 21) |
 | +8 | long | level-of-detail distance (entry words 19-20) |
 | +0Ch | long | cull distance (entry words 17-18) |
@@ -164,13 +165,19 @@ read it, with nv vertices and nn normals:
 | a+1 | vertices | 1 | nv, the DO count of the vertex loop | 011F -> DM 0032 (014D) |
 | a+2 | normals | 1 | nn, the DO count of the normal loop | 0123 -> DM 08DA (015F) |
 | a+3 ... | vertex i (i = 1..nv) | 3 | x, y, z, signed 16 bits, object space | 014C/014F/0152/0155, transformed at 0157-015C into DM 010D + 3(i-1) |
-| ... | normal j (j = 1..nn) | 3 | x, y, z, signed, length 4000h (unit vectors, Q14) | 0163/0166/0172, rotated at 0169-0171 into DM 010D + 3(nv + j - 1) |
+| ... | normal j (j = 1..nn) | 3 | x, y, z, signed; typically of length about 4000h (Q14), see below | 0163/0166/0172, rotated at 0169-0171 into DM 010D + 3(nv + j - 1) |
 | a+3+3(nv+nn) | record pointer | 1 | the address of the record list: always the next word | 0172 (the read after the last normal) -> DM 0034 -> /SIMCLK 017B |
 | then, per face k | record | 2 | word 0: the face's polygon address; word 1: type << 12, count << 6, colour | 017F, 0182 |
 | | end record | 2 | 0000 0000 (type 0) | 017F, 0182, then `RTS` at 0187 |
 | then, per face k | polygon | n + 2 | the normal's point number, the n vertices' point numbers, FFFF | 01EC, 01FC, 01B1 (or 01E4) |
 
 then zero padding to the next multiple of 4.
+
+**Normals** are typically of length about 4000h (unit vectors in Q14), which is what the shading
+assumes (HYP); nothing in the code depends on it and the encoder does not check it. Over the
+5,071 normals (computed from data/objects), 302 differ from 4000h by more than 50 and 10 by more
+than 500, every one of them used by a face: the zero normals of objects 310 and 336 (normal 0),
+and normals 26-31 and 52-53 of object 333 (lengths 15,446 to 17,854).
 
 **Point numbers.** Vertices and normals share one numbering from 1: vertex i is point i, normal
 j is point nv + j. 01EC-01EF turn a point number n into DM 010A + 3n with `MR = MR + MR0 * MY0
@@ -187,8 +194,11 @@ left by one, so MR0 = n + 2n = 3n. In the ROM every face's first word is a norma
 | 5-0 | colour | 0-63 | 019C-01A0 -> DM 0036; 0 skips the face (019F -> 01E4) |
 
 Type 15 faces are shaded: `shade_face` (0214, called at 01C7) turns colours below 1Fh into
-(colour << 4) + 10h ORed with an intensity from the normal and the light vector (PM 1019-101B),
-faded with depth by 0238; colours 1Fh and up become colour & 1Fh. Type 1 faces skip shading and
+(colour << 4) + 10h ORed with an intensity from the normal and two 3-word vectors at PM
+1019-101B and 101C-101E (0221-0228: CNTR = 2 at 0222, three multiply-accumulates per pass, I4
+from 1019 with M4 = 1 while L3 = 3 wraps I3 over the normal at DM 0014-0016, so the result is
+normal . (PM 1019-101B + PM 101C-101E); `copy_frame_parameters` fills all six from DM 1FEF-1FF4
+at 001B-0020; HYP: two light vectors), faded with depth by 0238; colours 1Fh and up become colour & 1Fh. Type 1 faces skip shading and
 carry 1000h (01C9-01CC), and the clipper takes another path for them (0273-0276 -> 068B, then
 0663 at 01D9; docs/08). Every face's colour word then gets the entry's colour bank, flags bits
 8-11 (01CD-01D0). What the colour word selects in the GSP palette is docs/08. HYP for the
@@ -209,12 +219,17 @@ The polygon of a colour-0 face is never read. 20 faces in 5 objects (87, 179, 19
 have colour 0. **MAME**: the record sequences of these faces read exactly the predicted number
 of words (section 7).
 
-**Count above 1 would not work**: 04B2 leaves /SIMCLK in page 1 (it restores /MP but not the
-address), so a record's second polygon would be read from the wrong place after a front-facing
-first one. The ROM never uses it, and the encoder rejects it.
+**Count above 1 would not work**: 04B2 leaves the address at the last projected vertex's z + 1
+(it reads the reciprocal table in page 1 through /SIMCLK at 04C2 and /SIMBUF at 04C5/04E1, then
+restores /MP to the object's page at 04DD-04DE, but not /SIMCLK), and 01DF-01E3 jump back to
+01A8 with no /SIMCLK write, so a record's second polygon would be read from the object's page at
+that address after a front-facing first one. The ROM never uses it, and the encoder rejects it.
 
-**Limits** the encoder checks: three 16-bit coordinates per point, 1 <= vertices and 1 <= normals
-(a DO loop with a count of 0 runs 65536 times), types 1-15, colours 0-63, every face with at
+**Limits** the encoder checks: three 16-bit coordinates per point, 1 <= vertices <= 3FFFh and
+1 <= normals <= 3FFFh (the counts are DO-loop counts loaded into CNTR at 014D and 015F; the
+ADSP-2100's counter is 14 bits, so a larger count would be truncated, and a count of 0 does not
+skip the loop: MAME runs the body once, 2100ops.hxx `slow_condition` and the `& 0x3fff` of every
+CNTR load; HYP for the hardware), types 1-15, colours 0-63, every face with at
 least one vertex, object numbers below 1000h (0056: `AND 0FFF`), every object inside its page.
 The largest object has 269 points (213), so its transformed points end at DM 010D + 3 × 269 =
 0434, below the other DM variables at 08DA up (HYP: the real limit; not probed).
@@ -266,14 +281,14 @@ the page-0 chips (90h, 90k) can only be rebuilt with the ROM image present.
 | 0:019D | 1 | FFFF, the directory's end |
 | 0:019E | 1 | residue (5.3) |
 | 0:019F | 1 | zero padding |
-| 0:01A0-F8F4 | 62,924 + 396 padding | 221 objects |
+| 0:01A0-F8F7 | 62,924 + 396 padding | 221 objects |
 | 0:F8F8 | 1 | checksum word |
 | 0:F8F9-FFFF | 1,799 | zero |
 | 1:0000-7FFF | 32,768 | reciprocal table |
-| 1:8000-FF3C | 32,375 + 201 padding | 107 objects |
+| 1:8000-FF3F | 32,375 + 201 padding | 107 objects |
 | 1:FF40 | 1 | checksum word |
 | 1:FF41-FFFF | 191 | zero |
-| 2:0000-4D7D | 19,651 + 189 padding | 85 objects |
+| 2:0000-4D7F | 19,651 + 189 padding | 85 objects |
 | 2:4D80 | 1 | checksum word |
 | 2:4D81-FFFF | 45,695 | zero |
 
@@ -329,7 +344,16 @@ read tap on 2000; taps observe and do not read the I/O) and cuts the accesses in
 /SIMCLK write starts one, the /SIMBUF reads until the next /SIMCLK write belong to it. Per
 sequence it keeps the PC of the /SIMCLK write, the /MP page at its first read, the start address
 and the number of words read, aggregated as "pc page address reads count" in
-`build/mame/objtrace-{attract,play}.txt`. It never records a ROM word.
+`build/mame/objtrace-{attract,play}.txt`. It never records a ROM word. The run stops at a frame
+boundary, where the ADSP is usually inside a sequence (both runs: `# open_at_end 1`): that last
+sequence may be cut short, so the script drops it instead of recording it, and it is not in the
+counts below.
+
+Both runs start from the factory state: `make objtrace` gives each its own empty NVRAM and cfg
+directories under `build/mame/state-<run>/` (the play run depends on the NVRAM it starts from;
+a play run from a copy of the archive NVRAM that `~/.mame/mame.ini` names gave 3,289,155
+sequences and 127 objects, also with 0 problems). From that state the trace is deterministic: two consecutive `make
+objtrace` runs wrote the same summary. The numbers below assume an empty NVRAM.
 
 `tools/test_objects.py::test_mame_trace_matches_decoder` (skips without the traces) asserts,
 for both runs, that every sequence starts where the decoder has a structure of the kind its PC
@@ -344,14 +368,14 @@ reads and reads exactly as many words as the decoder says:
 | 04C2 | reciprocal | page 1, z in 0001-7FFE | 1 |
 
 and that no /MP write falls between two reads of one sequence and no read precedes the first
-/SIMCLK write. Result (`tools/objects trace`, summary in `artifacts/objtrace-summary.json`):
+/SIMCLK write. Result (`tools/objects trace --summary artifacts/objtrace-summary.json`, the last step of `make objtrace`):
 
 | Run | Frames | Sequences | Directory | Header | Record | Polygon | Reciprocal | Objects loaded |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| attract | 3,600 | 1,036,284 | 13,914 | 13,914 | 238,983 | 225,070 | 544,403 | 137 |
-| play | 7,200 | 3,113,317 | 45,086 | 45,086 | 728,772 | 683,507 | 1,610,866 | 115 |
+| attract | 3,600 | 1,036,283 | 13,914 | 13,914 | 238,982 | 225,070 | 544,403 | 137 |
+| play | 7,200 | 3,113,316 | 45,086 | 45,086 | 728,772 | 683,506 | 1,610,866 | 115 |
 
-**0 problems**: every one of the 4,149,601 sequences matches the decoder, over 3,289 distinct
+**0 problems**: every one of the 4,149,599 sequences matches the decoder, over 3,289 distinct
 record starts and 3,109 distinct polygon starts, the colour-0 faces of object 87 included (the
 other colour-0 objects, 179, 193, 195 and 197, were not loaded); reciprocal reads use z
 0064-4E2E. 174 objects were loaded, 239 never (they are in
@@ -369,7 +393,7 @@ at a non-structure, a reciprocal read at z = 0 and an orphan read, and gets four
 {
   "object": 3,
   "vertices": [ [x, y, z], ... ],        signed 16-bit, object space
-  "normals": [ [x, y, z], ... ],         signed 16-bit, length 4000h
+  "normals": [ [x, y, z], ... ],         signed 16-bit, typically of length about 4000h
   "faces": [
     {"type": 15, "colour": 7, "normal": 0, "vertices": [5, 4, 0, 1]}, ...
   ]
@@ -395,11 +419,11 @@ check); `tools/objects` the CLI:
 
 | Command | What |
 |---|---|
-| `decode` (`make objects`) | reads `build/stunrun-obj.bin` the way the ADSP does and writes data/objects (keeps the manifest's names); fails where the image is not the format |
+| `decode` (`make objects`) | reads `build/stunrun-obj.bin` the way the ADSP does and writes data/objects; keeps the names of the existing manifest (read from the manifest alone, so an invalid mesh file does not lose them) and refuses to overwrite a manifest that does not parse; fails where the image is not the format |
 | `asm` (`make`) | writes `build/obj/page0.asm`-`page2.asm` from data/objects |
 | `encode` | writes the image itself (tests, experiments) |
 | `inventory` | prints the table of section 10 |
-| `trace` | checks the traces and writes `artifacts/objtrace-summary.json` |
+| `trace` | checks the traces against the decoder; with `--summary FILE` (as `make objtrace` runs it) also writes their summary, `artifacts/objtrace-summary.json` |
 
 The decoder is strict: a header count that is not vertices + normals, a record list that does
 not follow the header, polygons out of record order, a count field, a face normal that is not a
