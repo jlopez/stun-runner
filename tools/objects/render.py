@@ -7,10 +7,17 @@ sign of normal . first vertex in camera space, >= 0 looks away and 01E4 skips th
 the viewer at infinity along the view direction d that is normal . d >= 0). Faces of colour 0 are
 skipped as the ADSP skips them (019F -> 01E4). Edges are drawn darker, two-vertex faces as lines.
 
+Type 1 faces are not polygons: the ADSP sends them to `emit_image` (0663, 01D6-01D9: DM 0038
+set by 0197-0198 skips the CALL 04EB polygon path), whose command names an image by the face's
+colour field, and the GSP draws that image as a scaled axis-aligned box from corner 0
+(docs/08 sections 1.4 and 4.4). The image's pixels are not in the object ROMs, so a picture
+draws a type 1 face as a marker only: its outline and both diagonals, unfilled, in the colour of
+its index (= image number); the marker shows where the corners are, not what the GSP draws.
+
 Colours: the face's colour field (0-63) indexes runtime GSP tables that are not in the
 repository, so a picture uses a fixed made-up colour per index (`index_rgb`, a golden-ratio walk
 round the hue circle), lit flatly from the stored normal for the faces the ADSP shades (type 15
-and colour below 1Fh, 0214 at 01C7) and unlit for the others (type 1, colours 1Fh up), or the RGB
+and colour below 1Fh, 0214 at 01C7) and flat for colours 1Fh up and the type 1 markers, or the RGB
 of a palette file (`--palette`, a JSON list of 64 [r, g, b]) if one is given. The pictures
 therefore show shape, face order and which faces share a colour index, not the game's colours.
 
@@ -156,7 +163,8 @@ def _shade(rgb: RGB, k: float) -> RGB:
 
 def face_rgb(mesh: Mesh, face_index: int, palette: Sequence[RGB] | None = None) -> RGB:
     """The fill colour: the index's colour, times 0.35 + 0.65 max(0, n . light) / |n| for the
-    faces the ADSP shades (type other than 1, colour below 1Fh: 0214 at 01C7), unlit otherwise."""
+    faces the ADSP shades (type other than 1, colour below 1Fh: 0214 at 01C7), the index's colour
+    itself otherwise (a type 1 face's marker: its colour field is an image number, 0663)."""
     f = mesh.faces[face_index]
     base = palette[f.colour] if palette else index_rgb(f.colour)
     if f.type == TYPE_UNSHADED or f.colour >= 0x1F:
@@ -191,10 +199,14 @@ def render(
     zbuf = [float("inf")] * (size * size)
     eps = 0.5  # a face later in ROM order wins a tie with a coplanar one (decals, stripes)
     lines: list[tuple[int, RGB]] = []
+    images: list[tuple[int, RGB]] = []
     for k, f in enumerate(mesh.faces):
         if f.colour == 0 or (cull and not face_visible(mesh, k, view)):
             continue
         rgb = face_rgb(mesh, k, palette)
+        if f.type == TYPE_UNSHADED:
+            images.append((k, rgb))  # an image command (0663), not a polygon: a marker only
+            continue
         poly = [scr[i] for i in f.vertices]
         if len(poly) >= 3:
             _fill(canvas, zbuf, poly, rgb, eps)
@@ -206,6 +218,12 @@ def render(
             n = len(poly)
             for i in range(n if n > 2 else 1):
                 _line(canvas, zbuf, poly[i], poly[(i + 1) % n], dark, eps + 1.0)
+    for k, rgb in images:
+        poly = [scr[i] for i in mesh.faces[k].vertices]
+        n = len(poly)
+        pairs = [(i, (i + 1) % n) for i in range(n)] + ([(0, 2), (1, 3)] if n == 4 else [])
+        for i, j in pairs:
+            _line(canvas, zbuf, poly[i], poly[j], rgb, eps + 1.0)
     return canvas
 
 

@@ -723,7 +723,7 @@ name column is the manifest's (everywhere).
 | 220 | 1 | C184 | 15 | 9 | 9 | -481..28 | -81..520 | -49..20 | 138 | AP | 0-1,3-4,6-10,12-23 | lamp_post_a |
 | 221 | 1 | C218 | 16 | 9 | 9 | -29..480 | -81..520 | -21..48 | 139 | AP | 0-1,3-4,6-10,12-23 | lamp_post_b |
 | 222 | 1 | C2B0 | 18 | 1 | 8 | -1600..1600 | 0..0 | -480..480 | 140 | P | 0-5,9-12,23-24 | strip_striped |
-| 223 | 1 | C330 | 4 | 1 | 1 | -250..250 | -2..2 | -800..800 | 141 | - | - | panel_flat_a |
+| 223 | 1 | C330 | 4 | 1 | 1 | -250..250 | -2..2 | -800..800 | 141 | - | - | panel_flat |
 | 224 | 1 | C350 | 12 | 7 | 7 | -125..125 | 6..86 | -1056..1056 | 142 | - | 4,17,22 | plank_bevelled_a |
 | 225 | 1 | C3CC | 12 | 7 | 7 | -192..192 | 6..86 | -1056..1056 | 143 | - | 2 | plank_bevelled_b |
 | 226 | 1 | C448 | 12 | 7 | 7 | -250..250 | 6..80 | -1056..1056 | 144 | AP | 1-4,7-8,10,15-22 | plank_bevelled_c |
@@ -835,7 +835,7 @@ name column is the manifest's (everywhere).
 | 332 | 1 | F2D4 | 106 | 51 | 63 | -51..50 | 60..170 | -161..-23 | 233 | - | - | turret_dish |
 | 333 | 2 | 2BFC | 202 | 58 | 88 | -27..26 | 54..130 | -161..92 | 234 | - | 3,10,13,19 | turret_twin_guns_a |
 | 334 | 2 | 31E0 | 210 | 56 | 88 | -41..40 | 54..160 | -161..92 | 235 | - | - | turret_twin_guns_b |
-| 335 | 1 | F6AC | 4 | 2 | 2 | -385..384 | 0..1248 | 0..0 | 236 | - | - | panel_flat_b |
+| 335 | 1 | F6AC | 4 | 2 | 2 | -385..384 | 0..1248 | 0..0 | 236 | - | - | image_quad_large |
 | 336 | 1 | F6D4 | 7 | 3 | 3 | -248..248 | -2..2 | -496..2008 | 237 | P | 0 | star_flat_a |
 | 337 | 1 | F70C | 6 | 2 | 2 | -248..248 | -2..2 | -496..2008 | 238 | - | 2-3,5-21 | star_flat_b |
 | 338 | 1 | F738 | 59 | 9 | 29 | -1600..1600 | 0..3122 | -448..-320 | 239 | - | 8 | star_disc |
@@ -853,17 +853,17 @@ name column is the manifest's (everywhere).
 | 350 | 0 | F46C | 56 | 27 | 27 | -1611..1611 | -1533..3182 | -3409..3212 | 250 | - | 8 | tunnel_roof_rising |
 | 351 | 0 | F63C | 41 | 21 | 21 | -1601..1600 | -1629..1560 | -3304..3205 | 251 | - | 8 | tunnel_floor_notched |
 | 352 | 0 | F7A4 | 40 | 19 | 19 | -1604..1600 | -1574..1548 | -3254..3254 | 252 | - | 8 | tunnel_divided |
-| 353 | 1 | FD8C | 12 | 6 | 7 | -1025..1024 | -769..768 | -41..200 | 253 | A | - | panel_framed |
-| 354 | 1 | FE00 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 254 | AP | 0-23 | panel_unlit_1 |
-| 355 | 1 | FE20 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 255 | AP | 0-23 | panel_unlit_2 |
-| 356 | 1 | FE40 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 256 | AP | 0-23 | panel_unlit_3 |
-| 357 | 1 | FE60 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 257 | AP | 0-23 | panel_unlit_4 |
-| 358 | 1 | FE80 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 258 | AP | 0-23 | panel_unlit_5 |
-| 359 | 1 | FEA0 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 259 | AP | 0,3,6-10,12-16,18-20,22 | panel_unlit_6 |
-| 360 | 1 | FEC0 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 260 | AP | 0,3,6-10,12-16,18-20,22 | panel_unlit_7 |
-| 361 | 1 | FEE0 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 261 | AP | 0,3,6-10,12-16,18-20,22 | panel_unlit_8 |
-| 362 | 1 | FF00 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 262 | AP | 0,3,6-10,12-16,18-20,22 | panel_unlit_9 |
-| 363 | 1 | FF20 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 263 | AP | 0,3,6-10,12-16,18-20,22 | panel_unlit_10 |
+| 353 | 1 | FD8C | 12 | 6 | 7 | -1025..1024 | -769..768 | -41..200 | 253 | A | - | image_quad_framed |
+| 354 | 1 | FE00 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 254 | AP | 0-23 | image_quad_1 |
+| 355 | 1 | FE20 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 255 | AP | 0-23 | image_quad_2 |
+| 356 | 1 | FE40 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 256 | AP | 0-23 | image_quad_3 |
+| 357 | 1 | FE60 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 257 | AP | 0-23 | image_quad_4 |
+| 358 | 1 | FE80 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 258 | AP | 0-23 | image_quad_5 |
+| 359 | 1 | FEA0 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 259 | AP | 0,3,6-10,12-16,18-20,22 | image_quad_6 |
+| 360 | 1 | FEC0 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 260 | AP | 0,3,6-10,12-16,18-20,22 | image_quad_7 |
+| 361 | 1 | FEE0 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 261 | AP | 0,3,6-10,12-16,18-20,22 | image_quad_8 |
+| 362 | 1 | FF00 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 262 | AP | 0,3,6-10,12-16,18-20,22 | image_quad_9 |
+| 363 | 1 | FF20 | 4 | 1 | 1 | -21..20 | -21..20 | 0..0 | 263 | AP | 0,3,6-10,12-16,18-20,22 | image_quad_10 |
 | 364 | 2 | 3A50 | 18 | 1 | 6 | -324..364 | -288..296 | 0..0 | 264 | - | - | burst_star_1 |
 | 365 | 2 | 3ABC | 27 | 1 | 9 | -480..584 | -500..536 | 0..0 | 265 | - | 22 | burst_star_2 |
 | 366 | 2 | 3B58 | 36 | 1 | 12 | -684..884 | -684..756 | 0..0 | 266 | - | 22 | burst_star_3 |
@@ -982,7 +982,13 @@ classified here.
 at run time (docs/08); they are not in the repository. A picture uses a made-up colour per index
 (`index_rgb`: hue = index × golden ratio mod 1, saturation 0.55, value 0.95), shaded by 0.35 +
 0.65 · max(0, normal · light) for the faces the ADSP shades (type 15 with colour below 1Fh, 0214
-at 01C7) and flat for the others (type 1 and colours 1Fh up). The pictures therefore show shape,
+at 01C7) and flat for colours 1Fh up. Type 1 faces (objects 335 and 353-363) are not drawn as
+polygons: the ADSP turns them into image commands (`emit_image` 0663 at 01D9 instead of the
+polygon path 04EB at 01DB, by DM 0038 = 1 from 0197-0198), the colour field names an image and the
+GSP draws it as a scaled axis-aligned box from corner 0 (docs/08 sections 1.4 and 4.4); the
+image's pixels are not in the object ROMs, so a picture marks such a face by its outline and both
+diagonals, unfilled, in its index colour, which shows where its corners are and nothing of the
+image. The pictures therefore show shape,
 face order and which faces share an index, **not the game's colours** (the player's vehicle is
 red on screen; it is green and orange here). `--palette FILE` takes a JSON list of 64 [r, g, b]
 instead, for a palette captured from MAME into build/ (never committed); no such capture exists
@@ -1044,8 +1050,8 @@ the frames repeat).
 | 213-252 | `arch`, `pillar_*`, `coil_stack_*`, `lamp_post_*`, `burst_1`-`4` (+ `_far`), `rod_clamped_*`, `fighter_spiky_a/b`, ... | arches, pillars, lamp posts, flat pieces, bursts of shards, rods with clamps, spiky craft | 252 by constant descriptor A3h (0x0364D4) | level runs 32/40, levels 0-24; 35 of 40 with the objtrace runs (242-244 only there) | shape |
 | 253-310 | `shards_1`-`5`, `debris_1`-`4`, `umbrella`, `fan`, `winged_craft_1`-`6`, `crown_spiked`, `saucer_lumpy`, `dart_1`-`4`, ... | sprays of shards, debris, domes, fans, a winged craft in six wing positions, darts; the tetrahedra 272 and 273, the prisms 289 and 291, the wedges 287 and 290 (seven corners each) | 292-297 one animated family: an entity created with descriptor C1h, object 292 (0x033BD2, 0x0414A8, through 0x02EF4C), is stepped through descriptors C1h-C6h, objects 292-297, and back to C1h, by 0x037CF4-0x037D1E (every 5 ticks of +69h) and 0x040F10-0x040F3A (every 2 ticks of +66h) (section 3.2); 301/302 (CAh/CBh), 306 (CFh), 309 (D2h) by constant descriptors | level runs 47/58, levels 0-24 | shape |
 | 311-330 | `target_octagon_1`-`4`, `ring_round_1`-`12`, `ring_oval_1`-`4` | 311-314: concentric octagons; 315-326: concentric circular rings (8 faces of 10 vertices) centred on the z axis, every vertex at one of a few radii (992, 1175, 1354 and 1536 in 315), in three sizes, four objects each with the same radii: outer radius 1536 (315-318), 1152 (319-322) and 768 (323-326); 327-330: oval rings, 3840 × 2304 (x -1920..1920, y -1632..672 in 327), centred at y -480. The contact sheet's three-quarter view foreshortens the circles of 315-326 into ovals; `render --view rear` shows them round | | level runs 4/20, levels 5-6,8,10,13,15,18-19,21-22 | shape |
-| 331-352 | `cannon_long`, `turret_*`, `star_disc`, `zigzag_*`, `capsule_star`, `chain_*`, `girders_*`, `tunnel_roof_rising`, `tunnel_floor_notched`, `tunnel_divided` | guns on mounts, a star disc, zigzag lines, girders, three special tunnel sections | 343/344 pair | level runs 14/22, levels 0,2-3,5-21 | tunnels identified, the rest shape |
-| 353-367 | `panel_framed`, `panel_unlit_1`-`10`, `burst_star_1`-`4` | a framed panel, flat type-1 quadrilaterals (unshaded), star bursts | | level runs 13/15, levels 0-23; 14 of 15 with the objtrace runs (353 only there) | shape |
+| 331-352 | `cannon_long`, `turret_*`, `image_quad_large`, `star_disc`, `zigzag_*`, `capsule_star`, `chain_*`, `girders_*`, `tunnel_roof_rising`, `tunnel_floor_notched`, `tunnel_divided` | guns on mounts, a star disc, zigzag lines, girders, three special tunnel sections; 335: two type 1 faces on one 769 × 1248 rectangle (image 1, an image quad as 354-363) | 343/344 pair | level runs 14/22, levels 0,2-3,5-21 | tunnels identified, the rest shape |
+| 353-367 | `image_quad_framed`, `image_quad_1`-`10`, `burst_star_1`-`4` | 353: a frame of shaded faces around one type 1 face; 354-363: one type 1 face each (colour fields 3-12); star bursts. A type 1 face is an image command, not a polygon (`emit_image` 0663, reached at 01D9 when DM 0038 = 1, set by 0197-0198; the polygon path 04EB at 01DB is skipped): the colour field is an image number and the GSP draws the image as a scaled box from corner 0 (docs/08 sections 1.4 and 4.4); the renderer marks each by its outline and diagonals only (section 11.1) | | level runs 13/15, levels 0-23; 14 of 15 with the objtrace runs (353 only there) | shape |
 | 368-393 | `letter_a`-`letter_z` | the letters A-Z, one per object | | level runs 18/26, levels 22 | identified by shape (where the game shows them is not established) |
 | 394-412 | `tetrahedron_1`-`19` | 19 tetrahedra of one geometry with separate vertices per face, differing only in colour except 403 and 404, which are identical (colour 50) | | level runs 19/19, levels 22 | shape |
 
@@ -1165,7 +1171,8 @@ object by number (or the arrows) or by name (a search box over the manifest's na
 orbit, wheel to zoom; toggles for wireframe, the ADSP's culling (normal · (first vertex - eye) <
 0, from the current eye), face normals (from each face's centroid), axes, vertex and face
 indices. It shows the counts, the face types and the bounding box, and the colours of section
-11.1. Object space is shown as Three.js (x, y, -z), so the left-handed data is not mirrored.
+11.1; type 1 faces get the renderer's marker (outline and diagonals, unfilled), drawn whatever
+the culling toggle says. Object space is shown as Three.js (x, y, -z), so the left-handed data is not mirrored.
 **Editing**: change a vertex in `data/objects/NNN.json` and press *reload* (or tick *reload
 every second*): the page re-reads the file without cache and redraws; `make check` then shows
 what the edit does to the ROM (section 8.3).

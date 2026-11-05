@@ -186,14 +186,24 @@ def test_stored_normals_far_from_the_face_normal() -> None:
         assert winding(m, i) == "agrees", i
 
 
-def test_unshaded_faces_keep_the_index_colour() -> None:
-    """Type 1 faces (and colours 1Fh up) are not shaded (01C9-01CC, 0214): the fill is the index
-    colour itself; a shaded face is darker or equal."""
-    flat = render(quad(-0x4000, colour=9, type_=1), "rear", 32)
-    centre = 3 * (16 * 32 + 16)
-    assert tuple(flat.pixels[centre : centre + 3]) == index_rgb(9)
+def test_type_1_faces_are_image_markers() -> None:
+    """A type 1 face is an image command (0663 at 01D9, not the polygon path 04EB: 01D6-01D8),
+    so the renderer does not fill it: it draws its outline and diagonals in the index colour
+    (the image number's) and leaves the rest empty; a type 15 face of the same corners is filled,
+    shaded darker or equal (0214)."""
+    marker = render(quad(-0x4000, colour=9, type_=1), "rear", 32)
+    background = render(quad(-0x4000, colour=0), "rear", 32)
     lit = render(quad(-0x4000, colour=9), "rear", 32)
-    assert all(a <= b for a, b in zip(lit.pixels[centre : centre + 3], index_rgb(9), strict=True))
+
+    def at(c: Canvas, x: int, y: int) -> tuple[int, ...]:
+        o = 3 * (y * 32 + x)
+        return tuple(c.pixels[o : o + 3])
+
+    assert at(marker, 16, 16) == index_rgb(9)  # the diagonals cross at the centre
+    assert at(marker, 16, 9) == at(background, 16, 9)  # inside, off the diagonals: not filled
+    assert at(marker, 4, 16) == index_rgb(9)  # the outline
+    assert at(lit, 16, 9) != at(background, 16, 9)
+    assert all(a <= b for a, b in zip(at(lit, 16, 9), index_rgb(9), strict=True))
 
 
 def test_views_are_rotations() -> None:
@@ -254,7 +264,8 @@ def test_shape_words_match_the_geometry() -> None:
     every prism is one; a wedge is a solid of five to seven faces that is neither; a box has eight
     corners or more; a hexagon or an octagon has a face of six or eight vertices; a ring_round is
     circular in object space (equal x and y extents, centred on the z axis), a ring_oval is not;
-    a panel (but a folded or framed one) is flat."""
+    a panel (but a folded one) is flat; an image_quad is every object with a type 1 face (an
+    image command, 0663) and only those."""
     _, meshes, names = read_data(DATA)
     checked = 0
     tetrahedra, prisms = set(), set()
@@ -271,6 +282,7 @@ def test_shape_words_match_the_geometry() -> None:
             and not coplanar(corners)
         )
         is_prism = (len(corners), sides) == (6, [3, 3, 4, 4, 4])
+        assert name.startswith("image_quad_") == any(f.type == 1 for f in m.faces), name
         if is_tetrahedron:
             tetrahedra.add(n)
             assert name.startswith("tetrahedron_"), name
@@ -286,6 +298,8 @@ def test_shape_words_match_the_geometry() -> None:
             assert is_prism, name
         elif name.startswith("wedge_"):
             assert not is_tetrahedron and not is_prism and 5 <= len(m.faces) <= 7, name
+        elif name.startswith("image_quad_"):
+            assert all(len(f.vertices) == 4 for f in m.faces if f.type == 1), name
         elif name.startswith("box_"):
             assert len(corners) >= 8, name
         elif "hexagon" in name:
@@ -296,13 +310,13 @@ def test_shape_words_match_the_geometry() -> None:
             assert (min(xs), max(xs)) == (min(ys), max(ys)) == (-max(xs), max(xs)), name
         elif name.startswith("ring_oval_"):
             assert max(xs) - min(xs) > 1.2 * (max(ys) - min(ys)), name
-        elif name.startswith("panel_") and not name.startswith(("panel_folded", "panel_framed")):
+        elif name.startswith("panel_") and not name.startswith("panel_folded"):
             assert coplanar(corners), name
         else:
             continue
         checked += 1
     assert len(tetrahedra) == 28 and len(prisms) == 12
-    assert checked == 79
+    assert checked == 80
 
 
 def test_docs_table_names_are_the_manifest() -> None:
