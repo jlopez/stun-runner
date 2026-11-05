@@ -167,7 +167,7 @@ descriptor`. Examples of call sites: descriptors 0-10 (0 by `clr.l -(A7)` at 0x0
 by `pea` of a word) are taken at 0x0254A4-0x025610 and 0x02BDBA-0x02BED4 and passed with the
 vehicle entities 0xFF9C80 + 3Eh × k (k = 0-7: 9C80, 9CBE, 9CFC, 9D3A, 9D78, 9DB6, 9DF4, 9E32) to
 0x02EC9C, and D2h goes with 0xFF9E70 (0x02561A -> 0x025634, 0x02BEDE -> 0x02BEF8), the entity
-after them (= 0xFF9C80 + 3Eh × 8) that section 3.1 lists apart from the eight vehicles; descriptor 7Bh + D2 (0x031D68, 0x0323F0) steps through the iris rings 204-209; 0x0364D4 (A3h -> object 252), 0x03665A and 0x03BFDE (94h -> 230/231), 0x03BE02 (93h
+after them (= 0xFF9C80 + 3Eh × 8) that section 3.1 lists apart from the eight vehicles; descriptor 7Bh + n with n the byte at 0xFFDC86 steps through the iris, objects 205-211: 0x0323DA runs when the byte is 0, makes it 1 (`addq.b` at 0x0323E2) and selects 7Bh + 1 = descriptor 124 (0x0323F0), then 0x031D1E goes on while it is not 0, increments it (0x031D36) and selects 7Bh + n (0x031D68) while n <= 7 (`cmp.l d5,d2` / `bls` at 0x031D40, d5 = 7 from 0x031D00): descriptors 124-130, objects 205-211; 204 (descriptor 123, the closed iris) is selected elsewhere (a linear disassembly of 0x020000-0x05FFFF has no other immediate 7Bh next to a call of 0x02ECF0; M5); 0x0364D4 (A3h -> object 252), 0x03665A and 0x03BFDE (94h -> 230/231), 0x03BE02 (93h
 -> 229), 0x037D0C (C1h -> 292), 0x0380EA / 0x03819A (CBh / CAh -> 302 / 301), 0x027B60-0x02842C
 (CFh -> 306), 0x025616 / 0x028030 / 0x02BEDA (D2h -> 309). What these entities are in the game is M5's.
 
@@ -695,8 +695,8 @@ name column is the manifest's (everywhere).
 | 195 | 0 | A7A8 | 32 | 11 | 11 | -1647..1647 | -1561..1728 | -3200..3200 | 115f | - | 16,19 | tunnel_wire_17_far |
 | 196 | 0 | A888 | 50 | 19 | 19 | -1600..1600 | -1561..1561 | -3200..3200 | 116 | - | 16 | tunnel_wire_18 |
 | 197 | 0 | A9F8 | 38 | 12 | 12 | -1647..1647 | -1561..1728 | -3200..3200 | 116f | - | 16 | tunnel_wire_18_far |
-| 198 | 1 | 9DA4 | 7 | 1 | 2 | -680..436 | -212..28 | 0..0 | 117 | P | 1 | sign_arrow_left |
-| 199 | 1 | 9DD4 | 7 | 1 | 2 | -436..680 | -212..28 | 0..0 | 118 | P | 1 | sign_arrow_right |
+| 198 | 1 | 9DA4 | 7 | 1 | 2 | -680..436 | -212..28 | 0..0 | 117 | P | 1 | sign_arrow_right |
+| 199 | 1 | 9DD4 | 7 | 1 | 2 | -436..680 | -212..28 | 0..0 | 118 | P | 1 | sign_arrow_left |
 | 200 | 1 | 9E04 | 14 | 1 | 4 | -616..616 | -170..10 | 1..1 | 119 | - | 11,14 | sign_arrows_inward |
 | 201 | 1 | 9E58 | 14 | 1 | 4 | -632..632 | -170..10 | 1..1 | 120 | AP | 7-8,10-11,13,17-19,21 | sign_arrows_outward |
 | 202 | 1 | 9EAC | 79 | 1 | 20 | -820..814 | -224..156 | 0..0 | 121 | P | 0-2,4-5,9-12 | sign_station |
@@ -707,8 +707,8 @@ name column is the manifest's (everywhere).
 | 207 | 1 | A3EC | 36 | 1 | 8 | -1600..1600 | 0..3122 | 0..0 | 126 | AP | 0-22 | iris_4 |
 | 208 | 1 | A4AC | 35 | 1 | 8 | -1600..1600 | 0..3122 | 0..0 | 127 | AP | 0-22 | iris_5 |
 | 209 | 1 | A56C | 35 | 1 | 8 | -1600..1600 | 0..3122 | 0..0 | 128 | AP | 0-22 | iris_6 |
-| 210 | 1 | A62C | 34 | 1 | 8 | -1600..1600 | 0..3122 | 0..0 | 129 | AP | 0-22 | ring_thin |
-| 211 | 1 | A6E8 | 29 | 1 | 8 | -1600..1600 | 0..3105 | 0..0 | 130 | AP | 0-22 | ring_dashed |
+| 210 | 1 | A62C | 34 | 1 | 8 | -1600..1600 | 0..3122 | 0..0 | 129 | AP | 0-22 | iris_7 |
+| 211 | 1 | A6E8 | 29 | 1 | 8 | -1600..1600 | 0..3105 | 0..0 | 130 | AP | 0-22 | iris_8 |
 | 212 | 1 | A788 | 27 | 1 | 19 | -3200..3200 | -999..4121 | 0..0 | 131 | P | 0-22 | ring_spiked |
 | 213 | 1 | A870 | 215 | 54 | 132 | -5001..3750 | -2501..8000 | -1501..1500 | 132 | P | 0-5,9-12 | arch |
 | 214 | 1 | AFB4 | 66 | 1 | 16 | -5001..3750 | -2501..8000 | -1701..-1601 | 132f | P | 0-5,9-12 | arch_far |
@@ -933,14 +933,14 @@ the four in a 2 × 2 grid in that order. `tools/test_render.py` checks each is a
 mirror). Two signs are stored **upside down**, not mirrored: in the rear view of 202 (STATION)
 and 203 (CAUTION) the letters are turned 180° in the picture plane (T, U and A drawn inverted,
 the word running right to left, the arc opening upwards), a rotation about z and not a
-reflection, so no handedness question arises (198-201 are symmetric arrows). The game turns
+reflection, so no handedness question arises. The game turns
 them back (MAME): with `LEVELS_MATRIX=202,203` (section 11.4) the entry's matrix that the ADSP
 holds at each load (DM 0000-0008, section 2) is, at start level 0, diag(-4000h, -4000h, 4000h)
 within a few units for every load of 202 (frames 2819-2912) and of 203 (from frame 4465), in Q14
 a 180° turn about z with determinant +1; at start levels 1 and 14 every matrix logged also has -4000h in
 the middle, some with a turn about y added (the tunnel's heading), all proper rotations. The snapshots at frames 2908 and 4508 of start level 0 (`LEVELS_SNAP`) show
 STATION and CAUTION reading correctly as an arch over the tunnel. Open question 8 keeps only
-the 68k call site.
+the 68k call site. The single arrows 198 and 199 get the same turn, so the game shows them pointing the other way from their stored (and rendered) direction: with `LEVELS_MATRIX=198,199,200,201` at start level 1 every matrix logged for them is a turn about y times diag(-4000h, -4000h, 4000h) (198 at frame 1270, 36 loads: exactly the diagonal; 199 at frame 1500: m00 = -198, m02 = m20 = 16382, m11 = -16384, m22 = 198), and 198's normal is (0, 0, -4000h) as 202's. 198's head is stored at x = -680 (the shaft ends at x = 436), drawn pointing left in the rear view, so it points right in the game; 199 is its mirror. The names follow the game: 198 `sign_arrow_right`, 199 `sign_arrow_left`. The pairs 200 (heads towards the centre) and 201 (away from it) are unchanged by the turn; 201 gets the same diagonal at start level 7 (frame 1338).
 
 **Culling** follows the ADSP, not the winding: a face is drawn when its stored normal points at
 the viewer (01A8-01A9: `read_face_normal` returns the sign of normal · first vertex in camera
@@ -977,7 +977,7 @@ Every object 0-412 has a name in `data/objects/manifest.json` (the `names` field
 does not read it, and `make check` stays at 0 differences after the renaming). Convention:
 lowercase identifiers usable as 68k labels (`[a-z][a-z0-9_]*`), unique; a **far** object (the
 far object of a descriptor, the 100 marked "f" in section 10) is its near object's name + `_far`;
-variants form **numbered families** (`iris_1`-`iris_6`, `letter_a`-`letter_z`); tunnel bends
+variants form **numbered families** (`iris_1`-`iris_8`, `letter_a`-`letter_z`); tunnel bends
 carry their measured end cut (`tunnel_bend_xp7_yn5`: the -z end's plane is tilted about 7° with
 +x forwards and 5° with -y forwards, from a least-squares fit of the vertices of the -z half; the
 +z end is square in every bend). The angle is rounded to the nearest degree, except that the
@@ -1005,13 +1005,13 @@ the frames repeat).
 | 0-7 | `player_craft_body`, `_fin_left/right`, `_wing_left/right`, `_pod_left/right`, `_guns` | drawn together (`player-craft-0-7.png`) they make one vehicle: a body with canopy, two fins, two side wings, two pods, twin gun barrels; parts are placed in one object space (x of 1 is -87..-13, of 2 12..86) | descriptors 0-7, all near = far, bound to the vehicle entities 0xFF9C80 + 3Eh·k (section 3.2) by 0x02543A: when the level word 0xFF9578 is not 0 (`tst.w` at 0x02549C, `bne` to 0x0254F2) it binds 0, 3 and 4 to 0xFF9C80, 0xFF9D3A and 0xFF9D78, then (both branches, from 0x025562) 1, 2, 5, 6 and 7 to the other entities | loaded in both objtrace runs and at levels 1-22; at level 0 only object 0 (589 loads from frame 1073 in run 00), never 1-7. The snapshots at frame 2200 of start levels 5 and 14 and at 4508 of start level 0 (level word 1 by then) show this vehicle, fins, wings and pods, at the bottom centre, the camera behind it; at level word 0 (start level 0, frames 2200 and 2908) the vehicle is the bare body, object 0's shape, without them | identified: the player's vehicle (1-7 from level 1 on) |
 | 8-10 | `player_craft_rear_left`, `_rear_right`, `_front` | 8 and 9 the rear halves (z -271..-19, x <= 0 and >= 0), 10 a long nose (z -157..276) | descriptors 8-10; when the level word is 0, 0x02543A binds 10, 8 and 9 (0x0254A4-0x0254F0) to the entities that get 0, 3 and 4 otherwise (0xFF9C80, 0xFF9D3A, 0xFF9D78); 0x02BD48 binds 10, 8 and 9 to them unconditionally (from 0x02BDBA) | play only: run 00 loads them at level 0, 8 times each, all from frame 1042, after which object 0 takes over (from frame 1073); run 22 at level 22 from frame 7337. Drawn together they give object 0's picture cut in three (`render --view all 8-10` against `0`) | identified (CODE, MAME): the player's vehicle body in three parts, bound at level word 0 and by 0x02BD48; which routine swaps object 0 back in at frame 1073 is M5's |
 | 11-47 | `box_windowed_a`, `craft_a`-`craft_d`, `wedge_*`, `slab_*`, `rod_*`, ... | boxes, wedges, slabs, rods; 22, 24, 30 and 39 vehicle-shaped | LOD pairs 11/12, 13/14, 15/16, 22/23, 24/25, 30/31, 39/40 | all 37 loaded (35 in attract) | shape |
-| 48-99 | `tunnel_straight`, `tunnel_bend_*`, `tunnel_r1200_straight`, `tunnel_r800_straight`, `tunnel_taper_A_B`, `tunnel_transition_1`-`4`, `tunnel_fork`, `tunnel_bend_sharp_*` | open cylinders 6400 long (z -3200..3200), radius 1600 with a floor strip (colour 60), 16-sided near / 8-sided far; tapers name the radii at -z and +z | 26 near/far pairs, descriptors 41-66 | 44 of 52 loaded, levels 0-22 | identified: tunnel sections (the snapshots of start level 0 at 2200 and 2908 and of start level 1 at 1500 are inside such tunnels: a 16-sided tube with a floor strip); the bend/taper/transition labels are geometry |
+| 48-99 | `tunnel_straight`, `tunnel_bend_*`, `tunnel_r1200_straight`, `tunnel_r800_straight`, `tunnel_taper_A_B`, `tunnel_transition_1`-`4`, `tunnel_fork`, `tunnel_bend_sharp_*` | open cylinders 6400 long (z -3200..3200), radius 1600, the wall 18 faces near / 8 far (in 48 a 20-gon at 18° steps whose two bottom sides are replaced by the floor strip, colour 60, from (±494, -1561)); tapers name the radii at -z and +z | 26 near/far pairs, descriptors 41-66 | 44 of 52 loaded, levels 0-22 | identified: tunnel sections (the snapshots of start level 0 at 2200 and 2908 and of start level 1 at 1500 are inside such tunnels: a many-sided tube with a floor strip); the bend/taper/transition labels are geometry |
 | 100-121 | `track_wide`, `track_narrow`, `track_narrowing`, `track_widening`, `track_fork`, `track_*_bend_N` | flat strips at the tunnel floor's height (y -1561..-1401), 3264 or 1052 wide | pairs, descriptors 67-77 | 16 of 22 | identified: open track (the snapshots of start level 14 at 2200 and of start level 5 at 1232 show the vehicle on a track in the open; levels 1 and 14 load 100-107 and 114-117, level 5 100-104) |
 | 122-133 | `tunnel_mouth_a`, `tunnel_mouth_flared`, `tunnel_square_a/b`, `tunnel_roof_raised`, `pyramid_large`, `ramp` | a tunnel whose roof comes down to the floor, a flared one, two square-section halls (6400 × 5120), a tunnel with a raised roof, a square pyramid (far: a nine-sided cone), a ramp | 130/131 are descriptor 83, the 0xFFDC74 entity of section 3.1 | 10 of 12 | tunnels identified as above; 126-133 shape |
 | 134-161 | `tunnel_taper_800_1200`, `tunnel_r800_bend_*`, `tunnel_r1200_bend_*` | the narrower tunnels (radius 800 and 1200, colour 4) | pairs, descriptors 85-98 | 20 of 28, levels 2-22 only | identified: tunnel sections |
 | 162-197 | `tunnel_wire_1`-`18` | tunnels whose wall is partly line faces (colour 8) and partly solid (colour 2) | pairs, descriptors 99-116 (descriptors 115 and 116, objects 194/195 and 196/197, hold each other's +4 field, section 3.2) | 32 of 36, levels 0 and 12-22 | identified: tunnel sections ("wire" names the line faces; the line-drawn look of the level-5 snapshot, start level 5 at 2200, is not these objects: among 48-197 level 5 loads only 48-53, 56-57, 60-61, 86-93, 100-104, 128-129 and 131, so that look comes from the run-time colours) |
-| 198-203 | `sign_arrow_left/right`, `sign_arrows_inward/outward`, `sign_station`, `sign_caution` | arrows; the words STATION and CAUTION, stored upside down (section 11.1) | | all 6 | identified by their text and shape; STATION and CAUTION seen as an arch over the tunnel (start level 0, frames 2908 and 4508) |
-| 204-212 | `iris_1`-`6`, `ring_thin`, `ring_dashed`, `ring_spiked` | a disc of eight blades opening to a thin ring | 0x031D68 steps descriptor 7Bh + D2 through 204-209 | all 9, every level | identified: the iris door at a tunnel mouth (MAME): at start level 5, 204 and 212 load from frame 1028 and 205-211 once each in turn at frames 1215-1249, and the snapshots at 1220, 1232 and 1244 show blades opening in a tunnel mouth ahead of the vehicle; which picture each number gives is the render's, not checked frame by frame |
+| 198-203 | `sign_arrow_right/left`, `sign_arrows_inward/outward`, `sign_station`, `sign_caution` | arrows; the words STATION and CAUTION; all stored upside down (section 11.1), so 198 and 199 are named by the direction the game shows, the opposite of their render | | all 6 | identified by their text and shape (198/199's direction by the entry matrices, MAME); STATION and CAUTION seen as an arch over the tunnel (start level 0, frames 2908 and 4508) |
+| 204-212 | `iris_1`-`8`, `ring_spiked` | 204-211: a disc of eight blades, closed in 204 and opening step by step to a thin broken ring in 211 (28-36 vertices, 1 normal, 8 faces each, two colours); 212: a wider ring with spikes (27 vertices, 19 faces) | 0x0323F0 and 0x031D68 select descriptors 124-130, objects 205-211, in turn by the step byte 0xFFDC86 (section 3.2); 204 is descriptor 123, selected elsewhere | all 9, every level | identified: the iris door at a tunnel mouth (MAME): at start level 5, 204 and 212 load from frame 1028 and 205-211 once each in turn at frames 1215-1249, and the snapshots at 1220, 1232 and 1244 show blades opening in a tunnel mouth ahead of the vehicle; which picture each number gives is the render's, not checked frame by frame |
 | 213-252 | `arch`, `pillar_*`, `coil_stack_*`, `lamp_post_*`, `burst_1`-`4` (+ `_far`), `rod_clamped_*`, `fighter_spiky_a/b`, ... | arches, pillars, lamp posts, flat pieces, bursts of shards, rods with clamps, spiky craft | 252 by constant descriptor A3h (0x0364D4) | 35 of 40 | shape |
 | 253-310 | `shards_1`-`5`, `debris_1`-`4`, `umbrella`, `fan`, `winged_craft_1`-`6`, `crown_spiked`, `saucer_lumpy`, `dart_1`-`4`, ... | sprays of shards, debris, domes, fans, a winged craft in six wing positions, darts | 292 (C1h), 301/302 (CAh/CBh), 306 (CFh), 309 (D2h) by constant descriptors | 47 of 58 | shape |
 | 311-330 | `target_octagon_1`-`4`, `ring_oval_1`-`16` | concentric octagons, concentric oval rings | | 4 of 20 | shape |
@@ -1042,16 +1042,17 @@ its normals face inwards, as the ADSP culls it when the camera is outside:
 
 ![objects 48-49](../artifacts/objects/tunnel-straight-48-49.png)
 
-**The signs**, 198-203 (`sign_arrow_left` 7/1/2, `sign_arrow_right`, `sign_arrows_inward` 14/1/4,
-`sign_arrows_outward`, `sign_station`, `sign_caution`), rear view:
+**The signs**, 198-203 (`sign_arrow_right` 7/1/2, `sign_arrow_left`, `sign_arrows_inward` 14/1/4,
+`sign_arrows_outward`, `sign_station`, `sign_caution`), rear view, as stored: the game turns
+all six 180° about z (section 11.1), so 198 and 199 point the other way and the words read upright:
 `tools/objects render --sheet --view rear --tile 128 --columns 6 --out FILE 198-203`.
 
 ![objects 198-203](../artifacts/objects/signs-198-203.png)
 
-**The iris**, 204-209 (`iris_1`-`iris_6`, 28-36 vertices, 1 normal, 8 faces each), rear view:
-`tools/objects render --sheet --view rear --tile 128 --columns 6 --out FILE 204-209`.
+**The iris**, 204-211 (`iris_1`-`iris_8`, 28-36 vertices, 1 normal, 8 faces each), rear view:
+`tools/objects render --sheet --view rear --tile 128 --columns 8 --out FILE 204-211`.
 
-![objects 204-209](../artifacts/objects/iris-204-209.png)
+![objects 204-211](../artifacts/objects/iris-204-211.png)
 
 **All 413**, three-quarter view, 64-pixel tiles (137 KB):
 `tools/objects render --sheet --tile 64 --columns 24 --out FILE 0-412`.
@@ -1068,13 +1069,16 @@ M5's work through the descriptor call sites.
 pressed every 20 frames, the yoke left centred (the game keeps the vehicle in the tunnel and
 completes some levels on its own). It records, per object, the level word (0xFF9578) in force
 at each directory read (PC 009E). **Only play is counted**, from the first trigger press (frame
-1020, `LEVELS_FROM`): the attract demo goes on loading objects until frame 963, three frames
-after the start press, and the level select has already turned the level word to the start
+1020, `LEVELS_FROM`): the attract demo goes on loading objects until frame 965, the frame the
+start button is released (pressed at 960), and the level select has already turned the level word to the start
 level by then, so counting from frame 0 filed the demo's objects (94-99, 201 and 226 among
-them) under every start level. No object is loaded from frame 964 to 1026 in any run, and the
-game's first load is at frame 1027 or later. Counted this way, 94-99 load at levels 7-8, 10-11,
+them) under every start level. No object is loaded from frame 966 to 1025 (runs of objlevels.lua with the frame in place of the level word in its key and
+`LEVELS_FROM=900`, at start levels 0, 5 and 12, 1,100 frames), and the game's first load is at frame 1026
+or later (1026 in 20 of the 23 runs of `make objlevels`, 1027 in 2, 1042 at start level 0;
+`tools/test_objects.py` checks the bound and `counted_from` on the runs in build/mame/). Counted this way, 94-99 load at levels 7-8, 10-11,
 13, 17-18 and 21 only, 201 at those and 19, 226 at 15 of the 23; the objtrace attract run
-(run column "A") is where the demo's loads are recorded. **The level select is a scratch poke**, documented here
+(run column "A") is where the demo's loads are recorded. **The level select is a poke** (a MAME write tap, not a game feature; committed in
+`tools/mame/objlevels.lua`, pending Jesus's answer to the card in CLAUDE.md section 5), documented here
 exactly: the game clears the words 0xFF9578 and 0xFF9556 (`clr.w` at 0x02B95E and 0x02B964; 0xFF9578
 also at 0x024322, in the routine 0x024306 that `game_reset` calls); in 0x02543A, the routine
 that sets up the player's vehicle, a compiled-out debug switch at 0x025712 (`moveq #0,d1` at 0x0256FC always selects case 0) would set

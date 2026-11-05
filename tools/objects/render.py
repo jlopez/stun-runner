@@ -377,7 +377,7 @@ PICTURES: dict[str, str] = {
     "player-craft-0-7.png": "--view all --size 160 0-7",
     "tunnel-straight-48-49.png": "--sheet --tile 192 --columns 2 48-49",
     "signs-198-203.png": "--sheet --view rear --tile 128 --columns 6 198-203",
-    "iris-204-209.png": "--sheet --view rear --tile 128 --columns 6 204-209",
+    "iris-204-211.png": "--sheet --view rear --tile 128 --columns 8 204-211",
     "contact-sheet.png": "--sheet --tile 64 --columns 24 0-412",
 }
 
