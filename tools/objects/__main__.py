@@ -29,7 +29,7 @@ levels   reads the per-level MAME runs (tools/mame/objlevels.lua) and writes the
 render   draws objects to a PNG (tools/objects/render.py): NUMBERS such as 0, 0-7 or 48,50-53;
          several objects without --sheet are drawn together in their shared object space (the
          parts of one vehicle), --sheet tiles them with their numbers (a contact sheet). VIEW is
-         three-quarter, front, top, side, or all (the four in a 2 x 2 grid). --no-cull draws the
+         three-quarter, rear, top, side, or all (the four in a 2 x 2 grid). --no-cull draws the
          faces that look away too; --palette a JSON list of 64 [r, g, b] for the colour indices.
 pictures rewrites the pictures docs/07 shows (render.PICTURES); `make pictures`.
 trace    checks MAME traces of the ADSP's object-ROM reads (tools/mame/objtrace.lua) against the

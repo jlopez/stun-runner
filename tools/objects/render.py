@@ -371,7 +371,7 @@ def parse_numbers(text: str) -> list[int]:
 
 
 # The pictures docs/07 section 11 shows: file name -> the `render` arguments. `make pictures`
-# writes them (tools/objects pictures) and tools/test_objects.py regenerates each and compares
+# writes them (tools/objects pictures) and tools/test_render.py regenerates each and compares
 # its pixels with the committed file.
 PICTURES: dict[str, str] = {
     "player-craft-0-7.png": "--view all --size 160 0-7",
