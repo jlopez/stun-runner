@@ -246,27 +246,48 @@ def coplanar(points: list[tuple[int, int, int]]) -> bool:
 
 
 def test_shape_words_match_the_geometry() -> None:
-    """The shape words in the names say what the mesh is (docs/07 section 11.2, review r5):
-    a tetrahedron has four corners and four triangles, not coplanar; a prism two triangles and
-    three quadrilaterals on six corners; a hexagon or an octagon a face of six or eight vertices;
-    a ring_round is circular in object space (equal x and y extents, centred on the z axis), a
-    ring_oval is not; a panel (but a folded or framed one) is flat."""
+    """The shape words in the names say what the mesh is, both ways (docs/07 section 11.2,
+    reviews r5 and r6): every object of four non-coplanar corners and four triangles is a
+    tetrahedron and every tetrahedron is one; every object of six corners, two triangles and
+    three quadrilaterals is a prism, unless a proportion word (rod, slab: longest extent at least
+    three times the middle one) or an identified role (the player craft's wings) names it, and
+    every prism is one; a wedge is a solid of five to seven faces that is neither; a box has eight
+    corners or more; a hexagon or an octagon has a face of six or eight vertices; a ring_round is
+    circular in object space (equal x and y extents, centred on the z axis), a ring_oval is not;
+    a panel (but a folded or framed one) is flat."""
     _, meshes, names = read_data(DATA)
     checked = 0
+    tetrahedra, prisms = set(), set()
     for n, name in names.items():
         m = meshes[n]
         corners = sorted(set(m.vertices))
         sides = sorted(len(f.vertices) for f in m.faces)
         xs, ys = [v[0] for v in m.vertices], [v[1] for v in m.vertices]
+        extents = sorted(max(v[i] for v in corners) - min(v[i] for v in corners) for i in range(3))
+        is_tetrahedron = (
+            len(corners) == 4
+            and sides == [3, 3, 3, 3]
+            and all(len({m.vertices[i] for i in f.vertices}) == 3 for f in m.faces)
+            and not coplanar(corners)
+        )
+        is_prism = (len(corners), sides) == (6, [3, 3, 4, 4, 4])
+        if is_tetrahedron:
+            tetrahedra.add(n)
+            assert name.startswith("tetrahedron_"), name
+        if is_prism:
+            prisms.add(n)
+            if name.startswith(("rod_", "slab_")):
+                assert extents[2] >= 3 * extents[1], name
+            else:
+                assert name.startswith(("prism_", "player_craft_wing_")), name
         if name.startswith("tetrahedron_"):
-            assert len(corners) == 4 or len(m.vertices) == 12, name
-            assert sides == [3, 3, 3, 3], name
-            for f in m.faces:
-                assert len({m.vertices[i] for i in f.vertices}) == 3, name
-            if len(corners) == 4:
-                assert not coplanar(corners), name
+            assert is_tetrahedron, name
         elif name.startswith("prism_"):
-            assert (len(corners), sides) == (6, [3, 3, 4, 4, 4]), name
+            assert is_prism, name
+        elif name.startswith("wedge_"):
+            assert not is_tetrahedron and not is_prism and 5 <= len(m.faces) <= 7, name
+        elif name.startswith("box_"):
+            assert len(corners) >= 8, name
         elif "hexagon" in name:
             assert 6 in sides and 8 not in sides, name
         elif "octagon" in name:
@@ -280,7 +301,8 @@ def test_shape_words_match_the_geometry() -> None:
         else:
             continue
         checked += 1
-    assert checked == 61
+    assert len(tetrahedra) == 28 and len(prisms) == 12
+    assert checked == 79
 
 
 def test_docs_table_names_are_the_manifest() -> None:

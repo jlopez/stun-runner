@@ -517,37 +517,37 @@ name column is the manifest's (everywhere).
 | 14 | 0 | 0F04 | 20 | 8 | 8 | -251..250 | 0..274 | -563..562 | 12f | AP | 1-3,8,10,19,21-22 | box_windowed_b_far |
 | 15 | 0 | 0FA0 | 19 | 14 | 14 | -251..250 | 0..274 | -837..-563 | 13 | AP | 1-3,8,10-11,16,19,21-22 | block_rounded |
 | 16 | 0 | 1078 | 6 | 1 | 1 | -251..250 | 0..274 | -563..-563 | 13f | AP | 1,3,8,10-11,16,19,21-22 | block_rounded_far |
-| 17 | 0 | 10A0 | 6 | 5 | 5 | -125..124 | -21..18 | -93..84 | 14 | A | 1-2,8,10-11,19,21-22 | wedge_a |
+| 17 | 0 | 10A0 | 6 | 5 | 5 | -125..124 | -21..18 | -93..84 | 14 | A | 1-2,8,10-11,19,21-22 | prism_a |
 | 18 | 0 | 10F0 | 6 | 5 | 5 | -21..26 | -21..22 | -289..308 | 15 | A | 1-2,8,10-11,19,21-22 | rod_a |
-| 19 | 0 | 1140 | 6 | 5 | 5 | -41..26 | -37..36 | -167..130 | 16 | A | 1-2,8,10-11,19,21-22 | wedge_b |
+| 19 | 0 | 1140 | 6 | 5 | 5 | -41..26 | -37..36 | -167..130 | 16 | A | 1-2,8,10-11,19,21-22 | prism_b |
 | 20 | 0 | 1190 | 4 | 4 | 4 | -71..86 | -71..90 | -63..60 | 17 | A | 1-2,8,10-11,19,21-22 | tetrahedron_large |
 | 21 | 0 | 11CC | 17 | 7 | 8 | -139..110 | -25..24 | -145..136 | 18 | A | 1-2,8,10-11,19,21-22 | strip_bent |
 | 22 | 0 | 1258 | 76 | 63 | 70 | -269..268 | 0..180 | -445..544 | 19 | AP | 2-3,5,7-22 | craft_a |
 | 23 | 0 | 1618 | 55 | 28 | 37 | -281..280 | 0..180 | -461..576 | 19f | - | 2-3,5,7-20,22 | craft_a_far |
 | 24 | 0 | 1838 | 39 | 33 | 33 | -103..102 | 0..204 | -451..410 | 20 | A | 2-3,5-22 | craft_b |
 | 25 | 0 | 1A18 | 12 | 10 | 10 | -91..90 | 0..156 | -405..390 | 20f | - | 2-3,5-16,18-20,22 | craft_b_far |
-| 26 | 0 | 1AA8 | 4 | 4 | 4 | -37..36 | -27..14 | -109..68 | 21 | A | 2-3,5-7,9-10,12-22 | wedge_c |
-| 27 | 0 | 1AE4 | 4 | 4 | 4 | -37..42 | -31..62 | -127..84 | 22 | A | 2-3,5-7,9-10,12-22 | tetrahedron_a |
+| 26 | 0 | 1AA8 | 4 | 4 | 4 | -37..36 | -27..14 | -109..68 | 21 | A | 2-3,5-7,9-10,12-22 | tetrahedron_a |
+| 27 | 0 | 1AE4 | 4 | 4 | 4 | -37..42 | -31..62 | -127..84 | 22 | A | 2-3,5-7,9-10,12-22 | tetrahedron_b |
 | 28 | 0 | 1B20 | 8 | 6 | 6 | -21..46 | -41..60 | -123..104 | 23 | A | 2-3,5-7,9-10,12-22 | box_skewed |
-| 29 | 0 | 1B80 | 6 | 5 | 5 | -37..36 | -59..42 | -51..78 | 24 | A | 2-3,5-7,9-10,12-22 | box_a |
+| 29 | 0 | 1B80 | 6 | 5 | 5 | -37..36 | -59..42 | -51..78 | 24 | A | 2-3,5-7,9-10,12-22 | prism_c |
 | 30 | 0 | 1BD0 | 67 | 58 | 59 | -361..360 | 0..312 | -665..666 | 25 | A | 5-22 | craft_c |
 | 31 | 0 | 1F10 | 30 | 22 | 22 | -363..362 | 0..312 | -665..666 | 25f | A | 5-22 | craft_c_far |
 | 32 | 0 | 205C | 6 | 5 | 5 | -71..62 | -31..24 | -249..252 | 26 | A | 5-16,18-22 | slab_a |
-| 33 | 0 | 20AC | 6 | 5 | 5 | -71..30 | -67..66 | -223..278 | 27 | A | 5-16,18-22 | prism_a |
-| 34 | 0 | 20FC | 6 | 5 | 5 | -55..66 | -41..56 | -195..230 | 28 | A | 5-16,18-22 | prism_b |
-| 35 | 0 | 214C | 4 | 4 | 4 | -61..48 | -35..58 | -75..54 | 29 | A | 5-16,18-22 | tetrahedron_b |
-| 36 | 0 | 2188 | 4 | 4 | 4 | -45..76 | -89..20 | -73..60 | 30 | A | 5-16,18-22 | wedge_d |
-| 37 | 0 | 21C4 | 4 | 4 | 4 | -101..130 | -45..48 | -113..68 | 31 | A | 5-16,18-22 | spike |
-| 38 | 0 | 2200 | 10 | 5 | 5 | -141..140 | -83..76 | -91..100 | 32 | A | 5-16,18-22 | prism_c |
+| 33 | 0 | 20AC | 6 | 5 | 5 | -71..30 | -67..66 | -223..278 | 27 | A | 5-16,18-22 | prism_d |
+| 34 | 0 | 20FC | 6 | 5 | 5 | -55..66 | -41..56 | -195..230 | 28 | A | 5-16,18-22 | prism_e |
+| 35 | 0 | 214C | 4 | 4 | 4 | -61..48 | -35..58 | -75..54 | 29 | A | 5-16,18-22 | tetrahedron_c |
+| 36 | 0 | 2188 | 4 | 4 | 4 | -45..76 | -89..20 | -73..60 | 30 | A | 5-16,18-22 | tetrahedron_d |
+| 37 | 0 | 21C4 | 4 | 4 | 4 | -101..130 | -45..48 | -113..68 | 31 | A | 5-16,18-22 | tetrahedron_e |
+| 38 | 0 | 2200 | 10 | 5 | 5 | -141..140 | -83..76 | -91..100 | 32 | A | 5-16,18-22 | prism_f |
 | 39 | 0 | 225C | 54 | 52 | 52 | -281..280 | 0..320 | -869..864 | 33 | A | 6-16,18-22 | craft_d |
 | 40 | 0 | 2534 | 35 | 15 | 16 | -217..216 | 0..300 | -639..694 | 33f | A | 6-16,18-22 | craft_d_far |
 | 41 | 0 | 2650 | 10 | 5 | 5 | -53..132 | -19..34 | -195..282 | 34 | A | 6-16,18-22 | slab_b |
 | 42 | 0 | 26AC | 7 | 7 | 7 | -139..138 | -49..68 | -59..38 | 35 | A | 6-16,18-22 | block_faceted |
-| 43 | 0 | 2710 | 8 | 7 | 7 | -133..132 | -37..52 | -109..132 | 36 | A | 6-16,18-22 | wedge_e |
+| 43 | 0 | 2710 | 8 | 7 | 7 | -133..132 | -37..52 | -109..132 | 36 | A | 6-16,18-22 | wedge_a |
 | 44 | 0 | 277C | 27 | 8 | 9 | -33..16 | -27..42 | -231..302 | 37 | A | 6-16,18-22 | rod_b |
 | 45 | 0 | 2834 | 10 | 8 | 9 | -51..46 | -53..84 | -461..604 | 38 | A | 6-16,18-22 | rod_c |
 | 46 | 0 | 28B8 | 8 | 6 | 6 | -81..80 | -21..20 | -461..360 | 39 | A | 6-16,18-22 | slab_c |
-| 47 | 0 | 2918 | 4 | 4 | 4 | -81..80 | -21..20 | -239..238 | 40 | A | 6-16,18-22 | wedge_f |
+| 47 | 0 | 2918 | 4 | 4 | 4 | -81..80 | -21..20 | -239..238 | 40 | A | 6-16,18-22 | tetrahedron_f |
 | 48 | 0 | 2954 | 38 | 19 | 19 | -1600..1600 | -1561..1561 | -3200..3200 | 41 | AP | 0-23 | tunnel_straight |
 | 49 | 0 | 2AA0 | 18 | 9 | 9 | -1647..1647 | -1561..1728 | -3200..3200 | 41f | AP | 0-23 | tunnel_straight_far |
 | 50 | 0 | 2B40 | 38 | 19 | 19 | -1600..1600 | -1561..1561 | -3304..3304 | 42 | AP | 0-22 | tunnel_bend_xp7 |
@@ -772,12 +772,12 @@ name column is the manifest's (everywhere).
 | 269 | 0 | CDA0 | 15 | 1 | 3 | -244..237 | -37..-37 | -172..273 | 174f | - | 20 | propeller_far |
 | 270 | 0 | CDF4 | 26 | 21 | 21 | -184..183 | 63..381 | -217..-4 | 175 | - | 6,8,11-12,14-15,19-22 | umbrella |
 | 271 | 0 | CF20 | 17 | 10 | 10 | -184..183 | 63..378 | -244..-4 | 175f | - | 20 | umbrella_far |
-| 272 | 0 | CFC8 | 4 | 4 | 4 | -71..70 | -61..108 | -31..64 | 176 | - | 6,8,10-12,14-15,17,19-22 | tetrahedron_c |
-| 273 | 0 | D004 | 12 | 4 | 4 | -67..56 | -43..32 | -59..118 | 177 | - | 6,8,10-12,14-15,17,19-22 | shard |
+| 272 | 0 | CFC8 | 4 | 4 | 4 | -71..70 | -61..108 | -31..64 | 176 | - | 6,8,10-12,14-15,17,19-22 | tetrahedron_g |
+| 273 | 0 | D004 | 12 | 4 | 4 | -67..56 | -43..32 | -59..118 | 177 | - | 6,8,10-12,14-15,17,19-22 | tetrahedron_h |
 | 274 | 0 | D058 | 8 | 6 | 6 | -9..8 | -29..24 | -41..36 | 178 | - | 6,8,10-12,14-15,17,19-22 | beam_a |
 | 275 | 0 | D0B8 | 8 | 6 | 6 | -9..8 | -29..24 | -41..36 | 179 | - | 6,8,10-12,14-15,17,19-22 | beam_b |
 | 276 | 0 | D118 | 12 | 7 | 7 | -79..82 | -27..26 | -49..56 | 180 | - | 6,8,10-12,14-15,17,19-22 | slab_curved |
-| 277 | 0 | D190 | 13 | 8 | 8 | -69..64 | -29..24 | -75..72 | 181 | - | 6,8,10-12,14-15,17,19-22 | panel_folded_a |
+| 277 | 0 | D190 | 13 | 8 | 8 | -69..64 | -29..24 | -75..72 | 181 | - | 6,8,10-12,14-15,17,19-22 | panel_folded |
 | 278 | 0 | D214 | 13 | 6 | 6 | -71..86 | -19..18 | -51..44 | 182 | - | 6,8,10-12,14-15,17,19-22 | blade_thin |
 | 279 | 0 | D284 | 75 | 68 | 72 | -1441..1440 | 28..256 | -2161..716 | 183 | A | 7,12-13,16-19,21-22 | fan |
 | 280 | 0 | D678 | 38 | 17 | 18 | -1441..1440 | 28..140 | -2161..716 | 183f | A | 7,12-13,16-19,21-22 | fan_far |
@@ -787,11 +787,11 @@ name column is the manifest's (everywhere).
 | 284 | 0 | DAD0 | 16 | 2 | 2 | -23..-21 | 34..132 | -781..-683 | 185f | - | - | plate_octagon_far |
 | 285 | 0 | DB24 | 12 | 2 | 2 | -455..450 | -17..32 | -323..322 | 186 | - | 16,19 | blade |
 | 286 | 0 | DB68 | 8 | 6 | 6 | -101..100 | -51..50 | -83..78 | 187 | - | 16,19 | block_bevelled |
-| 287 | 0 | DBC8 | 7 | 7 | 7 | -53..52 | -23..18 | -63..78 | 188 | - | 16,19 | wedge_g |
+| 287 | 0 | DBC8 | 7 | 7 | 7 | -53..52 | -23..18 | -63..78 | 188 | - | 16,19 | wedge_b |
 | 288 | 0 | DC2C | 5 | 4 | 4 | -35..46 | -41..40 | -325..316 | 189 | - | 16,19 | needle |
-| 289 | 0 | DC6C | 18 | 5 | 5 | -65..96 | -9..16 | -49..56 | 190 | - | 16,19 | wedge_h |
-| 290 | 0 | DCE0 | 18 | 5 | 5 | -21..4 | -51..66 | -125..132 | 191 | - | 16,19 | wedge_i |
-| 291 | 0 | DD54 | 6 | 5 | 5 | -49..40 | -41..52 | -61..64 | 192 | - | 16,19 | panel_folded_b |
+| 289 | 0 | DC6C | 18 | 5 | 5 | -65..96 | -9..16 | -49..56 | 190 | - | 16,19 | prism_g |
+| 290 | 0 | DCE0 | 18 | 5 | 5 | -21..4 | -51..66 | -125..132 | 191 | - | 16,19 | wedge_c |
+| 291 | 0 | DD54 | 6 | 5 | 5 | -49..40 | -41..52 | -61..64 | 192 | - | 16,19 | prism_h |
 | 292 | 0 | DDA4 | 33 | 27 | 35 | -1286..1267 | -192..93 | -557..659 | 193 | A | 7,11-12,14,18,20-21 | winged_craft_1 |
 | 293 | 0 | DF5C | 33 | 29 | 35 | -1283..1283 | -212..265 | -645..571 | 194 | A | 7,11-12,14,18,20-21 | winged_craft_2 |
 | 294 | 0 | E118 | 35 | 29 | 35 | -946..971 | -240..698 | -557..659 | 195 | A | 7,11-12,14,18,20-21 | winged_craft_3 |
@@ -1006,7 +1006,7 @@ far object of a descriptor, the 100 marked "f" in section 10) is its near object
 variants form **numbered families** (`iris_1`-`iris_8`, `letter_a`-`letter_z`); tunnel bends
 carry their measured end cut (`tunnel_bend_xp7_yn5`: the -z end's plane is tilted about 7° with
 +x forwards and 5° with -y forwards, from a least-squares fit of the vertices of the -z half; the
-+z end is square in every bend). The angle is rounded to the nearest degree, except that the
++z end is square in every bend); shape words say the topology both ways: `tetrahedron_` is every object of four non-coplanar corners and four triangles, `prism_` every one of six corners, two triangles and three quadrilaterals unless a proportion word (`rod_`, `slab_`: the longest extent at least three times the middle one) or an identified role (`player_craft_wing_*`) names it, `wedge_` a solid of five to seven faces that is neither, `box_` one of eight corners or more. The angle is rounded to the nearest degree, except that the
 x cut of every gentle bend, which fits at 7.47-7.50° in all three radii (50-73, 138-141,
 150-153), is written 7 throughout, so equal geometry gets equal names; the sharp bends 96-99 fit
 at 26.7° (27). `tools/test_render.py` checks the form and the uniqueness, and that section 10's name column is
@@ -1033,7 +1033,7 @@ the frames repeat).
 |---|---|---|---|---|---|
 | 0-7 | `player_craft_body`, `_fin_left/right`, `_wing_left/right`, `_pod_left/right`, `_guns` | drawn together (`player-craft-0-7.png`) they make one vehicle: a body with canopy, two fins, two side wings, two pods, twin gun barrels; parts are placed in one object space (x of 1 is -87..-13, of 2 12..86) | descriptors 0-7, all near = far, bound to the vehicle entities 0xFF9C80 + 3Eh·k (section 3.2) by 0x02543A: when the level word 0xFF9578 is not 0 (`tst.w` at 0x02549C, `bne` to 0x0254F2) it binds 0, 3 and 4 to 0xFF9C80, 0xFF9D3A and 0xFF9D78, then (both branches, from 0x025562) 1, 2, 5, 6 and 7 to the other entities | level runs 8/8, levels 0-24; loaded in both objtrace runs; 1-7 at levels 1-24, at level 0 only object 0 (589 loads from frame 1073 in run 00), never 1-7. The snapshots at frame 2200 of start levels 5 and 14 and at 4508 of start level 0 (level word 1 by then) show this vehicle, fins, wings and pods, at the bottom centre, the camera behind it; at level word 0 (start level 0, frames 2200 and 2908) the vehicle is the bare body, object 0's shape, without them | identified: the player's vehicle (1-7 from level 1 on) |
 | 8-10 | `player_craft_rear_left`, `_rear_right`, `_front` | 8 and 9 the rear halves (z -271..-19, x <= 0 and >= 0), 10 a long nose (z -157..276) | descriptors 8-10; when the level word is 0, 0x02543A binds 10, 8 and 9 (0x0254A4-0x0254F0) to the entities that get 0, 3 and 4 otherwise (0xFF9C80, 0xFF9D3A, 0xFF9D78); 0x02BD48 binds 10, 8 and 9 to them unconditionally (from 0x02BDBA) | level runs 3/3, levels 0,22; play only: run 00 loads them at level 0, 8 times each, all from frame 1042, after which object 0 takes over (from frame 1073); run 22 at level 22 from frame 7337. Drawn together they give object 0's picture cut in three (`render --view all 8-10` against `0`) | identified (CODE, MAME): the player's vehicle body in three parts, bound at level word 0 and by 0x02BD48; which routine swaps object 0 back in at frame 1073 is M5's |
-| 11-47 | `box_windowed_a`, `craft_a`-`craft_d`, `wedge_*`, `slab_*`, `rod_*`, `prism_a`-`c`, `tetrahedron_large`, `tetrahedron_a/b`, ... | boxes, wedges, slabs, rods, prisms (33, 34, 38: two triangles and three quadrilaterals), tetrahedra (20, 27, 35: four triangles, not coplanar); 22, 24, 30 and 39 vehicle-shaped | LOD pairs 11/12, 13/14, 15/16, 22/23, 24/25, 30/31, 39/40 | level runs 37/37, levels 1-3,5-22; 35 of 37 in the objtrace runs (35 in attract; 23 and 25 only in the level runs) | shape |
+| 11-47 | `box_windowed_a/b`, `box_skewed`, `block_*`, `craft_a`-`craft_d`, `prism_a`-`f`, `tetrahedron_large`, `tetrahedron_a`-`f`, `wedge_a`, `slab_a`-`c`, `rod_a`-`c`, `strip_bent` | boxes, blocks, slabs, rods; the prisms 17, 19, 29, 33, 34 and 38, and 18 and 32 (a rod and a slab of the same shape), all six corners, two triangles and three quadrilaterals; the tetrahedra 20, 26, 27, 35, 36, 37 and 47 (four corners, four triangles, not coplanar); a wedge, 43 (eight corners, seven faces); 22, 24, 30 and 39 vehicle-shaped | LOD pairs 11/12, 13/14, 15/16, 22/23, 24/25, 30/31, 39/40 | level runs 37/37, levels 1-3,5-22; 35 of 37 in the objtrace runs (35 in attract; 23 and 25 only in the level runs) | shape |
 | 48-99 | `tunnel_straight`, `tunnel_bend_*`, `tunnel_r1200_straight`, `tunnel_r800_straight`, `tunnel_taper_A_B`, `tunnel_transition_1`-`4`, `tunnel_fork`, `tunnel_bend_sharp_*` | open cylinders 6400 long (z -3200..3200), radius 1600, the wall 18 faces near / 8 far (in 48 a 20-gon at 18° steps whose two bottom sides are replaced by the floor strip, colour 60, from (±494, -1561)); tapers name the radii at -z and +z | 26 near/far pairs, descriptors 41-66 | level runs 44/52, levels 0-23 | identified: tunnel sections (the snapshots of start level 0 at 2200 and 2908 and of start level 1 at 1500 are inside such tunnels: a many-sided tube with a floor strip); the bend/taper/transition labels are geometry |
 | 100-121 | `track_wide`, `track_narrow`, `track_narrowing`, `track_widening`, `track_fork`, `track_*_bend_N` | flat strips at the tunnel floor's height (y -1561..-1401), 3264 or 1052 wide | pairs, descriptors 67-77 | level runs 16/22, levels 0-24 | identified: open track (the snapshots of start level 14 at 2200 and of start level 5 at 1232 show the vehicle on a track in the open; levels 1 and 14 load 100-107 and 114-117, level 5 100-104) |
 | 122-133 | `tunnel_mouth_a`, `tunnel_mouth_flared`, `tunnel_square_a/b`, `tunnel_roof_raised`, `pyramid_large`, `ramp` | a tunnel whose roof comes down to the floor, a flared one, two square-section halls (6400 × 5120), a tunnel with a raised roof, a square pyramid (far: a nine-sided cone), a ramp | 130/131 are descriptor 83, the 0xFFDC74 entity of section 3.1 | level runs 10/12, levels 0-23 | tunnels identified as above; 126-133 shape |
@@ -1042,7 +1042,7 @@ the frames repeat).
 | 198-203 | `sign_arrow_right/left`, `sign_arrows_inward/outward`, `sign_station`, `sign_caution` | arrows; the words STATION and CAUTION; all stored upside down (section 11.1), so 198 and 199 are named by the direction the game shows, the opposite of their render | | level runs 6/6, levels 0-23 | identified by their text and shape (198/199's direction by the entry matrices, MAME); STATION and CAUTION seen as an arch over the tunnel (start level 0, frames 2908 and 4508) |
 | 204-212 | `iris_1`-`8`, `ring_spiked` | 204-211: a disc of eight blades, closed in 204 and opening step by step to a thin broken ring in 211 (28-36 vertices, 1 normal, 8 faces each, two colours); 212: a wider ring with spikes (27 vertices, 19 faces) | 0x0323F0 and 0x031D68 select descriptors 124-130, objects 205-211, in turn by the step byte 0xFFDC86 (section 3.2); 204 is descriptor 123, selected elsewhere | level runs 9/9, levels 0-22 | identified: the iris door at a tunnel mouth (MAME): at start level 5, 204 and 212 load from frame 1028 and 205-211 once each in turn at frames 1215-1249, and the snapshots at 1220, 1232 and 1244 show blades opening in a tunnel mouth ahead of the vehicle; which picture each number gives is the render's, not checked frame by frame |
 | 213-252 | `arch`, `pillar_*`, `coil_stack_*`, `lamp_post_*`, `burst_1`-`4` (+ `_far`), `rod_clamped_*`, `fighter_spiky_a/b`, ... | arches, pillars, lamp posts, flat pieces, bursts of shards, rods with clamps, spiky craft | 252 by constant descriptor A3h (0x0364D4) | level runs 32/40, levels 0-24; 35 of 40 with the objtrace runs (242-244 only there) | shape |
-| 253-310 | `shards_1`-`5`, `debris_1`-`4`, `umbrella`, `fan`, `winged_craft_1`-`6`, `crown_spiked`, `saucer_lumpy`, `dart_1`-`4`, ... | sprays of shards, debris, domes, fans, a winged craft in six wing positions, darts | 292-297 one animated family: an entity created with descriptor C1h, object 292 (0x033BD2, 0x0414A8, through 0x02EF4C), is stepped through descriptors C1h-C6h, objects 292-297, and back to C1h, by 0x037CF4-0x037D1E (every 5 ticks of +69h) and 0x040F10-0x040F3A (every 2 ticks of +66h) (section 3.2); 301/302 (CAh/CBh), 306 (CFh), 309 (D2h) by constant descriptors | level runs 47/58, levels 0-24 | shape |
+| 253-310 | `shards_1`-`5`, `debris_1`-`4`, `umbrella`, `fan`, `winged_craft_1`-`6`, `crown_spiked`, `saucer_lumpy`, `dart_1`-`4`, ... | sprays of shards, debris, domes, fans, a winged craft in six wing positions, darts; the tetrahedra 272 and 273, the prisms 289 and 291, the wedges 287 and 290 (seven corners each) | 292-297 one animated family: an entity created with descriptor C1h, object 292 (0x033BD2, 0x0414A8, through 0x02EF4C), is stepped through descriptors C1h-C6h, objects 292-297, and back to C1h, by 0x037CF4-0x037D1E (every 5 ticks of +69h) and 0x040F10-0x040F3A (every 2 ticks of +66h) (section 3.2); 301/302 (CAh/CBh), 306 (CFh), 309 (D2h) by constant descriptors | level runs 47/58, levels 0-24 | shape |
 | 311-330 | `target_octagon_1`-`4`, `ring_round_1`-`12`, `ring_oval_1`-`4` | 311-314: concentric octagons; 315-326: concentric circular rings (8 faces of 10 vertices) centred on the z axis, every vertex at one of a few radii (992, 1175, 1354 and 1536 in 315), in three sizes, four objects each with the same radii: outer radius 1536 (315-318), 1152 (319-322) and 768 (323-326); 327-330: oval rings, 3840 × 2304 (x -1920..1920, y -1632..672 in 327), centred at y -480. The contact sheet's three-quarter view foreshortens the circles of 315-326 into ovals; `render --view rear` shows them round | | level runs 4/20, levels 5-6,8,10,13,15,18-19,21-22 | shape |
 | 331-352 | `cannon_long`, `turret_*`, `star_disc`, `zigzag_*`, `capsule_star`, `chain_*`, `girders_*`, `tunnel_roof_rising`, `tunnel_floor_notched`, `tunnel_divided` | guns on mounts, a star disc, zigzag lines, girders, three special tunnel sections | 343/344 pair | level runs 14/22, levels 0,2-3,5-21 | tunnels identified, the rest shape |
 | 353-367 | `panel_framed`, `panel_unlit_1`-`10`, `burst_star_1`-`4` | a framed panel, flat type-1 quadrilaterals (unshaded), star bursts | | level runs 13/15, levels 0-23; 14 of 15 with the objtrace runs (353 only there) | shape |
