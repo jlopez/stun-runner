@@ -19,18 +19,43 @@
 -- Every object the ADSP loads starts with a /SIMCLK write of its number at PC 009E (docs/07
 -- section 2). The script taps that write and counts, per (object, level word at that moment), the
 -- loads; it writes "object level first_frame count" lines to <LEVELS_NAME>.txt after "# key
--- value" header lines (frames, start level, the number of replaced writes). Object numbers,
--- levels, frames and counts only: no ROM or RAM contents.
+-- value" header lines (frames, start level, the number of replaced writes, the first frame
+-- counted). Object numbers, levels, frames and counts only: no ROM or RAM contents.
+--
+-- Attract mode is not counted: the attract demo goes on loading objects until frame 963, three
+-- frames after the start press (94-99, 201 and 226 among them), and the level select already
+-- turns the level word to N there. Only loads from the first trigger press on (LEVELS_FROM,
+-- frame 1020) are counted; no object is loaded from frame 964 to 1026 at any start level, and
+-- the game's first load is at frame 1027 or later.
+--
+-- LEVELS_SNAP=f1,f2,... also saves a snapshot (manager.machine.video:snapshot(), headless) at
+-- each of those frames into the -snapshot_directory (`make objlevels` gives each run its own,
+-- build/mame/state-objlevels-NN/snap), named 0000.png, 0001.png, ... in frame order; the
+-- frames are listed in the output header. Docs/07 section 11.2 cites its pictures this way.
+--
+-- LEVELS_MATRIX=o1,o2,... also writes <LEVELS_NAME>.matrix.txt: for each load of those objects,
+-- the entry's rotation matrix as the ADSP holds it at PC 009E (DM 0000-0008, signed Q14, copied
+-- from entity +14h, docs/07 section 2), one line per distinct (object, matrix) with its first
+-- frame and count: "object first_frame count m00 m01 m02 m10 ... m22". ADSP data RAM, run-time
+-- state, not ROM bytes.
 
 local OUT = os.getenv("LEVELS_DIR") or "./"
 local NAME = os.getenv("LEVELS_NAME") or "objlevels"
 local START = tonumber(os.getenv("LEVELS_START") or "0")
 local FRAMES = tonumber(os.getenv("LEVELS_FRAMES") or "8000")
+local FROM = tonumber(os.getenv("LEVELS_FROM") or "1020")
+local SNAP = {}
+for f in (os.getenv("LEVELS_SNAP") or ""):gmatch("%d+") do SNAP[tonumber(f)] = true end
+local SNAP_LIST = os.getenv("LEVELS_SNAP") or ""
+local MATRIX = {}
+for o in (os.getenv("LEVELS_MATRIX") or ""):gmatch("%d+") do MATRIX[tonumber(o)] = true end
+local matrices, matrix_keys = {}, {}
 
 local machine = manager.machine
 local adsp = machine.devices[":mainpcb:adsp"]
 local pc_state = adsp.state["PC"]
 local cpu = machine.devices[":mainpcb:maincpu"].spaces["program"]
+local dm = adsp.spaces["data"]
 
 local frame, replaced = 0, 0
 local first, counts = {}, {}
@@ -38,10 +63,23 @@ local first, counts = {}, {}
 -- Taps stay referenced from globals: a collected tap is removed.
 LEVELS_DIR_TAP = adsp.spaces["data"]:install_write_tap(0x2001, 0x2001, "objlevels_w",
   function(offset, value)
-    if pc_state.value - 1 == 0x009E then -- the PC already points past the write
+    if frame >= FROM and pc_state.value - 1 == 0x009E then -- the PC already points past the write
       local key = string.format("%d %d", value & 0xFFFF, cpu:read_u16(0xFF9578))
       if not first[key] then first[key] = frame end
       counts[key] = (counts[key] or 0) + 1
+      if MATRIX[value & 0xFFFF] then
+        local m = {}
+        for i = 0, 8 do
+          local w = dm:read_u16(i)
+          m[#m + 1] = w >= 0x8000 and w - 0x10000 or w
+        end
+        local mk = string.format("%d %s", value & 0xFFFF, table.concat(m, " "))
+        if not matrices[mk] then
+          matrices[mk] = { frame, 0 }
+          matrix_keys[#matrix_keys + 1] = mk
+        end
+        matrices[mk][2] = matrices[mk][2] + 1
+      end
     end
   end)
 
@@ -65,6 +103,7 @@ assert(coin and start and trigger, "stunrun input fields not found")
 
 LEVELS_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
   frame = frame + 1
+  if SNAP[frame] then machine.video:snapshot() end
   if frame == 900 then coin:set_value(1) elseif frame == 905 then coin:clear_value() end
   if frame == 960 then start:set_value(1) elseif frame == 965 then start:clear_value() end
   if frame >= 1020 then
@@ -80,11 +119,21 @@ LEVELS_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
       return tonumber(a2) < tonumber(b2)
     end)
     local f = assert(io.open(OUT .. NAME .. ".txt", "w"))
-    f:write(string.format("# frames %d\n# start_level %d\n# replaced_writes %d\n", FRAMES, START,
-      replaced))
+    f:write(string.format("# frames %d\n# start_level %d\n# replaced_writes %d\n# counted_from %d\n",
+      FRAMES, START, replaced, FROM))
+    if SNAP_LIST ~= "" then f:write(string.format("# snapshots %s\n", SNAP_LIST)) end
     f:write("# object level first_frame count\n")
     for _, k in ipairs(keys) do f:write(string.format("%s %d %d\n", k, first[k], counts[k])) end
     f:close()
+    if #matrix_keys > 0 then
+      local g = assert(io.open(OUT .. NAME .. ".matrix.txt", "w"))
+      g:write("# object first_frame count m00 m01 m02 m10 m11 m12 m20 m21 m22\n")
+      for _, mk in ipairs(matrix_keys) do
+        local o, rest = mk:match("^(%d+) (.*)$")
+        g:write(string.format("%s %d %d %s\n", o, matrices[mk][1], matrices[mk][2], rest))
+      end
+      g:close()
+    end
     io.write(string.format("objlevels.lua: %d frames, start %d, %d keys -> %s%s.txt\n", FRAMES,
       START, #keys, OUT, NAME))
     machine:exit()
