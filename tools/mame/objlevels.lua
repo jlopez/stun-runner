@@ -10,8 +10,8 @@
 -- vehicle shoots. The yoke is left centred: the game keeps the vehicle in the tunnel.
 --
 -- Level select (a scratch poke, not a game feature): the level is the word at 0xFF9578, with a
--- copy at 0xFF9556. The game clears both when it starts (0x02543A); its compiled-out debug switch
--- at 0x025712 (`moveq #0,d1` at 0x0256FC selects case 0) would set them to 0Fh, 0Dh, 0Ch or 04h
+-- copy at 0xFF9556. The game clears both (clr.w at 0x02B95E and 0x02B964; 0xFF9578 also at
+-- 0x024322); in 0x02543A a compiled-out debug switch at 0x025712 (`moveq #0,d1` at 0x0256FC selects case 0) would set them to 0Fh, 0Dh, 0Ch or 04h
 -- (cases 1, 2, 4, 8 at 0x02572C-0x02581C). With LEVELS_START=N the script replaces every write
 -- of 0 to either word by N (a write tap that returns the new value), and nothing else: the level
 -- still advances when one is completed, and LEVELS_START=0 changes nothing.

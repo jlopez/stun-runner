@@ -37,6 +37,9 @@ the object path hands over to them.
   checksum words, zero fill, and **one residue word** (0:019E) the format does not explain.
   `data/objects` (a manifest and 413 mesh files) is now the source of the object image, and
   `make check` rebuilds the six files byte for byte from it (section 8).
+- (M3c) Every object has a final name, `tools/objects render` draws them, `tools/objects/viewer.html`
+  shows them interactively, and a per-level MAME run of all 23 levels raises the objects seen
+  loaded from 174 to 336 of 413 (section 11).
 
 ## 2. How the ADSP drives the object ROMs (CODE, MAME)
 
@@ -322,42 +325,17 @@ word, and checks that it reproduces the image (`decode()` re-encodes and compare
 
 ## 6. The inventory
 
-413 objects, numbered by their directory index (= entry words 0/1 = descriptor +0/+2). The
-names are **provisional** (HYP): they come from the shape of the decoded geometry (looked at in
-scratch wireframes, not committed: the viewer is M3c), from the descriptor pairs (far LOD
-objects) and from the traces; M3c renders them and refines the names, M5 ties them to the game's
-entities. Families:
+413 objects, numbered by their directory index (= entry words 0/1 = descriptor +0/+2). Every
+object has a final name in `data/objects/manifest.json` (M3c); section 11.2 gives the naming
+convention and the evidence per family, section 10 the table. The objtrace runs of section 7
+loaded 174 objects; the per-level runs of section 11.4 loaded 332, together 336; 77 were never
+loaded (listed in 11.4). Every one of the 413 is the near or far object of a populated
+descriptor.
 
-| Objects | Provisional family | Evidence |
-|---|---|---|
-| 0-10 | shapes of the eight vehicle entities and their variants | descriptors 0-10 (radius 1131), bound to the vehicle entities at 0x0254A4-0x025610 and 0x02BDBA-0x02BED4 (section 3.2); 0, 7, 9, 10 have craft-like geometry |
-| 11-47 | craft (22-25, 30-31, 39-40), panels, wedges, boxes, slabs | geometry; LOD pairs 11/12, 13/14, 15/16, 22/23, 24/25, 30/31 |
-| 48-99, 128-129, 194-196, 350-352 | tunnel sections (open cylinders, straight, curved, tapered, with openings) | geometry; 30 loaded in at least one run (18 in both: 62-63, 68-69 and 86-93 in one only), 30 never loaded (54-55, 58-59, 64-67, 70-85, 194-196, 350-352; section 10's run column); near/far pairs such as 48/49, 60/61, 62/63 in the MAME list dump |
-| 74-77, 134-161 | tunnel sections with a second set of colours | geometry, colours |
-| 100-121, 197 | flat track sections (108-109 forks) | geometry |
-| 122-127 | tunnel mouth, half-pipe, a structure with openings | geometry |
-| 130-133 | large panels (130/131) and a ramp or flat (132/133) | geometry; descriptors 83 (130/131: the 0xFFDC74 entity of section 3.1, entry 0 of the DUMP_FRAMES=3000 attract dump) and 84 (132/133); 131 loaded in both runs, 132-133 in attract mode only, 130 never (section 10's run column) |
-| 162-193 | striped tunnel sections (HYP: the map's "construction") | geometry: orange stripes over the tunnel shape |
-| 198-203 | arrow signs, the words "STATION" and "CAUTION" | geometry (letters readable in the faces) |
-| 204-209 | an iris ring in six steps (from a full disc to a thin ring) | geometry; descriptor 7Bh + n (0x031D68) |
-| 210-249 | rings, arches, pillars, coils, lamp posts, a striped strip, flat pieces, lines, explosion fragments (230-237), rods, craft-like shapes | geometry |
-| 250-310 | wings, explosion debris (253-265), domes, discs, shards, winged craft (292-297), blobs, streaks, bolts | geometry; 252, 292, 301, 302, 306, 309 selected by constant descriptors (section 3.2) |
-| 311-330 | targets and concentric oval rings (HYP: shockwaves) | geometry |
-| 331-349 | craft with arms, panels, bolts, a star disc, lines, bombs, zigzags | geometry |
-| 353-363 | coloured panels with type-1 faces | geometry, type 1 |
-| 364-367 | bursts | geometry |
-| 368-393 | the letters A to Z | geometry (one letter per object, in order) |
-| 394-412 | triangles | geometry |
-
-The traces loaded 174 objects (137 in attract mode, 115 in the game, 78 in both); the 239 never
-loaded are marked `-` in the run column of section 10 and listed in `artifacts/objtrace-summary.json`.
-A run that reached later levels would load more; every one of the 413 is the near or far
-object of a populated descriptor.
-
-Columns of the table in section 10: address = word within the page; x, y, z = the vertices' bounding box (object units);
-descriptor = the descriptors naming the object as near (n) or far (nf); run = loaded in the
-attract (A) or play (P) trace.
-
+Columns of the table in section 10: address = word within the page; x, y, z = the vertices'
+bounding box (object units); descriptor = the descriptors naming the object as near (n) or far
+(nf); run = loaded in the attract (A) or play (P) trace; levels = the level words (0xFF9578) at
+which a per-level run loaded it.
 
 ## 7. The MAME proof: every object-ROM read (MAME)
 
@@ -435,7 +413,7 @@ FFFF terminators, the padding, the directory, the reciprocal table and the check
 object numbers in ascending number order, which is also the address order (the placement:
 each page packs its objects in that order at the first multiple of 4 after the page's fixed
 part), the reciprocal table's rule, the residue ranges (position and length, never values) and
-the provisional names. A person edits a vertex, a colour or a face in a mesh file, or moves an
+the object names (section 11.2; the encoder does not read them). A person edits a vertex, a colour or a face in a mesh file, or moves an
 object to another page in the manifest by inserting its number at its sorted place in that
 page's list; the encoder re-places everything. The encoder rejects a page list that is not in
 ascending number order (`page N: objects must be in number order`), and the decoder rejects an
@@ -455,6 +433,9 @@ check); `tools/objects` the CLI:
 | `encode` | writes the image itself (tests, experiments) |
 | `inventory` | prints the table of section 10 |
 | `trace` | checks the traces against the decoder; with `--summary FILE` (as `make objtrace` runs it) also writes their summary, `artifacts/objtrace-summary.json` |
+| `levels` | summarises the per-level runs (section 11.4) into `artifacts/objlevels-summary.json` |
+| `render` | draws objects to a PNG (section 11.1) |
+| `pictures` (`make pictures`) | rewrites the pictures of section 11.3 |
 
 The decoder is strict: a header count that is not vertices + normals, a record list that does
 not follow the header, polygons out of record order, a count field, a face normal that is not a
@@ -497,8 +478,11 @@ two bytes of chip 90k, at the vertex's x word and page 0's checksum word, and no
 4. Flags bit 15 and routine 0887 (an extra transform of the position, HYP).
 5. Which game entity each descriptor is: M5 (the call sites of section 3.2 are the entry points).
 6. Type 1 faces (objects 335, 353-363): what the 068B/0663 path does with them (docs/08).
-7. The 239 objects no run loaded: later levels, the high-score screen (letters?), and the
-   self-test; a longer or steered run would show which.
+7. The 77 objects no run loaded (section 11.4): steered play (the runs never steer), the
+   self-test, or none (unused objects).
+8. Objects 202 and 203 (`sign_station`, `sign_caution`) read mirrored from the side their
+   normals face, where the letters 368-393 read correctly (section 11.1): how the 68k orients
+   them is M5's.
 
 ## 10. Inventory table
 
@@ -926,3 +910,179 @@ name column is the manifest's (everywhere).
 | 410 | 2 | 4C84 | 12 | 4 | 4 | -17..18 | -11..18 | -11..18 | 310 | - | 22 | tetrahedron_17 |
 | 411 | 2 | 4CD8 | 12 | 4 | 4 | -17..18 | -11..18 | -11..18 | 311 | - | 22 | tetrahedron_18 |
 | 412 | 2 | 4D2C | 12 | 4 | 4 | -17..18 | -11..18 | -11..18 | 312 | - | 22 | tetrahedron_19 |
+
+## 11. Pictures, names, per-level runs and the viewer (M3c)
+
+### 11.1 The renderer (`tools/objects render`, tools/objects/render.py)
+
+A verification aid, standard library only: a parallel projection from one of four fixed views,
+faces filled through a z-buffer (a face later in ROM order wins a tie with a coplanar one, so
+stripes and decals show), edges drawn darker, two-vertex faces as lines, PNG written with zlib.
+Every step is IEEE arithmetic with literal view matrices (no libm call), so a picture is the same
+on every machine.
+
+**Object space** (CODE, read off the data and the projection): `project_vertices` reads a
+camera-space vertex as x (04BD/04C9 into MX0), y (04BF, SR1) and z (04C0, AR), and writes screen
+x = x · t(z) + FFh (04C6-04C7) and screen y = -y · t(z) + FFh (04C4 `AR = -SR1`, 04C8-04C9): x to
+the right, y up, z forwards, a left-handed frame. The data agrees: the tunnel floor is at
+y = -1561 (48), the vehicle parts sit above it, their noses point at +z, and the letters 368-393
+read correctly from -z looking along +z. The views (`VIEWS`): `three-quarter` (from behind, right
+and above: yaw 45°, pitch 30° down), `rear` (along +z, the direction of the game's camera behind
+the player), `top` (down -y, +z up the picture), `side` (from +x, +z to the right); `all` draws
+the four in a 2 × 2 grid in that order. `tools/test_render.py` checks each is a rotation (no
+mirror). Two signs read mirrored in the rear view, from the side their normals face: 202
+(STATION) and 203 (CAUTION), while 198-201 are symmetric arrows. Open question 8.
+
+**Culling** follows the ADSP, not the winding: a face is drawn when its stored normal points at
+the viewer (01A8-01A9: `read_face_normal` returns the sign of normal · first vertex in camera
+space and >= 0 skips the polygon; for a viewer at infinity along the view direction d that is
+normal · d < 0); colour-0 faces are never drawn (019F). `--no-cull` draws all faces. **Winding**
+(`winding()`, computed over data/objects): for 6,531 of the 6,540 faces Newell's normal of the
+vertex order (right-hand formula) points the way of the stored normal, which in this left-handed
+space means the vertices run clockwise on screen when the face is drawn; 5 run the other way
+(object 122: 2 faces, 260, 262 and 264: 1 each), 2 have zero area and 2 are lines. The ADSP
+never uses the winding, so these 5 faces are drawn by their normals like the others.
+
+**Colours.** The colour field (0-63) indexes GSP colour tables and a palette that the game loads
+at run time (docs/08); they are not in the repository. A picture uses a made-up colour per index
+(`index_rgb`: hue = index × golden ratio mod 1, saturation 0.55, value 0.95), shaded by 0.35 +
+0.65 · max(0, normal · light) for the faces the ADSP shades (type 15 with colour below 1Fh, 0214
+at 01C7) and flat for the others (type 1 and colours 1Fh up). The pictures therefore show shape,
+face order and which faces share an index, **not the game's colours** (the player's vehicle is
+red on screen; it is green and orange here). `--palette FILE` takes a JSON list of 64 [r, g, b]
+instead, for a palette captured from MAME into build/ (never committed); no such capture exists
+yet (the colour word goes through the GSP's run-time colour table before the palette, docs/08).
+
+```
+uv run --frozen python tools/objects render --view all --size 160 --out build/obj/0-7.png 0-7
+uv run --frozen python tools/objects render --sheet --tile 64 --columns 24 --out build/obj/all.png 0-412
+```
+
+Several numbers without `--sheet` are drawn together in their shared object space (the parts of
+the player's vehicle); with `--sheet` each gets a numbered tile (a contact sheet: all 413 render
+in under a second).
+
+### 11.2 Names
+
+Every object 0-412 has a name in `data/objects/manifest.json` (the `names` field; the encoder
+does not read it, and `make check` stays at 0 differences after the renaming). Convention:
+lowercase identifiers usable as 68k labels (`[a-z][a-z0-9_]*`), unique; a **far** object (the
+far object of a descriptor, the 100 marked "f" in section 10) is its near object's name + `_far`;
+variants form **numbered families** (`iris_1`-`iris_6`, `letter_a`-`letter_z`); tunnel bends
+carry their measured end cut (`tunnel_bend_xp7_yn5`: the -z end's plane is tilted about 7° with
++x forwards and 5° with -y forwards, from a least-squares fit of the vertices of the -z half; the
++z end is square in every bend). `tools/test_render.py` checks the form, the uniqueness and the
+`_far` rule, and that section 10's name column is the manifest's.
+
+Evidence per family: the render (contact sheet, section 11.3), the descriptors (section 3.2;
+near/far pairs from the table at 0x048F9C), the MAME loads (run column: objtrace runs of section
+7; levels column: section 11.4). **Identified** means the evidence ties the object to something
+seen in the game; **shape** means the name only describes the geometry (HYP for any game role;
+none is claimed).
+
+| Objects | Names | Render | 68k | MAME | Status |
+|---|---|---|---|---|---|
+| 0-7 | `player_craft_body`, `_fin_left/right`, `_wing_left/right`, `_pod_left/right`, `_guns` | drawn together (`player-craft-0-7.png`) they make one vehicle: a body with canopy, two fins, two side wings, two pods, twin gun barrels; parts are placed in one object space (x of 1 is -87..-13, of 2 12..86) | descriptors 0-7, all near = far; taken at game start in 0x02543A (pushes at 0x0254A4-0x025610) and in 0x02BD48 and bound to the vehicle entities 0xFF9C80 + 3Eh·k (section 3.2) | loaded in both objtrace runs and at every level 0-22; every MAME play snapshot examined (start levels 0, 5, 9, 14, 19, 22) shows this vehicle (red) at the bottom centre, the camera behind it | identified: the player's vehicle |
+| 8-10 | `player_craft_rear_left`, `_rear_right`, `_front` | 8 and 9 the rear halves (z -271..-19, x <= 0 and >= 0), 10 a long nose (z -157..276) | descriptors 8-10; 0x02543A pushes 10 or 0 for the first entity (`bne` before 0x0254F2) | play only (levels 0 and 22) | shape (parts of the vehicle's shape; when they replace 0-7 is M5's) |
+| 11-47 | `box_windowed_a`, `craft_a`-`craft_d`, `wedge_*`, `slab_*`, `rod_*`, ... | boxes, wedges, slabs, rods; 22, 24, 30 and 39 vehicle-shaped | LOD pairs 11/12, 13/14, 15/16, 22/23, 24/25, 30/31, 39/40 | all 37 loaded (35 in attract) | shape |
+| 48-99 | `tunnel_straight`, `tunnel_bend_*`, `tunnel_r1200_straight`, `tunnel_r800_straight`, `tunnel_taper_A_B`, `tunnel_transition_1`-`4`, `tunnel_fork`, `tunnel_bend_sharp_*` | open cylinders 6400 long (z -3200..3200), radius 1600 with a floor strip (colour 60), 16-sided near / 8-sided far; tapers name the radii at -z and +z | 26 near/far pairs, descriptors 41-66 | 44 of 52 loaded, levels 0-22 | identified: tunnel sections (the snapshots are inside such tunnels); the bend/taper/transition labels are geometry |
+| 100-121 | `track_wide`, `track_narrow`, `track_narrowing`, `track_widening`, `track_fork`, `track_*_bend_N` | flat strips at the tunnel floor's height (y -1561..-1401), 3264 or 1052 wide | pairs, descriptors 67-77 (115/116 are the two whose +4 field is swapped, section 3.2) | 16 of 22 | identified: open track (snapshots at level words 1 and 14 show the vehicle on a track in the open; both levels load 100-107 and 114-117) |
+| 122-133 | `tunnel_mouth_a`, `tunnel_mouth_flared`, `tunnel_square_a/b`, `tunnel_roof_raised`, `pyramid_large`, `ramp` | a tunnel whose roof comes down to the floor, a flared one, two square-section halls (6400 × 5120), a tunnel with a raised roof, a square pyramid (far: a nine-sided cone), a ramp | 130/131 are descriptor 83, the 0xFFDC74 entity of section 3.1 | 10 of 12 | tunnels identified as above; 126-133 shape |
+| 134-161 | `tunnel_taper_800_1200`, `tunnel_r800_bend_*`, `tunnel_r1200_bend_*` | the narrower tunnels (radius 800 and 1200, colour 4) | pairs, descriptors 85-98 | 20 of 28, levels 2-22 only | identified: tunnel sections |
+| 162-197 | `tunnel_wire_1`-`18` | tunnels whose wall is partly line faces (colour 8) and partly solid (colour 2) | pairs, descriptors 99-116 | 32 of 36, levels 0 and 12-22 | identified: tunnel sections ("wire" names the line faces; the line-drawn look of the level-5 snapshot is not these objects: level 5 loads only 48-104 and 128-131 among the tunnels, so that look comes from the run-time colours) |
+| 198-203 | `sign_arrow_left/right`, `sign_arrows_inward/outward`, `sign_station`, `sign_caution` | arrows; the words STATION and CAUTION | | all 6 | identified by their text and shape |
+| 204-212 | `iris_1`-`6`, `ring_thin`, `ring_dashed`, `ring_spiked` | a disc of eight blades opening to a thin ring | 0x031D68 steps descriptor 7Bh + D2 through 204-209 | all 9, every level | shape (an iris-like ring with green spikes is seen at the end of a tunnel in the snapshots; which of 204-212 draw it is not established per object) |
+| 213-252 | `arch`, `pillar_*`, `coil_stack_*`, `lamp_post_*`, `burst_1`-`4` (+ `_far`), `rod_clamped_*`, `fighter_spiky_a/b`, ... | arches, pillars, lamp posts, flat pieces, bursts of shards, rods with clamps, spiky craft | 252 by constant descriptor A3h (0x0364D4) | 35 of 40 | shape |
+| 253-310 | `shards_1`-`5`, `debris_1`-`4`, `umbrella`, `fan`, `winged_craft_1`-`6`, `crown_spiked`, `saucer_lumpy`, `dart_1`-`4`, ... | sprays of shards, debris, domes, fans, a winged craft in six wing positions, darts | 292 (C1h), 301/302 (CAh/CBh), 306 (CFh), 309 (D2h) by constant descriptors | 47 of 58 | shape |
+| 311-330 | `target_octagon_1`-`4`, `ring_oval_1`-`16` | concentric octagons, concentric oval rings | | 4 of 20 | shape |
+| 331-352 | `cannon_long`, `turret_*`, `star_disc`, `zigzag_*`, `capsule_star`, `chain_*`, `girders_*`, `tunnel_roof_rising`, `tunnel_floor_notched`, `tunnel_divided` | guns on mounts, a star disc, zigzag lines, girders, three special tunnel sections | 343/344 pair | 14 of 22 | tunnels identified, the rest shape |
+| 353-367 | `panel_framed`, `panel_unlit_1`-`10`, `burst_star_1`-`4` | a framed panel, flat type-1 quadrilaterals (unshaded), star bursts | | 14 of 15 | shape |
+| 368-393 | `letter_a`-`letter_z` | the letters A-Z, one per object | | 18 of 26, at level 22 only | identified by shape (where the game shows them is not established) |
+| 394-412 | `tetrahedron_1`-`19` | 19 tetrahedra with separate vertices per face, differing only in colour | | all 19, at level 22 only | shape |
+
+### 11.3 The pictures
+
+Committed under `artifacts/objects/`, declared with their `render` arguments in
+`render.PICTURES`, rewritten by `make pictures`; `tools/test_render.py` draws each again from
+data/objects and compares its pixels with the committed file (the compressed stream is not
+compared: it may differ between zlib builds), so a picture cannot drift from the meshes. Colours
+as section 11.1 says (made-up per index).
+
+**The player's vehicle**, objects 0-7 (`player_craft_body` 49 vertices / 38 normals / 38 faces,
+`_fin_left` and `_fin_right` 12/16/20 each, `_wing_left` and `_wing_right` 6/5/5, `_pod_left`
+and `_pod_right` 18/18/18, `_guns` 122/26/46), in the four views (three-quarter, rear; top, side):
+`tools/objects render --view all --size 160 --out FILE 0-7`.
+
+![objects 0-7](../artifacts/objects/player-craft-0-7.png)
+
+**A tunnel section**, 48 `tunnel_straight` (38 vertices, 19 normals, 19 faces) and its far
+object 49 `tunnel_straight_far` (18, 9, 9), three-quarter view: the near wall is culled because
+its normals face inwards, as the ADSP culls it when the camera is outside:
+`tools/objects render --sheet --tile 192 --columns 2 --out FILE 48-49`.
+
+![objects 48-49](../artifacts/objects/tunnel-straight-48-49.png)
+
+**The signs**, 198-203 (`sign_arrow_left` 7/1/2, `sign_arrow_right`, `sign_arrows_inward` 14/1/4,
+`sign_arrows_outward`, `sign_station`, `sign_caution`), rear view:
+`tools/objects render --sheet --view rear --tile 128 --columns 6 --out FILE 198-203`.
+
+![objects 198-203](../artifacts/objects/signs-198-203.png)
+
+**The iris**, 204-209 (`iris_1`-`iris_6`, 28 vertices, 1 normal, 8 faces each), rear view:
+`tools/objects render --sheet --view rear --tile 128 --columns 6 --out FILE 204-209`.
+
+![objects 204-209](../artifacts/objects/iris-204-209.png)
+
+**All 413**, three-quarter view, 64-pixel tiles (137 KB):
+`tools/objects render --sheet --tile 64 --columns 24 --out FILE 0-412`.
+
+![objects 0-412](../artifacts/objects/contact-sheet.png)
+
+No enemy or pickup is in this list: none was identified with evidence (section 11.2), which is
+M5's work through the descriptor call sites.
+
+### 11.4 Which objects each level loads (MAME)
+
+`make objlevels` (or `make -j6 objlevels`) runs `tools/mame/objlevels.lua` once per start level
+0-22, 8,000 frames each from an empty NVRAM and cfg: a game started as in section 7, the trigger
+pressed every 20 frames, the yoke left centred (the game keeps the vehicle in the tunnel and
+completes some levels on its own). It records, per object, the level word (0xFF9578) in force
+at each directory read (PC 009E). **The level select is a scratch poke**, documented here
+exactly: the game clears the words 0xFF9578 and 0xFF9556 (`clr.w` at 0x02B95E and 0x02B964; 0xFF9578
+also at 0x024322, in the routine 0x024306 that `game_reset` calls); in 0x02543A, the routine
+that sets up the player's vehicle, a compiled-out debug switch at 0x025712 (`moveq #0,d1` at 0x0256FC always selects case 0) would set
+both to 0Fh, 0Dh, 0Ch or 04h (cases 1, 2, 4, 8, 0x02572C-0x02581C), which marks them as the
+level. The script installs a write tap on each word that replaces a written 0 by the start level
+and changes nothing else, so the level still advances (6 or 8 writes replaced in each run with
+a start level above 0; none at start level 0, which is the unmodified game). Start
+levels 23 and 24 were tried in scratch runs: the game stopped producing frames (no output), so
+there are 23 levels, 0-22.
+
+`tools/objects levels` writes `artifacts/objlevels-summary.json` (object numbers and counts only):
+per run its levels and the objects loaded at each, per level the union, and the objects no run
+loaded. Result: 332 objects loaded over levels 0-22; with the 174 of the objtrace runs (4 of
+which, 242-244 and 353, only those load), **336 of 413 loaded, 77 never**:
+
+54-55, 58-59, 82-85, 108-113, 127, 130, 142-143, 146-147, 154-155, 158-159, 178-181, 223, 231,
+233, 235, 237, 258-265, 283-284, 310, 315-332, 334-335, 339-340, 345-346, 364, 370, 373, 376-377,
+384, 389-391.
+
+Four of them (231, 233, 235, 237, the far bursts) are far objects whose near object was loaded
+(the far object is read only past the LOD distance, section 3.1); the other 73 are near objects
+or their far objects. The runs reproduce: a scratch batch with the same inputs and level select gave the same object
+count for each of the 22 start levels both ran.
+
+### 11.5 The viewer (`make view`, tools/objects/viewer.html)
+
+A static page, Three.js r128 from cdnjs its only dependency, that reads
+`data/objects/manifest.json` and the mesh files over HTTP. `make view` serves the repository
+root (`python3 -m http.server --bind 127.0.0.1 8000`) and prints the URL,
+`http://127.0.0.1:8000/tools/objects/viewer.html#48` (the hash is the object number). Pick an
+object by number (or the arrows) or by name (a search box over the manifest's names); drag to
+orbit, wheel to zoom; toggles for wireframe, the ADSP's culling (normal · (first vertex - eye) <
+0, from the current eye), face normals (from each face's centroid), axes, vertex and face
+indices. It shows the counts, the face types and the bounding box, and the colours of section
+11.1. Object space is shown as Three.js (x, y, -z), so the left-handed data is not mirrored.
+**Editing**: change a vertex in `data/objects/NNN.json` and press *reload* (or tick *reload
+every second*): the page re-reads the file without cache and redraws; `make check` then shows
+what the edit does to the ROM (section 8.3).
