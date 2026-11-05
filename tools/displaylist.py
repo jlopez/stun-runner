@@ -17,8 +17,9 @@ other at 810000, harddriv_m.cpp:614/811):
     word 1      T: the address of the FFFF that ends the commands (PM 00C0; GSP FFF44CA0)
     2 .. T-1    the commands, back to back, in the order the ADSP produced them
     T           FFFF (PM 00B5)
-    T+1 .. N-1  the draw order: one entry e per command, the command at word e + 1, deepest
-                first (PM 080B walks the depth-sorted list at PM 123C; GSP FFF45000)
+    T+1 .. N-1  the draw order: one entry e per command, the command at word e + 1, sorted
+                command by command (PM 080B walks the list at PM 123C that insert_depth_node,
+                07A2, keeps sorted by each polygon's largest vertex z; GSP FFF45000)
     N           FFFF (PM 082B; ends the GSP's walk, FFF45020)
 
 A command starts with a command word (PM 0515 or 066A, the record colour from DM 0036):
@@ -74,6 +75,13 @@ FILL_NAMES = {0: "solid", 1: "75%", 2: "25%", 3: "outline"}
 PATTERN = {FILL_SOLID: 0xFFFFFFFF, FILL_75: 0x15151515, FILL_25: 0x01010101}
 
 GSP_HEADER_BITS = 0x440  # FFF77F50 in every capture: the header block before the first command
+
+# FFF77E60, the list header's word 11h (read_list_header FFF4D940; the SOM loop loads it into A13
+# at FFF44CD0): bit 3 draws every polygon as an outline (FFF45130 -> FFF45800), bit 4 lifts the
+# image quads' size limits (FFF49460), bit 5 leaves out the outlines' right edges (FFF45B50)
+FLAG_OUTLINES = 0x08
+FLAG_LOOSE = 0x10
+FLAG_NO_RIGHT_EDGES = 0x20
 
 
 class DisplayListError(ValueError):
@@ -478,10 +486,13 @@ class Canvas:
                 x, y = x + inc2[0], y + inc2[1]
 
 
-def draw_polygon(canvas: Canvas, c: Command, colours: Sequence[int]) -> None:
+def draw_polygon(canvas: Canvas, c: Command, colours: Sequence[int], flags: int = 0) -> None:
+    """One polygon command; `flags` is FFF77E60 (FLAG_OUTLINES, FLAG_NO_RIGHT_EDGES)."""
     colour = colours[c.colour]
-    if c.fill == FILL_OUTLINE:
-        _draw_outline(canvas, c, colour)
+    # FFF45130: FFF77E60 bit 3 branches to draw_outline before the fill is looked at (FFF45150),
+    # so it overrides every fill and the colour byte 4 rule
+    if c.fill == FILL_OUTLINE or flags & FLAG_OUTLINES:
+        _draw_outline(canvas, c, colour, not flags & FLAG_NO_RIGHT_EDGES)
         return
     pattern = PATTERN[c.fill]
     if c.fill in (FILL_SOLID, FILL_25) and (c.cmd & 0xFF) == 4:
@@ -522,8 +533,9 @@ def draw_polygon(canvas: Canvas, c: Command, colours: Sequence[int]) -> None:
                 rows = 0xFFFF  # DSJS on a zero count wraps (never produced, HYP)
 
 
-def _draw_outline(canvas: Canvas, c: Command, colour: int) -> None:
-    """FFF45800-FFF45C50: the top row, a LINE per edge and segment, the bottom row."""
+def _draw_outline(canvas: Canvas, c: Command, colour: int, right_edges: bool = True) -> None:
+    """FFF45800-FFF45C50: the top row, a LINE per edge and segment, the bottom row; the right
+    edges' LINEs only when FFF77E60 bit 5 is clear (`BTST 5h,A13` at FFF45B50)."""
     full = PATTERN[FILL_SOLID]
     b0 = ((c.top_y << 16) | c.left_x) & 0xFFFFFFFF
     a6 = ((c.top_y << 16) | c.right_x) & 0xFFFFFFFF
@@ -540,7 +552,8 @@ def _draw_outline(canvas: Canvas, c: Command, colour: int) -> None:
         a7 = (n << 16 | dr) & 0xFFFFFFFF  # MOVX A10,A7 / RL 10h,A7: (y = n, x = int part)
         a9 = (n << 16 | dl) & 0xFFFFFFFF
         canvas.line(b0, a9, colour)  # FFF45B00-FFF45B40: the left edge
-        canvas.line(a6, a7, colour)  # FFF45B70-FFF45BA0: the right edge (A13 bit 5 clear)
+        if right_edges:  # FFF45B50 BTST 5h,A13 / JRNE FFF45BB0
+            canvas.line(a6, a7, colour)  # FFF45B70-FFF45BA0: the right edge
         b0 = _addxy(b0, a9)
         a6 = _addxy(a6, a7)
     xl, y = _xy(b0)
@@ -572,7 +585,8 @@ def read_images(data: bytes) -> dict[int, Image]:
 
 def draw_image(canvas: Canvas, c: Command, images: dict[int, Image], loose: bool,
                sign_extended: bool = False) -> bool:
-    """FFF48FC0: scale image cmd & 3Fh into the box from p0 to (p1.x, p2.y), 8 bits per pixel,
+    """FFF48FC0: scale image cmd & 3Fh into the box at p0 (FFF49350-FFF49370), p1.x - p0.x + 1
+    wide (FFF493D0-FFF49420) and p2.y - p1.y + 1 high (FFF49570-FFF495C0), 8 bits per pixel,
     pixel 0 transparent (CONTROL = E0h: T set). `loose` is FFF77E60 bit 4 (no size limits).
     False when the GSP's checks reject it (FFF49230-FFF49650; it then only skips the words).
     The corners are read with field 0 (`MOVE *A5+,An,0`) and the handler has no SETF: they are
@@ -616,10 +630,13 @@ def draw_image(canvas: Canvas, c: Command, images: dict[int, Image], loose: bool
 
 def render(som: SomList, colours: Sequence[int],
            window: tuple[int, int, int, int] = FULL_WINDOW,
-           images: dict[int, Image] | None = None, loose: bool = False,
+           images: dict[int, Image] | None = None, flags: int = 0,
            sign_extended: bool = False) -> Canvas:
     """Draw the list in table order into an empty 512 x 240 page (rows = GSP y 28h-117h),
-    clipped to `window` (the last command 5 before the list sets it, FFF47AF0). `sign_extended`
+    clipped to `window` (the last command 5 before the list sets it, FFF47AF0). `flags` is the
+    header word FFF77E60 (bits 3, 4 and 5: FLAG_OUTLINES, FLAG_LOOSE, FLAG_NO_RIGHT_EDGES).
+    A command with bit 15 set is not drawn (FFF450A0 `BTST Fh,A4`, JRNE to the RETS at
+    FFF44D50, back to the table walk); it is counted in `canvas.skipped`. `sign_extended`
     is ST FE0 when the list's command 7 starts (field0_sign_extended); nothing in the SOM loop
     (FFF44BF0-FFF45FB0) sets field 0, and only the image quads depend on it: the polygon code
     keeps the low 16 bits of its x reads (MOVY into B0/A6, FFF453B0-FFF453D0) and shifts y
@@ -631,10 +648,11 @@ def render(som: SomList, colours: Sequence[int],
         if c.skipped:
             canvas.skipped += 1
         elif c.is_image:
+            loose = bool(flags & FLAG_LOOSE)
             if images is None or not draw_image(canvas, c, images, loose, sign_extended):
                 canvas.images += 1
         else:
-            draw_polygon(canvas, c, colours)
+            draw_polygon(canvas, c, colours, flags)
     return canvas
 
 
@@ -952,8 +970,8 @@ def main(argv: list[str] | None = None) -> int:
             images = None
             if (d / "images.bin").exists():
                 images = read_images((d / "images.bin").read_bytes())
-            loose = bool(int(meta.get("FFF77E60", "0"), 16) & 0x10)
-            canvas = render(som, colours, window, images, loose, sign_extended)
+            flags = int(meta.get("FFF77E60", "0"), 16)
+            canvas = render(som, colours, window, images, flags, sign_extended)
             before = (d / "fb_pre.bin").read_bytes() if (d / "fb_pre.bin").exists() else None
             agreement = compare(canvas, page, before)
             pal = struct.unpack(f"<{len((d / 'palette.bin').read_bytes()) // 4}I",

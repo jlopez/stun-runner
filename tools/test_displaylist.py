@@ -24,6 +24,9 @@ import pytest
 from displaylist import (
     END,
     FB_PAGE_BYTES,
+    FLAG_LOOSE,
+    FLAG_NO_RIGHT_EDGES,
+    FLAG_OUTLINES,
     TOP,
     WIDTH,
     Canvas,
@@ -290,6 +293,49 @@ def test_outline_is_edges_only():
         assert (c.pixels[k + 10], c.pixels[k + 19]) == (lo, hi), hex(y)
 
 
+def test_header_flags_outline_every_polygon_and_drop_right_edges():
+    """FFF77E60 bit 3 (`BTST 3h,A13` at FFF45130 -> draw_outline FFF45800) outlines a polygon
+    whatever its fill, colour byte 4 included; bit 5 (`BTST 5h,A13` at FFF45B50) skips the right
+    edges' LINEs; neither changes an image quad (bit 12 branches first, FFF450D0)."""
+    colours = synthetic_colours()
+
+    def drawn(cmd: int, flags: int) -> bytes:
+        c = Canvas()
+        draw_polygon(c, square(cmd), colours, flags)
+        return bytes(c.drawn)
+
+    outline = drawn(0x0C00 | 0x0140, 0)
+    for cmd in (0x0140, 0x0540, 0x0940, 0x0104):
+        assert drawn(cmd, FLAG_OUTLINES) == outline, hex(cmd)
+        assert drawn(cmd, FLAG_NO_RIGHT_EDGES) == drawn(cmd, 0), hex(cmd)  # fills: no edges
+    left = drawn(0x0C00 | 0x0140, FLAG_NO_RIGHT_EDGES)
+    assert sum(left) == 10 + 10 + 8  # top and bottom rows, the left side only
+    assert drawn(0x0140, FLAG_OUTLINES | FLAG_NO_RIGHT_EDGES) == left
+    for y in range(0x41, 0x49):
+        k = (y - TOP) * WIDTH
+        assert left[k + 10] and not left[k + 19], hex(y)
+    som = decode_som(encode_som([square(), quad(100, 0x50, 105, 0x54)]))
+    plain = render(som, colours, images={3: PICTURE})
+    flagged = render(som, colours, images={3: PICTURE}, flags=FLAG_OUTLINES)
+    assert sum(plain.drawn) == 100 + 26 and sum(flagged.drawn) == 10 + 10 + 2 * 8 + 26
+
+
+def test_bit_15_commands_are_not_drawn():
+    """FFF450A0 `BTST Fh,A4` / `JRNE FFF44D50` (a RETS back to the table walk): a command with
+    bit 15 set draws nothing, polygon or image quad, and the next one is drawn as usual."""
+    colours = synthetic_colours()
+    tri = triangle(0x8000 | 0x0130)
+    som = decode_som(encode_som([tri, square(), quad(100, 0x50, 105, 0x54, cmd=0x9003)]))
+    canvas = render(som, colours, images={3: PICTURE})
+    assert canvas.skipped == 2 and canvas.images == 0
+    alone = Canvas()
+    draw_polygon(alone, square(), colours)
+    assert bytes(canvas.drawn) == bytes(alone.drawn) and sum(canvas.drawn) == 100
+    drawn_tri = Canvas()
+    draw_polygon(drawn_tri, triangle(), colours)
+    assert not any(a and b for a, b in zip(canvas.drawn, drawn_tri.drawn, strict=True))
+
+
 def test_compare_counts():
     c = Canvas()
     draw_polygon(c, square(), synthetic_colours())
@@ -309,7 +355,8 @@ PICTURE = Image(3, 4, bytes([1, 2, 3, 4,
 
 
 def quad(x0: int, y0: int, x1: int, y2: int, cmd: int = 0x1003) -> Command:
-    """An image command: the box from p0 to (p1.x, p2.y), height p2.y - p1.y + 1."""
+    """An image command: the box at p0, p1.x - p0.x + 1 wide and p2.y - p1.y + 1 high (here
+    p1.y = p0.y, so its far corner is (x1, y2))."""
     return Command(0, cmd, 0, points=((x0, y0), (x1, y0), (x1, y2), (x0, y2)))
 
 
@@ -405,8 +452,8 @@ def test_image_quad_sign_extended():
             if canvas.drawn[(y - TOP) * WIDTH + x]}
     assert rows == {0x28, 0x29, 0x2A}  # -16..2Ah, clipped to the window's top row 28h
     som = decode_som(encode_som([wide, left]))
-    zero = render(som, synthetic_colours(), images=images, loose=True)
-    sign = render(som, synthetic_colours(), images=images, loose=True, sign_extended=True)
+    zero = render(som, synthetic_colours(), images=images, flags=FLAG_LOOSE)
+    sign = render(som, synthetic_colours(), images=images, flags=FLAG_LOOSE, sign_extended=True)
     assert zero.images == 1 and sign.images == 1 and bytes(zero.drawn) != bytes(sign.drawn)
 
 
@@ -516,9 +563,9 @@ def test_captures_against_mame():
         # every capture's 7 follows a 9 and a 5 (FFF48C30, FFF47B20): field 0 zero-extended
         assert not sign_extended, d
         images = read_images((d / "images.bin").read_bytes())
-        loose = bool(int(meta["FFF77E60"], 16) & 0x10)
+        flags = int(meta["FFF77E60"], 16)
         colours = read_words(d / "colors.bin")
-        canvas = render(som, colours, window, images, loose, sign_extended)
+        canvas = render(som, colours, window, images, flags, sign_extended)
         a = compare(canvas, (d / "fb_som.bin").read_bytes(), (d / "fb_pre.bin").read_bytes())
         assert a.drawn > 0 and a.equal == a.drawn, (d, a)
         assert a.missed == 0, (d, a)
