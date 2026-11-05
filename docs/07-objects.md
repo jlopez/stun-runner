@@ -101,7 +101,7 @@ the frame (0051-0053 -> 00B4).
 | 17-18 | 0067-006B | DM 000A-000B | cull distance, 32 bits | descriptor +0Ch (0x02E220; not rewritten by update); an entity with +38h bit 5 set (0x02E1FC) gets 1 if it is the one whose pointer is at 0xFFDC74 (0x02E204-0x02E20E: a cull distance of 1, HYP: then always culled). The camera reading of that entity is contradicted by MAME: in the DUMP_FRAMES=3000 attract dump, entry 0 at DM 0A00 (the 0xFFDC74 entity, 0x02DEFC-0x02DF06) holds objects 130/131, radius 9600, LOD distance 1900h and cull distance 5DC00h, descriptor 83's values, so bit 5 was clear; in that frame the entry was culled (its flags bit 0, DM 0A17, is 0: 0090-0094 write DM 0013 there; DM 0108, cleared at 0038 and counted at 00AF-00B2 after the 0096-0097 cull test, is 1, entry 17's object). A bit-5 entity is otherwise skipped: `fill_object_entry` returns 0 at 0x02E214 and `update_object_entry` returns 0 for any bit-5 entity at 0x02E318-0x02E320 |
 | 19-20 | 006C-0070 | DM 0025-0026 | level-of-detail distance, 32 bits | descriptor +08h (0x02E25A; not rewritten by update) |
 | 21 | 0071-0073 | DM 000F | bounding radius | descriptor +06h (0x02E264; not rewritten by update) |
-| 22 | 0074-0076 | DM 0027, sign into DM 0028 | (not decoded; no reader in the object path) | entity +36h (0x02E26A; update 0x02E3CE) |
+| 22 | 0074-0076 | DM 0027, sign into DM 0028 | the object's draw-order bias: `insert_depth_node` adds it to the key of each of the object's commands (07B7-07BB; docs/08 section 1.5) | entity +36h (0x02E26A; update 0x02E3CE) |
 | 23 | 007E (not advanced), 0090-0094 | DM 002C, DM 002F | flags: bit 15 -> DM 002C (CALL 0887, HYP: an extra transform); bit 14 -> the batch handshake (0043-004F); bits 8-11 -> DM 002F, ORed into every face's colour word (01CE); bit 0 is written back by the ADSP: 1 = drawn, 0 = culled (DM 0013) | built from entity +38h: bit 7 -> flags bit 15 (0x02E2BE-0x02E2D2), bit 0 -> bit 14 (0x02E28A-0x02E2A2), bits 3-4 -> bits 10-11 (asl #3, lsr #6 at 0x02E274-0x02E276), bits 1-2 -> bits 8-9 (asl #5, lsr #6 at 0x02E2AA-0x02E2AC); bits 12-13 and 1-7 cleared (0x02E2D6-0x02E2F2); bit 0: uninitialised in `fill_object_entry`, whose flags word is the local at (-2,A6) of `link A6,#-$4` (0x02E1EC) and is never set before the `andi.b #$1,(-$1,A6)` at 0x02E2DC (the ADSP overwrites it at 0094); +38h bit 5 is not copied (tested at 0x02E1FC). Update: loads the entry's word (0x02E372), re-merges only bits 10-11 (0x02E37C-0x02E38C), 14 (0x02E390-0x02E3A6) and 8-9 (0x02E3AE-0x02E3BC) from +38h and writes it back (0x02E3C4); it has no `btst #7`, so bits 15, 12-13 and 0-7 stay as last written |
 
 `cull_and_lod` (06A1, called at 0088) culls an entry whose distance from the camera reaches
@@ -225,9 +225,10 @@ normal . (PM 1019-101B + PM 101C-101E); `copy_frame_parameters` fills all six fr
 at 001B-0020; HYP: two light vectors), faded with depth by 0238; colours 1Fh and up become colour & 1Fh. Type 1 faces skip shading and
 carry 1000h (01C9-01CC), and the clipper takes another path for them (0273-0276 -> 068B, then
 0663 at 01D9; docs/08). Every face's colour word then gets the entry's colour bank, flags bits
-8-11 (01CD-01D0). What the colour word selects in the GSP palette is docs/08. HYP for the
-meaning of type 1: flat panels drawn without lighting (objects 335 and 353-363 are flat
-coloured quadrilaterals).
+8-11 (01CD-01D0). What the colour word selects in the GSP palette is docs/08. Type 1 faces are not
+polygons: `emit_image` (0663) writes each as a SOM image command whose bits 0-5, the face's
+colour, name an image, and the GSP draws it as a scaled image quad (docs/08 sections 1.4 and
+4.4); the meshes of objects 335 and 353-363 are the quads' corners.
 
 **A face** (`read_face_normal` 01E8): the normal point goes to DM 0014-0016, the first vertex
 to DM 0040-0042; the sign of their dot product in camera space decides visibility (01A9: >= 0
@@ -344,7 +345,7 @@ entities. Families:
 | 250-310 | wings, explosion debris (253-265), domes, discs, shards, winged craft (292-297), blobs, streaks, bolts | geometry; 252, 292, 301, 302, 306, 309 selected by constant descriptors (section 3.2) |
 | 311-330 | targets and concentric oval rings (HYP: shockwaves) | geometry |
 | 331-349 | craft with arms, panels, bolts, a star disc, lines, bombs, zigzags | geometry |
-| 353-363 | coloured panels with type-1 faces | geometry, type 1 |
+| 353-363 | panels with type-1 faces, drawn as image quads (docs/08 section 1.4) | geometry, type 1 |
 | 364-367 | bursts | geometry |
 | 368-393 | the letters A to Z | geometry (one letter per object, in order) |
 | 394-412 | triangles | geometry |
@@ -492,11 +493,13 @@ two bytes of chip 90k, at the vertex's x word and page 0's checksum word, and no
 
 1. The residue word 0:019E (section 5.3): what wrote it? Card for Jesus.
 2. Descriptor +10h (a long, 6000A0h for many) is not read by `fill_object_entry`; who reads it?
-3. Entry word 22 (entity +36h) reaches DM 0027-0028; its reader is outside the object path
-   (07B7 loads I3 = 0027: docs/08 or later).
+3. Entry word 22 (entity +36h) reaches DM 0027-0028; its reader: answered by docs/08 section 1.5
+   (07B7-07BB add it to every command's draw-order key: the object's depth bias).
 4. Flags bit 15 and routine 0887 (an extra transform of the position, HYP).
 5. Which game entity each descriptor is: M5 (the call sites of section 3.2 are the entry points).
-6. Type 1 faces (objects 335, 353-363): what the 068B/0663 path does with them (docs/08).
+6. Type 1 faces (objects 335, 353-363): what the 068B/0663 path does with them: answered by
+   docs/08 sections 1.4 and 4.4 (SOM image commands, drawn by the GSP as scaled image quads;
+   068B drops one whose corner is too near, HYP: a near-plane cull).
 7. The 239 objects no run loaded: later levels, the high-score screen (letters?), and the
    self-test; a longer or steered run would show which.
 

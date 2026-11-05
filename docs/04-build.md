@@ -84,6 +84,44 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
 - `make coverage`: `tools/coverage` reads the five listings (vasm `-L`: a `Sections:` header, `Source:` blocks, `SS:AAAAAAAA hex  \t N: source` lines and `*` for repeated runs; 64tass `-L`: `>addr\thex\t...\tsource` lines and `Processing file` markers) and attributes to each statement the bytes from its address to the next statement's (or the section's / image's end), classified as `instr`, `data` (`dc.*`, `.byte`, `.word`, `.text`...), `blob` (`incbin`, `.binary`) or `fill` (`ds.*`, `dcb.*`, `blk.*`, `.fill`). Per source file, per image, the total, the blob share and a JSON line; it fails unless the total is the set's size, 1,511,424. The blob share only goes down (CLAUDE.md section 2).
 - `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/`, `tools/` and `data/objects` fed with a synthetic set (this is how CI exercises the real trees without ROMs; since M3a the synthetic set carries the object image the committed meshes encode to, with a random residue word, and an edited mesh must change the built chip). `tools/test_objects.py` adds the object format's tests (docs/07 section 8.3), among them one that runs in CI against the real hashes: the committed meshes encode to the four chips of pages 1 and 2 with MAME's CRC-32 and SHA-1.
 - `make lint`: ruff and mypy over the tools.
+- `make somdump` (needs MAME and the ROMs; never in CI): `tools/mame/somdump.lua` captures the
+  SOM display list at the frames of `SOM_ATTRACT` (attract mode), `SOM_GAME` (a game started at
+  frame 900) and `SOM_DITHER` (attract mode with every colour word's two bytes made different,
+  `SOM_DITHER=1`, docs/08 section 5) into `build/mame/som/<attract|game|dither>-f<N>/` (SOM banks, ADSP data RAM, the GSP command
+  buffer, the frame-buffer page before and after the list, colour and image tables, palette,
+  snapshots, the frame's protocol events), then runs `tools/displaylist.py` on each: decode,
+  redraw, compare with MAME's page (docs/08-display-list.md). It removes the previous
+  `attract-f*`, `game-f*` and `dither-f*` captures first, and the target fails when a run did not
+  write its done marker (`<prefix>done`, written by `somdump.lua` just before it exits: MAME exits
+  0 even when a Lua callback raises, so a broken script would otherwise run out its 600 seconds
+  silently) or left no `som.bin`, `fb_som.bin` or `snap_1.png` for a requested frame, when a
+  capture does not decode, or when its redrawing differs from the page (`--render` exits 2; each
+  capture's output also goes to `render.txt` in its directory). Each of its three MAME runs starts
+  from an empty private state, `build/mame/somstate` (removed first, then `-nvram_directory` and
+  `-cfg_directory` there): the game boots from the set's own 200e/210e, attract mode (which
+  follows the NVRAM's history) shows the same scenes on every run and machine, the user's
+  `~/.mame` state is never read or written, and parallel worktrees stay apart. `make test` then
+  also checks the captures
+  (`tools/test_displaylist.py`, which skips without them); the three lists committed under
+  `artifacts/display-list/` are decoded and redrawn in CI.
+- `make fieldext` (needs MAME and the ROMs; never in CI): `tools/mame/fieldext.lua` counts, under
+  `-debug -debugger none` and from an empty private state (`build/mame/fieldstate`), the GSP's
+  ST FE0 (field 0 sign-extended) at the start of every list FFF46E30, at command 7 FFF44BF0, at
+  the image-quad corner read FFF49380 and at the SOM command loop FFF45010 over `FIELD_FRAMES`
+  attract frames, into `build/mame/fieldext.txt` (docs/08 section 4.4: each list starts
+  sign-extended, and the 9 and 5 before every captured 7 reset field 0 to zero-extended).
+- `make depthkeys` (needs MAME and the ROMs; never in CI): `tools/mame/depthkeys.lua` walks the
+  ADSP's draw-order node list in PM (head PM 123F to tail 1242) at every 7th frame while the
+  ADSP waits at 0013-0015, over `DEPTH_FROM`-`DEPTH_TO` in attract mode and up to
+  `DEPTH_GAME_TO` in a game, each from an empty private state (`build/mame/depthstate`), and
+  writes `build/mame/depthkeys-{attract,game}.txt`: per frame the adjacent pairs whose key rises
+  and the largest rise (docs/08 section 1.5: never above 10h, the bias of 07C1-07C5).
+- `make vskip` (needs MAME and the ROMs; never in CI): `tools/mame/vskip.lua`, under
+  `-debug -debugger none` and from an empty private state (`build/mame/vskipstate`), counts the
+  GSP's polygon row tests (FFF454C0) and the rows its V test skips (FFF454D0, ST bit 28), each
+  skipped row logged with its frame, B2 (y, xl) and the stipple pattern B9, from frame 0 to
+  `VSKIP_TO` in attract mode and to `VSKIP_GAME_TO` in a game, into
+  `build/mame/vskip-{attract,game}.txt` (docs/08 section 5).
 
 ## 5. Coverage at the zero point (M1)
 
