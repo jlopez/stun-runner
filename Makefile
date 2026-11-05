@@ -59,8 +59,9 @@ $(BUILD)/adsp/%.bin $(BUILD)/gsp/%.bin: $(BUILD)/$(SET)-68k.bin $(PROGRAM_TOOLS)
 .SECONDARY: $(PROGRAMS)
 
 # The object image's source (docs/07-objects.md): data/objects, turned into one vasm source per
-# /MP page by tools/objects. The image supplies only the residue words the format does not
-# explain (incbin slices). Three targets, one recipe: a pattern rule (stem "page"), as above.
+# /MP page by tools/objects, from the committed data alone: the object image needs nothing from
+# the reference set (the residue word is a constant in the manifest). Three targets, one recipe:
+# a pattern rule (stem "page"), as above.
 OBJECT_DATA := $(wildcard data/objects/*.json)
 OBJECT_TOOLS := tools/objects/__init__.py tools/objects/__main__.py
 OBJECT_ASM := $(BUILD)/obj/page0.asm $(BUILD)/obj/page1.asm $(BUILD)/obj/page2.asm
@@ -77,21 +78,24 @@ $(OBJECT_LIST): FORCE
 FORCE:
 
 $(BUILD)/obj/%0.asm $(BUILD)/obj/%1.asm $(BUILD)/obj/%2.asm: $(OBJECT_DATA) $(OBJECT_LIST) \
-		$(OBJECT_TOOLS) $(BUILD)/$(SET)-obj.bin
-	$(PYTHON) tools/objects asm --data data/objects --image $(BUILD)/$(SET)-obj.bin \
-		--out $(BUILD)/obj
+		$(OBJECT_TOOLS)
+	$(PYTHON) tools/objects asm --data data/objects --out $(BUILD)/obj
 
 .SECONDARY: $(OBJECT_ASM)
 
-# image -> files it includes besides its own image
-EXTRA_stunrun-68k := $(PROGRAMS)
-EXTRA_stunrun-obj := $(OBJECT_ASM)
+# image -> the files its tree includes: its blob (the merged image) and any others; the object
+# tree includes only the generated page sources, never build/stunrun-obj.bin
+EXTRA_stunrun-68k   := $(BUILD)/stunrun-68k.bin $(PROGRAMS)
+EXTRA_stunrun-obj   := $(OBJECT_ASM)
+EXTRA_stunrun-oki   := $(BUILD)/stunrun-oki.bin
+EXTRA_stunrun-nvram := $(BUILD)/stunrun-nvram.bin
+EXTRA_stunrun-jsa   := $(BUILD)/stunrun-jsa.bin
 
 # The listing is a co-target of the assembly (a pattern rule with two targets is one recipe for
 # both, in every make version), so a missing or stale listing reassembles its image.
 ASM = $(if $(filter $(VASM_IMAGES),$*),$(VASM) $(VASMFLAGS),$(TASS) $(TASSFLAGS))
 
-$(BUILD)/%.out $(BUILD)/%.lst: $$(SRC_$$*) $(BUILD)/%.bin $$(EXTRA_$$*) $$(wildcard $$(dir $$(SRC_$$*))*.asm)
+$(BUILD)/%.out $(BUILD)/%.lst: $$(SRC_$$*) $$(EXTRA_$$*) $$(wildcard $$(dir $$(SRC_$$*))*.asm)
 	$(ASM) -L $(BUILD)/$*.lst -o $(BUILD)/$*.out $<
 
 # Without the reference set (CI) there is nothing to build from or compare with: skip, exit 0.

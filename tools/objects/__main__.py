@@ -1,8 +1,8 @@
 """The object ROMs as data/objects (docs/07-objects.md); the format is in tools/objects/__init__.py.
 
     tools/objects decode [--image build/stunrun-obj.bin] [--out data/objects]
-    tools/objects asm    [--data data/objects] [--image build/stunrun-obj.bin] [--out build/obj]
-    tools/objects encode [--data data/objects] [--image IMAGE] --out FILE
+    tools/objects asm    [--data data/objects] [--out build/obj]
+    tools/objects encode [--data data/objects] --out FILE
     tools/objects inventory [--data data/objects] [--image68k build/stunrun-68k.bin]
                             [--summary artifacts/objtrace-summary.json]
                             [--levels artifacts/objlevels-summary.json]
@@ -16,12 +16,12 @@
 
 decode   reads the image as the ADSP does and writes the manifest and one mesh file per object
          (keeps the names of the existing manifest, even when a mesh file is invalid; refuses to
-         overwrite a manifest that does not parse); fails where the image is not the format.
+         overwrite a manifest that does not parse); fails where the image is not the format,
+         including a word the format does not explain outside RESIDUE_ALLOWED.
 asm      writes build/obj/page0.asm .. page2.asm, the vasm sources asm/obj/objects.asm includes
-         (`make`): dc.w for every decoded structure, dcb.w for the zero fill, an incbin slice of
-         the image for each residue range. The image supplies only the residue words (and so the
-         checksum word of their page).
-encode   writes the image itself (tests, experiments).
+         (`make`): dc.w for every decoded structure and residue constant, dcb.w for the zero
+         fill. Needs data/objects only, never the ROM image.
+encode   writes the image itself from data/objects (tests, experiments).
 inventory prints the object table of docs/07 (numbers, addresses, counts, bounding boxes); with
          --image68k the descriptor column (the 68k descriptors that select each object) and,
          on stderr, how many objects are near objects, only far objects or in no descriptor;
@@ -92,14 +92,9 @@ def main() -> int:
     d.add_argument("--out", type=Path, default=DATA)
     a = sub.add_parser("asm")
     a.add_argument("--data", type=Path, default=DATA)
-    a.add_argument("--image", type=Path, default=IMAGE)
     a.add_argument("--out", type=Path, default=Path("build/obj"))
-    a.add_argument(
-        "--incbin", default="../../build/stunrun-obj.bin", help="the image as the sources name it"
-    )
     e = sub.add_parser("encode")
     e.add_argument("--data", type=Path, default=DATA)
-    e.add_argument("--image", type=Path, help="supplies the residue words")
     e.add_argument("--out", type=Path, required=True)
     i = sub.add_parser("inventory")
     i.add_argument("--data", type=Path, default=DATA)
@@ -152,24 +147,18 @@ def main() -> int:
             faces = sum(len(m.faces) for m in decoded.meshes.values())
             print(
                 f"{args.out}: {len(decoded.meshes)} objects, {faces} faces, "
-                f"{len(decoded.layout.residue)} residue ranges "
-                f"({sum(r.words for r in decoded.layout.residue)} words)"
+                f"{len(decoded.layout.residue)} residue constants"
             )
         elif args.cmd == "asm":
             layout, meshes, _ = read_data(args.data)
-            image = args.image.read_bytes() if args.image.exists() else None
-            if image is None and layout.residue:
-                print(f"{args.image} absent: needed for {len(layout.residue)} residue ranges")
-                return 2
             args.out.mkdir(parents=True, exist_ok=True)
-            for page, text in enumerate(asm_pages(layout, meshes, image, args.incbin)):
+            for page, text in enumerate(asm_pages(layout, meshes)):
                 (args.out / f"page{page}.asm").write_text(text)
             print(f"{args.out}: page0.asm-page{PAGES - 1}.asm from {len(meshes)} objects")
         elif args.cmd == "encode":
             layout, meshes, _ = read_data(args.data)
-            image = args.image.read_bytes() if args.image else None
             args.out.parent.mkdir(parents=True, exist_ok=True)
-            args.out.write_bytes(encode(layout, meshes, image))
+            args.out.write_bytes(encode(layout, meshes))
             print(f"{args.out}: {len(meshes)} objects")
         elif args.cmd == "inventory":
             from objects import Decoded, place
