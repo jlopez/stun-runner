@@ -382,10 +382,16 @@ def place(layout: Layout, meshes: Mapping[int, Mesh]) -> list[Placed]:
     return out
 
 
+def _is_int(v: object) -> bool:
+    """A JSON integer: `type(v) is int` rules out floats (5.0) and booleans, which Python counts
+    as ints (true would encode as 1, a colour false as 0, the hidden colour)."""
+    return type(v) is int
+
+
 def check_mesh(mesh: Mesh) -> None:
     def coords(rows: Iterable[tuple[int, int, int]], what: str) -> None:
         for row in rows:
-            if len(row) != 3 or not all(isinstance(c, int) and -0x8000 <= c <= 0x7FFF for c in row):
+            if len(row) != 3 or not all(_is_int(c) and -0x8000 <= c <= 0x7FFF for c in row):
                 raise FormatError(f"object {mesh.number}: a {what} is not three 16-bit integers")
 
     # The vertex and normal counts are DO-loop counts (CNTR at 014D and 015F): the ADSP-2100's
@@ -398,6 +404,9 @@ def check_mesh(mesh: Mesh) -> None:
     coords(mesh.vertices, "vertex")
     coords(mesh.normals, "normal")
     for f in mesh.faces:
+        fields = [f.type, f.colour, f.normal, *f.vertices]
+        if not all(_is_int(v) for v in fields):
+            raise FormatError(f"object {mesh.number}: a face field is not an integer")
         if not 1 <= f.type <= 15:
             raise FormatError(f"object {mesh.number}: face type {f.type} (1-15; 0 ends the list)")
         if not 0 <= f.colour <= 0x3F:
@@ -503,6 +512,8 @@ def mesh_from_json(text: str) -> Mesh:
         faces = [Face(f["type"], f["colour"], f["normal"], list(f["vertices"])) for f in d["faces"]]
     except (ValueError, KeyError, TypeError) as e:
         raise FormatError(f"malformed mesh file: {e}") from e
+    if not _is_int(number):
+        raise FormatError(f"malformed mesh file: object number {number!r} is not an integer")
     for k in d:
         if k not in ("object", "vertices", "normals", "faces"):
             raise FormatError(f"object {number}: unknown key {k!r}")
