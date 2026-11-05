@@ -241,7 +241,8 @@ depthkeys:
 # run starts from an empty private state (SOM_STATE, removed first): no NVRAM file, so the game
 # boots from the set's own 200e/210e, and attract mode, which depends on the NVRAM history (high
 # scores, the attract cycle), is the same on every machine and every run.
-SOM_ATTRACT ?= 1200,1500,1800,2100,2700,3000
+# attract 4000 is captured at frame 5531, an empty list (0003 0002 FFFF FFFF, docs/08 section 1.1)
+SOM_ATTRACT ?= 1200,1500,1800,2100,2700,3000,4000
 SOM_GAME ?= 1000,1100,2400,3000,3600,4200,4800,6600
 # attract mode again with every colour word's two bytes made different (SOM_DITHER, somdump.lua):
 # the game's table has equal bytes, so only these captures test the expander's even/odd bytes

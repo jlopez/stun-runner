@@ -96,6 +96,20 @@ def test_round_trip_and_accounting():
     assert encode_som(som.commands, [som.commands.index(c) for c in drawn]) == words
 
 
+def test_empty_list_decodes_and_draws_nothing():
+    """The game copies 0003 0002 FFFF FFFF on attract screens without 3D (make somdump, attract
+    frame 4000): no commands, the separator at 2, an empty table and the end at 3."""
+    words = encode_som([])
+    assert words == [3, 2, END, END]
+    som = decode_som(words)
+    assert (som.last, som.table_at, som.commands, som.order) == (3, 2, [], [])
+    assert som.words == 4 and som.draw_order() == []
+    canvas = render(som, synthetic_colours())
+    assert sum(canvas.drawn) == 0 and canvas.skipped == 0 and canvas.images == 0
+    with pytest.raises(DisplayListError):
+        decode_som([3, 2, END, 0x0001])  # the end marker is still required
+
+
 def test_fields_of_the_command_word():
     c = Command(0, 0x8000 | 0x1000 | 0x0C00 | 0x2A5, 0)
     assert c.skipped and c.is_image and c.fill == 3 and c.colour == 0x2A5
@@ -609,7 +623,8 @@ def test_captures_against_mame():
         colours = read_words(d / "colors.bin")
         canvas = render(som, colours, window, images, flags, sign_extended)
         a = compare(canvas, (d / "fb_som.bin").read_bytes(), (d / "fb_pre.bin").read_bytes())
-        assert a.drawn > 0 and a.equal == a.drawn, (d, a)
+        # an empty list (attract-f4000, frame 5531: 0003 0002 FFFF FFFF) draws and changes nothing
+        assert (a.drawn > 0) == bool(som.commands) and a.equal == a.drawn, (d, a)
         assert a.missed == 0, (d, a)
         if d.name.startswith("dither-"):
             # SOM_DITHER: every word's bytes differ, so the comparison tests the expander's

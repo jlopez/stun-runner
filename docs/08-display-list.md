@@ -14,7 +14,7 @@ become a projected polygon.
 
 - The ADSP builds one list per frame in the SOM bank the 68k does not see: a two-word header, the
   commands (polygons and image quads, back to back), FFFF, a draw-order table with one entry per
-  command, ordered by a depth key to within 10h (section 1.5), FFFF (section 1). Every word of 14 captured lists (attract mode and a game, `make
+  command, ordered by a depth key to within 10h (section 1.5), FFFF (section 1). Every word of 15 captured lists (attract mode and a game, `make
   somdump`) is accounted for by the decoder, and MAME's own write log (the ADSP PC of every
   SOMLATCH write) assigns each field to the instruction section 1 names (MAME).
 - When the ADSP signals the list complete (/GINT, 00C1), the 68k flips the bank (ADSP control
@@ -23,12 +23,12 @@ become a projected polygon.
 - The GSP's command interpreter has 16 command codes (section 3); code 7 walks the table and fills
   each polygon span by span through the 2 bpp expander (whose even and odd pixels take the two
   bytes of the colour word), with stipple patterns, outlines and scaled images (section 4).
-- **The reference renderer in `tools/displaylist.py` redraws all 14 captured lists and equals
-  MAME's frame buffer on every pixel it draws: 1,033,509 pixels over 14 frames, 0 different (and
+- **The reference renderer in `tools/displaylist.py` redraws all 15 captured lists and equals
+  MAME's frame buffer on every pixel it draws: 1,033,509 pixels over 15 frames, 0 different (and
   224,180 more over three replays whose colour words have two different bytes); and
   every pixel the list changed in MAME's page (page before the list vs after) is one it drew: 0
   missed.** The screen MAME shows a frame later is that page pixel for pixel (122,880 of 122,880
-  in all 17 captures). Section 5 says what this proves and what it does not.
+  in all 18 captures). Section 5 says what this proves and what it does not.
 
 ## 1. The SOM buffer, word by word
 
@@ -51,10 +51,14 @@ bank 0, 0x02C408 writes 818016 = bank 1).
 | N | FFFF | 082B | GSP FFF45020 (ends the walk); 68k 0x02F0E2 |
 
 DM 001E holds the address of the last word written (1 after the two placeholders, 0032); each
-command adds its length (05D7-05DA, 0685-0688), 080B adds the table and its FFFF (082E-0831). The
+command adds its length (05D7-05DA, 0685-0688), 080B adds the table and its FFFF (082E-0831). A
+frame with nothing to draw leaves the empty list 0003 0002 FFFF FFFF: no commands, T = 2, an
+empty table (MAME: attract-f4000, frame 5531: `somdump.lua` waits for the next GSP buffer that
+holds a SOM list, and none completed in frames 4000-5530; the 68k copies its 3 words,
+0x02F0BA). The decoder returns no commands for it and the renderer draws nothing. The
 writers in the table are MAME's: `tools/mame/somdump.lua` records the ADSP PC of every SOMLATCH
 write (CURPC, the writing instruction), and `tools/displaylist.py` maps each decoded field to
-its writers. Over the 17 captures, every word of every field comes from exactly these
+its writers. Over the 18 captures, every word of every field comes from exactly these
 instructions and no other (`test_captures_against_mame` asserts this table):
 
 ```
@@ -253,7 +257,7 @@ FFF49F10).
 
 ### 3.2 The codes
 
-Lengths in words, the command word included. "Seen" = present in the 17 captured buffers, whose
+Lengths in words, the command word included. "Seen" = present in the 18 captured buffers, whose
 commands the decoder walks to the end command with no word left over (MAME); the others are CODE.
 
 | Code | Handler | Operands | Length | Seen |
@@ -285,12 +289,12 @@ leaves the list cleanly when start + count is above 100h (`JRHI FFF47050` at FFF
 deep as 0 and F). E0 out of range restarts the GSP program instead: `JAHI FFF40000` (`gsp_main`)
 when start > 3Fh (FFF4A730) or start + count > 40h (FFF4A7C0). The decoder rejects all of these.
 
-The order of the commands is the 68k's, frame by frame, not a rule of the protocol. In the 17
+The order of the commands is the 68k's, frame by frame, not a rule of the protocol. In the 18
 captures of section 5 a buffer starts D, one to three 9, 5; then, before the SOM list, 3 and two 8
 (attract-f1200 to -f2100, game-f2400, -f3600, -f4800) or nothing; then 7, D, 5 and the dashboard
 text (4, with a 3 among them in all but attract-f2700 and -f3000), and F. But the two 8 can also come right after the list, drawn over the 3D
 scene (game-f1000, frame 1047, and game-f1100: `D 9 5 7 8 8 D 5 4 ...`), and palette loads 9 can follow the text
-(game-f1000: `... 4 9 9 F`; game-f4200: `... 4 9 F`). The colour table (C) and the image table (E0)
+(game-f1000 and attract-f4000: `... 4 9 9 F`; game-f4200: `... 4 9 F`). The colour table (C) and the image table (E0)
 were loaded before the captured frames (HYP: at mode changes).
 
 ### 3.3 Command 7 (CODE, MAME)
@@ -315,7 +319,7 @@ list (FFF412F0-FFF41690); `run_command_list` subtracts A000h (40 rows) from it (
 y 28h is the page's row 0: the coordinates the ADSP writes are x 0-1FFh, y 28h-117h on screen.
 MAME: the screen is 512 x 240 (the TMS34010 sets the visible area from its own timing registers,
 tms34010.cpp:1060-1080, replacing harddriv.cpp:1869's initial 228 lines), and the snapshot one
-frame after a list equals the page it drew, row 0 at the top, through palette bank 0, in all 17
+frame after a list equals the page it drew, row 0 at the top, through palette bank 0, in all 18
 captures (122,880 of 122,880 pixels each).
 
 The clip window is the hardware's (CONTROL W = 3: FILL and LINE skip what falls outside WSTART-
@@ -357,7 +361,7 @@ The colour is the word at FFF71D20 + 10h * (command & 3FFh), written to F4000000
 and writes byte i of that long to pixel i of each group of four (harddriv_v.cpp:300-318, the
 mask table at :32-56): **even pixels get the low byte, odd pixels the high byte**, so a colour
 word could be a two-index dither (CODE, the MAME source). The game's own table does not use it:
-in all 14 captures every one of the 400h words has equal bytes, so those comparisons cannot tell
+in all 15 captures every one of the 400h words has equal bytes, so those comparisons cannot tell
 this rule from one byte everywhere. The MAME evidence is the three `dither-f*` captures of
 section 5, a replay of attract mode in which `somdump.lua` (SOM_DITHER=1) rewrites every word
 as lo | (lo ^ 80h) << 8 each frame: there the redrawing matches MAME's page on every pixel, fills
@@ -453,7 +457,7 @@ drawn over the 3D scene, game-f1000), the window (5), palette
 loads (9), the dashboard text and digits (4). The SOM list carries only the ADSP's polygons and
 the image quads that are part of the 3D scene (sprites placed in the world, the text panel): the
 type-1 faces of objects 335 and 353-363 (docs/07 section 4), drawn as images (section 4.4), not
-as the flat unlit panels docs/07 section 4 supposes (HYP there).
+as flat unlit panels (M3a's hypothesis, which docs/07 now replaces with a pointer here).
 
 ## 5. The reference renderer and what it proves
 
@@ -479,6 +483,7 @@ page and is compared with MAME's page after the list:
 | attract-f2100 | 2105 | 5908 | 215 solid, 5 25%, 102 outline | 11224 | 11224 | 11224 | 0 | 122880 |
 | attract-f2700 | 2705 | 94 | 4 solid, 1 image | 85 | 85 | 85 | 0 | 122880 |
 | attract-f3000 | 3024 | 67 | 3 solid, 1 image | 91794 | 91794 | 91794 | 0 | 122880 |
+| attract-f4000 | 5531 | 4 | none (an empty list) | 0 | 0 | 0 | 0 | 122880 |
 | game-f1000 | 1047 | 6885 | 358 solid, 5 25% | 106493 | 106493 | 106493 | 0 | 122880 |
 | game-f1100 | 1104 | 5852 | 344 solid (17 colour byte 4) | 106496 | 106496 | 106496 | 0 | 122880 |
 | game-f2400 | 2406 | 4421 | 233 solid, 3 25% | 82350 | 82350 | 82350 | 0 | 122880 |
@@ -497,7 +502,7 @@ the list, "Missed" the changed pixels the renderer did not draw. The three `dith
 a third MAME run of `make somdump`: attract mode again from the same empty state, with
 `SOM_DITHER=1`, which rewrites every colour word as lo | (lo ^ 80h) << 8 each frame (the GSP only
 reads the table): the lists are byte-identical to attract-f1200, -f1800 and -f2100's, but every
-polygon now has two different bytes for its even and odd pixels. In the 14 game-table captures
+polygon now has two different bytes for its even and odd pixels. In the 15 game-table captures
 every colour word has equal bytes, so only these three test which byte a pixel gets; in them the
 redrawing is equal on every pixel, fills and outlines (dither-f2100: 102 outlines), even x low
 byte and odd x high byte (`test_captures_against_mame` asserts all four cases occur). "Snapshot = page" compares the
@@ -506,7 +511,7 @@ screen snapshot one frame later with the final page through palette bank 0. Pict
 ![game](../artifacts/display-list/compare-game-f2400.png)
 ![image quad](../artifacts/display-list/compare-attract-f3000.png)
 
-**What this proves.** For these 14 frames the format of section 1 is complete (no word
+**What this proves.** For these 15 frames the format of section 1 is complete (no word
 unexplained, the table a permutation), and the description of section 4 reproduces MAME's TMS34010
 pixel for pixel on every pixel the list touches, including the stipple phase, the window, the
 outlines' Bresenham lines, the 75% pattern (game-f6600), colour byte 4 under fill 0 drawn as 75%
@@ -519,7 +524,7 @@ A row skipped by the V test, bit 15, FFF77E60 bits 3
 and 5 (word 11h is 0000 or 0010 in every capture), colour byte 4 under fill 2 and commands 1, 2, 6, A, B, C and E0 do not
 occur in the captures: their description is CODE only (all but the commands have synthetic CI
 tests of the renderer, which pin the code reading, not MAME). The colour table, the palette and the images are
-inputs taken from MAME's memory; how they are loaded is M5d. "Changed" equals "drawn" in 13 of the 14
+inputs taken from MAME's memory; how they are loaded is M5d. "Changed" equals "drawn" in 14 of the 15
 captures; in attract-f1800 the list writes 81 pixels with the value they already had (drawn and
 equal, not changed). A pixel written so is invisible to the "missed" test.
 

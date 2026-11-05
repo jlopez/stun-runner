@@ -249,7 +249,10 @@ def decode_som(words: Sequence[int]) -> SomList:
     starts = sorted(targets)
     if t > 2 and (not starts or starts[0] != 2):
         raise DisplayListError("no table entry for the command at 0002")
-    commands = [decode_command(words, s, e) for s, e in zip(starts, starts[1:] + [t], strict=True)]
+    # an empty list (T = 2, N = 3: 0003 0002 FFFF FFFF) has no starts and so no bounds; the game
+    # copies such lists on attract screens without 3D (make somdump, attract frame 4000)
+    ends = starts[1:] + [t] if starts else []
+    commands = [decode_command(words, s, e) for s, e in zip(starts, ends, strict=True)]
     return SomList(n, t, commands, order)
 
 
