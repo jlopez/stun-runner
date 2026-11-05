@@ -142,6 +142,25 @@ def test_round_trip_synthetic(seed: int) -> None:
     assert words[layout.objects] == TERMINATOR
 
 
+def test_moving_an_object_to_another_page() -> None:
+    """docs/07 section 8.1: a move is the number inserted at its sorted place in the other page's
+    list; appending it out of order is rejected."""
+    layout, meshes = synthetic(1)
+    n = 0  # the lowest number: appended to a non-empty list it is always out of order
+    src = next(p for p in range(3) if n in layout.pages[p])
+    dst = next(p for p in range(3) if p != src and layout.pages[p])
+    pages = [list(p) for p in layout.pages]
+    pages[src].remove(n)
+    appended = Layout(layout.objects, [p if i != dst else p + [n] for i, p in enumerate(pages)])
+    with pytest.raises(FormatError, match=f"page {dst}: objects must be in number order"):
+        encode(appended, meshes)
+    pages[dst] = sorted(pages[dst] + [n])
+    moved = Layout(layout.objects, pages)
+    decoded = decode(encode(moved, meshes))
+    assert decoded.layout == moved and decoded.meshes == meshes
+    assert next(p for p in decoded.placed if p.number == n).page == dst
+
+
 def test_planted_difference_is_one_word() -> None:
     layout, meshes = synthetic(4)
     image = to_words(encode(layout, meshes))

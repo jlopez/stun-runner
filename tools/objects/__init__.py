@@ -139,7 +139,8 @@ class Residue:
 
 @dataclass
 class Layout:
-    """Where everything goes: per page the object numbers in address order."""
+    """Where everything goes: per page the object numbers in ascending order (= address order;
+    `place` and `decode` reject any other order)."""
 
     objects: int  # number of directory entries
     pages: list[list[int]]
