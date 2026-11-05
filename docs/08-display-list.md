@@ -69,14 +69,15 @@ image x, y      PM 0678, 067A (attract-f2700, -f3000)
 
 ### 1.2 The command word (CODE; MAME for the cases marked)
 
-Written at 0515 (polygons) or 066A (images) from DM 0036, which the record reader builds (docs/07):
+Written at 0515 (polygons) or 066A (images) from DM 0036, which the record reader builds (docs/07 section 4, record word 1):
 the record's colour (the low 6 bits of its second word, 01A0), lit at 0214 (`((colour << 4) + 10h)
 OR shade`, the shade 0-Fh from the normal and the light: 0232 `SR = LSHIFT SI BY 4`, 0234 `AF =
 SR0 + AY0` with AY0 = 10h (0233), 0235 `AR = MR1 OR AF`; so the index is `(colour + 1) << 4 |
 shade`, and bit 4 is clear for an odd record colour; colours 1Fh and up are not lit and
 are stored masked, `colour AND 1Fh` (021A-021F), so a record colour of 20h-3Fh reaches the command
-word as 00h-1Fh), 1000h for image records (01C9-01CC) and the object's flags DM 002F (the object list
-entry's bits 8-11, 0082-0084).
+word as 00h-1Fh), 1000h for image records, the type-1 faces (01C9-01CC; docs/07 section 4), and the object's
+flags DM 002F (the object list entry's bits 8-11, 0082-0084, docs/07 section 3.1, which calls
+them the colour bank: bits 8-9 land in the colour index, bits 10-11 are the fill).
 
 | Bits | Meaning | GSP |
 |---|---|---|
@@ -101,7 +102,9 @@ vertex (smallest y; on a flat top the left chain starts at the leftmost and the 
 the rightmost top vertex, 052B-0544), then walks the two chains down. Each segment ends at the next
 vertex of either chain (057A: both, 059D: the left one first, 05B7: the right one first) and
 recomputes the slope of the chain that turned: `right_slope` (05DD) and `left_slope` (0607) give
-`dx * PM(1036 + dy)`, where PM 1036-1235 (`reciprocal_table`, the loaded record 1036/200) holds
+`dx * PM(1036 + dy)`, where PM 1036-1235 (`reciprocal_table`, the loaded record 1036/200; not
+the object ROM's 32K-word table in page 1 that `project_vertices` 04B2 reads for 1/z, docs/07
+section 5.1) holds
 floor(8000h/dy) for dy <= 40h and floor(200000h/dy) above; the ADSP's fractional multiply
 (`MR = AR * MY0 (SU)`, 05F1/0601 and 061B/062B) doubles the product and dy > 40h shifts it right
 arithmetically by 6 (0602-0603). The slope, a signed 16.16 x step per row, is therefore
@@ -128,8 +131,11 @@ cmd (bit 12; bits 0-5 the image)   066A
 FFFF FFFF                          0680 0682
 ```
 
-Written by `emit_image` (0663) for records whose type sets DM 0038 (docs/07). Four corners in
-every capture. The GSP draws the box at the first point, the second's x - the first's x + 1
+Written by `emit_image` (0663) for the records whose type sets DM 0038: type 1 (`record_type_table`
+0187 -> 0197), which in the ROM are the 13 faces of objects 335 and 353-363 (docs/07 section 4),
+so bits 0-5 are the face's record colour, unlit. The clipper sends them to 068B instead of the
+polygon path (0273-0276), which drops the whole image when any corner's z is below C8h (0695-069E,
+HYP: a near-plane cull), before 0663 (01D9). Four corners in every capture. The GSP draws the box at the first point, the second's x - the first's x + 1
 pixels wide and the third's y - the second's y + 1 rows high (section 4.4); its far corner is
 (p1.x, p2.y) only when p1.y = p0.y.
 
@@ -316,7 +322,9 @@ The clip window is the hardware's (CONTROL W = 3: FILL and LINE skip what falls 
 WEND, `apply_window` and `line` in `src/devices/cpu/tms34010/34010gfx.hxx`). Command 5 sets it;
 in every capture the SOM list is drawn inside (0, 28h)-(1FFh, F7h), rows 0-207, which leaves the
 dashboard rows alone. The ADSP's own clamp (0-1FFh, 0509) is the only clipping of the polygon
-coordinates themselves; the near-plane clipping before projection (from 0271) is docs/07's.
+coordinates themselves. The clipping before projection (0271: images through 068B, section 1.4;
+polygons from 0278 on) is not decoded here, nor in docs/07, which leaves the clipper to this
+document (docs/07's introduction): section 6, question 7.
 
 ### 4.2 A polygon (FFF45090-FFF45630)
 
@@ -363,7 +371,7 @@ after each row, so the stipple shifts two pixels per row: pixel x of a row is wr
 34010gfx.hxx:1797-1960; the patterns repeat every 8 bits, so the real chip's alternating halves
 would give the same result). The fill bits come only from the object: the record reader stores
 the record colour masked to 6 bits (019C-01A0), lighting builds bits 0-8 (0214-0236), and bits 8-11
-are DM 002F, the object list entry's bits 8-11 (0082-0084, docs/07), ORed in at 01CD-01CF, so an
+are DM 002F, the object list entry's bits 8-11 (0082-0084, docs/07 section 3.1), ORed in at 01CD-01CF, so an
 object is filled one way in all its faces (CODE). In the game captures of section 5 none to 5
 faces use fill 2, all colour 14h (a shadow under the player's ship, HYP); at frame 6303 of the same
 game run (`make somdump SOM_GAME=1000,2400,3000,3600,4200,4800,6300`, game-f6300: 109 25% and 219
@@ -443,7 +451,9 @@ Everything 2D comes from the 68k's own commands in the same buffer (section 3.2)
 ground rectangles (3), backgrounds and the dashboard (8, D: images, M5d; an 8 after the list is
 drawn over the 3D scene, game-f1000), the window (5), palette
 loads (9), the dashboard text and digits (4). The SOM list carries only the ADSP's polygons and
-the image quads that are part of the 3D scene (sprites placed in the world, the text panel).
+the image quads that are part of the 3D scene (sprites placed in the world, the text panel): the
+type-1 faces of objects 335 and 353-363 (docs/07 section 4), drawn as images (section 4.4), not
+as the flat unlit panels docs/07 section 4 supposes (HYP there).
 
 ## 5. The reference renderer and what it proves
 
@@ -538,7 +548,8 @@ command-5 window run in CI on synthetic inputs (`tools/test_displaylist.py`).
 1. Who writes FFF77F50 (440h in every capture) and what the rest of the 44h-word header holds (M5d).
 2. Commands 6, 8, B and D's targets (FFF595B0, FFF58950, FFF52060, the entries at FFF71C20) and
    the palette packing of command 9 (M5d).
-3. The meaning of the depth key's direction and of DM 0033 (the object's shift) (docs/07, M3a).
+3. The meaning of the depth key's direction and of DM 0033 (the object's shift); docs/07 does not
+   cover them either.
 4. The object handshake: 0047-004F raise /GINT mid-frame when an object entry has bit 14 set; the
    68k answers at 0x02E418 and, with FF9C74 set, defers it to 0x02E3E0, which calls 0x02DFFE before
    releasing the ADSP (HYP: the 68k recomputes something per object; M5).
@@ -550,5 +561,9 @@ command-5 window run in CI on synthetic inputs (`tools/test_displaylist.py`).
    sets it (HYP that it is never produced). The 75% fill and colour byte 4 are produced and
    redrawn equal to MAME (section 4.3: game-f6600, game-f1100); what stays open is which state of
    the 68k's entity selects fill 1 or 2: the fill is the object entry's bits 10-11 (0082-0084,
-   01CD-01CF), which the 68k builds from the entity's +38h bits 3-4 (docs/07), and the ship is
-   drawn with fill 2 at frame 6303 and fill 1 at 6605 of the same game (M5).
+   01CD-01CF), which the 68k builds from the entity's +38h bits 3-4 (0x02E274-0x02E276, docs/07
+   section 3.1), and the ship is drawn with fill 2 at frame 6303 and fill 1 at 6605 of the same
+   game (M5).
+7. The clipper (0271-04B1): the polygon path from 0278 (the edge moves at 02C8, 031F, 0385, 03EB
+   and 0452 that `project_vertices` 04B2 follows) and what 064A and 0631, called around the image
+   cull at 068B, do. docs/07 leaves the clipper to docs/08 and docs/08 does not decode it.

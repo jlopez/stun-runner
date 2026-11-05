@@ -465,7 +465,9 @@ the CPUs (harddriv_m.cpp:595-601).
 
 1. The object list entry format at DM 0A00 and the object ROM pointer (`read_object_pointer`
    shifts the /SIMBUF word left by 2 into a page and an address: is the pointer in units of four
-   words?) and the record types behind the table at PM 0187 (M3).
+   words?) and the record types behind the table at PM 0187 (M3): answered by docs/07 sections
+   3.1 (the entry), 3.3 (the pointer: page P >> 14, word (P << 2) & FFFF) and 4 (record types 1
+   and 15).
 2. The SOM display list: answered by docs/08 sections 1 and 2 (the header words written at
    00BB-00C0, the FFFF at 00B5 that ends the commands, `write_draw_order` 080B and the frame
    protocol); what it leaves open is docs/08 section 6.

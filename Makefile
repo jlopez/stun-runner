@@ -200,10 +200,6 @@ objtrace: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
 	$(PYTHON) tools/objects trace --image $< --summary artifacts/objtrace-summary.json \
 		$(BUILD)/mame/objtrace-attract.txt $(BUILD)/mame/objtrace-play.txt
 
-# Are the image-quad corners read zero-extended (ST FE0 = 0 at FFF49380, docs/08 section 4.4)?
-# Breakpoints count the GSP's field-0 extension mode from an empty private NVRAM/cfg state (as
-# somdump); writes build/mame/fieldext.txt.
-
 # How does the GSP extend field 0 (ST FE0, docs/08 section 4.4): at the start of every list
 # (FFF46E30, sign-extended after read_list_header), at command 7 and at the image-quad corner read
 # FFF49380 (zero-extended after a 9 or 5)? Breakpoints count the mode from an empty private
