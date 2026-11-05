@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from objects import encode, read_data
+from objects import checksum_address, encode, place, read_data
 from romset import IMAGES, compare, layout, load_snapshot, merge, split
 from test_programs import plant_programs
 
@@ -247,7 +247,23 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert (
         "136070-2107.210u: 1 differing bytes, first at file offset $0FFFF = 68k $07FFFF" in r.stdout
     )
-    # an edited mesh reaches the object ROMs: the vertex's x word and its page's checksum word
+    # undo the plant, so that the mesh edit below is the only difference
+    data[0x7FFFF] ^= 0x01
+    image.write_bytes(bytes(data))
+    later = image.stat().st_mtime + 5
+    os.utime(image, (later, later))
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+    # an edited mesh reaches the object ROMs: the vertex's x word and its page's checksum word,
+    # both on page 0 (the low bytes, chip 90k), and nothing else in the 25 files
+    obj = images["stunrun-obj"]
+    pointer = obj[2 * 100] << 8 | obj[2 * 100 + 1]
+    assert pointer >> 14 == 0
+    vertex_x = (pointer << 2 & 0xFFFF) + 3
+    layout_, meshes, _ = read_data(REPO / "data/objects")
+    checksum_word = checksum_address(0, place(layout_, meshes), layout_)
     mesh = work / "data/objects/100.json"
     text = mesh.read_text()
     first = text.index("    [") + 5
@@ -258,4 +274,10 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     r = run(*make, "all", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
     r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 1
+    assert "1 problems over 25 files" in r.stdout, r.stdout
     assert "136070-2118.90k: 2 differing bytes" in r.stdout, r.stdout
+    built = {p.name: p.read_bytes() for p in (work / "build/roms/stunrun").iterdir()}
+    assert {name for name in files if built[name] != files[name]} == {"136070-2118.90k"}
+    chip, ref = built["136070-2118.90k"], files["136070-2118.90k"]
+    assert [i for i in range(len(ref)) if chip[i] != ref[i]] == sorted([vertex_x, checksum_word])
