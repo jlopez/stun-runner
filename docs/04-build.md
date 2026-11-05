@@ -90,9 +90,13 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   `SOM_DITHER=1`, docs/08 section 5) into `build/mame/som/<attract|game|dither>-f<N>/` (SOM banks, ADSP data RAM, the GSP command
   buffer, the frame-buffer page before and after the list, colour and image tables, palette,
   snapshots, the frame's protocol events), then runs `tools/displaylist.py` on each: decode,
-  redraw, compare with MAME's page (docs/08-display-list.md), and the target fails when a capture
-  does not decode or its redrawing differs from the page (`--render` exits 2; each capture's
-  output also goes to `render.txt` in its directory). Each of its three MAME runs starts
+  redraw, compare with MAME's page (docs/08-display-list.md). It removes the previous
+  `attract-f*`, `game-f*` and `dither-f*` captures first, and the target fails when a run did not
+  write its done marker (`<prefix>done`, written by `somdump.lua` just before it exits: MAME exits
+  0 even when a Lua callback raises, so a broken script would otherwise run out its 600 seconds
+  silently) or left no `som.bin`, `fb_som.bin` or `snap_1.png` for a requested frame, when a
+  capture does not decode, or when its redrawing differs from the page (`--render` exits 2; each
+  capture's output also goes to `render.txt` in its directory). Each of its three MAME runs starts
   from an empty private state, `build/mame/somstate` (removed first, then `-nvram_directory` and
   `-cfg_directory` there): the game boots from the set's own 200e/210e, attract mode (which
   follows the NVRAM's history) shows the same scenes on every run and machine, the user's
@@ -106,6 +110,12 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   the image-quad corner read FFF49380 and at the SOM command loop FFF45010 over `FIELD_FRAMES`
   attract frames, into `build/mame/fieldext.txt` (docs/08 section 4.4: each list starts
   sign-extended, and the 9 and 5 before every captured 7 reset field 0 to zero-extended).
+- `make depthkeys` (needs MAME and the ROMs; never in CI): `tools/mame/depthkeys.lua` walks the
+  ADSP's draw-order node list in PM (head PM 123F to tail 1242) at every 7th frame while the
+  ADSP waits at 0013-0015, over `DEPTH_FROM`-`DEPTH_TO` in attract mode and up to
+  `DEPTH_GAME_TO` in a game, each from an empty private state (`build/mame/depthstate`), and
+  writes `build/mame/depthkeys-{attract,game}.txt`: per frame the adjacent pairs whose key rises
+  and the largest rise (docs/08 section 1.5: never above 10h, the bias of 07C1-07C5).
 
 ## 5. Coverage at the zero point (M1)
 

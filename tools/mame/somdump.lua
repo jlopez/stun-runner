@@ -43,7 +43,7 @@
 -- table the SOM polygons index, GSP FFF452D0) as lo | (lo ^ 80h) << 8: the game's own table has
 -- equal bytes in every word, and this makes the expander's even/odd byte rule visible in the
 -- page (docs/08 section 4.3). The GSP only reads the table, so the game runs as without it. It
--- exits after the last capture. The SOM banks, ADSP data RAM, the colour table and the GSP
+-- exits after the last capture, writing SOM_DIR/<SOM_PREFIX>done first. The SOM banks, ADSP data RAM, the colour table and the GSP
 -- buffer are runtime RAM state; images.bin is ROM-derived, and fb*.bin and the snapshots hold
 -- pages those images were drawn into. All of it stays under build/: only the bare SOM list (a
 -- .som, through tools/displaylist.py --export) is ever committed.
@@ -378,6 +378,9 @@ SOM_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
   end
   snaps = keep
   if next_capture > #FRAMES and #snaps == 0 then
+    -- the done marker `make somdump` requires: MAME exits 0 even when a callback raised, so
+    -- only this file says that every frame was captured
+    write(OUT, PREFIX .. "done", string.format("%d captures, frame %d\n", #FRAMES, frame))
     machine:exit()
   end
 end)
