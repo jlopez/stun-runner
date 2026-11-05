@@ -480,9 +480,9 @@ two bytes of chip 90k, at the vertex's x word and page 0's checksum word, and no
 6. Type 1 faces (objects 335, 353-363): what the 068B/0663 path does with them (docs/08).
 7. The 77 objects no run loaded (section 11.4): steered play (the runs never steer), the
    self-test, or none (unused objects).
-8. Objects 202 and 203 (`sign_station`, `sign_caution`) read mirrored from the side their
-   normals face, where the letters 368-393 read correctly (section 11.1): how the 68k orients
-   them is M5's.
+8. Objects 202 and 203 (`sign_station`, `sign_caution`) are stored upside down and the game
+   places them with a matrix whose middle element is -4000h (section 11.1, MAME): which 68k
+   call site builds that matrix is M5's.
 
 ## 10. Inventory table
 
@@ -498,13 +498,13 @@ name column is the manifest's (everywhere).
 | # | page | address | vertices | normals | faces | x | y | z | descriptor | run | levels | name |
 |---:|---:|---|---:|---:|---:|---|---|---|---|---|---|---|
 | 0 | 0 | 01A0 | 49 | 38 | 38 | -71..70 | 10..60 | -271..276 | 0 | AP | 0-22 | player_craft_body |
-| 1 | 0 | 03D4 | 12 | 16 | 20 | -87..-13 | 0..78 | -19..288 | 1 | AP | 0-22 | player_craft_fin_left |
-| 2 | 0 | 04C4 | 12 | 16 | 20 | 12..86 | 0..78 | -19..288 | 2 | AP | 0-22 | player_craft_fin_right |
-| 3 | 0 | 05B4 | 6 | 5 | 5 | -133..-69 | 28..34 | -189..-83 | 3 | AP | 0-22 | player_craft_wing_left |
-| 4 | 0 | 0604 | 6 | 5 | 5 | 68..132 | 28..34 | -189..-83 | 4 | AP | 0-22 | player_craft_wing_right |
-| 5 | 0 | 0654 | 18 | 18 | 18 | -133..-95 | 6..68 | -255..16 | 5 | AP | 0-22 | player_craft_pod_left |
-| 6 | 0 | 0754 | 18 | 18 | 18 | 94..132 | 6..68 | -255..16 | 6 | AP | 0-22 | player_craft_pod_right |
-| 7 | 0 | 0854 | 122 | 26 | 46 | -27..26 | 54..98 | -161..92 | 7 | AP | 0-22 | player_craft_guns |
+| 1 | 0 | 03D4 | 12 | 16 | 20 | -87..-13 | 0..78 | -19..288 | 1 | AP | 1-22 | player_craft_fin_left |
+| 2 | 0 | 04C4 | 12 | 16 | 20 | 12..86 | 0..78 | -19..288 | 2 | AP | 1-22 | player_craft_fin_right |
+| 3 | 0 | 05B4 | 6 | 5 | 5 | -133..-69 | 28..34 | -189..-83 | 3 | AP | 1-22 | player_craft_wing_left |
+| 4 | 0 | 0604 | 6 | 5 | 5 | 68..132 | 28..34 | -189..-83 | 4 | AP | 1-22 | player_craft_wing_right |
+| 5 | 0 | 0654 | 18 | 18 | 18 | -133..-95 | 6..68 | -255..16 | 5 | AP | 1-22 | player_craft_pod_left |
+| 6 | 0 | 0754 | 18 | 18 | 18 | 94..132 | 6..68 | -255..16 | 6 | AP | 1-22 | player_craft_pod_right |
+| 7 | 0 | 0854 | 122 | 26 | 46 | -27..26 | 54..98 | -161..92 | 7 | AP | 1-22 | player_craft_guns |
 | 8 | 2 | 0000 | 32 | 20 | 20 | -71..0 | 10..60 | -271..-19 | 8 | P | 0,22 | player_craft_rear_left |
 | 9 | 2 | 0140 | 32 | 20 | 20 | 0..70 | 10..60 | -271..-19 | 9 | P | 0,22 | player_craft_rear_right |
 | 10 | 2 | 0280 | 32 | 17 | 21 | -49..48 | 10..50 | -157..276 | 10 | P | 0,22 | player_craft_front |
@@ -519,7 +519,7 @@ name column is the manifest's (everywhere).
 | 19 | 0 | 1140 | 6 | 5 | 5 | -41..26 | -37..36 | -167..130 | 16 | A | 1-2,8,10-11,19,21-22 | wedge_b |
 | 20 | 0 | 1190 | 4 | 4 | 4 | -71..86 | -71..90 | -63..60 | 17 | A | 1-2,8,10-11,19,21-22 | tetrahedron_large |
 | 21 | 0 | 11CC | 17 | 7 | 8 | -139..110 | -25..24 | -145..136 | 18 | A | 1-2,8,10-11,19,21-22 | strip_bent |
-| 22 | 0 | 1258 | 76 | 63 | 70 | -269..268 | 0..180 | -445..544 | 19 | AP | 0-22 | craft_a |
+| 22 | 0 | 1258 | 76 | 63 | 70 | -269..268 | 0..180 | -445..544 | 19 | AP | 2-3,5,7-22 | craft_a |
 | 23 | 0 | 1618 | 55 | 28 | 37 | -281..280 | 0..180 | -461..576 | 19f | - | 2-3,5,7-20,22 | craft_a_far |
 | 24 | 0 | 1838 | 39 | 33 | 33 | -103..102 | 0..204 | -451..410 | 20 | A | 2-3,5-22 | craft_b |
 | 25 | 0 | 1A18 | 12 | 10 | 10 | -91..90 | 0..156 | -405..390 | 20f | - | 2-3,5-16,18-20,22 | craft_b_far |
@@ -554,11 +554,11 @@ name column is the manifest's (everywhere).
 | 54 | 0 | 2F18 | 38 | 19 | 19 | -1600..1600 | -1560..1561 | -3241..3186 | 44 | - | - | tunnel_bend_yp1 |
 | 55 | 0 | 3064 | 18 | 9 | 9 | -1647..1647 | -1561..1728 | -3214..3214 | 44f | - | - | tunnel_bend_yp1_far |
 | 56 | 0 | 3104 | 38 | 19 | 19 | -1600..1600 | -1552..1570 | -3404..3132 | 45 | AP | 0,3-5,7-10,12,15-22 | tunnel_bend_yp5 |
-| 57 | 0 | 3250 | 18 | 9 | 9 | -1647..1647 | -1561..1728 | -3272..3272 | 45f | AP | 0-22 | tunnel_bend_yp5_far |
+| 57 | 0 | 3250 | 18 | 9 | 9 | -1647..1647 | -1561..1728 | -3272..3272 | 45f | AP | 0,3-5,7-10,12,15-22 | tunnel_bend_yp5_far |
 | 58 | 0 | 32F0 | 38 | 19 | 19 | -1600..1600 | -1561..1560 | -3241..3186 | 46 | - | - | tunnel_bend_yn1 |
 | 59 | 0 | 343C | 18 | 9 | 9 | -1647..1647 | -1561..1728 | -3214..3214 | 46f | - | - | tunnel_bend_yn1_far |
-| 60 | 0 | 34DC | 38 | 19 | 19 | -1600..1600 | -1570..1552 | -3404..3132 | 47 | AP | 0-22 | tunnel_bend_yn5 |
-| 61 | 0 | 3628 | 18 | 9 | 9 | -1647..1647 | -1561..1728 | -3272..3272 | 47f | AP | 0-22 | tunnel_bend_yn5_far |
+| 60 | 0 | 34DC | 38 | 19 | 19 | -1600..1600 | -1570..1552 | -3404..3132 | 47 | AP | 0,3-5,7-10,12,16-22 | tunnel_bend_yn5 |
+| 61 | 0 | 3628 | 18 | 9 | 9 | -1647..1647 | -1561..1728 | -3272..3272 | 47f | AP | 0,3-5,7-10,12,16-22 | tunnel_bend_yn5_far |
 | 62 | 0 | 36C8 | 38 | 19 | 19 | -1600..1600 | -1561..1561 | -3323..3323 | 48 | A | 3,9,17 | tunnel_bend_xp7_yn5 |
 | 63 | 0 | 3814 | 18 | 9 | 9 | -1647..1647 | -1561..1728 | -3323..3323 | 48f | A | 3,9,17 | tunnel_bend_xp7_yn5_far |
 | 64 | 0 | 38B4 | 38 | 19 | 19 | -1600..1600 | -1561..1561 | -3323..3323 | 49 | - | 9 | tunnel_bend_xn7_yn5 |
@@ -591,12 +591,12 @@ name column is the manifest's (everywhere).
 | 91 | 1 | 8540 | 15 | 8 | 8 | -1647..1647 | -1561..976 | -3202..3200 | 62f | P | 0-2,4-5,9,11-12 | tunnel_transition_3_far |
 | 92 | 1 | 85CC | 15 | 12 | 12 | -1600..1600 | -1562..464 | -3200..3200 | 63 | P | 0-2,4-5,9,11 | tunnel_transition_4 |
 | 93 | 1 | 867C | 10 | 8 | 8 | -1647..1647 | -1560..466 | -3200..3201 | 63f | P | 0-2,4-5,9,11-12 | tunnel_transition_4_far |
-| 94 | 1 | 86F4 | 52 | 27 | 27 | -1599..3194 | -1567..1567 | -3409..3236 | 64 | AP | 0-22 | tunnel_fork |
-| 95 | 1 | 88B8 | 24 | 15 | 15 | -1713..3140 | -1557..1724 | -3408..3193 | 64f | AP | 0-22 | tunnel_fork_far |
-| 96 | 1 | 89A8 | 40 | 19 | 19 | -1600..1600 | -1561..1561 | -3254..3254 | 65 | AP | 0-22 | tunnel_bend_sharp_xn27_yn2 |
-| 97 | 1 | 8AFC | 20 | 9 | 9 | -1659..1643 | -1569..1736 | -3523..3005 | 65f | AP | 0-22 | tunnel_bend_sharp_xn27_yn2_far |
-| 98 | 1 | 8BA4 | 40 | 19 | 19 | -1600..1600 | -1561..1561 | -3254..3254 | 66 | AP | 0-22 | tunnel_bend_sharp_xp27_yn2 |
-| 99 | 1 | 8CF8 | 20 | 9 | 9 | -1633..1661 | -1561..1728 | -3519..3014 | 66f | AP | 0-22 | tunnel_bend_sharp_xp27_yn2_far |
+| 94 | 1 | 86F4 | 52 | 27 | 27 | -1599..3194 | -1567..1567 | -3409..3236 | 64 | AP | 7-8,10-11,13,17-18,21 | tunnel_fork |
+| 95 | 1 | 88B8 | 24 | 15 | 15 | -1713..3140 | -1557..1724 | -3408..3193 | 64f | AP | 7-8,10-11,13,17-18,21 | tunnel_fork_far |
+| 96 | 1 | 89A8 | 40 | 19 | 19 | -1600..1600 | -1561..1561 | -3254..3254 | 65 | AP | 7-8,10-11,13,17-18,21 | tunnel_bend_sharp_xn27_yn2 |
+| 97 | 1 | 8AFC | 20 | 9 | 9 | -1659..1643 | -1569..1736 | -3523..3005 | 65f | AP | 7-8,10-11,13,17-18,21 | tunnel_bend_sharp_xn27_yn2_far |
+| 98 | 1 | 8BA4 | 40 | 19 | 19 | -1600..1600 | -1561..1561 | -3254..3254 | 66 | AP | 7-8,10-11,13,17-18,21 | tunnel_bend_sharp_xp27_yn2 |
+| 99 | 1 | 8CF8 | 20 | 9 | 9 | -1633..1661 | -1561..1728 | -3519..3014 | 66f | AP | 7-8,10-11,13,17-18,21 | tunnel_bend_sharp_xp27_yn2_far |
 | 100 | 0 | 4DD8 | 28 | 5 | 15 | -1632..1632 | -1561..-1401 | -3200..3200 | 67 | AP | 0-22 | track_wide |
 | 101 | 0 | 4EBC | 8 | 3 | 5 | -1600..1600 | -1561..-1433 | -3200..3200 | 67f | AP | 0-22 | track_wide_far |
 | 102 | 0 | 4F0C | 28 | 5 | 11 | -526..526 | -1561..-1401 | -3200..3200 | 68 | AP | 1-22 | track_narrow |
@@ -647,10 +647,10 @@ name column is the manifest's (everywhere).
 | 147 | 0 | 6F08 | 18 | 9 | 9 | -823..823 | -780..864 | -3214..3200 | 91f | - | - | tunnel_r800_bend_yp1_far |
 | 148 | 0 | 6FA8 | 38 | 19 | 19 | -800..800 | -780..780 | -3268..3200 | 92 | - | 9-10,17,21-22 | tunnel_r800_bend_yp5 |
 | 149 | 0 | 70F4 | 18 | 9 | 9 | -823..823 | -780..864 | -3272..3200 | 92f | - | 9-10,17,21-22 | tunnel_r800_bend_yp5_far |
-| 150 | 0 | 7194 | 38 | 19 | 19 | -1200..1200 | -1171..1171 | -3357..3200 | 93 | - | 2,15,17,21 | tunnel_r1200_bend_xn8 |
-| 151 | 0 | 72E0 | 18 | 9 | 9 | -1235..1235 | -1171..1296 | -3361..3200 | 93f | - | 2,15,17,21 | tunnel_r1200_bend_xn8_far |
-| 152 | 0 | 7380 | 38 | 19 | 19 | -1200..1200 | -1171..1171 | -3357..3200 | 94 | - | 2,21 | tunnel_r1200_bend_xp8 |
-| 153 | 0 | 74CC | 18 | 9 | 9 | -1235..1235 | -1171..1296 | -3361..3200 | 94f | - | 2,21 | tunnel_r1200_bend_xp8_far |
+| 150 | 0 | 7194 | 38 | 19 | 19 | -1200..1200 | -1171..1171 | -3357..3200 | 93 | - | 2,15,17,21 | tunnel_r1200_bend_xn7 |
+| 151 | 0 | 72E0 | 18 | 9 | 9 | -1235..1235 | -1171..1296 | -3361..3200 | 93f | - | 2,15,17,21 | tunnel_r1200_bend_xn7_far |
+| 152 | 0 | 7380 | 38 | 19 | 19 | -1200..1200 | -1171..1171 | -3357..3200 | 94 | - | 2,21 | tunnel_r1200_bend_xp7 |
+| 153 | 0 | 74CC | 18 | 9 | 9 | -1235..1235 | -1171..1296 | -3361..3200 | 94f | - | 2,21 | tunnel_r1200_bend_xp7_far |
 | 154 | 0 | 756C | 38 | 19 | 19 | -1200..1200 | -1171..1171 | -3220..3200 | 95 | - | - | tunnel_r1200_bend_yn1 |
 | 155 | 0 | 76B8 | 18 | 9 | 9 | -1235..1235 | -1171..1296 | -3222..3200 | 95f | - | - | tunnel_r1200_bend_yn1_far |
 | 156 | 0 | 7758 | 38 | 19 | 19 | -1200..1200 | -1171..1171 | -3302..3200 | 96 | - | 15,17,21 | tunnel_r1200_bend_yn5 |
@@ -698,7 +698,7 @@ name column is the manifest's (everywhere).
 | 198 | 1 | 9DA4 | 7 | 1 | 2 | -680..436 | -212..28 | 0..0 | 117 | P | 1 | sign_arrow_left |
 | 199 | 1 | 9DD4 | 7 | 1 | 2 | -436..680 | -212..28 | 0..0 | 118 | P | 1 | sign_arrow_right |
 | 200 | 1 | 9E04 | 14 | 1 | 4 | -616..616 | -170..10 | 1..1 | 119 | - | 11,14 | sign_arrows_inward |
-| 201 | 1 | 9E58 | 14 | 1 | 4 | -632..632 | -170..10 | 1..1 | 120 | AP | 0-22 | sign_arrows_outward |
+| 201 | 1 | 9E58 | 14 | 1 | 4 | -632..632 | -170..10 | 1..1 | 120 | AP | 7-8,10-11,13,17-19,21 | sign_arrows_outward |
 | 202 | 1 | 9EAC | 79 | 1 | 20 | -820..814 | -224..156 | 0..0 | 121 | P | 0-2,4-5,9-12 | sign_station |
 | 203 | 1 | A044 | 75 | 1 | 19 | -820..810 | -224..152 | 0..0 | 122 | AP | 1,3-4,6-22 | sign_caution |
 | 204 | 1 | A1C8 | 28 | 1 | 8 | -1600..1600 | 0..3122 | 0..0 | 123 | AP | 0-22 | iris_1 |
@@ -723,17 +723,17 @@ name column is the manifest's (everywhere).
 | 223 | 1 | C330 | 4 | 1 | 1 | -250..250 | -2..2 | -800..800 | 141 | - | - | panel_flat_a |
 | 224 | 1 | C350 | 12 | 7 | 7 | -125..125 | 6..86 | -1056..1056 | 142 | - | 4,17,22 | plank_bevelled_a |
 | 225 | 1 | C3CC | 12 | 7 | 7 | -192..192 | 6..86 | -1056..1056 | 143 | - | 2 | plank_bevelled_b |
-| 226 | 1 | C448 | 12 | 7 | 7 | -250..250 | 6..80 | -1056..1056 | 144 | AP | 0-22 | plank_bevelled_c |
+| 226 | 1 | C448 | 12 | 7 | 7 | -250..250 | 6..80 | -1056..1056 | 144 | AP | 1-4,7-8,10,15-22 | plank_bevelled_c |
 | 227 | 1 | C4C4 | 6 | 1 | 1 | -501..501 | 0..0 | -1056..1056 | 145 | - | 8 | panel_octagon |
-| 228 | 1 | C4EC | 9 | 2 | 4 | -25..24 | 0..0 | 100..1900 | 146 | AP | 0-22 | line_double_a |
-| 229 | 1 | C530 | 6 | 2 | 4 | -21..28 | 0..0 | -2561..0 | 147 | AP | 0-22 | line_double_b |
-| 230 | 1 | C56C | 72 | 24 | 24 | -101..80 | -65..102 | -69..2 | 148 | AP | 0-22 | burst_1 |
+| 228 | 1 | C4EC | 9 | 2 | 4 | -25..24 | 0..0 | 100..1900 | 146 | AP | 1-22 | line_double_a |
+| 229 | 1 | C530 | 6 | 2 | 4 | -21..28 | 0..0 | -2561..0 | 147 | AP | 1-22 | line_double_b |
+| 230 | 1 | C56C | 72 | 24 | 24 | -101..80 | -65..102 | -69..2 | 148 | AP | 1-22 | burst_1 |
 | 231 | 1 | C73C | 34 | 1 | 13 | -105..90 | -69..118 | -3..8 | 148f | - | - | burst_1_far |
-| 232 | 1 | C808 | 51 | 15 | 17 | -229..168 | -123..190 | -165..78 | 149 | AP | 0-22 | burst_2 |
+| 232 | 1 | C808 | 51 | 15 | 17 | -229..168 | -123..190 | -165..78 | 149 | AP | 1-22 | burst_2 |
 | 233 | 1 | C94C | 36 | 1 | 12 | -275..166 | -133..220 | -3..0 | 149f | - | - | burst_2_far |
-| 234 | 1 | CA18 | 51 | 15 | 17 | -421..286 | -223..320 | -299..138 | 150 | AP | 0-22 | burst_3 |
+| 234 | 1 | CA18 | 51 | 15 | 17 | -421..286 | -223..320 | -299..138 | 150 | AP | 1-22 | burst_3 |
 | 235 | 1 | CB5C | 36 | 1 | 12 | -559..282 | -349..420 | 0..0 | 150f | - | - | burst_3_far |
-| 236 | 1 | CC28 | 45 | 13 | 15 | -503..338 | -297..396 | -353..66 | 151 | AP | 0-22 | burst_4 |
+| 236 | 1 | CC28 | 45 | 13 | 15 | -503..338 | -297..396 | -353..66 | 151 | AP | 1-22 | burst_4 |
 | 237 | 1 | CD48 | 36 | 2 | 12 | -771..404 | -533..560 | 0..0 | 151f | - | - | burst_4_far |
 | 238 | 1 | CE14 | 116 | 31 | 63 | 100..500 | 10..60 | -155..-107 | 152 | P | 22 | rod_clamped_a |
 | 239 | 1 | D1F8 | 116 | 31 | 63 | -501..-101 | 10..60 | -155..-107 | 153 | P | 22 | rod_clamped_b |
@@ -803,7 +803,7 @@ name column is the manifest's (everywhere).
 | 303 | 1 | E874 | 66 | 15 | 18 | -69..68 | 10..34 | -385..-181 | 204 | AP | 1-4,7-8,16-19,21 | streaks_1 |
 | 304 | 1 | EA00 | 68 | 15 | 18 | -69..68 | 10..34 | -515..-181 | 205 | AP | 1-4,7-8,16-19,21 | streaks_2 |
 | 305 | 1 | EB90 | 68 | 11 | 18 | -69..68 | 10..34 | -643..-181 | 206 | A | 1-4,7,16-17,19,21 | streaks_3 |
-| 306 | 1 | ED14 | 14 | 1 | 5 | -133..132 | 0..0 | -249..274 | 207 | AP | 0-22 | dart_1 |
+| 306 | 1 | ED14 | 14 | 1 | 5 | -133..132 | 0..0 | -249..274 | 207 | AP | 1-3,5-15,17-22 | dart_1 |
 | 307 | 1 | ED74 | 12 | 1 | 4 | -69..132 | 0..0 | -249..274 | 208 | - | 17 | dart_2 |
 | 308 | 1 | EDC4 | 12 | 1 | 4 | -133..68 | 0..0 | -249..274 | 209 | - | 15,22 | dart_3 |
 | 309 | 1 | EE14 | 10 | 1 | 3 | -69..68 | 0..0 | -249..274 | 210 | P | 0-22 | dart_4 |
@@ -930,8 +930,17 @@ read correctly from -z looking along +z. The views (`VIEWS`): `three-quarter` (f
 and above: yaw 45°, pitch 30° down), `rear` (along +z, the direction of the game's camera behind
 the player), `top` (down -y, +z up the picture), `side` (from +x, +z to the right); `all` draws
 the four in a 2 × 2 grid in that order. `tools/test_render.py` checks each is a rotation (no
-mirror). Two signs read mirrored in the rear view, from the side their normals face: 202
-(STATION) and 203 (CAUTION), while 198-201 are symmetric arrows. Open question 8.
+mirror). Two signs are stored **upside down**, not mirrored: in the rear view of 202 (STATION)
+and 203 (CAUTION) the letters are turned 180° in the picture plane (T, U and A drawn inverted,
+the word running right to left, the arc opening upwards), a rotation about z and not a
+reflection, so no handedness question arises (198-201 are symmetric arrows). The game turns
+them back (MAME): with `LEVELS_MATRIX=202,203` (section 11.4) the entry's matrix that the ADSP
+holds at each load (DM 0000-0008, section 2) is, at start level 0, diag(-4000h, -4000h, 4000h)
+within a few units for every load of 202 (frames 2819-2912) and of 203 (from frame 4465), in Q14
+a 180° turn about z with determinant +1; at start levels 1 and 14 every matrix logged also has -4000h in
+the middle, some with a turn about y added (the tunnel's heading), all proper rotations. The snapshots at frames 2908 and 4508 of start level 0 (`LEVELS_SNAP`) show
+STATION and CAUTION reading correctly as an arch over the tunnel. Open question 8 keeps only
+the 68k call site.
 
 **Culling** follows the ADSP, not the winding: a face is drawn when its stored normal points at
 the viewer (01A8-01A9: `read_face_normal` returns the sign of normal · first vertex in camera
@@ -971,27 +980,38 @@ far object of a descriptor, the 100 marked "f" in section 10) is its near object
 variants form **numbered families** (`iris_1`-`iris_6`, `letter_a`-`letter_z`); tunnel bends
 carry their measured end cut (`tunnel_bend_xp7_yn5`: the -z end's plane is tilted about 7° with
 +x forwards and 5° with -y forwards, from a least-squares fit of the vertices of the -z half; the
-+z end is square in every bend). `tools/test_render.py` checks the form, the uniqueness and the
-`_far` rule, and that section 10's name column is the manifest's.
++z end is square in every bend). The angle is rounded to the nearest degree, except that the
+x cut of every gentle bend, which fits at 7.47-7.50° in all three radii (50-73, 138-141,
+150-153), is written 7 throughout, so equal geometry gets equal names; the sharp bends 96-99 fit
+at 26.7° (27). `tools/test_render.py` checks the form and the uniqueness, and that section 10's name column is
+the manifest's; `tools/test_objects.py` (with the reference set) checks the `_far` rule against
+the descriptor pairs at 0x048F9C: every far-only object is named its near object's name +
+`_far`, and no other name ends in `_far`.
 
 Evidence per family: the render (contact sheet, section 11.3), the descriptors (section 3.2;
 near/far pairs from the table at 0x048F9C), the MAME loads (run column: objtrace runs of section
 7; levels column: section 11.4). **Identified** means the evidence ties the object to something
 seen in the game; **shape** means the name only describes the geometry (HYP for any game role;
-none is claimed).
+none is claimed). The snapshots cited are MAME runs of `tools/mame/objlevels.lua` with
+`LEVELS_SNAP` (section 11.4), reproducible as
+`LEVELS_DIR=build/mame/ LEVELS_NAME=snap-L LEVELS_START=L LEVELS_FRAMES=4600 LEVELS_SNAP=<frames>
+mame stunrun ... -snapshot_directory <dir> -autoboot_script tools/mame/objlevels.lua`: start
+level 0 at frames 2200, 2908 and 4508; start level 1 at 1500, 2200 and 3000; start level 5 at
+1220, 1232, 1244 and 2200; start level 14 at 1500, 2200 and 3000 (the input script is fixed, so
+the frames repeat).
 
 | Objects | Names | Render | 68k | MAME | Status |
 |---|---|---|---|---|---|
-| 0-7 | `player_craft_body`, `_fin_left/right`, `_wing_left/right`, `_pod_left/right`, `_guns` | drawn together (`player-craft-0-7.png`) they make one vehicle: a body with canopy, two fins, two side wings, two pods, twin gun barrels; parts are placed in one object space (x of 1 is -87..-13, of 2 12..86) | descriptors 0-7, all near = far; taken at game start in 0x02543A (pushes at 0x0254A4-0x025610) and in 0x02BD48 and bound to the vehicle entities 0xFF9C80 + 3Eh·k (section 3.2) | loaded in both objtrace runs and at every level 0-22; every MAME play snapshot examined (start levels 0, 5, 9, 14, 19, 22) shows this vehicle (red) at the bottom centre, the camera behind it | identified: the player's vehicle |
-| 8-10 | `player_craft_rear_left`, `_rear_right`, `_front` | 8 and 9 the rear halves (z -271..-19, x <= 0 and >= 0), 10 a long nose (z -157..276) | descriptors 8-10; 0x02543A pushes 10 or 0 for the first entity (`bne` before 0x0254F2) | play only (levels 0 and 22) | shape (parts of the vehicle's shape; when they replace 0-7 is M5's) |
+| 0-7 | `player_craft_body`, `_fin_left/right`, `_wing_left/right`, `_pod_left/right`, `_guns` | drawn together (`player-craft-0-7.png`) they make one vehicle: a body with canopy, two fins, two side wings, two pods, twin gun barrels; parts are placed in one object space (x of 1 is -87..-13, of 2 12..86) | descriptors 0-7, all near = far, bound to the vehicle entities 0xFF9C80 + 3Eh·k (section 3.2) by 0x02543A: when the level word 0xFF9578 is not 0 (`tst.w` at 0x02549C, `bne` to 0x0254F2) it binds 0, 3 and 4 to 0xFF9C80, 0xFF9D3A and 0xFF9D78, then (both branches, from 0x025562) 1, 2, 5, 6 and 7 to the other entities | loaded in both objtrace runs and at levels 1-22; at level 0 only object 0 (589 loads from frame 1073 in run 00), never 1-7. The snapshots at frame 2200 of start levels 5 and 14 and at 4508 of start level 0 (level word 1 by then) show this vehicle, fins, wings and pods, at the bottom centre, the camera behind it; at level word 0 (start level 0, frames 2200 and 2908) the vehicle is the bare body, object 0's shape, without them | identified: the player's vehicle (1-7 from level 1 on) |
+| 8-10 | `player_craft_rear_left`, `_rear_right`, `_front` | 8 and 9 the rear halves (z -271..-19, x <= 0 and >= 0), 10 a long nose (z -157..276) | descriptors 8-10; when the level word is 0, 0x02543A binds 10, 8 and 9 (0x0254A4-0x0254F0) to the entities that get 0, 3 and 4 otherwise (0xFF9C80, 0xFF9D3A, 0xFF9D78); 0x02BD48 binds 10, 8 and 9 to them unconditionally (from 0x02BDBA) | play only: run 00 loads them at level 0, 8 times each, all from frame 1042, after which object 0 takes over (from frame 1073); run 22 at level 22 from frame 7337. Drawn together they give object 0's picture cut in three (`render --view all 8-10` against `0`) | identified (CODE, MAME): the player's vehicle body in three parts, bound at level word 0 and by 0x02BD48; which routine swaps object 0 back in at frame 1073 is M5's |
 | 11-47 | `box_windowed_a`, `craft_a`-`craft_d`, `wedge_*`, `slab_*`, `rod_*`, ... | boxes, wedges, slabs, rods; 22, 24, 30 and 39 vehicle-shaped | LOD pairs 11/12, 13/14, 15/16, 22/23, 24/25, 30/31, 39/40 | all 37 loaded (35 in attract) | shape |
-| 48-99 | `tunnel_straight`, `tunnel_bend_*`, `tunnel_r1200_straight`, `tunnel_r800_straight`, `tunnel_taper_A_B`, `tunnel_transition_1`-`4`, `tunnel_fork`, `tunnel_bend_sharp_*` | open cylinders 6400 long (z -3200..3200), radius 1600 with a floor strip (colour 60), 16-sided near / 8-sided far; tapers name the radii at -z and +z | 26 near/far pairs, descriptors 41-66 | 44 of 52 loaded, levels 0-22 | identified: tunnel sections (the snapshots are inside such tunnels); the bend/taper/transition labels are geometry |
-| 100-121 | `track_wide`, `track_narrow`, `track_narrowing`, `track_widening`, `track_fork`, `track_*_bend_N` | flat strips at the tunnel floor's height (y -1561..-1401), 3264 or 1052 wide | pairs, descriptors 67-77 (115/116 are the two whose +4 field is swapped, section 3.2) | 16 of 22 | identified: open track (snapshots at level words 1 and 14 show the vehicle on a track in the open; both levels load 100-107 and 114-117) |
+| 48-99 | `tunnel_straight`, `tunnel_bend_*`, `tunnel_r1200_straight`, `tunnel_r800_straight`, `tunnel_taper_A_B`, `tunnel_transition_1`-`4`, `tunnel_fork`, `tunnel_bend_sharp_*` | open cylinders 6400 long (z -3200..3200), radius 1600 with a floor strip (colour 60), 16-sided near / 8-sided far; tapers name the radii at -z and +z | 26 near/far pairs, descriptors 41-66 | 44 of 52 loaded, levels 0-22 | identified: tunnel sections (the snapshots of start level 0 at 2200 and 2908 and of start level 1 at 1500 are inside such tunnels: a 16-sided tube with a floor strip); the bend/taper/transition labels are geometry |
+| 100-121 | `track_wide`, `track_narrow`, `track_narrowing`, `track_widening`, `track_fork`, `track_*_bend_N` | flat strips at the tunnel floor's height (y -1561..-1401), 3264 or 1052 wide | pairs, descriptors 67-77 | 16 of 22 | identified: open track (the snapshots of start level 14 at 2200 and of start level 5 at 1232 show the vehicle on a track in the open; levels 1 and 14 load 100-107 and 114-117, level 5 100-104) |
 | 122-133 | `tunnel_mouth_a`, `tunnel_mouth_flared`, `tunnel_square_a/b`, `tunnel_roof_raised`, `pyramid_large`, `ramp` | a tunnel whose roof comes down to the floor, a flared one, two square-section halls (6400 × 5120), a tunnel with a raised roof, a square pyramid (far: a nine-sided cone), a ramp | 130/131 are descriptor 83, the 0xFFDC74 entity of section 3.1 | 10 of 12 | tunnels identified as above; 126-133 shape |
 | 134-161 | `tunnel_taper_800_1200`, `tunnel_r800_bend_*`, `tunnel_r1200_bend_*` | the narrower tunnels (radius 800 and 1200, colour 4) | pairs, descriptors 85-98 | 20 of 28, levels 2-22 only | identified: tunnel sections |
-| 162-197 | `tunnel_wire_1`-`18` | tunnels whose wall is partly line faces (colour 8) and partly solid (colour 2) | pairs, descriptors 99-116 | 32 of 36, levels 0 and 12-22 | identified: tunnel sections ("wire" names the line faces; the line-drawn look of the level-5 snapshot is not these objects: level 5 loads only 48-104 and 128-131 among the tunnels, so that look comes from the run-time colours) |
-| 198-203 | `sign_arrow_left/right`, `sign_arrows_inward/outward`, `sign_station`, `sign_caution` | arrows; the words STATION and CAUTION | | all 6 | identified by their text and shape |
-| 204-212 | `iris_1`-`6`, `ring_thin`, `ring_dashed`, `ring_spiked` | a disc of eight blades opening to a thin ring | 0x031D68 steps descriptor 7Bh + D2 through 204-209 | all 9, every level | shape (an iris-like ring with green spikes is seen at the end of a tunnel in the snapshots; which of 204-212 draw it is not established per object) |
+| 162-197 | `tunnel_wire_1`-`18` | tunnels whose wall is partly line faces (colour 8) and partly solid (colour 2) | pairs, descriptors 99-116 (descriptors 115 and 116, objects 194/195 and 196/197, hold each other's +4 field, section 3.2) | 32 of 36, levels 0 and 12-22 | identified: tunnel sections ("wire" names the line faces; the line-drawn look of the level-5 snapshot, start level 5 at 2200, is not these objects: among 48-197 level 5 loads only 48-53, 56-57, 60-61, 86-93, 100-104, 128-129 and 131, so that look comes from the run-time colours) |
+| 198-203 | `sign_arrow_left/right`, `sign_arrows_inward/outward`, `sign_station`, `sign_caution` | arrows; the words STATION and CAUTION, stored upside down (section 11.1) | | all 6 | identified by their text and shape; STATION and CAUTION seen as an arch over the tunnel (start level 0, frames 2908 and 4508) |
+| 204-212 | `iris_1`-`6`, `ring_thin`, `ring_dashed`, `ring_spiked` | a disc of eight blades opening to a thin ring | 0x031D68 steps descriptor 7Bh + D2 through 204-209 | all 9, every level | identified: the iris door at a tunnel mouth (MAME): at start level 5, 204 and 212 load from frame 1028 and 205-211 once each in turn at frames 1215-1249, and the snapshots at 1220, 1232 and 1244 show blades opening in a tunnel mouth ahead of the vehicle; which picture each number gives is the render's, not checked frame by frame |
 | 213-252 | `arch`, `pillar_*`, `coil_stack_*`, `lamp_post_*`, `burst_1`-`4` (+ `_far`), `rod_clamped_*`, `fighter_spiky_a/b`, ... | arches, pillars, lamp posts, flat pieces, bursts of shards, rods with clamps, spiky craft | 252 by constant descriptor A3h (0x0364D4) | 35 of 40 | shape |
 | 253-310 | `shards_1`-`5`, `debris_1`-`4`, `umbrella`, `fan`, `winged_craft_1`-`6`, `crown_spiked`, `saucer_lumpy`, `dart_1`-`4`, ... | sprays of shards, debris, domes, fans, a winged craft in six wing positions, darts | 292 (C1h), 301/302 (CAh/CBh), 306 (CFh), 309 (D2h) by constant descriptors | 47 of 58 | shape |
 | 311-330 | `target_octagon_1`-`4`, `ring_oval_1`-`16` | concentric octagons, concentric oval rings | | 4 of 20 | shape |
@@ -1028,7 +1048,7 @@ its normals face inwards, as the ADSP culls it when the camera is outside:
 
 ![objects 198-203](../artifacts/objects/signs-198-203.png)
 
-**The iris**, 204-209 (`iris_1`-`iris_6`, 28 vertices, 1 normal, 8 faces each), rear view:
+**The iris**, 204-209 (`iris_1`-`iris_6`, 28-36 vertices, 1 normal, 8 faces each), rear view:
 `tools/objects render --sheet --view rear --tile 128 --columns 6 --out FILE 204-209`.
 
 ![objects 204-209](../artifacts/objects/iris-204-209.png)
@@ -1047,7 +1067,14 @@ M5's work through the descriptor call sites.
 0-22, 8,000 frames each from an empty NVRAM and cfg: a game started as in section 7, the trigger
 pressed every 20 frames, the yoke left centred (the game keeps the vehicle in the tunnel and
 completes some levels on its own). It records, per object, the level word (0xFF9578) in force
-at each directory read (PC 009E). **The level select is a scratch poke**, documented here
+at each directory read (PC 009E). **Only play is counted**, from the first trigger press (frame
+1020, `LEVELS_FROM`): the attract demo goes on loading objects until frame 963, three frames
+after the start press, and the level select has already turned the level word to the start
+level by then, so counting from frame 0 filed the demo's objects (94-99, 201 and 226 among
+them) under every start level. No object is loaded from frame 964 to 1026 in any run, and the
+game's first load is at frame 1027 or later. Counted this way, 94-99 load at levels 7-8, 10-11,
+13, 17-18 and 21 only, 201 at those and 19, 226 at 15 of the 23; the objtrace attract run
+(run column "A") is where the demo's loads are recorded. **The level select is a scratch poke**, documented here
 exactly: the game clears the words 0xFF9578 and 0xFF9556 (`clr.w` at 0x02B95E and 0x02B964; 0xFF9578
 also at 0x024322, in the routine 0x024306 that `game_reset` calls); in 0x02543A, the routine
 that sets up the player's vehicle, a compiled-out debug switch at 0x025712 (`moveq #0,d1` at 0x0256FC always selects case 0) would set
@@ -1069,8 +1096,10 @@ which, 242-244 and 353, only those load), **336 of 413 loaded, 77 never**:
 
 Four of them (231, 233, 235, 237, the far bursts) are far objects whose near object was loaded
 (the far object is read only past the LOD distance, section 3.1); the other 73 are near objects
-or their far objects. The runs reproduce: a scratch batch with the same inputs and level select gave the same object
-count for each of the 22 start levels both ran.
+or their far objects. The runs reproduce: a second `make objlevels` (review round 1, before
+the attract change) gave the same summary byte for byte, and the review's scratch copy that
+counts from frame 1020 gave the same object counts per run as this script (start levels 5, 12
+and 20: 84, 136 and 151).
 
 ### 11.5 The viewer (`make view`, tools/objects/viewer.html)
 
