@@ -12,6 +12,7 @@ redrawing equals MAME's frame buffer on every pixel it draws and misses none the
 from __future__ import annotations
 
 import json
+import struct
 import zlib
 from pathlib import Path
 
@@ -35,6 +36,7 @@ from displaylist import (
     read_meta,
     read_words,
     render,
+    snapshot_agreement,
     synthetic_colours,
 )
 
@@ -250,6 +252,13 @@ def test_captures_against_mame():
         assert a.drawn > 0 and a.equal == a.drawn, (d, a)
         assert a.missed == 0, (d, a)
         assert canvas.images == 0 and canvas.skipped == 0, d
+        # the screen MAME shows a frame later is the page the buffer drew, rows 0-239 = GSP y
+        # 28h-117h (snap_2, a frame further, can already show something else: game-f4200)
+        base = int(meta["fb_som_page"], 16)
+        final = (d / "fb.bin").read_bytes()[base : base + FB_PAGE_BYTES]
+        raw = (d / "palette.bin").read_bytes()
+        pal = struct.unpack(f"<{len(raw) // 4}I", raw)
+        assert snapshot_agreement(d / "snap_1.png", final, pal) == FB_PAGE_BYTES, d
         writers = field_writers(som, read_words(d / "som_pc.bin"))
         assert writers["header N"] == [0x00BE] and writers["header T"] == [0x00C0], d
         assert writers["table entry"] == [0x0828] and writers["end FFFF"] == [0x082B], d

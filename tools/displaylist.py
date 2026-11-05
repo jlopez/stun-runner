@@ -653,6 +653,59 @@ def png(path: Path, width: int, height: int, rgb: bytes) -> None:
                      + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
 
 
+def read_png(path: Path) -> tuple[int, int, bytes]:
+    """Width, height and RGB bytes of an 8-bit RGB PNG such as MAME's snapshots."""
+    data = path.read_bytes()
+    i, idat, width, height = 8, b"", 0, 0
+    while i < len(data):
+        (n,) = struct.unpack_from(">I", data, i)
+        kind, body = data[i + 4 : i + 8], data[i + 8 : i + 8 + n]
+        if kind == b"IHDR":
+            width, height, depth, colour = struct.unpack_from(">IIBB", body)
+            if (depth, colour) != (8, 2):
+                raise DisplayListError(f"{path}: not 8-bit RGB")
+        elif kind == b"IDAT":
+            idat += body
+        i += 12 + n
+    raw = zlib.decompress(idat)
+    stride = 3 * width
+    out = bytearray()
+    prev = bytearray(stride)
+    p = 0
+    for _ in range(height):
+        kind_ = raw[p]
+        line = bytearray(raw[p + 1 : p + 1 + stride])
+        p += 1 + stride
+        for x in range(stride):
+            a = line[x - 3] if x >= 3 else 0
+            b = prev[x]
+            c = prev[x - 3] if x >= 3 else 0
+            if kind_ == 1:
+                line[x] = (line[x] + a) & 255
+            elif kind_ == 2:
+                line[x] = (line[x] + b) & 255
+            elif kind_ == 3:
+                line[x] = (line[x] + (a + b) // 2) & 255
+            elif kind_ == 4:
+                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                line[x] = (line[x] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        out += line
+        prev = line
+    return width, height, bytes(out)
+
+
+def snapshot_agreement(snapshot: Path, page: bytes, palette: Sequence[int]) -> int:
+    """How many pixels of a MAME snapshot equal the frame-buffer page through palette bank 0."""
+    width, height, rgb = read_png(snapshot)
+    if (width, height) != (WIDTH, HEIGHT):
+        raise DisplayListError(f"{snapshot}: {width} x {height}, not {WIDTH} x {HEIGHT}")
+    equal = 0
+    for k in range(FB_PAGE_BYTES):
+        v = palette[page[k]]
+        equal += rgb[3 * k : 3 * k + 3] == bytes(((v >> 16) & 255, (v >> 8) & 255, v & 255))
+    return equal
+
+
 def comparison_picture(canvas: Canvas, page: bytes, palette: Sequence[int]) -> bytes:
     """Three panels side by side: MAME's page, the rendering, and agreement (green equal, red
     different, grey not drawn by the list)."""
@@ -853,6 +906,12 @@ def main(argv: list[str] | None = None) -> int:
             pal = struct.unpack(f"<{len((d / 'palette.bin').read_bytes()) // 4}I",
                                 (d / "palette.bin").read_bytes())
             png(args.render, 3 * WIDTH, HEIGHT, comparison_picture(canvas, page, pal))
+            base = int(meta.get("fb_som_page", "0"), 16)
+            final = (d / "fb.bin").read_bytes()[base : base + FB_PAGE_BYTES]
+            for snap in sorted(d.glob("snap_*.png")):
+                n = snapshot_agreement(snap, final, pal)
+                lines.append(f"{snap.name}: {n} of {FB_PAGE_BYTES} pixels equal the drawn page "
+                             f"at VRAM {base:05X} after the whole buffer, through palette bank 0")
             lines.append(
                 f"render: {agreement.drawn} pixels drawn, {agreement.equal} equal to MAME's page "
                 f"({100 * agreement.share:.3f}%); the list changed {agreement.changed} pixels of "
