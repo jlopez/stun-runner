@@ -492,8 +492,8 @@ CODE_MAP_68K = [
         "flush_sound_queue",
         "Sends every byte of the buffer sound_queue_send through send_sound_byte (030170), "
         "three empty loop turns after each, empties it, then advances sound_queue_send and "
-        "sound_queue_fill (0, 1, 2, 0...): a command waits two flushes. Called once per pass of "
-        "the main loop (024500).",
+        "sound_queue_fill (0, 1, 2, 0...): a command goes out at the third flush after it is "
+        "queued. Called once per pass of the main loop (024500).",
     ),
     Entry(
         0x0301CA,

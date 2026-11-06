@@ -55,8 +55,8 @@ Eleven sets (`mame.lst`: `stunrun`, `stunrun0`, `stunrun2`, `stunrun2e`, `stunru
 | Range | Access | What | MAME |
 |---|---|---|---|
 | 000000-0BFFFF | R | program ROM, the 12 files interleaved | `map(0x000000, 0x0fffff).rom()` |
-| 600000-603FFF | R/W, high byte | JSA II: read the sound CPU's response byte, write a command byte | `init_multisync`, `atari_jsa_base_device::main_response_r / main_command_w` |
-| 604000-607FFF | R | reset the sound board (any read) | `hd68k_sound_reset_r` |
+| 600000-603FFF | R/W, high byte | JSA II: read the sound CPU's response byte (clears level 4), write a command byte (asserts the 6502's NMI); the protocol is docs/11-sound-protocol.md | `init_multisync`, `atari_jsa_base_device::main_response_r / main_command_w` |
+| 604000-607FFF | R | reset the sound board (any read): the whole JSA device, 6502, YM2151, M6295 and latches | `hd68k_sound_reset_r` (`m_jsa->reset()`) |
 | 604000-607FFF | W | **NWR latch**: address bits 0-2 pick the line, bit 3 is the value, data ignored. 0 CR2, 1 CR1, 2 LC1, 3 LC2, 4 ZP1, 5 ZP2 (NVRAM write protect), 6 /GSPRES (GSP reset), 7 /MSPRES | `hd68k_nwr_w` |
 | 608000-60BFFF | W | watchdog | |
 | 60C000-60FFFF | R | **port 0**: bit 0 DIAGN jumper, 1 /HSYNC, 2 /VSYNC, 3 EOC12, 4 EOC8 (ADC done), 5 self-test, 6 coin 2, 7 coin 1, 8-15 DIP SW1 (8…1) | `hd68k_port0_r`, `INPUT_PORTS_START(stunrun)` line 1084 |
@@ -68,7 +68,7 @@ Eleven sets (`mame.lst`: `stunrun`, `stunrun0`, `stunrun2`, `stunrun2e`, `stunru
 | 818060-81807F | W | clear the ADSP interrupt (level 2) | `hd68k_adsp_irq_clear_w` |
 | 838000-83FFFF | R | ADSP status: bit 0 low = ADSP interrupt pending, bit 1 low = XFLAG set, other bits 1 | `hd68k_adsp_irq_state_r` |
 | A00000-A7FFFF | W | **WR0 latch**, same bit scheme: 1-4 SEL1-SEL4 (which analogue latch WR1 targets), 6-7 coin counters | `hd68k_wr0_write` |
-| A80000-AFFFFF | R | buttons: bit 0 button 1, bit 1 button 2, bit 2 start | `hd68k_a80000_r`, port `a80000` |
+| A80000-AFFFFF | R | buttons: bit 0 button 1, bit 1 button 2, bit 2 start; bit 15: the game writes a sound command only when it is 1 (023EB0, 023EEC; inferred "latch free", always 1 in MAME, docs/11 section 1) | `hd68k_a80000_r`, port `a80000` |
 | A80000-AFFFFF | W | WR1: data high byte into the SEL1-4 register picked by WR0 ("shifter interface latch", lamps/outputs on this game) | `hd68k_wr1_write` |
 | B00000-B7FFFF | R, odd byte | ADC0809 result (8-bit): channel 0 stick X, channel 2 stick Y | `adc0808_device::data_r`, ports `8BADC.0/.2` |
 | B00000-B7FFFF | W | WR2 "steering wheel latch" (unused here) | `hd68k_wr2_write` |
@@ -119,11 +119,11 @@ So the pipeline is: the 68010 fills ADSP data RAM with the frame's scene (and wr
 | 0000-1FFF | RAM |
 | 2000-2001 | YM2151 |
 | 2800 (mirror 01F9) | OKI M6295 read (/RDV) |
-| 2802 | command byte from the 68010 (/RDP) |
-| 2804 | **/RDIO**: bit 7 self-test, 6 NMI state, 5 output buffer full, 4-2 +5V, 1 coin 2, 0 coin 1 |
+| 2802 | command byte from the 68010 (/RDP); reading it clears the NMI (docs/11-sound-protocol.md) |
+| 2804 | **/RDIO**: bit 7 self-test (always 0 for stunrun in MAME 0.289, docs/09 section 1), 6 command not yet read (active low), 5 response not yet read, 4-3 unused, 2 coin 3, 1 coin 2, 0 coin 1, per `jsa_ii_ioports` (`rdio_r`'s comment says +5V for bits 4-2) |
 | 2806 | IRQ acknowledge (read or write) |
 | 2A00 | OKI write (/WRV) |
-| 2A02 | response byte to the 68010 (/WRP) |
+| 2A02 | response byte to the 68010 (/WRP); asserts the 68010's level 4 |
 | 2A04 | **/WRIO**: bits 7-6 ROM bank for 3000-3FFF, 5-4 coin counters 2 and 1, 3 OKI pin 7 ("voice frequency", `set_pin7`), 2 OKI reset (active low), 1 OKI bank bit 0 (JSA III only), 0 YM2151 reset (active low), per `wrio_w` |
 | 2A06 | **/MIX**: bits 7-6 right OKI bank (JSA IIIs only), 5 low-pass filter enable (not emulated), 4 OKI bank bit 1 (JSA III only), 3-1 YM2151 volume 0-7, 0 OKI volume (1.0 when set, 0.5 when clear) per `mix_w` |
 | 3000-3FFF | banked ROM: 4 pages of 4 KB from the first 16 KB of `136070-2123.10c` (`configure_entries(0, 4, base, 0x1000)`) |

@@ -16,6 +16,7 @@ import json
 import re
 import struct
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -33,12 +34,14 @@ HEX2 = re.compile(r"^[0-9A-F]{2}$")
 HEX6 = re.compile(r"^[0-9A-F]{6}$")
 
 
-def load() -> dict:
-    return json.loads(COMMANDS.read_text())
+def load() -> dict[str, Any]:
+    doc: dict[str, Any] = json.loads(COMMANDS.read_text())
+    return doc
 
 
-def commands() -> list[dict]:
-    return load()["commands"]
+def commands() -> list[dict[str, Any]]:
+    cmds: list[dict[str, Any]] = load()["commands"]
+    return cmds
 
 
 def h(text: str) -> int:
@@ -221,7 +224,9 @@ def test_every_queue_call_is_listed(m68k: bytes) -> None:
     for s, values in per_site.items():
         a = h(s)
         if s in doc["site_notes"]:
-            for value, at in re.findall(r"pea ([0-9A-F]{2}) at ([0-9A-F]{6})", doc["site_notes"][s]):
+            for value, at in re.findall(
+                r"pea ([0-9A-F]{2}) at ([0-9A-F]{6})", doc["site_notes"][s]
+            ):
                 assert _w(m68k, h(at)) == 0x4878 and _w(m68k, h(at) + 2) == h(value), s
             continue
         assert _w(m68k, a - 4) == 0x4878, s
