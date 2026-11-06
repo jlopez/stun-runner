@@ -446,7 +446,8 @@ none -sound none`), each from its own empty NVRAM and cfg under `build/mame/stat
 the traces stay in `build/mame/sndproto-<run>.txt` (commands, responses, addresses and counts).
 `tools/test_sound_commands.py` checks `data/sound/commands.json` against them: per command the
 count of writes at 600000, every call site the run saw queue a command among the sites listed for
-it, every byte written taken by `h_nmi`, and the responses of section 3.2.
+it, every byte written taken by `h_nmi`, and per run exactly the responses (byte and writing
+address) of the table below, FF once per reset.
 
 | Run | Frames | Commands written | Different | Queued | Resets | Responses |
 |---|---|---|---|---|---|---|
@@ -470,8 +471,13 @@ it, every byte written taken by `h_nmi`, and the responses of section 3.2.
   table counts as queued. The 68010 then runs `boot_reset` again (00023C, frame 445) and the boot
   program runs its test menu; start bypasses the power-up self-test and the re-entry resets the
   board at 000FC2 (frame 543) **MAME** (the `reset` and `queue` lines of
-  `build/mame/sndproto-selftest.txt` and `-soundtest.txt`). Why the machine restarts at 445 is
-  not established here.
+  `build/mame/sndproto-selftest.txt` and `-soundtest.txt`). The restart is the game's main loop
+  seeing the switch: 0244F0 tests 60C001 bit 5 (the self-test switch, active low, MAME's
+  `PORT_SERVICE( 0x20, IP_ACTIVE_LOW )` in harddriv.cpp) and, when it is 0, 0244FA calls
+  `soft_reset` past its `stop` (02128A: A7 from $0.w, SR = 2700, VBR = 0, FF8018 cleared,
+  `jmp (A0)` through $4.w), which is `boot_reset` (000216); its read at 00023C is the frame-445
+  reset, and 000254-00025C sends it to the test menus. The call comes before the flush (024500),
+  so the 1E queued at 420 is never written **CODE**.
 
 ## 9. Findings
 

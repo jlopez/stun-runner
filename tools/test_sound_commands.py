@@ -34,8 +34,20 @@ IMAGE_JSA = REPO / "build/stunrun-jsa.bin"
 TRACES = REPO / "build/mame"
 FUNCTIONS = REPO / "data/ida/stunrun-68k.functions.jsonl"
 SNAPSHOT = REPO / "data/ida/stunrun-68k.json"
+DOC = REPO / "docs/11-sound-protocol.md"
 
 RUNS = ("attract", "game", "selftest", "soundtest", "inject")
+# (byte, writing PC) of every response each run saw: docs/11 section 8's table
+_RESET = ("FF", "413E")
+RESPONSES = {
+    "attract": {_RESET},
+    "game": {_RESET},
+    "selftest": {_RESET, ("00", "455D")},
+    "soundtest": {_RESET, ("00", "455D"), ("34", "455D"), ("55", "4164"), ("6D", "455D"),
+                  ("AA", "455D")},
+    "inject": {_RESET, ("00", "455D"), ("55", "4164"), ("5A", "455D"), ("6D", "455D"),
+               ("AA", "455D")},
+}
 QUEUE = 0x0301CA  # queue_sound_command
 TYPES_USED = {"00", "01", "03", "05", "08", "09", "0A", "0B", "13", "14", "FF"}
 HEX2 = re.compile(r"^[0-9A-F]{2}$")
@@ -110,6 +122,9 @@ def test_type_fields() -> None:
             # the command whose stream is stopped or released starts a stream (type 08)
             assert by_value[c["target"]]["type"] == "08", c["value"]
             assert c["target"] == c["param"]
+        if t == "0B":
+            # cmdtype_0B (4496-44C2) releases the voices whose group (ram_03EC, y >> 2) is A
+            assert HEX2.match(c["group"]) and c["group"] == c["param"], c["value"]
 
 
 def test_site_notes_name_listed_sites() -> None:
@@ -417,6 +432,40 @@ def test_routines_without_ida_function(m68k: bytes) -> None:
             assert not [a for a in range(h(routine) + 2, h(site), 2) if _w(m68k, a) == 0x4E56]
 
 
+def test_sa_ii_messages_in_number_order(m68k: bytes) -> None:
+    """boot_sa_ii_test's messages 105-108, as ida/code_map.py and docs/11 list them, are the texts
+    the message pointers at 010136 give in number order; 008F68 shows 108 first, then 105 (status
+    0, 008FBE), 106 (008FC6) or 107 (008FDE)."""
+
+    def text(n: int) -> str:
+        p = struct.unpack_from(">I", m68k, 0x010136 + 4 * n)[0]
+        return m68k[p + 4 : m68k.index(b"\x01", p + 4)].decode().replace("*", " ")
+
+    comment = next(e.comment for e in CODE_MAP_68K if e.name == "boot_sa_ii_test")
+    for source in (comment, DOC.read_text()):
+        found = re.search(r"messages 105-108 \(SA II test ([^;)]*)", source)
+        assert found, source[:60]
+        items = [s.strip().upper() for s in found.group(1).split(",")]
+        assert len(items) == 4
+        for n, item in zip(range(0x105, 0x109), items, strict=True):
+            assert text(n).endswith(item), (hex(n), text(n), item)
+    for site, n in ((0x008F68, 0x108), (0x008FBE, 0x105), (0x008FC6, 0x106), (0x008FDE, 0x107)):
+        assert struct.unpack_from(">HH", m68k, site) == (0x303C, n), hex(site)
+
+
+def test_main_loop_restarts_on_the_self_test_switch(m68k: bytes) -> None:
+    """docs/11 section 8: the frame-445 restart. 0244F0 btst #5,$60C001; bne past; 0244FA jsr
+    02128A (soft_reset past its stop: ... movea.l $4.w,A0; jmp (A0)); then 024500 jsr
+    flush_sound_queue. boot_reset (000216) tests the same bit at 000254."""
+    assert struct.unpack_from(">HHI", m68k, 0x0244F0) == (0x0839, 5, 0x60C001)
+    assert struct.unpack_from(">HHI", m68k, 0x0244F8) == (0x6606, 0x4EB9, 0x02128A)
+    assert struct.unpack_from(">HI", m68k, 0x024500) == (0x4EB9, 0x03013C)
+    assert struct.unpack_from(">HH", m68k, 0x021286) == (0x4E72, 0x2700)
+    assert struct.unpack_from(">HHH", m68k, 0x0212A8) == (0x2078, 0x0004, 0x4ED0)
+    assert struct.unpack_from(">I", m68k, 4)[0] == 0x000216
+    assert struct.unpack_from(">HHI", m68k, 0x000254) == (0x0839, 5, 0x60C001)
+
+
 def test_sounds_in_attract_is_option_bit_11(m68k: bytes) -> None:
     """The option menu's item decoder (042CE4-042D2C) takes the field from the item's first byte:
     shift = low nibble, 2 << (high - low) choices. "SOUNDS IN ATTRACT" (text at 020F52) is bit 11
@@ -478,6 +527,14 @@ def test_mame_protocol(run: str) -> None:
     assert {r for r, pc in responses if pc == "413E"} <= {"FF"}
     assert {pc for _, pc in responses} <= {"413E", "455D", "4164"}
     assert {r for r, pc in responses if pc == "4164"} <= {"55"}
+    # and nothing else: per run exactly the responses of docs/11 section 8's table, FF once per
+    # reset
+    assert responses == RESPONSES[run], run
+    counts: dict[str, int] = {}
+    for p in lines:
+        if p[0] == "response":
+            counts[p[1]] = counts.get(p[1], 0) + int(p[3])
+    assert counts["FF"] == resets, run
     # the game only resets the board (023FA8) through reset_sound; the boot program at 00023C,
     # 000FC2 and 008DB8
     assert {p[1] for p in lines if p[0] == "reset"} <= {"00023C", "000FC2", "008DB8", "023FA8"}

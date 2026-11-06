@@ -172,7 +172,9 @@ CODE_MAP_68K = [
         "stop #2700 (every interrupt but level 7 masked: the watchdog, no longer kicked, "
         "resets the board, HYP); after it, VBR = 0, 818040 = 4, the warm-start magic at "
         "FF8018 cleared, jmp through the boot vector table ($4.w). Called on fatal errors: "
-        "load_gsp_section (02FE40), unpack_gsp_image (0225CE), the exception reporters.",
+        "load_gsp_section (02FE40), unpack_gsp_image (0225CE), the exception reporters. The "
+        "game's main loop enters at 02128A, past the stop (0244F0-0244FA: jsr when 60C001 bit 5, "
+        "the self-test switch, active low, is 0), so holding the switch restarts boot_reset.",
     ),
     Entry(
         0x021334,
@@ -409,8 +411,8 @@ CODE_MAP_68K = [
     Entry(
         0x008F68,
         "boot_sa_ii_test",
-        "As boot_sa_audio_test with messages 105-108 (SA II test in progress, OK, error, timeout "
-        "error): reset (008F72), 180 syncs, FF expected (008F86), 07 (008F94), status 0 is OK "
+        "As boot_sa_audio_test with messages 105-108 (SA II test OK, error, timeout error, in "
+        "progress; 108 is shown first, 008F68): reset (008F72), 180 syncs, FF expected (008F86), 07 (008F94), status 0 is OK "
         "(008FB4); then boot_play_test_sounds. Called from 00533C (the power-up self-test).",
     ),
     Entry(
