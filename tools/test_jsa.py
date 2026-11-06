@@ -131,8 +131,8 @@ MIRRORS = ("OKI_READ", "CMD_FROM_68K", "RDIO", "IRQ_ACK")
 
 @needs_tass
 def test_ida_names_carried_in(tmp_path: Path) -> None:
-    """Every name of the IDA snapshot is in the source at the same address: the I/O ports and
-    their _M mirrors as equates in hardware.asm, the vectors and their targets as labels. The
+    """Every global name of the IDA snapshot is in the source at the same address: the I/O ports
+    and their _M mirrors as equates in hardware.asm, the labels and the RAM equates. The
     values are the ones the assembler resolved (its -l output), so an _M equate missing or wrong
     in hardware.asm fails here, whether or not the code still uses it."""
     r = assemble(TREE, tmp_path / "jsa.bin")
@@ -144,6 +144,8 @@ def test_ida_names_carried_in(tmp_path: Path) -> None:
     names = {entry["name"] for entry in snapshot["names"]}
     assert {m + "_M" for m in MIRRORS} <= names
     for entry in snapshot["names"]:
+        if entry.get("local"):
+            continue  # a _local: not in the -l output (tools/test_ida_sync.py checks them)
         ea, name = int(entry["ea"], 16), entry["name"]
         assert syms.get(name) == ea, name
 

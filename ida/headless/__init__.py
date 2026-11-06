@@ -102,6 +102,13 @@ def create_database(
         if snapshot is not None:
             apply(snapshot, db)
             ida_auto.auto_wait()
+            # The analysis the snapshot queued (its instructions) can turn a local name at the
+            # end of a function into a global one while it settles the function: set the local
+            # names again once it is done.
+            for name in snapshot.names:
+                if name.local:
+                    db.set_name(name.ea, name.name, True)
+            ida_auto.auto_wait()
         saved = True
     finally:
         idapro.close_database(save=saved)
