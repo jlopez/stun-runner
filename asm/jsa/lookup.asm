@@ -3,10 +3,10 @@
 ; Read at 4F69 with Y = the key code (key_note, register 28's value, 4F0B-4F0E) OR the patch's
 ; curve byte of the operator (key_scaling,y: record bytes 1C-23 even, 4F62-4F68), so 256 bytes:
 ; a curve byte 00 reads the first half, 80 the second. tick_ym_channel takes the high nibble of
-; the value and the high nibble of the operator's depth byte to index tbl_5EDF (tables.asm, 4F6C-
-; 4F78; entry a x 10 + b is within 1 of a x b / 8): the TL added to the operator (key_tl_offset). The first half rises
-; with the key code from 00 to EA, the second falls from F7 to 00. The byte after it, AC48, is
-; checksum_adjust (jsa.asm).
+; the value and the high nibble of the operator's depth byte to index tbl_5EDF (tables.asm,
+; 4F6C-4F78; entry a x 10 + b is within 1 of a x b / 8): the TL added to the operator
+; (key_tl_offset). The first half rises with the key code from 00 to EA, the second falls from
+; F7 to 00. The byte after it, AC48, is checksum_adjust (jsa.asm).
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
 ; program.md section 3); hand-maintained from here on (docs/12-sound-music.md section 3).

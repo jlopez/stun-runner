@@ -46,7 +46,7 @@ Every byte of the file belongs to one statement of one file; the region files ar
 | 5CB8-5DB4 | `io.asm` | code (124), 2 tables | RDIO inputs and coin counters, commands 03 and 08 |
 | 5DB5-61E3 | `tables.asm` | data | 7 lookup tables of the code, `cmd_class`, `cmd_type`, `cmd_param`, `imm_handlers` |
 | 61E4-65E5 | `data/sounds.asm` | data | the tables the command handlers index with their parameter, `tbl_633E` (125 stream addresses as `.word dat_XXXX`) |
-| 65E6-AB47 | `data/music.asm` | data | the 125 byte streams and the data they point to, `.byte` rows under `dat_XXXX` labels |
+| 65E6-AB47 | `data/streams_1.asm` ... `data/patches_2.asm` | data | the byte streams and the YM2151 patch records as macro statements (M4d: docs/12-sound-music.md section 7; until M4d `data/music.asm`) |
 | AB48-AC47 | `lookup.asm` | data | a 256-byte table read at 4F69 |
 | AC48 | `jsa.asm` | data | `checksum_adjust`: no instruction reads it; it makes the byte sum of the file FF, which the self-test checks (40E4) |
 | AC49-FFF9 | `jsa.asm` | fill | zero, unreferenced |

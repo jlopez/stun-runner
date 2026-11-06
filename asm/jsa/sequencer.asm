@@ -326,8 +326,8 @@ _l497C
 ; The note's length byte in A (not 00): bits 3-0 index note_lengths (tables.asm tbl_5FE3), whose
 ; word is added to the time counter's bytes 1-2 (498B-49A1); DOT adds half of it again
 ; (49A2-49BC). Unless TIE: the gate counter = counter - 2 x tempo (49C8-49F1), halved with
-; GATE_HALF (49F4-4A02). Then the fade's step (fade_step) when one runs, and on a YM2151 track the key-on
-; (prepare_key_on with the length byte: its bits 5-4 select the accent, key_flags).
+; GATE_HALF (49F4-4A02). Then the fade's step (fade_step) when one runs, and on a YM2151 track
+; the key-on (prepare_key_on with the length byte: its bits 5-4 select the accent, key_flags).
 ; from 4916
 set_note_length
     pha
