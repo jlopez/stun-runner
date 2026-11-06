@@ -14,7 +14,7 @@
 ; whose output this program never writes and no entry_channel reaches (no track joins them).
 ; Every track of a list runs; only the last, the highest priority, is heard: run_track marks the
 ; others muted (track_muted = FF, 4759-4764), and they keep time without writing the chip. When
-; the heard track ends, free_track reloads the patch of the track that is heard next (4966-4976).
+; the heard track ends, free_track reloads the patch of the track that is heard next (4967-4976).
 ;
 ; The tick. h_irq (system.asm, about 249.7 Hz) calls tick_group with X = 0 and 1 on alternate
 ; ticks (tick_sequencer, 422B-4235): each group runs at about 124.9 Hz. tick_ym_group runs
@@ -42,8 +42,8 @@
 
 ; Run track X for one tick, then the next track of its list (next_track). A = chain_mute: 0, or
 ; FF to mute every track of the list (tick_ym_channel, channels 6-7 while the timer voices own
-; them, 4E8A-4E9D). track_muted = FF when A or a next track (a higher priority) exists. A track
-; with priority 0 or trk_sound = FF (stopped by a command or the op stop) is freed (4765-4770).
+; them, 4E8B-4E9D). track_muted = FF when A or a next track (a higher priority) exists. A track
+; with priority 0 or trk_sound = FF (stopped by a command or the op stop) is freed (4764-4770).
 ; Then the time counter loses the tempo; at 0 read_item reads the next statements; the gate
 ; counter at 0 asks for the key-off (key_flags bit 0, 47CD-47E0). On a YM2151 track: a fade step
 ; (fade_step) every LEN_32 of time while a fade runs, prepare_key_on again after it to write the
@@ -299,7 +299,7 @@ _l4919
 ; The track ends: its priority 0 (the slot is free), its call and loop nodes back on the free
 ; list (free_track_frames), unlinked from its list (chain_prev). When it was the heard track of a
 ; YM2151 channel and a track before it remains, that track's patch is written again (load_patch,
-; 4966-4976).
+; 4967-4976).
 ; from 4770, 480C, 4A71
 free_track
     sta trk_priority,x
@@ -1041,15 +1041,15 @@ _l4E71
     rts
 
 ; YM2151 channel ym_channel (list Y = 1E + channel): run its tracks (run_track; channels 6 and 7
-; muted while ymtimer_active is set, the timer voices of ymtimer.asm, 4E8A-4E9D). When the heard
+; muted while ymtimer_active is set, the timer voices of ymtimer.asm, 4E8B-4E9D). When the heard
 ; track is not muted: registers 20 and 30 from the shadow (4EA7-4ECD); the key-off (key_flags bit 0:
-; register 08 = channel, 4ED0-4EE1); then, only when sounding_prio (the heard track's
+; register 08 = channel, 4ECE-4EE2); then, only when sounding_prio (the heard track's
 ; priority x 4 + 1) is at least min_priority (4EE3-4EE8; command 01 sets min_priority to F0, 02 to
 ; 0), and a update is asked (key_flags bit 1) for a pitch other than 0: the key code key_codes[note]
-; (tables.asm key_codes) into register 28 (4EF1-4F0E), each operator's TL = the track's TL +
+; (tables.asm key_codes) into register 28 (4EEF-4F0E), each operator's TL = the track's TL +
 ; key scaling (key_level_curve by key code, depth nibble) - velocity scaling (velocity + the
 ; accent, key_accent level_bias, by the sensitivity nibble: key_velocity holds -velocity, minus the
-; accent, 4F2C-4F54, negated back at 4F92-4F9D) clamped to 00-7F (4F16-4FD4); then, only with
+; accent, 4F2C-4F54, negated back at 4F92-4F9D) clamped to 00-7F (4F15-4FD4); then, only with
 ; key_flags bit 2 (4FD7-4FDA: a note after one without TIE, set_note_length 4A27), the LFO reset
 ; on every key-on of a track that ran an lfo op (key_flags bit 7, bit 4 after the shifts:
 ; register 01 = 02 then 00, 4FDE-4FF7), and the key-on: register 08 = channel + 78, all four
@@ -2088,28 +2088,31 @@ op_var_cmp
     sec
     rts
 
-; op B5 (branch_zero): register operand 1 = 0: go to the address after it
+; op B5 (branch_zero): register operand 1 = 0: go to the address after it. The branches decide on
+; the flags read_register returns with: for register 00 on a YM2151 track those of `ldy tmp_1C`
+; (54CA), the saved Y (1 from run_op, 4859, 5068), not of the 0 in A, so B5 and B8 are never taken
+; on it and B6 and B7 always are (var_load still gives 0). No stream branches on register 00.
 ; MAME: dispatched in make musictrace
 op_branch_zero
     jsr read_register
     beq branch_taken
     bne branch_not_taken
 
-; op B6 (branch_nonzero): register operand 1 not 0: go
+; op B6 (branch_nonzero): register operand 1 not 0: go (register 00, YM2151: always, see B5)
 ; MAME: not dispatched in make musictrace
 op_branch_nonzero
     jsr read_register
     bne branch_taken
     beq branch_not_taken
 
-; op B7 (branch_plus): register operand 1 bit 7 clear: go
+; op B7 (branch_plus): register operand 1 bit 7 clear: go (register 00, YM2151: always)
 ; MAME: not dispatched in make musictrace
 op_branch_plus
     jsr read_register
     bpl branch_taken
     bmi branch_not_taken
 
-; op B8 (branch_minus): register operand 1 bit 7 set: go
+; op B8 (branch_minus): register operand 1 bit 7 set: go (register 00, YM2151: never)
 ; MAME: dispatched in make musictrace
 op_branch_minus
     jsr read_register
@@ -2136,8 +2139,9 @@ branch_taken
 ; A = register A of the track (the variable ops): 26 and up, the last result (trk_test); 06-25,
 ; global variable A - 6 (seq_vars+n, shared by every track; cmdtype_01_set_var sets it); 05, the
 ; next random byte; YM2151: 04 the pitch fraction trk_key_fraction, 03 -trk_level_offset (the
-; velocity), 02 the transpose, 01 the tempo's high byte, 00 the value 0; other kind: 00 the level,
-; 01 and 02 the same, 03-04 the result. Keeps Y.
+; velocity), 02 the transpose, 01 the tempo's high byte, 00 the value 0 (with the flags of the
+; `ldy tmp_1C` at 54CA, not of A); other kind: 00 the level, 01 and 02 the same, 03-04 the
+; result. Keeps Y. Every other exit sets the flags from the value it returns.
 ; from 544B, 5451, 5460, 5467, 546E, 5475
 read_register
     sty tmp_1C

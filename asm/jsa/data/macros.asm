@@ -49,7 +49,10 @@ ACCENT_2 = $30                          ; bits 5-4 = 11: velocity + 58 (level_bi
 ; var (trk_acc), and the last result (trk_test). var_add_to B1 (5411-544A) takes 00-04 only:
 ; 00 volume_add, 01 tempo high byte + var, 02 transpose_add, 03 velocity_add, 04 bend (the
 ; fraction + var x 4); from 05 up (the globals too) it does nothing (5419-541B).
-R_VOLUME = $00                          ; write: volume (op 82); read: 0 (54C8-54CC)
+R_VOLUME = $00                          ; write: volume (op 82); read: A = 0, but the flags come
+                                        ;   from `ldy tmp_1C` (54CA): a branch on it decides on
+                                        ;   Y, 1 from run_op, so branch_zero and branch_minus are
+                                        ;   never taken, branch_nonzero and branch_plus always
 R_TEMPO_HI = $01                        ; the tempo's high byte (trk_tempo_hi)
 R_TRANSPOSE = $02                       ; transpose (trk_transpose)
 R_VELOCITY = $03                        ; write: velocity (op A2); read: the same value back
@@ -209,7 +212,7 @@ velocity_add .macro delta               ; A3
 .endm
 
 ; A4: for steps x LEN_1 of time the carriers' TL loses rate + frac / 8 (signed) per LEN_1, in
-; 32 fade steps per LEN_1 (52C3-52EA, fade_step 4CC1; with fade_mode 0). A running fade also
+; 32 fade steps per LEN_1 (52C2-52EA, fade_step 4CC1; with fade_mode 0). A running fade also
 ; takes a full step, and restarts its LEN_32 timer, at every note start (4A5F-4A74): the rate
 ; holds only while the notes are multiples of LEN_32, shorter notes fade faster
 fade .macro steps, rate, frac=0
@@ -226,7 +229,7 @@ fine_tune .macro fraction               ; A6: the pitch fraction (trk_key_fracti
 .endm
 
 bend .macro delta                       ; A7: pitch fraction + delta x 4 (signed), carried into
-    .byte $A7, \delta                   ;   the transpose (5711-5733)
+    .byte $A7, \delta                   ;   the transpose (570F-5733)
 .endm
 
 fade_mode .macro value                  ; A8: nonzero: no step timer, the fade steps only at
@@ -281,22 +284,23 @@ var_shl .macro count                    ; B4: var << count (1-7)
     .byte $B4, \count
 .endm
 
-branch_zero .macro reg, target          ; B5: go to target when register reg is 0
+branch_zero .macro reg, target          ; B5: go to target when register reg is 0 (R_VOLUME:
+                                        ;   never, see above)
     .byte $B5, \reg
     .word \target
 .endm
 
-branch_nonzero .macro reg, target       ; B6
+branch_nonzero .macro reg, target       ; B6: not 0 (R_VOLUME: always)
     .byte $B6, \reg
     .word \target
 .endm
 
-branch_plus .macro reg, target          ; B7: bit 7 clear
+branch_plus .macro reg, target          ; B7: bit 7 clear (R_VOLUME: always)
     .byte $B7, \reg
     .word \target
 .endm
 
-branch_minus .macro reg, target         ; B8: bit 7 set
+branch_minus .macro reg, target         ; B8: bit 7 set (R_VOLUME: never)
     .byte $B8, \reg
     .word \target
 .endm

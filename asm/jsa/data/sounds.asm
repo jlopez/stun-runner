@@ -34,8 +34,8 @@ sound_restartable
 
 ; 125 bytes, one per entry E: the track's priority, read through (start_ptr),y at 45B8 and 45FF
 ; (base #<entry_priority + E, 45A9-45B6, 45F0-45FD). The track keeps priority x 4 + 1 in
-; trk_priority (4600-4604); a new track takes over a busy channel's slot only with a priority at
-; least as high (45D8-45DC), an equal priority replaces the track (465A-4668), and the YM2151
+; trk_priority (4601-4604); a new track takes over a busy channel's slot only with a priority at
+; least as high (45D7-45DC), an equal priority replaces the track (465A-4668), and the YM2151
 ; keys on only when the sounding track's priority x 4 + 1 reaches min_priority (4EE3-4EE8).
 entry_priority
     .byte $03, $03, $03, $03, $03, $03, $03, $03, $27, $27, $27, $27, $27, $29, $29, $29 ; 00-0F

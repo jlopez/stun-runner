@@ -422,10 +422,11 @@ CITING = [
 
 
 @needs_tass
-def test_single_code_citations_are_instruction_starts(tmp_path: Path) -> None:
-    """A single code address (4000-5DB4) cited in docs/12, sequencer.asm or the data files is
-    where an instruction or a label starts, never an operand byte; the ends of a range "a-b" are
-    bytes and not checked (round-3 review: 4A84, 5062, 4EF0 and others were operand bytes)."""
+def test_code_citations_are_instruction_starts(tmp_path: Path) -> None:
+    """A code address (4000-5DB4) cited in docs/12, sequencer.asm or the data files, alone or as
+    the start of a range "a-b", is where an instruction or a label starts, never an operand byte;
+    the end of a range is a byte and not checked (round-3 review: 4A84, 5062, 4EF0 and others
+    were operand bytes; round 4: range starts such as 545A, 4F16, 4966)."""
     r = assemble(TREE, tmp_path / "jsa.bin")
     assert r.returncode == 0, r.stdout + r.stderr
     listing = (tmp_path / "jsa.bin.lst").read_text()
@@ -433,12 +434,43 @@ def test_single_code_citations_are_instruction_starts(tmp_path: Path) -> None:
     bad = []
     for path in CITING:
         for n, line in enumerate(path.read_text().splitlines(), 1):
+            cited = re.findall(r"(?<![\w$#+-])([45][0-9A-F]{3})-[0-9A-F]{2,4}\b", line)
             line = re.sub(r"\b[0-9A-F]{4}-[0-9A-F]{2,4}\b", "", line)
-            for m in re.finditer(r"(?<![\w$#+-])([45][0-9A-F]{3})(?![\w-])", line):
-                a = int(m.group(1), 16)
+            cited += re.findall(r"(?<![\w$#+-])([45][0-9A-F]{3})(?![\w-])", line)
+            for c in cited:
+                a = int(c, 16)
                 if 0x4000 <= a <= 0x5DB4 and a not in starts:
-                    bad.append(f"{path.name}:{n} {m.group(1)}")
+                    bad.append(f"{path.name}:{n} {c}")
     assert not bad, bad
+
+
+def test_no_branch_on_register_00() -> None:
+    """docs/12 section 3.7: on a YM2151 track a branch on register 00 decides on the saved Y, not
+    on the 0 read_register returns (54CA), so no stream may branch on it without docs/12 and
+    macros.asm saying what it does there."""
+    regs = [s.args[0] for s in jm.statements() if s.name.startswith("branch_")]
+    assert len(regs) == 21
+    assert not [r for r in regs if r in ("R_VOLUME", "$00", "0")], regs
+
+
+def test_unused_stream_openings() -> None:
+    """docs/12 section 7: unused streams 03-07 open with tempo then patch, 09-12 with a patch,
+    and 08 is the fragment note, rest, ret."""
+    by_label: dict[str, list[str]] = {}
+    current = None
+    for s in jm.statements(files=["data/unused_streams.asm"]):
+        for label in s.labels:
+            if re.fullmatch(r"unused_stream_\d\d", label):
+                current = label
+                by_label[current] = []
+        if current:
+            by_label[current].append(s.name)
+    assert sorted(by_label) == [f"unused_stream_{n:02}" for n in range(3, 13)]
+    for n in range(3, 8):
+        assert by_label[f"unused_stream_{n:02}"][:2] == ["tempo", "patch"], n
+    for n in range(9, 13):
+        assert by_label[f"unused_stream_{n:02}"][0] == "patch", n
+    assert by_label["unused_stream_08"] == ["note", "rest", "ret"]
 
 
 def test_sndtrace_column_claims_no_unused_op() -> None:
