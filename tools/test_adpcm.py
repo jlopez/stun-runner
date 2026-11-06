@@ -735,3 +735,23 @@ def test_survey_keeps_names_descriptions_and_audio_test(tmp_path: Path) -> None:
         assert "start" not in b and "length" not in b
     assert new[1]["starts"] == {"inject": 3} and new[0]["starts"] == {"inject": 0}
     read_manifest(manifest)
+
+
+def test_samples_writes_one_canonical_wav_per_phrase(tmp_path: Path) -> None:
+    """`make samples` on a synthetic image: one WAV per phrase of the image's own table, the
+    decoder's PCM, named from the manifest; a stale WAV is removed, a second run writes none."""
+    lay = reference_layout()
+    samples = synthetic_samples(lay, 14)
+    image = tmp_path / "oki.bin"
+    image.write_bytes(build(lay, samples))
+    out = tmp_path / "oki"
+    out.mkdir()
+    (out / "99-stale.wav").write_bytes(pcm_wav([0, 0]))
+    adpcm = TOOLS / "adpcm"
+    r = run(sys.executable, adpcm, "samples", "--image", image, "--manifest", MANIFEST, "--out", out)
+    assert r.returncode == 0 and "52 written, 1 stale removed" in r.stdout, r.stdout + r.stderr
+    assert sorted(f.name for f in out.glob("*.wav")) == sorted(f"{p.stem}.wav" for p in lay.phrases)
+    for p in lay.phrases:
+        assert (out / f"{p.stem}.wav").read_bytes() == pcm_wav(pcm(samples[p.number]))
+    r = run(sys.executable, adpcm, "samples", "--image", image, "--manifest", MANIFEST, "--out", out)
+    assert r.returncode == 0 and "0 written" in r.stdout, r.stdout
