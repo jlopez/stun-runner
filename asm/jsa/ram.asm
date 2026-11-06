@@ -61,8 +61,9 @@ start_tmp = $17                         ; cmdtype_08_start_sound: the entry's pr
 tmp_ptr = $19
 tmp_1B = $1B                            ; scratch: checksum_pages' page count (41A9), sequencer
                                         ; arithmetic
-tmp_1C = $1C                            ; scratch: a handler's parameter (cmdtype_04 43D9), the
-                                        ; sequencer's X across a dispatch (5069), arithmetic
+tmp_1C = $1C                            ; scratch: a handler's parameter
+                                        ; (cmdtype_04_stop_priority 43D9), the sequencer's X
+                                        ; across a dispatch (5069), arithmetic
 zp_1D = $1D
 min_priority = $1E                      ; 4 x the parameter of a type-00 command (438A): a track
                                         ; whose priority byte is below it is not keyed on
@@ -112,7 +113,8 @@ oki_entry = $52
 oki_time_lo = $56
 oki_time_hi = $5A
 ; 4 bytes, channels 1-4: how much the channel lowers the YM2151's volume while it plays
-; (tbl_659C, 5C56; oki_duck_ym); cleared once the channel is idle (5BEB-5BF3)
+; (tbl_659C, 5C56; oki_duck_ym); cleared once the channel is idle, or in the tick that stops it
+; on time-out (5BE9 falls into 5BEB-5BF3)
 oki_duck = $5E
 rx_count = $62                          ; receive_bytes: how many bytes to wait for (5CC5)
 rx_buffer = $63                         ; where receive_bytes has h_nmi store them (5CC7-5CCE)

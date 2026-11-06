@@ -149,7 +149,7 @@ The raw traces stay in `build/mame/` (the YM2151 and OKI streams carry values fr
 
 ## 10. The system code named (M4c)
 
-**Date**: 2026-11-05 (milestone 4, leg M4c, issue #16). The system half of the tree, `system.asm`, `commands.asm`, `nmi.asm`, `ymtimer.asm`, `oki.asm`, `io.asm`, `tables.asm` and the equates of `hardware.asm` and `ram.asm`, has names instead of address labels: every routine has a header block in the Spindizzy style (what it does, its inputs and outputs, who calls it, whether the traces ran it), every branch target inside a routine is a 64tass `_local` with a name, and every table and RAM variable these files use has a name that says what is stored there. `make check` is unchanged (0 differences): only labels, comments and equates changed, and immediates became the equates of `hardware.asm` where the value is that constant. `tools/test_jsa.py` checks that no `sub_`, `loc_`, `tbl_`, `dat_` or `_lXXXX` label is left in these files and that every `zp_XX`/`ram_XXXX` equate left in `ram.asm` is used by the sequencer's files only.
+**Date**: 2026-11-05 (milestone 4, leg M4c, issue #16). The system half of the tree, `system.asm`, `commands.asm`, `nmi.asm`, `ymtimer.asm`, `oki.asm`, `io.asm`, `tables.asm` and the equates of `hardware.asm` and `ram.asm`, has names instead of address labels: every routine has a header block in the Spindizzy style (what it does, its inputs and outputs, who calls it, whether the traces ran it), every branch target inside a routine is a 64tass `_local` with a name, and every table and RAM variable these files use has a name that says what is stored there. `make check` is unchanged (0 differences): only labels, comments and equates changed, and immediates became the equates of `hardware.asm` where the value is that constant. `tools/test_jsa.py` checks that no `sub_`, `loc_`, `tbl_`, `dat_` or `_lXXXX` label is left in these files and that every `zp_XX`/`ram_XXXX` equate left in `ram.asm` is used by the sequencer's files (`sequencer.asm`, `lookup.asm`, `data/`) and by no system file; once M4d has named them all, none is left and the check still passes.
 
 Terms the names use (from the code, sections 10.2 and 10.9):
 
@@ -231,7 +231,7 @@ So `min_priority` is a floor on the track priority, as its name says, and not a 
 | Name | Address | What the code does | Evidence |
 |---|---|---|---|
 | `oki_reset` | 5BAC | WRIO bit 2 low then high; clears 56-67 | 5BAC-5BC5 |
-| `oki_tick` | 5BC6 | every eighth tick: stops a channel playing for 256 of them (about 8.2 s), clears `oki_duck` of idle channels | 5BC6-5BF9 |
+| `oki_tick` | 5BC6 | every eighth tick: stops a channel playing for 256 of them (about 8.2 s), clears `oki_duck` of idle channels and, in the same tick, of a channel it stops (5BE9 falls into 5BEB) | 5BC6-5BF9 |
 | `op_95` | 5BFA | stream op 95: the OKI start of command A's parameter | 5BFA-5BFD (op names are M4d's) |
 | `cmdtype_13_oki_play` | 5BFE | the effect entry A: phrase `tbl_6532`, channel and attenuation `tbl_6567`, duck `tbl_659C` | 5BFE-5C62; `make okitrace` (docs/10) |
 | `oki_start_bits`, `oki_busy_bits`, `oki_stop_bits` | 5C63, 5C67, 5C6B | channels 1-4's bit in the start's second byte, the status, the stop byte | okim6295.cpp 220-222, 238-247, 303-308 |

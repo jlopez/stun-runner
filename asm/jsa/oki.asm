@@ -44,9 +44,10 @@ _clear
 ; The OKI tick (from h_irq 420E, every timed IRQ; acts on every eighth: oki_divider counts 7-0).
 ;
 ; For channels 4-1 (X = 3-0): playing (OKI_READ bit), count oki_time down; when it reaches 0
-; (256 ticks of 8 IRQs after a start, about 8.2 s) stop the channel and set oki_time_lo to 2.
-; Idle with oki_duck set: clear it and recompute MIX (oki_duck_ym), so the YM2151 volume comes
-; back once the sample has ended.
+; (256 ticks of 8 IRQs after a start, about 8.2 s) stop the channel and set oki_time_lo to 2,
+; then fall into the idle path (5BE9 into 5BEB) in the same tick. Idle, or just stopped, with
+; oki_duck set: clear it and recompute MIX (oki_duck_ym), so the YM2151 volume comes back once
+; the sample has ended or been stopped.
 ; -------------------------------------------------------------------------------------------------
 oki_tick
     dec oki_divider

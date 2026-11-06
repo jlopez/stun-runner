@@ -191,13 +191,16 @@ SYSTEM_FILES = (
     "io.asm",
     "tables.asm",
 )
-ADDRESS_LABEL = re.compile(r"^(?:(?:sub|loc|tbl|dat)_[0-9A-F]{4}|_l[0-9A-F]{4})$")
+# The hex digits in either case: the build is case sensitive (-C), so loc_5d3a is its own symbol.
+ADDRESS_LABEL = re.compile(r"^(?:(?:sub|loc|tbl|dat)_[0-9A-Fa-f]{4}|_l[0-9A-Fa-f]{4})$")
 EQUATE = re.compile(r"^([A-Za-z_]\w*)\s*=")
 # The symbol a line defines: its first token, whatever follows it (a colon, an instruction, a data
 # statement, an equate's "=", a comment) and however far it is indented. A mnemonic or a directive
 # never has an address label's shape, so only definitions can match ADDRESS_LABEL.
 DEFINED = re.compile(r"^\s*(_?[A-Za-z]\w*)")
-NEUTRAL_EQUATE = re.compile(r"^(?:zp_[0-9A-F]{2}|ram_[0-9A-F]{4})$")
+NEUTRAL_EQUATE = re.compile(r"^(?:zp_[0-9A-Fa-f]{2}|ram_[0-9A-Fa-f]{4})$")
+# The sequencer's files (M4d's): the only users a neutral equate may have.
+SEQUENCER_FILES = ("sequencer.asm", "lookup.asm", "data")
 
 
 def address_labels(lines: list[str]) -> list[str]:
@@ -221,6 +224,8 @@ def test_address_label_guard_sees_every_form() -> None:
         "_l5CE0 lda #0",
         "    sub_4100 rts",
         "dat_6000 = $6000",
+        "loc_5d3a",
+        "_l5cE0 ; x",
     ]
     assert address_labels(planted) == planted
     assert not address_labels(["    jsr sub_4100", "    .word tbl_5DB5", "; loc_4400", "lda_ok"])
@@ -233,19 +238,26 @@ def code_refers(lines: list[str], name: str) -> bool:
 def test_system_files_are_named() -> None:
     """docs/09 section 10: no address-style label (sub_, loc_, tbl_, dat_ + address, or an _lXXXX
     local) is left in the system files, and every RAM equate still called zp_XX or ram_XXXX is one
-    that only the sequencer's files use (the M4c/M4d split of ram.asm)."""
+    that the sequencer's files use and no system file does (the M4c/M4d split of ram.asm). When
+    M4d has named them all, none is left and the test still passes."""
     for name in SYSTEM_FILES:
         left = address_labels((TREE / name).read_text().splitlines())
         assert not left, f"{name}: {left}"
     system = {n: (TREE / n).read_text().splitlines() for n in SYSTEM_FILES if n != "ram.asm"}
-    neutral = []
+    paths = [
+        p
+        for n in SEQUENCER_FILES
+        for p in ((TREE / n).rglob("*.asm") if (TREE / n).is_dir() else [TREE / n])
+    ]
+    assert len(paths) > 2, paths
+    sequencer = {str(p.relative_to(TREE)): p.read_text().splitlines() for p in paths}
     for t in (TREE / "ram.asm").read_text().splitlines():
         m = EQUATE.match(t)
         if m and NEUTRAL_EQUATE.match(m.group(1)):
-            neutral.append(m.group(1))
             users = [n for n, lines in system.items() if code_refers(lines, m.group(1))]
             assert not users, f"{m.group(1)} is used by {users}: M4c names it"
-    assert neutral, "the split has M4d variables"
+            seq = [n for n, lines in sequencer.items() if code_refers(lines, m.group(1))]
+            assert seq, f"{m.group(1)} is used by no sequencer file: it is not M4d's"
 
 
 @needs_tass

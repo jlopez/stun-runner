@@ -1,9 +1,11 @@
 ; tables.asm: 5DB5-61E3, lookup tables of the code and the command tables.
 ;
-; Every table here is read by the code at the addresses its comment gives (and the MAME trace
-; confirms each read: artifacts/sndtrace-summary.json, data_read). A table's length is what the
-; index the code builds can reach where that is bounded (an AND, a compare), else up to the next
-; table. The first eight are the sequencer's (sequencer.asm reads them; engine 0 and engine 1 as
+; Every table here is read by the code at the addresses its comment gives. The MAME trace
+; (artifacts/sndtrace-summary.json, data_read) confirms the reads of every table but three:
+; empty_envelope, note_periods and level_curves are read only by engine-1 code that no trace runs
+; (docs/09-sound-program.md section 10.11), so their reads rest on the code alone. A table's
+; length is what the index the code builds can reach where that is bounded (an AND, a compare),
+; else up to the next table. The first eight are the sequencer's (sequencer.asm reads them; engine 0 and engine 1 as
 ; in ram.asm); the command tables (cmd_class, cmd_type, cmd_param, imm_handlers) are the protocol
 ; with the 68010 (docs/09-sound-program.md section 5).
 ;
