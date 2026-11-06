@@ -156,7 +156,7 @@ Terms the names use (from the code, sections 10.2 and 10.9):
 - **Track**: one of the 30 stream players, X = 00-1D, the index of the 1E-byte arrays at 0248-085F (`trk_*`). A type-08 command starts one track per entry of its sound (`cmdtype_08_start_sound`).
 - **List**: `trk_link` chains the tracks of one channel, in ascending `trk_priority`; `chan_list` (087E, 14 bytes) holds the heads. Only a list's last track (the highest priority) writes the chip: the sequencer runs the others silently (zp_22, 475B-4762, M4d's).
 - **Engine**: `tick_sequencer` runs engine 0 (X = 0, `tbl_57DF` = 02: the lists 0-7, YM2151 channels 0-7) and engine 1 (X = 1, `tbl_57DF` = 03: the lists 8-D, `engine_chip` 0000) on alternate timed IRQs. No sound of this ROM uses engine 1: `tbl_62C1`, the list of each of the 125 entries, holds 0-7 only. Arrays that mean one thing to each engine are named by their engine-0 use, the comment giving both.
-- **Frame**: a 4-byte record of the pool at 09AE (199 of them, 1-C7) that the stream ops 8D (a call) and 8E (a loop) push the stream address into.
+- **Frame**: a 4-byte record of `frame_pool` at 09AE (room for 199, 1-C7, but `init_frame_pool` chains only 1-86, section 10.10) that the stream ops 8D (a call) and 8E (a loop) push the stream address into.
 
 The names of the sequencer's own routines and variables (`sequencer.asm`, `data/**`, `lookup.asm`) are leg M4d's; where these files call them, the call keeps the neutral label (`sub_5504`, `loc_5043`, `sub_55B4`, ...).
 
@@ -181,9 +181,9 @@ The names of the sequencer's own routines and variables (`sequencer.asm`, `data/
 | Name | Address | Commands (type) | What the code does | Evidence |
 |---|---|---|---|---|
 | `init_sound` | 4238 | 00 (03), reset | OKI reset, frame pool, lists and tracks freed, channels 7-0 keyed off, register 1B, MIX 0F | 4238-42D7 |
-| `init_frame_pool` | 42D8 | | chains the frames 1-C7 | 42D8-4308 |
+| `init_frame_pool` | 42D8 | | chains the frames 1-86 (meant 1-C7, fault below) | 42D8-4308 |
 | `alloc_frame` | 4309 | | pops a frame off `frame_free` | 4309-4319 (fault below) |
-| `frame_address` | 431A | | `frame_ptr` = 09AE + (A - 1) x 4 | 431A-433B |
+| `frame_address` | 431A | | `frame_ptr` = `frame_pool` (09AE) + (A - 1) x 4 | 431A-433B |
 | `free_track_frames` | 433C | | returns a track's loop and call frames to the pool | 433C-4370 |
 | `dispatch_command` | 4371 | all | the type's handler with A = `cmd_param` | 4371-4389 |
 | `cmdtype_00_min_priority` | 438A | 01, 02 (00) | `min_priority` = 4 x A | 438A-438E; MAME below |
@@ -235,7 +235,7 @@ So `min_priority` is a floor on the track priority, as its name says, and not a 
 | `op_95` | 5BFA | stream op 95: the OKI start of command A's parameter | 5BFA-5BFD (op names are M4d's) |
 | `cmdtype_13_oki_play` | 5BFE | the effect entry A: phrase `tbl_6532`, channel and attenuation `tbl_6567`, duck `tbl_659C` | 5BFE-5C62; `make okitrace` (docs/10) |
 | `oki_start_bits`, `oki_busy_bits`, `oki_stop_bits` | 5C63, 5C67, 5C6B | channels 1-4's bit in the start's second byte, the status, the stop byte | okim6295.cpp 220-222, 238-247, 303-308 |
-| `cmdtype_14_oki_stop` | 5C6F | stops the first channel (from 4) playing phrase A | 5C6F-5C86; docs/10 section 4 |
+| `cmdtype_14_oki_stop` | 5C6F | stops the first channel (from 4) playing phrase A | 5C6F-5C86 (not executed in the `make sndtrace` runs: no run sends command 66); docs/10 section 4 |
 | `oki_duck_ym` | 5C87 | MIX's YM2151 volume = `mix_shadow`'s - the largest `oki_duck` / 2 | 5C87-5CB7 |
 
 ### 10.5 `ymtimer.asm`
@@ -246,7 +246,7 @@ So `min_priority` is a floor on the track priority, as its name says, and not a 
 | `ymtimer_start` | 5869 | loads `ymtimer_patch` into channels 6-7, filter on, page select, `ymt_ptr`, key codes and attack rates, timer A on | 5869-59BF |
 | `ymtimer_irq` | 59C0 | one timer-A step: key 6 or 7, period, operator registers by groups of 0E bytes; a 0 byte ends it | 59C0-5B62 |
 | `ymtimer_write` | 5B63 | register X = the next data byte | 5B63-5B6F |
-| `cmp_list_priority` | 5B70 | C set when `ymt_priority` + 1 is not below the priority of the last track from X | 5B70-5B81 |
+| `cmp_list_priority` | 5B70 | C set when `ymt_priority` OR 1 (5B7A-5B7E) is not below the priority of the last track from X | 5B70-5B81 |
 | `ymtimer_patch` | 5B82 | 42 bytes, the patch `sub_55B4` loads (its fields are M4d's patch format) | 5892-5898, 58C2-58C8 |
 
 None of it runs (no command has type 10, section 3). `tbl_65DD`, which the path indexes for its priority, outputs, page and data pointer, is 9 zero bytes before the first stream: for entry 0 the data pointer would be 0000, so the data this path was written for is not in this ROM's tables. `cmp_list_priority` is entered with X = a list head (1 + the first track, 5872-5877 and 587E-5883) without the DEX the other walk of the same lists does (5A0C-5A11), so it starts from the wrong track: a latent fault in dead code.
@@ -295,9 +295,10 @@ Kept neutral on purpose: `tmp_1B` and `tmp_1C` are scratch bytes with no meaning
 
 ### 10.10 Latent faults the names make visible
 
-None is reached in the traces; each is from the code alone.
+The first runs at every `init_sound`; the others are not reached in the traces and are from the code alone.
 
-- `alloc_frame` (4309-4319): when the free frame is the last (its link 0), it returns with the A it pushed at 430E still on the stack, so the RTS goes to a wrong address. The pool has 199 frames; no trace came near.
+- `init_frame_pool` (42D8-4308): the loop links frame 1 to 2 and so on up to C6 to C7 and leaves at C8 (42F7-42F9), but `_last` begins with `DEC frame_ptr+1` (42FB), which undoes the INC of the other exit (42EE, when the pool would reach 1F00) and is wrong on this one, where no carry happened: `frame_ptr` goes from 0CC6 (frame C7) to 0BC2, not to 0CC2, and the terminating 0 lands on frame 86's link (4306). The free chain is frames 1-86, 134 of them; frames 87-C7 are never reached. A headless MAME probe (a frame notifier reading the 6502's RAM at frame 400 of the rebuilt set, from empty private state) walked the chain: `frame_free` 01, the chain ends at frame 86 after 134 frames, 0BC2 = 00, 0CC2 = C7.
+- `alloc_frame` (4309-4319): when the free frame is the last (its link 0, frame 86), it returns with the A it pushed at 430E still on the stack, so the RTS goes to a wrong address. Only frames 1-85 (133) can be taken, so the 134th frame held at once takes this path; no trace came near. `frame_free` is never 0: `_none` does not store it.
 - `cmdtype_08_start_sound` (45E4-45E9): a track taken from the head of a full list is re-initialised by `init_track` without `free_track_frames`, so frames it held are never returned (the same-priority replacement at 465A-4664 does free them).
 - `cmp_list_priority` (5B70) is entered one track off (section 10.5); dead code.
 - `oki_reset` (5BBC-5BC4) clears 18 bytes from 56: besides the OKI state, `rx_count`, `rx_buffer`, three unused bytes and `coin_pulse`+0.

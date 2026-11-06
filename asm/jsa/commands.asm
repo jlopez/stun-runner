@@ -110,10 +110,14 @@ _set_mix
 ; -------------------------------------------------------------------------------------------------
 ; Chain the frame pool (from init_sound 423D).
 ;
-; The pool is 4-byte frames at 09AE (frame_address), numbered from 1. Links frame 1 to 2, 2 to 3
-; and so on (byte 0 of a frame: the next free frame), up to C7 or the frame that would reach 1F00,
-; whichever comes first (C7 here: 09AE + C6 x 4 = 0CC6), the last frame's link 0; frame_free = 1.
-; Uses frame_ptr, X; Y = 0 on return.
+; The pool is 4-byte frames at frame_pool, 09AE (frame_address), numbered from 1. Links frame 1 to
+; 2, 2 to 3 and so on up to C6 to C7 (byte 0 of a frame: the next free frame; the loop stops at C8
+; or at the frame that would reach 1F00), then writes the terminating link 0; frame_free = 1.
+; Latent fault: _last undoes the INC of the 1F00 exit with DEC frame_ptr+1 (42FB) on the normal
+; exit too, where no carry happened, so frame_ptr goes from 0CC6 (frame C7) to 0BC2 and the 0 lands
+; on frame 86's link (4306). The free chain is frames 1-86 (134), frames 87-C7 are never reached
+; (a headless MAME probe at frame 400: frame_free 01, the chain ends at 86 after 134 frames, 0BC2 =
+; 00, 0CC2 = C7). Uses frame_ptr, X; Y = 0 on return.
 ; -------------------------------------------------------------------------------------------------
 init_frame_pool
     lda #$01
@@ -151,9 +155,10 @@ _last
 ; Take a frame from the pool (from op 8D 523C and op 8E 5264, sequencer.asm).
 ;
 ; Output: A = the frame number (Z clear) with frame_ptr at it and Y = 0, or A = 0 (Z set) when the
-; free frame is the last one (its link is 0). In that case the A pushed at 430E is not pulled
-; before the RTS at 4319, so the return goes astray: a latent fault, never reached in the traces
-; (the pool holds 199 frames).
+; free frame is the last one (its link is 0; frame 86, init_frame_pool). In that case the A pushed
+; at 430E is not pulled before the RTS at 4319, so the return goes astray: a latent fault, never
+; reached in the traces. Only frames 1-85 (133) can be taken; the 134th request takes that path.
+; frame_free is never 0: _none does not store it.
 ; -------------------------------------------------------------------------------------------------
 alloc_frame
     lda frame_free
@@ -172,7 +177,7 @@ _none
 ; The address of a frame (from init_frame_pool, alloc_frame, free_track_frames, the sequencer
 ; 491F and op 8F 5293).
 ;
-; Input: A = the frame number (1 up). Output: frame_ptr = 09AE + (A - 1) x 4, Y = 0, A kept;
+; Input: A = the frame number (1 up). Output: frame_ptr = frame_pool + (A - 1) x 4, Y = 0, A kept;
 ; tmp_ptr's low byte gets A - 1 as well.
 ; -------------------------------------------------------------------------------------------------
 frame_address
@@ -187,11 +192,11 @@ frame_address
     rol frame_ptr+1
     asl frame_ptr
     rol frame_ptr+1
-    lda #$AE
+    lda #<frame_pool
     clc
     adc frame_ptr
     sta frame_ptr
-    lda #$09
+    lda #>frame_pool
     adc frame_ptr+1
     sta frame_ptr+1
     pla
@@ -588,8 +593,9 @@ _full
 ; Type 0D: run a stream op on a sound's tracks (cmdtype_handlers entry 0D, no command; not executed
 ; in the make sndtrace runs).
 ;
-; X = A, an entry of tbl_65DD: the op tbl_65DD+5 (an op_handlers index; 3B and up, and the ops
-; 08-09, 0D-11 and 16-18, the ones that move the stream, refused at 44ED-450A), its operand
+; X = A, an entry of tbl_65DD: the op tbl_65DD+5 (an op_handlers index; 3B and up, and the
+; indexes 08-09, 0D-11 and 16-18, the ops 88, 89, 8D-91 and 96-98, refused at 44ED-450A for a
+; reason the code does not show: 89, 96 and 97 do not move the stream), its operand
 ; tbl_65DD+6 (cmd_op_operand), a command tbl_65DD+7 whose type must be 08 (its parameter is
 ; cmd_target_sound) and a list tbl_65DD+8 (+ 1E, an index into trk_link). loc_508D runs the op
 ; on every track of that list playing cmd_target_sound.

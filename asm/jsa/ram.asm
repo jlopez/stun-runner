@@ -69,8 +69,8 @@ min_priority = $1E                      ; 4 x the parameter of a type-00 command
                                         ; (4EE3-4EE8), a type-10 sound below it does not start
                                         ; (44C5-44CA), and no OKI sample starts unless it is 0
                                         ; (5BFE); 01 sets F0, 02 sets 0, reset 0 (412B)
-frame_free = $1F                        ; the first free 4-byte frame of the pool at 09AE (1-C7, 0
-                                        ; = none): init_frame_pool, alloc_frame, free_track_frames
+frame_free = $1F                        ; the first free 4-byte frame of frame_pool (1-86, never
+                                        ; 0): init_frame_pool, alloc_frame, free_track_frames
 ; 2 bytes: the address of a frame, set by frame_address (431A-433A)
 frame_ptr = $20
 zp_22 = $22
@@ -262,3 +262,6 @@ cmd_op_operand = $08AD                  ; cmdtype_0D_run_op: the op's operand (4
 ; 256 bytes: the value last written to each YM2151 register (4909, 4F05, 5009, 55C3-561B, 5678,
 ; 56B5 and more); read back to rewrite registers 20, 30 (4EB5, 4EC7) and the levels (4FB5)
 ym_shadow = $08AE
+; 199 x 4 bytes, 09AE-0CC9, frames 1-C7: the frame pool (frame_address 432D, 4334); byte 0 of a
+; free frame links the next; init_frame_pool chains only 1-86 (its latent fault, 42FB)
+frame_pool = $09AE

@@ -166,7 +166,8 @@ oki_stop_bits
     .byte $08, $10, $20, $40
 
 ; -------------------------------------------------------------------------------------------------
-; Type 14: stop an OKI phrase (cmdtype_handlers entry 14; command 66, A = 48).
+; Type 14: stop an OKI phrase (cmdtype_handlers entry 14; command 66, A = 30, phrase 48 in docs/10's
+; decimal numbering; not executed in the make sndtrace runs).
 ;
 ; A is a phrase number: the first channel from 4 down whose current entry (oki_entry,x) has
 ; tbl_6532 = A is stopped; at most one. oki_duck stays until oki_tick sees the channel idle.

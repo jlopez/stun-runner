@@ -1,12 +1,12 @@
 ; sequencer.asm: 4759-57E2, the stream interpreter and its YM2151 output.
 ;
 ; Up to 30 entries (the X of the 1E-byte arrays of ram.asm) each read a byte stream of
-; data/music.asm through zp_06 (4859-486E: the pointer from trk_ptr_lo/trk_ptr_hi, which cmdtype_08_start_sound
-; sets from tbl_633E). A byte below 80 is handled at 487E on; a byte 80-BA is an op, run by
-; sub_505D through op_handlers with the next byte in A; BB and up ends the entry (trk_sound =
-; FF). The YM2151 register writes go through ym_wait. h_irq reaches this file through tick_sequencer
-; (loc_5043, X = 0 and 1 on alternate ticks). What the ops and the bytes mean is for a later leg;
-; the labels name the dispatch only.
+; data/music.asm through zp_06 (4859-486E: the pointer from trk_ptr_lo/trk_ptr_hi, which
+; cmdtype_08_start_sound sets from tbl_633E). A byte below 80 is handled at 487E on; a byte 80-BA is
+; an op, run by sub_505D through op_handlers with the next byte in A; BB and up ends the entry
+; (trk_sound = FF). The YM2151 register writes go through ym_wait. h_irq reaches this file through
+; tick_sequencer (loc_5043, X = 0 and 1 on alternate ticks). What the ops and the bytes mean is for
+; a later leg; the labels name the dispatch only.
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
 ; program.md section 3); hand-maintained from here on. sub_/loc_/tbl_/dat_/_lXXXX labels are
@@ -1197,8 +1197,9 @@ _l5019
 ; from 427A, 4286, 428E, 4295, 42A6, 42AE, 439A, 4EAF, 4EC1, 4ED7, 4EFC, 4FAB, 4FB2, 4FE7, 4FF2,
 ; 4FFC, 55B8, 55D0, 55F2, 5613, 56A8, 58A3, 58D3, 591A, 5925, 5938, 5943, 594E, 5959, 5964, 596F,
 ; 597A, 5985, 599C, 59A8, 59B5, 59D6, 59E1, 5A4D, 5A5E, 5A6A, 5A77, 5A88, 5A93, 5AA2, 5AAD, 5B66
-; Wait until the YM2151 is not busy (status bit 7), at most 255 reads: on a time-out set ym_timed_out
-; (later calls return at once) and board_status bit 1 (the status imm_03_send_status sends). Keeps A.
+; Wait until the YM2151 is not busy (status bit 7), at most 255 reads: on a time-out set
+; ym_timed_out (later calls return at once) and board_status bit 1 (the status imm_03_send_status
+; sends). Keeps A.
 ym_wait
     bit ym_timed_out
     bmi _l5042

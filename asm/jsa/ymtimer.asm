@@ -49,7 +49,8 @@ ymtimer_reset
 ;   so it could set any WRIO bit), written to WRIO;
 ; - ymt_ptr = the word tbl_65DD + 2 x the entry; its first byte to registers 2E and 2F (the key
 ;   codes of channels 6 and 7), the second to the eight KS/AR registers of the two channels;
-; - ymt_phase 1, timer A period 000 then 0A, timer A loaded with its IRQ on (register 14 = 15).
+; - ymt_phase 1, registers 10 = 00 and 11 = 0A (timer A period 002: register 11 holds bits 1-0
+;   only), timer A loaded with its IRQ on (register 14 = 15).
 ; Uses ymt_priority as scratch after the checks.
 ; -------------------------------------------------------------------------------------------------
 ymtimer_start
@@ -451,7 +452,7 @@ ymtimer_write
 ; Compare with a list's last track (from ymtimer_start 5877, 5883, and itself; not executed in the
 ; make sndtrace runs).
 ;
-; Follows trk_link from track X to the track whose link is 0, then compares ymt_priority + 1 with
+; Follows trk_link from track X to the track whose link is 0, then compares ymt_priority OR 1 with
 ; its trk_priority: C set when not below it. The callers pass the list head (1 + the first track)
 ; as X, one more than the track (see ymtimer_start).
 ; -------------------------------------------------------------------------------------------------

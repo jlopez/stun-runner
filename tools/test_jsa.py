@@ -3,9 +3,9 @@
 Runs in CI without the ROMs: asm/jsa/jsa.asm assembles with 64tass to 136070-2123.10c as MAME
 lists it (size, CRC-32, SHA-1), a planted change in an operand changes the hash, the region
 guards catch a moved region, the tree has no .binary, the IDA names are carried in, the system
-files carry no address-style label, and the committed trace summary agrees with the source. The trace tools (tools/sndtrace.py) are tested
-on synthetic traces of a synthetic program; the MAME traces under build/mame/, when present, are
-checked against the source too.
+files carry no address-style label, and the committed trace summary agrees with the source. The
+trace tools (tools/sndtrace.py) are tested on synthetic traces of a synthetic program; the MAME
+traces under build/mame/, when present, are checked against the source too.
 """
 
 from __future__ import annotations
@@ -193,7 +193,37 @@ SYSTEM_FILES = (
 )
 ADDRESS_LABEL = re.compile(r"^(?:(?:sub|loc|tbl|dat)_[0-9A-F]{4}|_l[0-9A-F]{4})$")
 EQUATE = re.compile(r"^([A-Za-z_]\w*)\s*=")
+# The symbol a line defines: its first token, whatever follows it (a colon, an instruction, a data
+# statement, an equate's "=", a comment) and however far it is indented. A mnemonic or a directive
+# never has an address label's shape, so only definitions can match ADDRESS_LABEL.
+DEFINED = re.compile(r"^\s*(_?[A-Za-z]\w*)")
 NEUTRAL_EQUATE = re.compile(r"^(?:zp_[0-9A-F]{2}|ram_[0-9A-F]{4})$")
+
+
+def address_labels(lines: list[str]) -> list[str]:
+    """The lines that define a symbol with an address label's shape."""
+    out = []
+    for t in lines:
+        m = DEFINED.match(t)
+        if m and ADDRESS_LABEL.match(m.group(1)):
+            out.append(t)
+    return out
+
+
+def test_address_label_guard_sees_every_form() -> None:
+    """The forms 64tass accepts for a label definition, each caught; references are not."""
+    planted = [
+        "loc_4400",
+        "loc_4400 ; x",
+        "loc_4400:",
+        "_l4400 ; x",
+        "tbl_5DB5 .byte $00, $01",
+        "_l5CE0 lda #0",
+        "    sub_4100 rts",
+        "dat_6000 = $6000",
+    ]
+    assert address_labels(planted) == planted
+    assert not address_labels(["    jsr sub_4100", "    .word tbl_5DB5", "; loc_4400", "lda_ok"])
 
 
 def code_refers(lines: list[str], name: str) -> bool:
@@ -205,9 +235,8 @@ def test_system_files_are_named() -> None:
     local) is left in the system files, and every RAM equate still called zp_XX or ram_XXXX is one
     that only the sequencer's files use (the M4c/M4d split of ram.asm)."""
     for name in SYSTEM_FILES:
-        for t in (TREE / name).read_text().splitlines():
-            m = GLOBAL_LABEL.match(t) or re.match(r"^(_\w+)\s*$", t)
-            assert not (m and ADDRESS_LABEL.match(m.group(1))), f"{name}: {t}"
+        left = address_labels((TREE / name).read_text().splitlines())
+        assert not left, f"{name}: {left}"
     system = {n: (TREE / n).read_text().splitlines() for n in SYSTEM_FILES if n != "ram.asm"}
     neutral = []
     for t in (TREE / "ram.asm").read_text().splitlines():
