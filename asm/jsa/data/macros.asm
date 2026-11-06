@@ -11,7 +11,7 @@
 
 ; ---------------------------------------------------------------------------------------------
 ; Note lengths: the low nibble of a note's length byte indexes note_lengths (tables.asm
-; tbl_5FE3, 16 words; 498B-49A9 add the word to the track's 24-bit time counter, bytes 1-2).
+; tbl_5FE3, 16 words; 498B-49A1 add the word to the track's 24-bit time counter, bytes 1-2).
 ; LEN_n is 1/n of LEN_1 ($1E00); LEN_0 adds nothing.
 
 LEN_0 = $00                             ; $0000
@@ -33,11 +33,11 @@ LEN_10 = $0F                            ; $0300
 
 ; Flags of the length byte (set_note_length 497F-4A2F; prepare_key_on 4D6C-4D82,
 ; tick_ym_channel 4F24-4F2C).
-DOT = $40                               ; adds half the length again (49A9-49BD)
-TIE = $80                               ; no key-off at the end: the gate counter is not set
-                                        ;   (49C4); the next note keys on without a key-off
+DOT = $40                               ; adds half the length again (49A2-49BC)
+TIE = $80                               ; no key-off at the end: the gate counter stays 7F
+                                        ;   (49BF-49C6); the next note keys on without one
 GATE_HALF = $10                         ; bits 5-4 = 01: the key-off comes at half the length
-                                        ;   (49F2-4A02); velocity offset 0 (tbl_5FDF entry 1)
+                                        ;   (49F4-4A02); velocity offset 0 (tbl_5FDF entry 1)
 ACCENT_1 = $20                          ; bits 5-4 = 10: velocity - 24 (tbl_5FDF entry 2)
 ACCENT_2 = $30                          ; bits 5-4 = 11: velocity - 58 (tbl_5FDF entry 3)
 

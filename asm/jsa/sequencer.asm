@@ -23,7 +23,7 @@
 ; (ram_0626/ram_0644) each tick (4794-47AB); when it runs out, read_item reads statements until a
 ; note: an op byte (80-BA) runs its handler through op_handlers (run_op), a note sets the pitch
 ; and adds its length (note_lengths, tables.asm tbl_5FE3) to the counter. The gate counter
-; (ram_0338, ram_0356, ram_0374) is the counter less twice the tempo (49C9-49E1): the key-off
+; (ram_0338, ram_0356, ram_0374) is the counter less twice the tempo (49C8-49F1): the key-off
 ; comes two ticks before the next note, at half the length with GATE_HALF, never with TIE.
 ;
 ; The other voice kind (kind 0 of ram_03EC bits 1-0, and group 1's output kind): read_item,
@@ -41,10 +41,11 @@
 ; Run track X for one tick, then the next track of its list (next_track). A = chain_mute: 0, or
 ; FF to mute every track of the list (tick_ym_channel, channels 6-7 while the timer voices own
 ; them, 4E8A-4E9D). track_muted = FF when A or a next track (a higher priority) exists. A track
-; whose ram_0248 is FF (stopped by a command or the op stop) is freed (476A-4770). Then the time
-; counter loses the tempo; at 0 read_item reads the next statements; the gate counter at 0 asks
-; for the key-off (key_flags bit 0, 47CD-47E0). On a YM2151 track: the fade (fade_step) every
-; LEN_32 of time while one runs (47F5-482C), the portamento every fourth tick (482F-4845).
+; with priority 0 or ram_0248 = FF (stopped by a command or the op stop) is freed (4765-4770).
+; Then the time counter loses the tempo; at 0 read_item reads the next statements; the gate
+; counter at 0 asks for the key-off (key_flags bit 0, 47CD-47E0). On a YM2151 track: a fade step
+; (fade_step) every LEN_32 of time while a fade runs, the key-on path again after it to write the
+; new TLs (47F5-4845), and the same every fourth tick while a portamento runs (482F-4845).
 ; from 4CBD, 4E6E, 4E9F
 run_track
     sta chain_mute
@@ -323,9 +324,9 @@ _l497C
     jmp other_voice_off
 
 ; The note's length byte in A (not 00): bits 3-0 index note_lengths (tables.asm tbl_5FE3), whose
-; word is added to the time counter's bytes 1-2 (498B-49A9); DOT adds half of it again (49AC-
-; 49BD). Unless TIE: the gate counter = counter - 2 x tempo (49C6-49E1), halved with GATE_HALF
-; (49F2-4A02). Then the fade's step (fade_step) when one runs, and on a YM2151 track the key-on
+; word is added to the time counter's bytes 1-2 (498B-49A1); DOT adds half of it again
+; (49A2-49BC). Unless TIE: the gate counter = counter - 2 x tempo (49C8-49F1), halved with
+; GATE_HALF (49F4-4A02). Then the fade's step (fade_step) when one runs, and on a YM2151 track the key-on
 ; (prepare_key_on with the length byte: its bits 5-4 select the accent, key_flags).
 ; from 4916
 set_note_length
@@ -876,7 +877,7 @@ _l4D68
 ; A YM2151 note of the heard track: key_flags bit 1 (key-on) and the length byte's bits 5-4
 ; (the accent, 4D6C-4D82); the track's four TLs (ram_0482 + n x 1E) into the shadow of registers
 ; 60-78 (4D8D-4DA0); the patch's scaling bytes (record +1D to +23, through ram_0428/ram_0446 =
-; record + 1C) and the velocity (ram_04FA) into key_scaling (4DA9-4DBC). For every track with a
+; record + 1C) and the velocity (ram_04FA) into key_scaling (4DA3-4DBC). For every track with a
 ; portamento: the offset ram_06F8/ram_0716 moves toward 0 by the rate (4DBE-4E11); the heard
 ; track's offset and fine tune go to the shadow of register 30 and the note (4E12-4E54).
 ; from 4845, 4A80

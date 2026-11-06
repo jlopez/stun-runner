@@ -61,8 +61,9 @@ evidence; `make oki-pcm` decodes every phrase the manifest names to 16-bit PCM u
 listening (other WAVs there are removed, so a rename leaves no stale copy).
 Sample bytes, WAVs and PCM stay under `build/`.
 Since M4a the 6502 image is not an incbin of `build/stunrun-jsa.bin` either: `asm/jsa/jsa.asm`
-and the files it includes (`hardware.asm`, `ram.asm` and eleven region files,
-`data/sounds.asm` and `data/music.asm` among them) are the whole program as 64tass source, instructions, tables and fills
+and the files it includes (`hardware.asm`, `ram.asm`, `data/macros.asm` and the region files,
+`data/sounds.asm` and the stream and patch files of `data/` among them, docs/12-sound-music.md
+section 7) are the whole program as 64tass source, instructions, tables and fills
 (docs/09-sound-program.md section 4), so the tree's output depends on its own files only; the
 Makefile's prerequisites for it are `asm/jsa/*.asm` and `asm/jsa/data/*.asm`.
 `build/stunrun-jsa.bin` is still made by `tools/merge-roms`, for `make ida`.
