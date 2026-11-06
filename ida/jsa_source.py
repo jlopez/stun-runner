@@ -89,6 +89,17 @@ def ida_ea(offset: int) -> int:
     return ((offset // BANK_SIZE + 1) << 16) | 0x3000 | (offset % BANK_SIZE)
 
 
+def source_value(ea: int) -> int:
+    """The value 64tass gives the label at IDA address `ea`: the file offset for a bank page,
+    the address itself elsewhere (ROM, RAM, IO)."""
+    if ea >= 0x10000:
+        n = (ea >> 16) - 1
+        if not 0 <= n < BANKS or not 0x3000 <= (ea & 0xFFFF) < 0x4000:
+            raise ValueError(f"{ea:#x} is in no bank page")
+        return n * BANK_SIZE + (ea & 0xFFF)
+    return ea
+
+
 def in_image(ea: int) -> bool:
     """An IDA address that holds image bytes (ROM or a bank page)."""
     if 0x4000 <= ea < 0x10000:
@@ -237,9 +248,7 @@ def data_item(st: Statement, image_labels: set[str]) -> DataItem:
     ea = ida_ea(st.offset)
     if st.kind in ("word", "addr") and st.size % 2 == 0:
         ops = operand_list(st.operands)
-        offset = bool(ops) and all(
-            any(i in image_labels for i in IDENT.findall(op)) for op in ops
-        )
+        offset = bool(ops) and all(any(i in image_labels for i in IDENT.findall(op)) for op in ops)
         return DataItem(ea, "word", st.size // 2, offset)
     return DataItem(ea, "byte", st.size, False)
 
@@ -492,7 +501,7 @@ def build(
             body = code.strip()
             if not text[0].isspace() or NO_BYTES.match(body) or ORG.match(body):
                 if above or comment:
-                    src.loose.append(f"{where} (directive) {(above or [comment])[0][:60]}")
+                    src.loose.append(f"{where} (directive) {(above or [comment or ''])[0][:60]}")
                 cont = None
                 continue
             offset = addresses.get((rel, no))
@@ -514,7 +523,9 @@ def build(
     for ea, locs in sorted(locals_at.items()):
         if ea in globals_at:
             for _, name in locs:
-                src.left_out.append(f"{ea:06X} {name}: a local at the address of {globals_at[ea][0]}")
+                src.left_out.append(
+                    f"{ea:06X} {name}: a local at the address of {globals_at[ea][0]}"
+                )
             continue
         if ida_ea_offset_is_code(ea, code_offsets):
             src.names.append(Name(ea, locs[0][1], local=True))
@@ -551,10 +562,26 @@ def build(
     # code and data
     for st in statements:
         if st.kind == "code":
+            if st.offset < BANKS * BANK_SIZE:
+                raise ValueError(f"{st.offset:04X}: an instruction in a bank page")
             src.code.append((ida_ea(st.offset), st.size))
         else:
-            src.data.append(data_item(st, image_labels))
+            src.data += [data_item(part, image_labels) for part in split_at_pages(st)]
     return src
+
+
+def split_at_pages(st: Statement) -> list[Statement]:
+    """A statement over file 0000-3FFF cut where a bank page ends (each page is its own IDA
+    segment)."""
+    out = []
+    offset, end = st.offset, st.offset + st.size
+    while offset < end:
+        stop = (
+            end if offset >= BANKS * BANK_SIZE else min(end, (offset // BANK_SIZE + 1) * BANK_SIZE)
+        )
+        out.append(Statement(offset, st.kind, st.operands, stop - offset))
+        offset = stop
+    return out
 
 
 def ida_ea_offset_is_code(ea: int, code_offsets: set[int]) -> bool:
@@ -571,6 +598,12 @@ def tass_program() -> str:
     return found
 
 
+def assembled_symbols(tree: Path, work: Path) -> dict[str, int]:
+    """The global symbols 64tass resolves for `tree` (its -l output)."""
+    _assemble(tree, work / "jsa.bin", "-l", str(work / "jsa.labels"))
+    return symbols((work / "jsa.labels").read_text())
+
+
 def _assemble(tree: Path, out: Path, *extra: str) -> bytes:
     args = [tass_program(), *TASS_FLAGS, *extra, "-o", str(out), MAIN]
     r = subprocess.run(args, cwd=tree, capture_output=True, text=True, check=False)
@@ -584,7 +617,9 @@ def load(tree: Path = TREE, work: Path | None = None) -> Source:
     tmp = Path(tempfile.mkdtemp(prefix="jsa-sync-")) if work is None else work
     try:
         tmp.mkdir(parents=True, exist_ok=True)
-        image = _assemble(tree, tmp / "jsa.bin", "-L", str(tmp / "jsa.lst"), "-l", str(tmp / "jsa.labels"))
+        image = _assemble(
+            tree, tmp / "jsa.bin", "-L", str(tmp / "jsa.lst"), "-l", str(tmp / "jsa.labels")
+        )
         order = include_order(tree)
         files = {rel: (tree / rel).read_text() for rel in order}
         copy = tmp / "marked"

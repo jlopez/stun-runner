@@ -28,7 +28,7 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
-.PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
+.PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate ida-sync \
 	dasm oracle pcwatch objects objtrace objlevels pictures view somdump fieldext depthkeys vskip \
 	okitrace oki-pcm sndtrace soundcheck listen sndproto musictrace FORCE
 .SECONDEXPANSION:
@@ -184,6 +184,12 @@ ida-export:
 # needs this once, then `make ida-export`.
 ida-annotate:
 	$(PYTHON) -m ida.headless.annotate all
+
+# The 6502 source into its database (docs/05-ida.md section 6): names, comments, functions and
+# the code/data classification of asm/jsa. A dry run on a copy by default (the changes per
+# category); `make ida-sync WRITE=1` writes data/stunrun-jsa.i64, then `make ida-export`.
+ida-sync: $(BUILD)/$(SET)-jsa.bin
+	$(PYTHON) -m ida.headless.sync $(if $(WRITE),--write)
 
 # The GSP and ADSP programs as unidasm listings with the sidecars merged in (docs/06-code-map.md
 # section 6). The listings contain the program bytes: build output, never committed.

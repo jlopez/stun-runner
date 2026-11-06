@@ -21,6 +21,8 @@ import pytest
 import sndtrace
 from romset import hashes, load_snapshot
 
+from ida.jsa_source import source_value
+
 TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
 TREE = REPO / "asm/jsa"
@@ -147,7 +149,7 @@ def test_ida_names_carried_in(tmp_path: Path) -> None:
         if entry.get("local"):
             continue  # a _local: not in the -l output (tools/test_ida_sync.py checks them)
         ea, name = int(entry["ea"], 16), entry["name"]
-        assert syms.get(name) == ea, name
+        assert syms.get(name) == source_value(ea), name  # a bank page's IDA address differs
 
 
 GLOBAL_LABEL = re.compile(r"^([A-Za-z]\w*)\s*$")

@@ -92,7 +92,9 @@ class Sync:
         for item in self.src.data:
             current = db.data_item(item.ea)
             if current != item:
-                self.note("data", f"{item.ea:06X} {describe_item(current)} -> {describe_item(item)}")
+                self.note(
+                    "data", f"{item.ea:06X} {describe_item(current)} -> {describe_item(item)}"
+                )
                 if self.write:
                     db.create_data(item)
         for ea, size in self.src.code:
