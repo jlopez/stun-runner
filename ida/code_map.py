@@ -475,7 +475,8 @@ CODE_MAP_68K = [
         "(get_sound_response): FF ends the wait after a reset (sound_wait_ready); with a status "
         "request out (sound_wait_status), status AND 7 = 0 is good; any other byte resets the "
         "board. With nothing pending, every 240 calls sends 07 (0300B8, send_sound_byte_once) "
-        "and gives 30 calls for the answer; a timeout of either wait, or 180 failed sends, calls "
+        "and gives 30 calls for the answer; a timeout of either wait, or more than 181 failed "
+        "sends in a row (sound_check_tries above B4 before the increment, 0300D6-0300E6), calls "
         "reset_sound.",
     ),
     Entry(

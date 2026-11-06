@@ -1,14 +1,16 @@
 """data/sound/commands.json, the sound commands of the 68010 -> 6502 protocol (docs/11-sound-
 protocol.md), against its own shape, data/oki/samples.json, the two images and the MAME traces.
 
-The shape, the OKI agreement and the 6502 source's command tables (asm/jsa/tables.asm, the phrase
-table in asm/jsa/data/sounds.asm) run everywhere (CI). The image tests skip without
-build/stunrun-68k.bin and build/stunrun-jsa.bin (`make` needs the ROMs): the 6502's command tables
-give each command's class, type, parameter, handler and phrase; the 68010's audio test list gives
-the names; every call of queue_sound_command (0301CA) in the image is listed, with the value its
-`pea` pushes. The trace tests skip without the `make sndproto` traces
-(build/mame/sndproto-<run>.txt): the counts and call sites the file records are what MAME saw, no
-command was lost between the two CPUs, and the responses are the ones docs/11 lists.
+The shape, the OKI agreement, the routines against the IDA export and the 6502's command tables
+in the assembled source (asm/jsa, read at the addresses `tables` gives, so the region files'
+labels and layout do not matter) run everywhere (CI; the tables need 64tass). The image tests
+skip without build/stunrun-68k.bin and build/stunrun-jsa.bin (`make` needs the ROMs): the same
+tables in the image; the 68010's audio test list gives the names; every call of
+queue_sound_command (0301CA) and every direct send in the image is listed, with the value it
+pushes, or, for a computed site, the values its note's instructions or table give. The trace
+tests skip without the `make sndproto` traces (build/mame/sndproto-<run>.txt): the counts and
+call sites the file records are what MAME saw, no command was lost between the two CPUs, and the
+responses are the ones docs/11 lists.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from test_jsa import assemble, tass
 
 REPO = Path(__file__).resolve().parent.parent
 COMMANDS = REPO / "data/sound/commands.json"
@@ -27,6 +30,7 @@ SAMPLES = REPO / "data/oki/samples.json"
 IMAGE_68K = REPO / "build/stunrun-68k.bin"
 IMAGE_JSA = REPO / "build/stunrun-jsa.bin"
 TRACES = REPO / "build/mame"
+FUNCTIONS = REPO / "data/ida/stunrun-68k.functions.jsonl"
 
 RUNS = ("attract", "game", "selftest", "soundtest", "inject")
 QUEUE = 0x0301CA  # queue_sound_command
@@ -133,33 +137,24 @@ def test_oki_commands_agree_with_samples_json() -> None:
         assert sorted(phrase["commands"]) == sorted(plays.get(number, [])), number
 
 
-def source_table(path: Path, label: str) -> list[int]:
-    """The bytes of the `.byte` rows under a label of the 6502 source (asm/jsa, 64tass)."""
-    values: list[int] = []
-    lines = path.read_text().splitlines()
-    start = lines.index(label) + 1
-    for line in lines[start:]:
-        code = line.split(";")[0].strip()
-        if not code.startswith(".byte"):
-            break
-        values += [int(v.strip().lstrip("$"), 16) for v in code[len(".byte") :].split(",")]
-    return values
+def ida_owners(address: int) -> list[int]:
+    """The starts of the functions of the committed 68k IDA export whose extent (or a chunk of
+    it) holds the address."""
+    owners = []
+    for line in FUNCTIONS.read_text().splitlines():
+        f = json.loads(line)
+        extents = [(f["start_ea"], f["end_ea"]), *(tuple(c) for c in f["chunks"])]
+        if any(lo <= address < hi for lo, hi in extents):
+            owners.append(int(f["start_ea"]))
+    return owners
 
 
-def test_6502_source_tables() -> None:
-    """The committed 6502 source (asm/jsa, M4a) holds the same class, type and parameter for every
-    command and the same OKI phrase for every play command (runs in CI, no ROMs needed)."""
-    tables, sounds = REPO / "asm/jsa/tables.asm", REPO / "asm/jsa/data/sounds.asm"
-    if not tables.exists():
-        pytest.skip("no asm/jsa/tables.asm")
-    cls, typ, par = (source_table(tables, n) for n in ("cmd_class", "cmd_type", "cmd_param"))
-    phrase = source_table(sounds, "tbl_6532")
-    assert len(cls) == len(typ) == len(par) == 0x6D and len(phrase) == 0x35
+def test_routines_are_ida_functions() -> None:
+    """The routine given with each call site and direct send is the IDA function around it, or,
+    where the IDA export has no function there, a `link A6` the image test below checks."""
     for c in commands():
-        v = h(c["value"])
-        assert (cls[v], typ[v], par[v]) == (h(c["class"]), h(c["type"]), h(c["param"])), v
-        if c["type"] == "13":
-            assert phrase[h(c["param"])] == c["phrase"], c["value"]
+        for site, routine in c["call_sites"] + c["direct_sends"]:
+            assert ida_owners(h(site)) in ([h(routine)], []), (c["value"], site, routine)
 
 
 # --- against the images (skip without `make`) ---------------------------------------------------
@@ -179,7 +174,24 @@ def jsa() -> bytes:
     return IMAGE_JSA.read_bytes()
 
 
-def test_6502_tables(jsa: bytes) -> None:
+@pytest.fixture(scope="module")
+def jsa_source(tmp_path_factory: pytest.TempPathFactory) -> bytes:
+    """The committed 6502 source (asm/jsa) assembled as tools/test_jsa.py assembles it: the
+    chip, read by address, so the tables are found where commands.json's `tables` says whatever
+    the region files call or lay them out (runs in CI, no ROMs needed)."""
+    if tass() is None:
+        pytest.skip("64tass not available")
+    out = tmp_path_factory.mktemp("jsa") / "jsa.bin"
+    r = assemble(REPO / "asm/jsa", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    return out.read_bytes()
+
+
+@pytest.mark.parametrize("which", ["source", "image"])
+def test_6502_tables(which: str, request: pytest.FixtureRequest) -> None:
+    """The class, type, parameter, handler and phrase of every command, in the assembled source
+    (CI) and in the built image (with the ROMs)."""
+    jsa: bytes = request.getfixturevalue("jsa_source" if which == "source" else "jsa")
     tables = load()["tables"]
     cls, typ, par = h(tables["cmd_class"]), h(tables["cmd_type"]), h(tables["cmd_param"])
     imm, hnd = h(tables["imm_handlers"]), h(tables["cmdtype_handlers"])
@@ -254,27 +266,119 @@ def test_every_queue_call_is_listed(m68k: bytes) -> None:
     for s, values in per_site.items():
         a = h(s)
         if s in doc["site_notes"]:
-            for value, at in re.findall(
-                r"pea ([0-9A-F]{2}) at ([0-9A-F]{6})", doc["site_notes"][s]
-            ):
-                assert _w(m68k, h(at)) == 0x4878 and _w(m68k, h(at) + 2) == h(value), s
+            assert note_values(doc["site_notes"][s], m68k) == values, s
             continue
         assert _w(m68k, a - 4) == 0x4878, s
         assert values == {_w(m68k, a - 2)}, s
 
 
+def _moveq(image: bytes, a: int, reg: int) -> int | None:
+    """N of `moveq #N,Dreg` (0111 rrr0 NNNNNNNN) at a, else None."""
+    return image[a + 1] if image[a] == 0x70 | reg << 1 else None
+
+
+def note_values(note: str, m68k: bytes) -> set[int]:
+    """The values a site note says its site can queue, each read from the instructions or the
+    table the note cites. A note in none of these forms fails: a new kind of note needs a check."""
+    peas = re.findall(r"pea ([0-9A-F]{2}) at ([0-9A-F]{6})", note)
+    if note.startswith("one of pea"):
+        # alternatives: each `pea N.w` (4878 00NN) at its address, then the call
+        for value, at in peas:
+            assert _w(m68k, h(at)) == 0x4878 and _w(m68k, h(at) + 2) == h(value), note
+        return {h(v) for v, _ in peas}
+    if m := re.match(r"table ([0-9A-F]{6}) \((\d+) bytes", note):
+        # a byte table indexed at run time: the values are the table's bytes
+        start, size = h(m[1]), int(m[2])
+        return set(m68k[start : start + size])
+    if m := re.search(r"of table ([0-9A-F]{6}) \((\w+) entries", note):
+        # 8-byte entries, the command the word at 2; a 0 word is not sent (04164E-041652)
+        start, count = h(m[1]), {"six": 6}[m[2]]
+        words = {_w(m68k, start + 8 * i + 2) for i in range(count)}
+        return words - {0}
+    if m := re.match(r"argument: the long at 20\(A6\) of sub_2589A", note):
+        # 025AFC reads the low word of that long (move.w 22(A6),D1); each caller pushes it
+        # first of seven arguments, 1C bytes before its jsr 02589A (8 + 6 longs = 20(A6))
+        assert _w(m68k, 0x025AFC) == 0x322E and _w(m68k, 0x025AFE) == 0x0022
+        values = set()
+        for value, call in re.findall(r"([0-9A-F]{2}) \(([0-9A-F]{6})\+\)", note):
+            assert _w(m68k, h(call)) == 0x4EB9
+            assert struct.unpack_from(">I", m68k, h(call) + 2)[0] == 0x02589A, call
+            assert _w(m68k, h(call) - 0x1C) == 0x4878, call
+            assert _w(m68k, h(call) - 0x1A) == h(value), call
+            values.add(h(value))
+        assert len(values) == 3, note
+        return values
+    if m := re.match(r"0x44 \+ the level word FF9578 .* levels (\d+)-(\d+), ([0-9A-F]{2})-", note):
+        # 029068-029076: move.w FF9578,D0; ext.l; moveq #45,D1; add.l D1,D0; subq.l #1,D0
+        assert _moveq(m68k, 0x029070, 1) == 0x45 and _w(m68k, 0x029074) == 0x5380
+        lo, hi = int(m[1]), int(m[2])
+        assert 0x44 + lo == h(m[3]), note
+        return {0x44 + level for level in range(lo, hi + 1)}
+    if m := re.match(r"([0-9A-F]{2}) or ([0-9A-F]{2}) \(moveq at ([0-9A-F]{6}) / ([0-9A-F]{6})\)", note):
+        assert _moveq(m68k, h(m[3]), 0) == h(m[1]) and _moveq(m68k, h(m[4]), 0) == h(m[2]), note
+        return {h(m[1]), h(m[2])}
+    if m := re.match(r"D2 = ([0-9A-F/]+) by .*\(([0-9A-F]{6})-([0-9A-F]{6})\)", note):
+        # the results: each moveq #N,D2 that a bra.s follows, and the last one of the range
+        lo, hi = h(m[2]), h(m[3])
+        results = {
+            image_value
+            for a in range(lo, hi + 2, 2)
+            if (image_value := _moveq(m68k, a, 2)) is not None
+            and (m68k[a + 2] == 0x60 or a == hi)
+        }
+        values = {h(v) for v in m[1].split("/")}
+        assert results == values, note
+        return values
+    raise AssertionError(f"no check for the site note {note!r}")
+
+
 def test_direct_sends(m68k: bytes) -> None:
     """The boot program writes its test commands with move.b #N,$600000 (13FC 00NN 0060 0000);
     the game's audio test and the watchdog push them for send_sound_byte (023EDA) or
-    try_sound_byte (023EDE)."""
+    send_sound_byte_once (023EDE): `pea N.w` (4878 00NN) or `clr.l -(A7)` (42A7, 00) before the
+    jsr, or at 04395C `move.l D1,-(A7)` (2F01), the audio test's entry word, which sends every
+    command of the list. Every such instruction of the image is listed, but for 030170, the
+    flush of the queue."""
+    listed: dict[str, set[int]] = {}
     for c in commands():
         for s, _ in c["direct_sends"]:
-            a = h(s)
-            if a < 0x020000:
-                assert m68k[a : a + 8] == bytes([0x13, 0xFC, 0, h(c["value"]), 0, 0x60, 0, 0]), s
-            else:
-                (target,) = struct.unpack_from(">I", m68k, a + 2)
-                assert _w(m68k, a) == 0x4EB9 and target in (0x023EDA, 0x023EDE), s
+            listed.setdefault(s, set()).add(h(c["value"]))
+    found = set()
+    for a in range(0, 0x0C0000, 2):
+        if m68k[a : a + 3] == bytes([0x13, 0xFC, 0]) and m68k[a + 4 : a + 8] == bytes(
+            [0, 0x60, 0, 0]
+        ):
+            found.add(f"{a:06X}")
+            assert listed.get(f"{a:06X}") == {m68k[a + 3]}, f"{a:06X}"
+        if _w(m68k, a) == 0x4EB9 and struct.unpack_from(">I", m68k, a + 2)[0] in (
+            0x023EDA,
+            0x023EDE,
+        ):
+            found.add(f"{a:06X}")
+    assert found - set(listed) == {"030170"}
+    assert set(listed) <= found
+    in_list = {h(c["value"]) for c in commands() if c["audio_test"] is not None}
+    for s, values in listed.items():
+        a = h(s)
+        if a < 0x020000:
+            continue
+        if _w(m68k, a - 2) == 0x2F01:
+            assert s == "04395C" and values == in_list, s
+        elif _w(m68k, a - 2) == 0x42A7:
+            assert values == {0}, s
+        else:
+            assert _w(m68k, a - 4) == 0x4878 and values == {_w(m68k, a - 2)}, s
+
+
+def test_routines_without_ida_function(m68k: bytes) -> None:
+    """Where the IDA export has no function around a site, its routine is the `link A6` (4E56)
+    the site follows, with no other `link A6` in between."""
+    for c in commands():
+        for site, routine in c["call_sites"] + c["direct_sends"]:
+            if ida_owners(h(site)):
+                continue
+            assert _w(m68k, h(routine)) == 0x4E56, routine
+            assert not [a for a in range(h(routine) + 2, h(site), 2) if _w(m68k, a) == 0x4E56]
 
 
 def test_sounds_in_attract_is_option_bit_11(m68k: bytes) -> None:
@@ -350,16 +454,31 @@ def test_mame_protocol(run: str) -> None:
     assert not [p for p in lines if p[0] == "ym_timer_reg"]
 
 
+def test_mame_sites_are_what_the_runs_saw() -> None:
+    """mame_sites is exactly the union of the call sites the five runs saw queue the command."""
+    seen: dict[str, set[str]] = {}
+    for run in RUNS:
+        for p in trace(run):
+            if p[0] == "queue":
+                seen.setdefault(p[1], set()).add(p[2])
+    for c in commands():
+        assert set(c["mame_sites"]) == seen.get(c["value"], set()), c["value"]
+
+
 def test_mame_immediate_responses() -> None:
     lines = trace("inject")
     responses = {(p[1], p[2]) for p in lines if p[0] == "response"}
     assert {("6D", "455D"), ("55", "4164"), ("AA", "455D"), ("5A", "455D"), ("00", "455D")} <= (
         responses
     )
-    # 6D, 7F, 80 and FF are queued as 6D (5836) and never dispatched
-    dispatched = {p[1] for p in lines if p[0] == "dispatch"}
-    assert not dispatched & {"6D", "7F", "80", "FF"}
-    assert not {p[1] for p in lines if p[0] == "jsa_queue" and p[2] == "5846"} & {"6D", "7F", "80"}
+    # 6D, 7F, 80 and FF were written and taken, and h_nmi left each in its slot as the 6D it
+    # writes first (5836): the byte replaces the 6D only at 5846, and 5846 wrote none of them.
+    # That a 6D slot is then skipped is the code (dispatch_command's cpy #$6D at 4371-4373), not
+    # this trace: its dispatch lines come from the reads of cmd_type at 4375, after that test.
+    assert {p[1] for p in lines if p[0] == "inject"} >= {"6D", "7F", "80", "FF"}
+    assert {p[1] for p in lines if p[0] == "jsa_queue" and p[2] == "5836"} == {"6D"}
+    queued = {h(p[1]) for p in lines if p[0] == "jsa_queue" and p[2] == "5846"}
+    assert queued and max(queued) < 0x6D
 
 
 def test_mame_audio_test_plays_every_entry() -> None:

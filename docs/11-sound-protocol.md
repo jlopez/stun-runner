@@ -45,7 +45,7 @@ program at 00023C/000242, the game in `reset_sound_board` at 023FA8/023FAE **COD
                                                          class 0-3: imm handler, now
                                                          main_loop: dispatch_command
                                                          ... a response, sometimes:
-                     level 4 <------- response byte <--- sta $2A02 (413E, 455D, 4164)
+                     level 4 <------- response byte <--- stx/sta $2A02 (413E, 455D, 4164)
  h_level4_sound: move.b $600000 -> sound_resp_ring (nobody reads it)
 
  reset_sound -> reset_sound_board:
@@ -89,8 +89,9 @@ program at 00023C/000242, the game in `reset_sound_board` at 023FA8/023FAE **COD
   as code it is a health check: after a reset it waits up to 180 calls (`sound_wait_ready`
   = B4) for the FF; every 240 calls (`sound_check_timer`) it sends 07 with
   `send_sound_byte_once` (0300B8) and expects, within 30 calls (`sound_wait_status`), a status
-  byte whose bits 0-2 are clear; a wrong byte, a timeout, or 180 failed sends
-  (`sound_check_tries`) call `reset_sound`. So the game has the code to supervise the board and
+  byte whose bits 0-2 are clear; a wrong byte, a timeout, or more than 181 failed sends
+  (`sound_check_tries` above B4, 0300D6-0300E6: the count before the increment is compared,
+  so the 182nd consecutive failure) call `reset_sound`. So the game has the code to supervise the board and
   does not run it.
 - **Reset** (`reset_sound`, 0300F8): `reset_sound_board` (023FA2: 604000, 600000, reply pointer
   cleared), the watchdog counters, the queue emptied. Callers: 0243B2, 029B42, 02BA16, 02BB4A,
@@ -141,8 +142,8 @@ game's queue **CODE, MAME**:
 2. `nmi_mode` (set to FF at reset, 4127): FF is the command mode; 0 is the data mode of command
    08 (the byte is stored at `nmi_data_ptr`, 57F2-5807, read at 57FC); anything else drops the
    byte.
-3. Command mode: the next slot of `cmd_queue` (48 entries at 0200; when full the oldest entry is
-   dropped, 5815-5831) gets 6D, then the byte is read (5839). A byte of 6D or more stays 6D
+3. Command mode: the next slot of `cmd_queue` (48 slots at 0200, at most 47 commands pending: in
+   = out is empty, 4171-4177; when full the oldest entry is dropped, 5815-5831) gets 6D, then the byte is read (5839). A byte of 6D or more stays 6D
    (583C-583E). Else `cmd_class` (6093+byte): bit 7 set, the byte replaces the 6D (5845-5846);
    0-3, the byte is an **immediate command**, run at once inside the NMI through `imm_handlers`
    (61DA) entry class+1 (584F-585D); 4-7F (no command has one) leaves the 6D **CODE**.
@@ -151,8 +152,11 @@ game's queue **CODE, MAME**:
    does nothing; else the handler `cmdtype_handlers` (472F) gives for the type runs with A =
    `cmd_param` (616D+Y) **CODE**.
 
-MAME, inject run: the bytes 6D, 7F, 80 and FF written at 600000 are each queued as 6D (5836) and
-never dispatched; no byte is lost in any run (section 8) **MAME**.
+MAME, inject run: the bytes 6D, 7F, 80 and FF written at 600000 are each taken and left in their
+slot as the 6D written first (5836): `h_nmi`'s queue write of the byte itself (5846) wrote none of
+them; no byte is lost in any run (section 8) **MAME**. That `dispatch_command` then skips a 6D
+slot is the code (`cpy #$6D`, `bcs` at 4371-4373) **CODE**: the trace's dispatch lines are reads
+of `cmd_type` at 4375, after that test, so they cannot show it.
 
 ### 3.2 Responses
 
@@ -162,14 +166,15 @@ never dispatched; no byte is lost in any run (section 8) **MAME**.
 | 10 | the self-test found the zero page or the stack bad; the 6502 then stops (never in MAME: RDIO bit 7 cannot be set, docs/09 section 1) | 41A1-41A3 |
 | the status byte `zp_02` | command 07 (imm_03, 4533) | `send_response` 4553-4568 (the write at 455D) |
 | 6D | command 06 (imm_02, 4543) | `send_response` |
-| `zp_75` | command 03 (imm_01, 5DAD): the RDIO input state (coins) `sub_5CE8` keeps | `send_response` |
+| `zp_75` | command 03 (imm_01, 5DAD): `sub_5CE8`'s four 2-bit coin counters (5D11-5D57: RDIO bits 0-3 debounced in `zp_6F`,x, `tbl_5D09`,x added inside the field mask `tbl_5D0D`,x), or the raw RDIO bits 0-3 when RDIO bit 7, the self-test, is set (5CE8-5D08; never in MAME) | `send_response` |
 | AA, then the next byte written | command 08 (imm_04, 5CB8): a loop-back | `send_response` |
 | 55 | command 09 (type 09, `queue_response` 44D0) | `main_loop` 4159-4164 |
 | a stream's operand | stream op 96 (`op_96`, 550E, through `queue_response`) | `main_loop` |
 
 `send_response` waits for RDIO bit 5 to clear before and after its write, so the immediate
 commands hold the 6502 inside its NMI until the 68010 has read their answer. `main_loop` sends a
-queued response only when bit 5 is clear (4152-4157) and never waits; `resp_queue` holds 16 and
+queued response only when bit 5 is clear (4152-4157) and never waits; `resp_queue` has 16 slots, at most 15 responses pending
+(44D0-44E6: the new in may not equal out), and
 sets `resp_queue_full` = 80 when a byte is dropped **CODE**.
 
 MAME saw FF after every reset (29 resets over the five runs), 00 for 07, 00 for 03, 6D for 06,
@@ -194,8 +199,8 @@ bit 2 (41F3-41F7), so a second 07 reads 0 in those bits only if both still run *
 | 68010 `send_sound_byte` | 256 tests of A80000 bit 15 | the command is dropped |
 | 68010 spacing | three empty loop turns and the next call between two bytes of one flush (03015A-030192) | none: no other wait for the 6502 |
 | 6502 `h_nmi` | waits for RDIO bit 5 clear, without a limit | a response the 68010 never reads stops command intake |
-| 6502 `cmd_queue` | 48 commands | the oldest is dropped |
-| 6502 `resp_queue` | 16 responses | the new one is dropped, `resp_queue_full` = 80 |
+| 6502 `cmd_queue` | 47 commands (48 slots) | the oldest is dropped |
+| 6502 `resp_queue` | 15 responses (16 slots) | the new one is dropped, `resp_queue_full` = 80 |
 | 68010 `sound_resp_ring` | 16 responses | the oldest is overwritten (no reader anyway) |
 | boot tests | 180 vertical syncs after a reset before the FF is read, two after the 07 | message 90 or 107 when the FF is missing |
 
@@ -213,7 +218,7 @@ game does not wait for it (only the unused watchdog would), the boot tests wait 
 ## 5. The 68010's names for the commands: the audio test
 
 The game program's audio test (`audio_test`, 043718; title AUDIO TEST at 05C3DA, drawn through
-`reload_gsp` at 043738) lists `audio_test_list` (05C63C): 108 entries of 22 bytes, a word (the
+`reload_gsp` at 04373A) lists `audio_test_list` (05C63C): 108 entries of 22 bytes, a word (the
 command value) and a name of up to 20 characters, sorted by name, ended by a word FFFF at 05CF84.
 The cursor (index D4) selects an entry; button 2 sends its word (`move.w (a4,d0.w),d1` at
 04394E, `send_sound_byte` at 04395C), button 1 sends 00 (04393E), and each move of the stick
@@ -266,7 +271,7 @@ except the audio test's 04395C.
 | 00 | STOP | FF | 03 | 00 | the sound initialisation (imm_00, 4238) | 0 / 0 | none; written by 008E9A, 008EC6, 04393E |
 | 01 | SOFF | FF | 00 | 3C | mute: zp_1E = F0 | 5 / 1 | 024E42, 0253A4, 02837E |
 | 02 | SON | FF | 00 | 00 | unmute: zp_1E = 0 | 0 / 1 | 027178, 02837E |
-| 03 | (not listed) | 00 | FF | 00 | sends zp_75, the RDIO input state (coins) sub_5CE8 keeps | 0 / 0 | none |
+| 03 | (not listed) | 00 | FF | 00 | sends zp_75, sub_5CE8's four 2-bit coin counters (raw RDIO bits 0-3 under the self-test) | 0 / 0 | none |
 | 04 | YTST | FF | 08 | 00 | starts stream 00 | 0 / 0 | none; written by 008E84 |
 | 05 | ADTEST | FF | 13 | 00 | plays OKI phrase 1 | 0 / 0 | none; written by 008EB0 |
 | 06 | SMAX | 01 | FF | 00 | sends 6D, the number of command values the tables cover | 0 / 0 | none (audio test only) |
@@ -377,7 +382,7 @@ Over 00-6C: 53 commands of type 13 (OKI phrases), 32 of type 08 (streams), 6 of 
 type 0A, 2 each of types 00, 05 and 0B, 1 each of types 03, 09 and 14, and the 4 immediate
 commands. 13 commands have no call site in the game (00, 03, 04, 05, 06, 07, 08, 09, and 10
 WARPMUS, 37 EXP3, 3A CONGRATS, 5D APAD, 66 KBRAKE): the game program can play them only from its
-audio test, the boot program 00, 04, 05 and 07 from its sound tests **CODE**. MAME saw the 68010
+audio test (03 not even there: the game has no way to send it), the boot program 00, 04, 05 and 07 from its sound tests **CODE**. MAME saw the 68010
 write 26 different commands in attract mode and 43 in the game run, 50 in the two; the other 46
 that have call sites were not reached in 10,800 frames of each **MAME**.
 
