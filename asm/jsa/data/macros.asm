@@ -44,9 +44,11 @@ GATE_HALF = $10                         ; bits 5-4 = 01: the key-off comes at ha
 ACCENT_1 = $20                          ; bits 5-4 = 10: velocity + 24 (tbl_5FDF entry 2)
 ACCENT_2 = $30                          ; bits 5-4 = 11: velocity + 58 (tbl_5FDF entry 3)
 
-; Registers of the variable ops (var_store B0, var_add_to B1: 53C4-5449; var_load B2,
-; var_cmp_reg B9, the branches B5-B8: read_register 5494-5503), for the YM2151 tracks. Each
-; track has one variable, var (ram_0824), and the last result (ram_0842).
+; Registers of the variable ops (var_store B0 53C4-5410; var_load B2, var_cmp_reg B9, the
+; branches B5-B8: read_register 5494-5503), for the YM2151 tracks. Each track has one variable,
+; var (ram_0824), and the last result (ram_0842). var_add_to B1 (5411-544A) takes 00-04 only:
+; 00 volume_add, 01 tempo high byte + var, 02 transpose_add, 03 velocity_add, 04 bend (the
+; fraction + var x 4); from 05 up (the globals too) it does nothing (5419-541B).
 R_VOLUME = $00                          ; write: volume (op 82); read: 0 (54C8-54CC)
 R_TEMPO_HI = $01                        ; the tempo's high byte (ram_0644)
 R_TRANSPOSE = $02                       ; transpose (ram_0662)
@@ -67,7 +69,7 @@ note .macro pitch, len                  ; key a note: pitch 01-7F + transpose in
     .byte \pitch, \len
 .endm
 
-rest .macro len                         ; pitch 00: no transpose, no key-on (4EF0)
+rest .macro len                         ; pitch 00: no transpose, no key-on (4EEF-4EF2)
     .cerror \len < $01 || \len > $FF, "rest: length byte 01-FF (00 is ret)"
     .byte $00, \len
 .endm
@@ -227,7 +229,7 @@ bend .macro delta                       ; A7: pitch fraction + delta x 4 (signed
 .endm
 
 fade_mode .macro value                  ; A8: nonzero: no step timer, the fade steps only at
-    .byte $A8, \value                   ;   note starts, by the length nibble (47F5, 4CCF)
+    .byte $A8, \value                   ;   note starts, by the length nibble (47F5, 4CCE)
 .endm
 
 var_add .macro value                    ; A9: var + value
@@ -314,7 +316,7 @@ stop .macro op=$FF                      ; BB-FF: the track ends (ram_0248 = FF)
 .endm
 
 ; ---------------------------------------------------------------------------------------------
-; YM2151 patch records, 42 bytes (2A): what patch (9D: load_patch 5543-55A8 and the register
+; YM2151 patch records, 42 bytes (2A): what patch (9D: op_patch 553E-5584, load_patch 5585-55B3 and the register
 ; loop 55B6-5637), lfo (9E, 563B) and noise (9F, 567F) read through the record's address.
 
 ym_voice .macro rl_fb_con, kc, kf, pms_ams      ; +00: registers 20, 28, 30, 38 (+ channel)
@@ -341,5 +343,5 @@ ym_lfo .macro lfrq, pmd, amd, ct_w      ; +24: registers 18, 19, 19, 1B (bits 1-
 .endm
 
 ym_noise .macro shadow_1b, ne_nfrq      ; +28: op 9E copies shadow_1b into the shadow slot of
-    .byte \shadow_1b, \ne_nfrq          ;   register 1B (5677), which nothing reads; +29:
+    .byte \shadow_1b, \ne_nfrq          ;   register 1B (5678), which nothing reads; +29:
 .endm                                   ;   register 0F for op 9F

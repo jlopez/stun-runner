@@ -412,3 +412,46 @@ def test_sndtrace_reads_lie_in_walked_statements(image: tuple[bytes, dict[str, i
                 reads += 1
                 assert int(f[1], 16) in allowed, f"{trace.name}: read of {f[1]} by {f[2]}"
     assert reads
+
+
+CITING = [
+    REPO / "docs/12-sound-music.md",
+    TREE / "sequencer.asm",
+    *sorted((TREE / "data").glob("*.asm")),
+]
+
+
+@needs_tass
+def test_single_code_citations_are_instruction_starts(tmp_path: Path) -> None:
+    """A single code address (4000-5DB4) cited in docs/12, sequencer.asm or the data files is
+    where an instruction or a label starts, never an operand byte; the ends of a range "a-b" are
+    bytes and not checked (round-3 review: 4A84, 5062, 4EF0 and others were operand bytes)."""
+    r = assemble(TREE, tmp_path / "jsa.bin")
+    assert r.returncode == 0, r.stdout + r.stderr
+    listing = (tmp_path / "jsa.bin.lst").read_text()
+    starts = {int(a, 16) for a in re.findall(r"^\.([0-9a-f]{4})\t", listing, re.M)}
+    bad = []
+    for path in CITING:
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            line = re.sub(r"\b[0-9A-F]{4}-[0-9A-F]{2,4}\b", "", line)
+            for m in re.finditer(r"(?<![\w$#+-])([45][0-9A-F]{3})(?![\w-])", line):
+                a = int(m.group(1), 16)
+                if 0x4000 <= a <= 0x5DB4 and a not in starts:
+                    bad.append(f"{path.name}:{n} {m.group(1)}")
+    assert not bad, bad
+
+
+def test_sndtrace_column_claims_no_unused_op() -> None:
+    """docs/12 section 4: an op no stream uses (0 / 0) was never dispatched, so a handler the
+    sndtrace runs executed must be reached another way: its cell is not a bare "yes" (A1's
+    handler is also entered from add_volume and volume_ym: "(shared)")."""
+    doc = (REPO / "docs/12-sound-music.md").read_text()
+    doc = doc[doc.index("| Op | Macro |") :]
+    doc = doc[: doc.index("\n\n")]
+    row = r"^\| ([0-9A-F-, ]+) \| `[^|]*\|[^|]*\|[^|]*\| ([^|]*) \| ([^|]*) \| ([^|]*) \|"
+    rows = re.findall(row, doc, re.M)
+    assert len(rows) == 53
+    for op, _music, snd, streams in rows:
+        if streams.strip() == "0 / 0":
+            assert snd.strip() != "yes", op
+    assert ("A1", "(shared)") in {(op, snd.strip()) for op, _m, snd, _s in rows}

@@ -885,7 +885,8 @@ _l4D68
 ; bits 5-4 (the accent, 4D6C-4D82); the track's four TLs (ram_0482 + n x 1E) into the shadow of registers
 ; 60-78 (4D8D-4DA0); the patch's scaling bytes (record +1D to +23, through ram_0428/ram_0446 =
 ; record + 1C) and the velocity (ram_04FA) into key_scaling and key_velocity (4DA3-4DBC). For every track with a
-; portamento: the offset ram_06F8/ram_0716 moves toward 0 by the rate (4DBE-4E11); the heard
+; portamento: the offset ram_06F8/ram_0716 moves toward 0 by 2 x the rate (4DD5-4DDB) every
+; fourth tick (zp_00 & 6 = 0, 4DCB-4DCF; 4DBE-4E11); the heard
 ; track's offset and fine tune go to the shadow of register 30 and the note (4E12-4E54).
 ; from 4845, 4A80
 prepare_key_on
@@ -1921,8 +1922,9 @@ _l536B
     asl a
     jmp store_var
 
-; op AE (jump_table): go to word number var of the list after the op (no bound:
-; the streams AND var first)
+; op AE (jump_table): go to word number var of the list after the op (no bound: 14 of the
+; 18 tables follow a var_and; snd_09_0-2 index by global 19, which snd_09_3 on channel 7,
+; run first in each tick by tick_ym_group 500E-5023, sets to random & 3)
 ; MAME: dispatched in make musictrace
 op_jump_table
     sta zp_1C
@@ -2019,7 +2021,10 @@ _l540F
     sec
     rts
 
-; op B1 (var_add_to): register A + var (the same registers as B0)
+; op B1 (var_add_to): register A + var, fewer registers than B0. YM2151 track: 00 volume_add,
+; 01 the tempo's high byte + var (tempo_add_hi), 02 transpose_add, 03 velocity_add, 04 bend
+; (the fraction + var x 4); 05 and up, the globals among them, do nothing (5419-541B to 5449).
+; Other kind: 00-02 only (542E-5430). No stream uses B1.
 ; MAME: not dispatched in make musictrace
 op_var_add_to
     ldy cur_group_kind
@@ -2610,7 +2615,7 @@ op_fine_tune
     rts
 
 ; op A8 (fade_mode): ram_0608 = A: nonzero, fade steps only at note starts, the step
-; by the length byte's low nibble (fade_step 4CCF; the other kind: the pitch envelope's count)
+; by the length byte's low nibble (fade_step 4CCE; the other kind: the pitch envelope's count)
 ; MAME: not dispatched in make musictrace
 op_fade_mode
     sta ram_0608,x
