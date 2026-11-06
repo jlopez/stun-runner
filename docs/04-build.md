@@ -232,6 +232,7 @@ fill; the 52 samples stay blob (they are ROM content, recovered from the WAVs un
 | `../../build/oki/samples.asm` | 261,720 | 0 | 0 | 260,864 | 856 |
 
 `blob: 73.9% of 1511424 bytes come from incbin/.binary` (1,116,928 blob bytes, 1,280 fewer).
+
 After M4a (`make coverage`, 2026-11-05, on top of M4b) the 6502 image has no blob:
 
 | Source file | Bytes | instr | data | blob | fill |

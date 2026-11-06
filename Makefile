@@ -423,7 +423,6 @@ oki-pcm: $(OKI_SPLIT)
 	@$(OKI_REFILL)
 	$(PYTHON) tools/adpcm pcm --manifest $(OKI_MANIFEST) --wav $(OKI_WAV_DIR) --out $(BUILD)/oki/pcm
 
-
 # The JSA II sound program in MAME (docs/09-sound-program.md). tools/mame/sndtrace.lua records
 # what the 6502 executes and reads, the command bytes of the 68010 and the 6502's responses, and
 # the YM2151 and OKI writes (build/mame/<run>.txt, build artefacts: they carry values the program

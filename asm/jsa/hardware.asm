@@ -37,9 +37,10 @@ MIX             = $2A06                 ; /MIX, below
 
 ; WRIO (atari_jsa_oki_base_device::wrio_w): bits 7-6 the page at 3000-3FFF, 5-4 coin counters
 ; 2 and 1, 3 OKI pin 7 (sample rate), 2 OKI reset (low), 1 OKI bank (JSA III only), 0 YM2151
-; reset (low). MAME configures pin 7 high at power-on, but every WRIO write of this program has
-; bit 3 clear (4005 on), so the M6295 runs with pin 7 low: 3.579545 MHz / 3 / 165, about
-; 7,231 Hz, not / 132.
+; reset (low). MAME configures pin 7 high at power-on, but every WRIO write a command can reach
+; has bit 3 clear (4005 on), so the M6295 runs with pin 7 low: 3.579545 MHz / 3 / 165, about
+; 7,231 Hz, not / 132. The one store that could set it, 5903 (ymtimer.asm), is reached only
+; through cmdtype_10, and no command has type 10 (docs/10-adpcm.md section 2).
 ; MIX (mix_w): bit 5 low-pass filter (not emulated), 4 OKI bank (JSA III only), 3-1 YM2151
 ; volume 0-7, 0 OKI volume (half or full).
 

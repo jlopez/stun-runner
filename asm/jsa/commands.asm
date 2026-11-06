@@ -221,9 +221,10 @@ _l4389
     rts
 
 ; cmdtype_handlers entry $00
-; zp_1E = 4 x the parameter: commands 01 (F0) and 02 (0). The OKI start (5BFE) needs zp_1E = 0,
-; the YM2151 key-on (4EE6) ram_088E >= zp_1E: the 68010 sends 01 when attract mode starts with
-; "SOUNDS IN ATTRACT" off and 02 otherwise (docs/09-sound-program.md section 6).
+; zp_1E = 4 x the parameter: commands 01 (F0) and 02 (0). The OKI start (5BFE) needs zp_1E = 0;
+; sub_4E79's key code, levels and key-on (after 4EE6) need ram_088E >= zp_1E: the 68010 sends 01
+; when attract mode starts with "SOUNDS IN ATTRACT" off and 02 otherwise (docs/09-sound-program.md
+; section 6).
 cmdtype_00
     asl a
     asl a
