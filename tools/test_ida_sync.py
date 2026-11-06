@@ -251,9 +251,7 @@ def test_synthetic_names_and_functions(synthetic: js.Source) -> None:
 
 
 @needs_tass
-def test_functions_follow_a_renamed_code_file(
-    synthetic: js.Source, tmp_path: Path
-) -> None:
+def test_functions_follow_a_renamed_code_file(synthetic: js.Source, tmp_path: Path) -> None:
     """The code files are derived from the listing: a code file under a new name keeps its
     functions (a fixed file list would silently drop them)."""
     tree = {k: v for k, v in TREE.items() if k != "system.asm"}
@@ -427,16 +425,99 @@ def test_an_equate_outside_the_constants_files_fails(tmp_path: Path) -> None:
     no, line = next(
         (i, x)
         for i, x in enumerate(ram)
-        if (m := js.EQUATE.match(js.split_comment(x)[0])) and m.group(1) in syms
-        and syms[m.group(1)] < 0x2000 and "*" not in m.group(2)
+        if (m := js.EQUATE.match(js.split_comment(x)[0]))
+        and m.group(1) in syms
+        and syms[m.group(1)] < 0x2000
+        and "*" not in m.group(2)
     )
     name = js.EQUATE.match(js.split_comment(line)[0]).group(1)  # type: ignore[union-attr]
     (tree / "ram.asm").write_text("".join(ram[:no] + ram[no + 1 :]))
     (tree / "ram_moved.asm").write_text(line)
     main = (tree / "jsa.asm").read_text()
     assert '    .include "ram.asm"\n' in main
-    main = main.replace('    .include "ram.asm"\n', '    .include "ram.asm"\n    .include "ram_moved.asm"\n')
+    main = main.replace(
+        '    .include "ram.asm"\n', '    .include "ram.asm"\n    .include "ram_moved.asm"\n'
+    )
     (tree / "jsa.asm").write_text(main)
     assert js.assembled_symbols(tree, tmp_path / "moved")[name] == syms[name]
     with pytest.raises(ValueError, match=rf"ram_moved\.asm:1: the equate {name} "):
         js.load(tree)
+
+
+def _plant_in_oki(tmp_path: Path, define: str, old: str | None = None, new: str = "") -> Path:
+    """A copy of asm/jsa with `define` before oki.asm's first label and, if `old` is given, its
+    first instruction line `old` (stripped) replaced by `new` (the same bytes)."""
+    tree = tmp_path / "jsa"
+    shutil.copytree(js.TREE, tree)
+    lines = (tree / "oki.asm").read_text().splitlines(keepends=True)
+    if old is not None:
+        at = next(i for i, x in enumerate(lines) if x.strip() == old)
+        lines[at] = lines[at].replace(old, new)
+    first = next(
+        i
+        for i, x in enumerate(lines)
+        if x[:1].strip() and js.GLOBAL_LABEL.match(js.split_comment(x)[0])
+    )
+    lines.insert(first, define + "\n")
+    (tree / "oki.asm").write_text("".join(lines))
+    (tmp_path / "work").mkdir()
+    assert js._assemble(tree, tmp_path / "work" / "a.bin") == js._assemble(
+        js.TREE, tmp_path / "work" / "b.bin"
+    )
+    return tree
+
+
+@needs_tass
+@pytest.mark.parametrize("form", ["=", ":=", ".var"])
+def test_an_address_equate_outside_the_constants_files_fails(tmp_path: Path, form: str) -> None:
+    """A RAM equate defined in a code file in any 64tass form (`=`, `:=`, `.var`) and used as a
+    memory operand fails the load (the image unchanged)."""
+    syms = js.assembled_symbols(js.TREE, tmp_path)
+    value = syms["wrio_shadow"]
+    tree = _plant_in_oki(tmp_path, f"zz_addr {form} ${value:04X}", "lda wrio_shadow", "lda zz_addr")
+    with pytest.raises(
+        ValueError, match=rf"oki\.asm:\d+: the equate zz_addr = \${value:04X} is used as an address"
+    ):
+        js.load(tree)
+
+
+@needs_tass
+def test_a_constant_outside_the_constants_files_loads(tmp_path: Path) -> None:
+    """A small constant (a count, a mask) used only as an immediate is no address: it stays in its
+    code file, the load succeeds and the database gets no name for it."""
+    tree = _plant_in_oki(tmp_path, "ZZ_COUNT = $11 ; a count", "ldx #$11", "ldx #ZZ_COUNT")
+    src = js.load(tree)
+    assert not [n for n in src.names if n.name == "ZZ_COUNT"]
+    assert src.global_names() == js.load().global_names()
+
+
+@needs_tass
+def test_an_unused_equate_outside_the_constants_files_fails(tmp_path: Path) -> None:
+    """An equate in 0000-2FFF that nothing uses cannot be told from a RAM name: it fails."""
+    tree = _plant_in_oki(tmp_path, "zz_ram := $0010")
+    with pytest.raises(ValueError, match=r"the equate zz_ram = \$0010 is used nowhere"):
+        js.load(tree)
+
+
+def test_address_uses() -> None:
+    """The leading name of a memory operand, an address byte or a pointer is an address; a plain
+    immediate, a .byte value and an offset after the leading name are constants."""
+    st = [
+        js.Statement(0x4000, "code", "lda ram_a+1,x", 3),
+        js.Statement(0x4003, "code", "jmp (ram_b)", 3),
+        js.Statement(0x4006, "code", "lda #<ram_c", 2),
+        js.Statement(0x4008, "code", "ldx #COUNT", 2),
+        js.Statement(0x400A, "code", "lda table+OFFSET", 3),
+        js.Statement(0x400D, "code", "asl a", 1),
+        js.Statement(0x400E, "word", "ram_d, ram_e-1", 4),
+        js.Statement(0x4012, "byte", "MASK, >ram_f", 2),
+    ]
+    assert js.address_uses(st) == {
+        "ram_a": 0x4000,
+        "ram_b": 0x4003,
+        "ram_c": 0x4006,
+        "table": 0x400A,
+        "ram_d": 0x400E,
+        "ram_e": 0x400E,
+        "ram_f": 0x4012,
+    }

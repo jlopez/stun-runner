@@ -25,9 +25,15 @@ returns a `Source`, the annotations the source carries at their IDA addresses.
   (IDA's tdelta) the -n or +n, so an RTS-dispatch entry `.word handler-1` points at the handler,
   not at the byte before it. Any other operand (a number, an equate, another expression) makes
   the statement plain words.
-- **Equates.** Only ram.asm and hardware.asm (`CONST_FILES`) hold the RAM and I/O names; an
-  equate elsewhere whose value lies in 0000-2FFF fails the load, because its name would silently
-  drop out of the database (data/macros.asm, `SKIP_FILES`, holds the macros' constants).
+- **Equates.** Only ram.asm and hardware.asm (`CONST_FILES`) hold the RAM and I/O names. Every
+  symbol definition counts (`name = v`, `name := v`, `name .var v`, a compound `name += v`).
+  An equate elsewhere whose value lies in 0000-2FFF and which the listing uses as an address
+  (`address_uses`: a memory operand, `#<name`/`#>name`, a .word or .addr operand, a .byte
+  `<name`/`>name`) fails the load, because its name would silently drop out of the database; one
+  used only as a constant (a plain immediate, a .byte value, an offset) is no address and stays
+  where it is, like data/macros.asm's (`SKIP_FILES`); one used nowhere fails, since nothing tells
+  an address from a constant. A symbol of the labels file in 0000-2FFF
+  that no line of the tree defines in one of those forms fails the load too.
 - **Comments.** A column-0 comment block directly above a global label (its `; ---` rules
   dropped) is the label's header: the function comment of a routine, the repeatable comment of
   any other label. The comments on a line, its continuation lines (comment-only lines at the
@@ -69,11 +75,15 @@ MARKER = "sync__"
 RULE = re.compile(r"^-{3,}$")
 GLOBAL_LABEL = re.compile(r"^([A-Za-z][A-Za-z0-9_]*)\s*$")
 LOCAL_LABEL = re.compile(r"^(_[A-Za-z0-9_]+)\s*$")
-EQUATE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$")
+# a symbol definition: `name = v`, a variable `name := v` or `name .var v`, a compound `name += v`
+EQUATE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*(?:\.var\b|[:?+\-*/|&^<>%]*=)\s*(.+?)\s*$")
 INCLUDE = re.compile(r'^\s*\.include\s+"([^"]+)"')
 NO_BYTES = re.compile(r"^\.(cerror|cwarn|include|if|else|elsif|endif|fi|comment|endc)\b")
 ORG = re.compile(r"^\*\s*=")
-SYMBOL = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\$[0-9A-Fa-f]+|\d+)\s*$")
+SYMBOL = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:?=\s*(\$[0-9A-Fa-f]+|\d+)\s*$")
+ADDRESS_LIMIT = 0x3000  # RAM and I/O: an equate below it may be an address the database names
+LEADING_NAME = re.compile(r"^[\s(\[]*[<>]?\s*([A-Za-z_][A-Za-z0-9_]*)")
+REGISTERS = {"a", "x", "y", "A", "X", "Y"}
 LISTED = re.compile(r"^([.>])([0-9a-f]{4})$")
 HEX = re.compile(r"^[0-9a-f]{2}( [0-9a-f]{2})*$")
 DATA_KIND = re.compile(r"^\.(byte|char|word|addr|text|fill)\b\s*(.*)$")
@@ -254,6 +264,38 @@ def label_delta(op: str, image_labels: set[str]) -> int | None:
         return 0
     n = int(m.group(3)[1:], 16) if m.group(3).startswith("$") else int(m.group(3))
     return n if m.group(2) == "+" else -n
+
+
+def address_uses(statements: list[Statement]) -> dict[str, int]:
+    """The names the listing uses as an address, each with the offset of its first use: the
+    leading name of an instruction's memory operand (`lda name+1,x`, `jmp (name)`), of an
+    immediate that takes an address's low or high byte (`#<name`, `#>name`), of a .word or .addr
+    operand and of a .byte operand `<name` or `>name`. A name used only as a plain immediate
+    (`#name`), a .byte value or an offset after the leading name (`table+name`) is a constant."""
+    out: dict[str, int] = {}
+
+    def use(op: str, st: Statement) -> None:
+        m = LEADING_NAME.match(op)
+        if m and m.group(1) not in REGISTERS:
+            out.setdefault(m.group(1), st.offset)
+
+    for st in statements:
+        if st.kind == "code":
+            parts = st.operands.split(None, 1)
+            op = parts[1].strip() if len(parts) > 1 else ""
+            if op.startswith("#"):
+                if op[1:].lstrip()[:1] in ("<", ">"):
+                    use(op[1:], st)
+            elif op:
+                use(op, st)
+        elif st.kind in ("word", "addr"):
+            for op in operand_list(st.operands):
+                use(op, st)
+        elif st.kind == "byte":
+            for op in operand_list(st.operands):
+                if op[:1] in ("<", ">"):
+                    use(op, st)
+    return out
 
 
 def data_item(st: Statement, image_labels: set[str]) -> DataItem:
@@ -452,8 +494,18 @@ def build(
     code_offsets = {s.offset for s in statements if s.kind == "code"}
     routine_files = code_files(addresses, code_offsets)
     image_labels: set[str] = set()
+    defined: set[str] = set()  # every name the tree defines at column 0, in any file
+    mentions: dict[str, int] = defaultdict(int)  # source lines whose code names it, definitions too
+    outside: dict[str, tuple[str, int]] = {}  # RAM or I/O equates outside the constants files
 
     for rel in order:
+        for line in files[rel].splitlines():
+            code = split_comment(line)[0]
+            m = EQUATE.match(code) if line[:1].strip() else None
+            if m:
+                defined.add(m.group(1))
+            for word in set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code)):
+                mentions[word] += 1
         if rel in SKIP_FILES:
             continue
         if rel in CONST_FILES:
@@ -522,12 +574,8 @@ def build(
             equate = EQUATE.match(code) if not text[0].isspace() else None
             if equate and "*" not in equate.group(2):
                 v = syms.get(equate.group(1))
-                if v is not None and 0 <= v < CONST_FILES["hardware.asm"][1]:
-                    raise ValueError(
-                        f"{where}: the equate {equate.group(1)} = ${v:04X} (RAM or I/O) is outside"
-                        f" {' and '.join(CONST_FILES)}, so IDA would lose its name: move it there"
-                        " or add its file to CONST_FILES (ida/jsa_source.py)"
-                    )
+                if v is not None and 0 <= v < ADDRESS_LIMIT:
+                    outside.setdefault(equate.group(1), (where, v))
             if not text[0].isspace() or NO_BYTES.match(body) or ORG.match(body):
                 if above or comment:
                     src.loose.append(f"{where} (directive) {(above or [comment or ''])[0][:60]}")
@@ -543,6 +591,31 @@ def build(
                 cont = (text.index(";", len(code)), ea, regular)
             else:
                 cont = (40, ea, regular)
+
+    # equates: an address outside the constants files would drop its name out of the database
+    uses = address_uses(statements)
+    for name, (where, v) in outside.items():
+        if mentions[name] <= 1:
+            raise ValueError(
+                f"{where}: the equate {name} = ${v:04X} is used nowhere, so the sync cannot tell"
+                " a RAM or I/O address from a constant: use it, or move an address to ram.asm or"
+                " hardware.asm"
+            )
+        if name in uses:
+            raise ValueError(
+                f"{where}: the equate {name} = ${v:04X} is used as an address (at file"
+                f" {uses[name]:04X}) outside {' and '.join(CONST_FILES)}, so IDA would lose its"
+                " name: move it to ram.asm (RAM) or hardware.asm (I/O), or add its file to"
+                " CONST_FILES (ida/jsa_source.py). A constant used only as an immediate, a .byte"
+                " value or an offset stays where it is."
+            )
+    for name, v in sorted(syms.items()):
+        if 0 <= v < ADDRESS_LIMIT and not name.startswith(MARKER) and name not in defined:
+            if name not in image_labels:
+                raise ValueError(
+                    f"the symbol {name} = ${v:04X} is defined in a form ida/jsa_source.py does"
+                    " not read (it reads `name = v`, `name := v`, `name .var v` at column 0)"
+                )
 
     # names: one global per address; a local beside a global is left out
     for ea, names in sorted(globals_at.items()):
