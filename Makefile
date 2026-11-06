@@ -30,7 +30,7 @@ ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
 	dasm oracle pcwatch objects objtrace objlevels pictures view somdump fieldext depthkeys vskip \
-	okitrace oki-pcm sndtrace soundcheck listen FORCE
+	okitrace oki-pcm sndtrace soundcheck listen musictrace FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -159,7 +159,7 @@ test: selftest
 PYTOOLS := tools/romset.py tools/listings.py tools/programs.py tools/test_*.py \
 	tools/check-roms tools/merge-roms tools/split-roms tools/bytecheck tools/coverage \
 	tools/extract-programs tools/dasm-programs tools/annotate-listing tools/displaylist.py \
-	tools/sndtrace.py
+	tools/sndtrace.py tools/jsa_music.py
 
 lint:
 	uv run --frozen ruff check tools ida
@@ -465,6 +465,28 @@ $(BUILD)/mame/sndtrace-play.txt: FORCE
 sndtrace: $(SND_TRACES) $(BUILD)/stunrun-jsa.lst
 	$(PYTHON) tools/sndtrace.py summary --listing $(BUILD)/stunrun-jsa.lst \
 		--out artifacts/sndtrace-summary.json $(SND_TRACES)
+
+# The sequencer in MAME (docs/12-sound-music.md): tools/mame/musictrace.lua injects, headless,
+# from an empty private state, each command of type 08 in turn (MUSIC_SOUNDS, MUSIC_WINDOW frames
+# each, after command 00 and 02; the 68010's own commands are replaced by the no-op 6D) and
+# records the tracks started, the ops dispatched, the stream statements read and the YM2151
+# key-ons per sound (build/mame/musictrace.txt); tools/jsa_music.py summary checks them against
+# the source (the listing) and rewrites artifacts/musictrace-summary.json (addresses, counts and
+# command/sound numbers; commit it when it changes). Needs MAME and the ROMs.
+MUSIC_SOUNDS ?= 04,0A,0C,0D,0F,10,11,12,14,16,17,18,1A,1B,1C,1D,24,25,26,28,2A,2B,2C,2D,2F,30,31,32,33,34,35,37
+MUSIC_WINDOW ?= 600
+
+musictrace: $(BUILD)/stunrun-jsa.lst
+	@mkdir -p $(BUILD)/mame
+	rm -f $(BUILD)/mame/musictrace.txt $(BUILD)/mame/musictracedone
+	$(call TRACE_STATE,musictrace)
+	SDL_VIDEODRIVER=dummy MUSIC_DIR=$(BUILD)/mame/ MUSIC_NAME=musictrace \
+		MUSIC_SOUNDS=$(MUSIC_SOUNDS) MUSIC_WINDOW=$(MUSIC_WINDOW) $(MAME) stunrun $(MAME_FLAGS) \
+		-rompath $(REF_ROMPATH) $(call TRACE_DIRS,musictrace) \
+		-autoboot_script tools/mame/musictrace.lua
+	@test -f $(BUILD)/mame/musictracedone || { echo "musictrace: the run did not finish"; exit 1; }
+	$(PYTHON) tools/jsa_music.py summary --listing $(BUILD)/stunrun-jsa.lst \
+		--out artifacts/musictrace-summary.json $(BUILD)/mame/musictrace.txt
 
 # The machine half of M4's acceptance: the reference set and the rebuilt one (build/roms, after
 # `make check`; MAME's -verifyroms confirms it finds the set there, and -rompath on the command
