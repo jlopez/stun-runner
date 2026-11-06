@@ -525,5 +525,6 @@ document writes `tools/adpcm <command>` for short.
 - Whether the phrases that only the injected commands started are reachable in a real game
   (36 of 52 were not seen in the 10,800-frame game run). docs/11 section 6 lists the 68010's
   call sites of each command; the game events behind them are M5's.
-- The names are Jesus's hearing of MAME's playback; nothing here checks them against the game's
-  own documentation.
+- The descriptions are Jesus's hearing of MAME's playback (card A8). The names are the 68010's
+  audio-test abbreviations (card A12); nothing in the repository expands them (section 7), so
+  what a name stands for is not verified.

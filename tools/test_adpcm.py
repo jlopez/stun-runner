@@ -330,6 +330,20 @@ def test_committed_manifest() -> None:
     assert (numbers[0]["description"], numbers[-1]["description"]) == ("One", "Twenty-two")
 
 
+def test_docs_attribute_names_to_audio_test() -> None:
+    """Card A12: the names come from the 68010's audio test, only the descriptions from Jesus's
+    listening (card A8). No sentence of docs/10 or CLAUDE.md may say the names are his hearing."""
+    import re
+
+    stale = re.compile(r"names\s+(?:are|come\s+from)\s+Jesus's\s+(?:hearing|listening)", re.I)
+    for path in (REPO / "docs/10-adpcm.md", REPO / "CLAUDE.md"):
+        text = " ".join(path.read_text().split())
+        assert not stale.search(text), path
+    assert "audio-test abbreviations (card A12)" in " ".join(
+        (REPO / "docs/10-adpcm.md").read_text().split()
+    )
+
+
 def test_sample_name_follows_commands() -> None:
     """The name rule fails when the manifest and data/sound/commands.json disagree: a command's
     audio-test name changed, or a phrase played by no command in 38-6C."""
