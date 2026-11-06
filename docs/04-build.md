@@ -60,8 +60,14 @@ missing there (deleted, or a phrase renamed behind the split's stamp) and keeps 
 evidence; `make oki-pcm` decodes every phrase the manifest names to 16-bit PCM under `build/oki/pcm/` for
 listening (other WAVs there are removed, so a rename leaves no stale copy).
 Sample bytes, WAVs and PCM stay under `build/`.
+Since M4a the 6502 image is not an incbin of `build/stunrun-jsa.bin` either: `asm/jsa/jsa.asm`
+and the files it includes (`hardware.asm`, `ram.asm` and eleven region files,
+`data/sounds.asm` and `data/music.asm` among them) are the whole program as 64tass source, instructions, tables and fills
+(docs/09-sound-program.md section 4), so the tree's output depends on its own files only; the
+Makefile's prerequisites for it are `asm/jsa/*.asm` and `asm/jsa/data/*.asm`.
+`build/stunrun-jsa.bin` is still made by `tools/merge-roms`, for `make ida`.
 
-`make` (= `make all`) runs the three steps. The images are rebuilt only when the layout tools or the snapshot change (`make clean` re-reads the archive); the trees reassemble when their sources or blobs change; the split always runs (cheap, and make 3.81 on macOS compares whole-second mtimes, so a stamp could hide a reassembly in the same second).
+`make` (= `make all`) runs the three steps. The images are rebuilt only when the layout tools or the snapshot change (`make clean` re-reads the archive); the trees reassemble when their sources or blobs change; the split always runs (cheap, and make 3.81 on macOS compares whole-second mtimes, so a stamp could hide a reassembly in the same second). For the same reason the 6502 tree assembles on every make (64tass takes well under a second): an edit to `asm/jsa` in the same second as the last assembly would otherwise leave a stale image, and a planted-change probe run from a script would check the wrong bytes. The other trees still reassemble by mtime: after a scripted edit to `asm/` (68k) or `data/objects`, `touch` the file or wait a second before `make check`.
 
 ## 2. The five images
 
@@ -91,7 +97,7 @@ rom_s:
 
 - **vasm incbin syntax** (verified on vasm 2.0f, Motorola syntax module 3.19f): `incbin "file"[,offset[,length]]`, the path relative to the source file's directory (it also works when vasm runs from the repository root). As documented.
 - **vasm guards**: `assert <expr>[,"message"]` fails the assembly with `error 48 ... assertion "*=$020000" failed: pair S misplaced`. `if *<>$20000` does **not** work in vasm's Motorola syntax (`<>` gives error 10, "number or identifier expected"); `if *!=$20000` / `fail` and `ifne *-$20000` do. The trees use `assert`.
-- **64tass** (1.60): `.binary "file", offset, length`, `.cerror cond, "message"`. The 6502 program counter wraps from $FFFF to $0000 after a full 64 KB, so `* != $10000` is always true at the end of the image: `asm/jsa/jsa.asm` guards the slices at $1000/$2000/$3000/$4000, the end with `* != $0000`, and the blob's size with `len(binary(IMAGE)) != $10000`. The 6502 tree is cut into the four bank pages and the $4000-$FFFF window so that M4 can give each its own file and `.logical $3000`.
+- **64tass** (1.60): `.binary "file", offset, length`, `.cerror cond, "message"`. The 6502 program counter wraps from $FFFF to $0000 after a full 64 KB, so `* != $10000` is always true at the end of the image: `asm/jsa/jsa.asm` guards the slices at $1000/$2000/$3000/$4000, the end with `* != $0000`, and the blob's size with `len(binary(IMAGE)) != $10000`. The 6502 tree is cut into the four bank pages and the $4000-$FFFF window so that M4 can give each its own file and `.logical $3000`. (M4a: the four pages are zero in this set, so they became `.fill`s with no `.logical`; the window became the region files of docs/09 section 2.)
 
 Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/<image>.out` (the data trees use the same assembler and flags, no instruction is involved); `64tass -q -C -b -L build/stunrun-jsa.lst -o build/stunrun-jsa.out`.
 
@@ -117,6 +123,28 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   write its done marker); then `tools/adpcm survey` rewrites `data/oki/samples.json` (layout,
   names kept, commands, starts per run) and fails on a start the 6502's tables do not explain
   (docs/10-adpcm.md section 4).
+- `tools/test_jsa.py` (CI, no ROMs; docs/09 section 8): `asm/jsa/jsa.asm` assembles with 64tass
+  to MAME's size, CRC-32 and SHA-1 of `136070-2123.10c`; a changed operand changes the hash, a
+  moved region fails its guard, the IDA names are in the source, and the committed
+  `artifacts/sndtrace-summary.json` agrees with the source. The synthetic `make all` of
+  `tools/test_build.py` carries the image the 6502 source assembles to and checks that an
+  operand edited in the copy reaches 10c.
+- `make sndtrace` (needs MAME and the ROMs; never in CI; `-j3` runs its three MAME runs side by
+  side): `tools/mame/sndtrace.lua` records what the 6502 executes and reads, the 68010's command
+  bytes and the 6502's responses, the YM2151 and OKI writes, in attract mode with the factory
+  NVRAM, in attract mode with "SOUNDS IN ATTRACT" on and in a started game, each from its own
+  empty private state, into `build/mame/sndtrace-*.txt`; `tools/sndtrace.py summary` checks
+  them against the source and rewrites `artifacts/sndtrace-summary.json` (docs/09 section 7).
+- `make soundcheck` (needs MAME and the ROMs; never in CI): after `make check`, the reference
+  set and the rebuilt one (`-rompath build/roms`, confirmed by `-verifyroms`) each run 3000
+  frames of attract mode with its sound on, headless; their YM2151 and OKI write streams,
+  commands and responses must be equal and the reference must key on (docs/09 section 8). It runs
+  only on a byte-identical set: `make check` is its prerequisite and stops on any differing byte
+  before MAME starts, so it never compares a moved build (that comparison is a manual procedure,
+  docs/09 section 3 item 7).
+- `make listen`: the listening check, Jesus's: MAME on the rebuilt set in a window with sound,
+  from an empty private state, attract mode with its sound on (docs/09 section 6). The one
+  target that opens a window.
 - `make somdump` (needs MAME and the ROMs; never in CI): `tools/mame/somdump.lua` captures the
   SOM display list at the frames of `SOM_ATTRACT` (attract mode), `SOM_GAME` (a game started at
   frame 900) and `SOM_DITHER` (attract mode with every colour word's two bytes made different,
@@ -204,6 +232,17 @@ fill; the 52 samples stay blob (they are ROM content, recovered from the WAVs un
 | `../../build/oki/samples.asm` | 261,720 | 0 | 0 | 260,864 | 856 |
 
 `blob: 73.9% of 1511424 bytes come from incbin/.binary` (1,116,928 blob bytes, 1,280 fewer).
+
+After M4a (`make coverage`, 2026-11-05, on top of M4b) the 6502 image has no blob:
+
+| Source file | Bytes | instr | data | blob | fill |
+|---|---|---|---|---|---|
+| `asm/jsa/jsa.asm` | 37,816 | 0 | 7 | 0 | 37,809 |
+| `asm/jsa/*.asm`, `asm/jsa/data/*.asm` (region files) | 27,720 | 7,351 | 20,369 | 0 | 0 |
+| **stunrun-jsa** | **65,536** | **7,351** | **20,376** | **0** | **37,809** |
+
+`blob: 69.6% of 1511424 bytes come from incbin/.binary` (1,051,392 blob bytes, 65,536 fewer);
+the per-file table is docs/09 section 2.
 
 ## 6. Tools and versions
 

@@ -171,6 +171,11 @@ def tass(listing: str, image_size: int) -> Counts:
     return _attribute(*_tass_parse(listing, image_size))
 
 
+def tass_statements(listing: str, image_size: int) -> list[tuple[Statement, int]]:
+    """Every statement of a 64tass -L listing that emits bytes, with its size in bytes."""
+    return _spans(*_tass_parse(listing, image_size))
+
+
 def tass_blobs(listing: str, image_size: int) -> list[Blob]:
     """The .binary statements of a 64tass -L listing, with their labels, files and sizes."""
     return _blobs(*_tass_parse(listing, image_size))

@@ -12,6 +12,9 @@ build/stunrun-obj.bin, and a mesh edited in the copy must change the built objec
 The OKI image goes through one WAV per sample (docs/10-adpcm.md), split by the phrase table that
 data/oki/samples.json describes, so the synthetic set carries a valid OKI image: that table over
 random sample bytes and a zero tail. A WAV altered by one data byte must change the built file.
+
+The 6502 image is built from asm/jsa alone (docs/09-sound-program.md), so the synthetic set
+carries the image the source assembles to, and an operand edited in the copy must change 10c.
 """
 
 from __future__ import annotations
@@ -58,6 +61,14 @@ def plant_oki(seed: int) -> bytes:
     layout = read_manifest(REPO / "data/oki/samples.json")
     rng = random.Random(seed)
     return build_oki(layout, {p.number: rng.randbytes(p.length) for p in layout.phrases})
+
+
+def plant_jsa(tmp: Path) -> bytes:
+    """The 6502 image the committed asm/jsa assembles to."""
+    out = tmp / "jsa.bin"
+    r = run(tool("TASS", "64tass"), "-q", "-C", "-b", "-o", out, REPO / "asm/jsa/jsa.asm")
+    assert r.returncode == 0, r.stdout + r.stderr
+    return out.read_bytes()
 
 
 def run(*args: object, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -272,6 +283,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     images["stunrun-68k"] = plant_programs(images["stunrun-68k"], 42)
     images["stunrun-obj"] = plant_objects()
     images["stunrun-oki"] = plant_oki(42)
+    images["stunrun-jsa"] = plant_jsa(tmp_path)
     files = split(snapshot, images)
     write_set(tmp_path / "archive" / "stunrun", files)
     work = tmp_path / "repo"
@@ -298,7 +310,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 73.9% of 1511424 bytes" in r.stdout
+    assert "blob: 69.6% of 1511424 bytes" in r.stdout
     blobs = {line.split()[0]: line.split() for line in r.stdout.splitlines() if line.strip()}
     assert blobs["adsp_program"][1:4] == ["1702E", "8270", "../../build/adsp/program.bin"]
     assert blobs["gsp_program"][1:4] == ["1907C", "24408", "../../build/gsp/program.bin"]
@@ -308,8 +320,12 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert summary["images"]["stunrun-obj"]["blob"] == 0
     # the OKI image: the phrase table is data, the tail fill, the 52 samples blob
     assert summary["images"]["stunrun-oki"] == {"instr": 0, "data": 424, "blob": 260864, "fill": 856}
-    assert summary["blob"] == 1116928
+    # nor has the 6502 image a blob: all instructions, data and fills
+    assert summary["images"]["stunrun-jsa"]["blob"] == 0
+    assert summary["images"]["stunrun-jsa"]["instr"] > 0
+    assert summary["blob"] == 1051392
     assert "build/stunrun-obj.bin" not in r.stdout
+    assert "build/stunrun-jsa.bin" not in r.stdout
     # the merged blobs are kept (not deleted as intermediates of the pattern rules)
     assert sorted(p.name for p in (work / "build").glob("*.bin")) == sorted(
         f"{name}.bin" for name in IMAGES
@@ -319,7 +335,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
         (work / f"build/{name}.lst").unlink()
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 73.9% of 1511424 bytes" in r.stdout
+    assert "blob: 69.6% of 1511424 bytes" in r.stdout
     assert (work / "build/stunrun-obj.lst").exists() and (work / "build/stunrun-jsa.lst").exists()
     # the object image needs nothing from the set: rebuilt with build/stunrun-obj.bin gone (and
     # its generated sources and output removed), it is still the same and the blob stays absent
@@ -349,7 +365,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert (
         "136070-2107.210u: 1 differing bytes, first at file offset $0FFFF = 68k $07FFFF" in r.stdout
     )
-    # undo the plant, so that the WAV and mesh edits below are the only differences
+    # undo the plant, so that the WAV, mesh and operand edits below are the only differences
     data[0x7FFFF] ^= 0x01
     image.write_bytes(bytes(data))
     later = image.stat().st_mtime + 5
@@ -439,3 +455,33 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert {name for name in files if built[name] != files[name]} == {"136070-2118.90k"}
     chip, ref = built["136070-2118.90k"], files["136070-2118.90k"]
     assert [i for i in range(len(ref)) if chip[i] != ref[i]] == sorted([vertex_x, checksum_word])
+    # an operand edited in the 6502 source reaches 10c: reset's ldx #$FF (4002) becomes ldx #$FE,
+    # one byte at 4003, and the guards still pass (nothing moved)
+    mesh.write_text(text)
+    later = mesh.stat().st_mtime + 20
+    os.utime(mesh, (later, later))
+    system = work / "asm/jsa/system.asm"
+    source = system.read_text()
+    first = source.index("    ldx #$FF")
+    system.write_text(source[:first] + "    ldx #$FE" + source[first + len("    ldx #$FF") :])
+    later = system.stat().st_mtime + 30
+    os.utime(system, (later, later))
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 1
+    assert "1 problems over 25 files" in r.stdout, r.stdout
+    assert "136070-2123.10c: 1 differing bytes, first at file offset $04003 = 6502 $4003" in (
+        r.stdout
+    ), r.stdout
+    # the source restored in the same second as the last assembly (make 3.81 compares whole-second
+    # mtimes; here the source's mtime is set equal to the image's) still reassembles: the 6502
+    # tree is assembled on every make (Makefile, FORCE), so a planted-change probe cannot check
+    # a stale image
+    system.write_text(source)
+    stamp = (work / "build/stunrun-jsa.out").stat().st_mtime
+    os.utime(system, (stamp, stamp))
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0, r.stdout
