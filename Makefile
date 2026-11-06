@@ -135,6 +135,12 @@ ASM = $(if $(filter $(VASM_IMAGES),$*),$(VASM) $(VASMFLAGS),$(TASS) $(TASSFLAGS)
 $(BUILD)/%.out $(BUILD)/%.lst: $$(SRC_$$*) $$(EXTRA_$$*) $$(wildcard $$(dir $$(SRC_$$*))*.asm)
 	$(ASM) -L $(BUILD)/$*.lst -o $(BUILD)/$*.out $<
 
+# The 6502 tree assembles on every make (64tass takes well under a second): make 3.81 compares
+# whole-second mtimes, so an edit to asm/jsa in the same second as the last assembly would leave
+# a stale image, and a planted-change probe run from a script (edit, make check, restore, make
+# check) would check the wrong bytes. The pattern rule above still supplies the recipe.
+$(BUILD)/stunrun-jsa.out $(BUILD)/stunrun-jsa.lst: FORCE
+
 # Without the reference set (CI) there is nothing to build from or compare with: skip, exit 0.
 check:
 	@$(PYTHON) tools/check-roms --set $(SET) >/dev/null; rc=$$?; \

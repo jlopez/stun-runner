@@ -474,3 +474,14 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert "136070-2123.10c: 1 differing bytes, first at file offset $04003 = 6502 $4003" in (
         r.stdout
     ), r.stdout
+    # the source restored in the same second as the last assembly (make 3.81 compares whole-second
+    # mtimes; here the source's mtime is set equal to the image's) still reassembles: the 6502
+    # tree is assembled on every make (Makefile, FORCE), so a planted-change probe cannot check
+    # a stale image
+    system.write_text(source)
+    stamp = (work / "build/stunrun-jsa.out").stat().st_mtime
+    os.utime(system, (stamp, stamp))
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0, r.stdout

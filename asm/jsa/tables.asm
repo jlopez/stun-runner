@@ -67,7 +67,7 @@ tbl_5FDF
     .byte $00, $00, $24, $58
 
 ; 16 words: read at 498F-49AD with Y = (A AND 0F) x 2 (498B-498E); 4CD3 and 4CD9 read
-; entry 10 (tbl_5FE3+20).
+; entry 0A (tbl_5FE3+$14).
 tbl_5FE3
     .word $0000, $1E00, $0F00, $0780, $03C0, $0A00, $0500, $0280
     .word $0600, $01E0, $00F0, $0078, $003C, $0140, $00A0, $0300

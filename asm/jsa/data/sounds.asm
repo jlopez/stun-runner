@@ -1,19 +1,19 @@
 ; sounds.asm: 61E4-65E5, the tables the command handlers index with their parameter.
 ;
-; cmdtype_08 (4569, the commands of type 08) takes a number N in A, the command's parameter
-; (00-1F). tbl_61E4 gives a first entry E (an N from 80 up would read tbl_62C1+$23 on as words,
-; 4575/4581, but no parameter reaches 80), and E, then each next entry tbl_6438 gives until 0,
-; indexes four 125-entry tables: tbl_6244 and tbl_62C1 (bytes) and tbl_633E, whose words are the
-; addresses of byte streams in data/music.asm, copied to ram_0266/ram_0284 (4632-463A), the
-; pointer the stream reader at 4859 reads through zp_06 (4781-4786, 4864-486C). The 125 entries
-; end where the next table starts: tbl_6244 + 7D = tbl_62C1, + 7D = tbl_633E, + FA = tbl_6438,
-; + FA = tbl_6532. cmdtype_13 (5BFE, the OKI start) indexes the three 53-entry tables
-; tbl_6532, tbl_6567 and tbl_659C with its parameter (00-34; 5C43 ORs 80 into tbl_6532's byte for
-; the OKI's first command byte) and keeps the entry in zp_52,x for the channel. cmdtype_14 (5C6F)
-; does not index with its parameter: it compares it with tbl_6532 of each channel's current entry
-; (zp_52,x, 5C73-5C76) and stops the channel that matches. cmdtype_01 (commands 1E-23, parameters
-; 00-05) and cmdtype_02 (no command) index tbl_65D1 and tbl_65D7. What N, E and the bytes mean
-; for the sound is for a later leg.
+; cmdtype_08 (4569, the commands of type 08) takes a number N in A, the command's parameter (00-1F).
+; tbl_61E4 gives a first entry E (an N from 80 up would read its second half, tbl_61E4+$100 on, as
+; words, 4575/4581, but no parameter reaches 80), and E, then each next entry tbl_6438 gives until
+; 0, indexes four 125-entry tables: tbl_6244 and tbl_62C1 (bytes) and tbl_633E, whose words are the
+; addresses of byte streams in data/music.asm, copied to ram_0266/ram_0284 (4632-463A), the pointer
+; the stream reader at 4859 reads through zp_06 (4781-4786, 4864-486C). The 125 entries end where
+; the next table starts: tbl_6244 + 7D = tbl_62C1, + 7D = tbl_633E, + FA = tbl_6438, + FA =
+; tbl_6532. cmdtype_13 (5BFE, the OKI start) indexes the three 53-entry tables tbl_6532, tbl_6567
+; and tbl_659C with its parameter (00-34; 5C43 ORs 80 into tbl_6532's byte for the OKI's first
+; command byte) and keeps the entry in zp_52,x for the channel. cmdtype_14 (5C6F) does not index
+; with its parameter: it compares it with tbl_6532 of each channel's current entry (zp_52,x,
+; 5C73-5C76) and stops the channel that matches. cmdtype_01 (commands 1E-23, parameters 00-05) and
+; cmdtype_02 (no command) index tbl_65D1 and tbl_65D7. What N, E and the bytes mean for the sound is
+; for a later leg.
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
 ; program.md section 3); hand-maintained from here on.

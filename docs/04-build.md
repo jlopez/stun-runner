@@ -61,13 +61,13 @@ evidence; `make oki-pcm` decodes every phrase the manifest names to 16-bit PCM u
 listening (other WAVs there are removed, so a rename leaves no stale copy).
 Sample bytes, WAVs and PCM stay under `build/`.
 Since M4a the 6502 image is not an incbin of `build/stunrun-jsa.bin` either: `asm/jsa/jsa.asm`
-and the files it includes (`hardware.asm`, `ram.asm`, eleven region files, `data/sounds.asm`
-and `data/music.asm`) are the whole program as 64tass source, instructions, tables and fills
+and the files it includes (`hardware.asm`, `ram.asm` and eleven region files,
+`data/sounds.asm` and `data/music.asm` among them) are the whole program as 64tass source, instructions, tables and fills
 (docs/09-sound-program.md section 4), so the tree's output depends on its own files only; the
 Makefile's prerequisites for it are `asm/jsa/*.asm` and `asm/jsa/data/*.asm`.
 `build/stunrun-jsa.bin` is still made by `tools/merge-roms`, for `make ida`.
 
-`make` (= `make all`) runs the three steps. The images are rebuilt only when the layout tools or the snapshot change (`make clean` re-reads the archive); the trees reassemble when their sources or blobs change; the split always runs (cheap, and make 3.81 on macOS compares whole-second mtimes, so a stamp could hide a reassembly in the same second).
+`make` (= `make all`) runs the three steps. The images are rebuilt only when the layout tools or the snapshot change (`make clean` re-reads the archive); the trees reassemble when their sources or blobs change; the split always runs (cheap, and make 3.81 on macOS compares whole-second mtimes, so a stamp could hide a reassembly in the same second). For the same reason the 6502 tree assembles on every make (64tass takes well under a second): an edit to `asm/jsa` in the same second as the last assembly would otherwise leave a stale image, and a planted-change probe run from a script would check the wrong bytes. The other trees still reassemble by mtime: after a scripted edit to `asm/` (68k) or `data/objects`, `touch` the file or wait a second before `make check`.
 
 ## 2. The five images
 
@@ -138,7 +138,10 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
 - `make soundcheck` (needs MAME and the ROMs; never in CI): after `make check`, the reference
   set and the rebuilt one (`-rompath build/roms`, confirmed by `-verifyroms`) each run 3000
   frames of attract mode with its sound on, headless; their YM2151 and OKI write streams,
-  commands and responses must be equal and the reference must key on (docs/09 section 8).
+  commands and responses must be equal and the reference must key on (docs/09 section 8). It runs
+  only on a byte-identical set: `make check` is its prerequisite and stops on any differing byte
+  before MAME starts, so it never compares a moved build (that comparison is a manual procedure,
+  docs/09 section 3 item 7).
 - `make listen`: the listening check, Jesus's: MAME on the rebuilt set in a window with sound,
   from an empty private state, attract mode with its sound on (docs/09 section 6). The one
   target that opens a window.

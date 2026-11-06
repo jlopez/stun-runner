@@ -1,11 +1,12 @@
 ; commands.asm: 4238-4758, command execution: the command-type handlers and their table.
 ;
 ; A queued command byte (main_loop, from cmd_queue) goes to dispatch_command: cmd_type (tables.asm)
-; gives its type 00-14, cmdtype_handlers the handler, cmd_param the byte the handler gets in A.
-; Three immediate commands of h_nmi end here too (imm_00, imm_02, imm_03), with send_response,
-; which writes one byte to the 68010 and waits for it to be read, and queue_response, which
-; leaves one for main_loop. Some handlers are also stream ops of the sequencer (op_handlers).
-; What each type does to the sound is for a later leg: the labels name the dispatch, not the role.
+; gives its type 00-14, cmdtype_handlers the handler, cmd_param the byte the handler gets in A. Two
+; immediate commands of h_nmi end here too (imm_02, imm_03), and imm_00, the sound initialisation
+; run at reset (4141) and as the queued command 00 through cmdtype_03 (43CA), with send_response,
+; which writes one byte to the 68010 and waits for it to be read, and queue_response, which leaves
+; one for main_loop. Some handlers are also stream ops of the sequencer (op_handlers). What each
+; type does to the sound is for a later leg: the labels name the dispatch, not the role.
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
 ; program.md section 3); hand-maintained from here on.
@@ -578,14 +579,14 @@ cmdtype_08
     lda tbl_61E4,x
     bcc _l4578
 _l4575
-    lda tbl_62C1+$23,x
+    lda tbl_61E4+$100,x
 _l4578
     sta zp_13
     bcs _l4581
     lda tbl_61E4+1,x
     bcc _l4584
 _l4581
-    lda tbl_62C1+$24,x
+    lda tbl_61E4+$101,x
 _l4584
     sta zp_14
     lda tbl_6224,y
