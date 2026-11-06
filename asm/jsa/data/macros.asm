@@ -11,7 +11,7 @@
 
 ; ---------------------------------------------------------------------------------------------
 ; Note lengths: the low nibble of a note's length byte indexes note_lengths (tables.asm
-; tbl_5FE3, 16 words; 498B-49A1 add the word to the track's 24-bit time counter, bytes 1-2).
+; note_lengths, 16 words; 498B-49A1 add the word to the track's 24-bit time counter, bytes 1-2).
 ; LEN_n is 1/n of LEN_1 ($1E00); LEN_0 adds nothing.
 
 LEN_0 = $00                             ; $0000
@@ -37,34 +37,35 @@ DOT = $40                               ; adds half the length again (49A2-49BC)
 TIE = $80                               ; no key-off at the end: the gate counter stays 7F
                                         ;   (49BF-49C6); and the next note is not keyed on
                                         ;   again (legato): key_flags bit 2 only after a
-                                        ;   length byte without TIE (ram_0392, 4A05-4A2C;
+                                        ;   length byte without TIE (trk_length_byte, 4A05-4A2C;
                                         ;   4FD7-4FDA)
 GATE_HALF = $10                         ; bits 5-4 = 01: the key-off comes at half the length
-                                        ;   (49F4-4A02); velocity offset 0 (tbl_5FDF entry 1)
-ACCENT_1 = $20                          ; bits 5-4 = 10: velocity + 24 (tbl_5FDF entry 2)
-ACCENT_2 = $30                          ; bits 5-4 = 11: velocity + 58 (tbl_5FDF entry 3)
+                                        ;   (49F4-4A02); velocity offset 0 (level_bias entry 1)
+ACCENT_1 = $20                          ; bits 5-4 = 10: velocity + 24 (level_bias entry 2)
+ACCENT_2 = $30                          ; bits 5-4 = 11: velocity + 58 (level_bias entry 3)
 
 ; Registers of the variable ops (var_store B0 53C4-5410; var_load B2, var_cmp_reg B9, the
 ; branches B5-B8: read_register 5494-5503), for the YM2151 tracks. Each track has one variable,
-; var (ram_0824), and the last result (ram_0842). var_add_to B1 (5411-544A) takes 00-04 only:
+; var (trk_acc), and the last result (trk_test). var_add_to B1 (5411-544A) takes 00-04 only:
 ; 00 volume_add, 01 tempo high byte + var, 02 transpose_add, 03 velocity_add, 04 bend (the
 ; fraction + var x 4); from 05 up (the globals too) it does nothing (5419-541B).
 R_VOLUME = $00                          ; write: volume (op 82); read: 0 (54C8-54CC)
-R_TEMPO_HI = $01                        ; the tempo's high byte (ram_0644)
-R_TRANSPOSE = $02                       ; transpose (ram_0662)
+R_TEMPO_HI = $01                        ; the tempo's high byte (trk_tempo_hi)
+R_TRANSPOSE = $02                       ; transpose (trk_transpose)
 R_VELOCITY = $03                        ; write: velocity (op A2); read: the same value back
 R_FINE = $04                            ; write: fine_tune (op A6, the value x 4); read: the
-                                        ;   pitch fraction itself (ram_0464, = the value x 4)
+                                        ;   pitch fraction itself (trk_key_fraction, = the value
+                                        ;   x 4)
 R_RANDOM = $05                          ; read: the next random byte (random 5504); write: none
-R_GLOBAL = $06                          ; $06+n: global variable n, n 00-1F (zp_23+n), shared by
+R_GLOBAL = $06                          ; $06+n: global variable n, n 00-1F (seq_vars+n), shared by
                                         ;   all tracks; commands 1E-23 set global 0 to 0-5
-R_FLAG = $FF                            ; $26-$FF: read the track's last result (ram_0842)
+R_FLAG = $FF                            ; $26-$FF: read the track's last result (trk_test)
 
 ; ---------------------------------------------------------------------------------------------
 ; Notes (bytes 00-7F, then a length byte; read_item 487E-4919)
 
 note .macro pitch, len                  ; key a note: pitch 01-7F + transpose indexes the
-    .cerror \pitch < $01 || \pitch > $7F, "note: pitch 01-7F"      ;   key codes, tbl_5E7D
+    .cerror \pitch < $01 || \pitch > $7F, "note: pitch 01-7F"      ;   key codes, key_codes
     .cerror \len < $01 || \len > $FF, "note: length byte 01-FF (00 is ret)"
     .byte \pitch, \len
 .endm
@@ -82,7 +83,7 @@ ret .macro                              ; length 00: return from a call, or stop
 ; Ops (bytes 80-BA; op_handlers, 50AF). A byte BB-FF stops the track (run_op 505D-5067).
 
 tempo .macro rate                       ; 80: the 16-bit amount the time counter loses per
-    .byte $80                           ;   tick (ram_0626/ram_0644)
+    .byte $80                           ;   tick (trk_tempo_lo/trk_tempo_hi)
     .word \rate
 .endm
 
@@ -121,20 +122,20 @@ sync .macro unused=$00                  ; 88: wait until every track of the grou
     .byte $88, \unused                  ;   (5125-517E)
 .endm
 
-sync_group .macro group                 ; 89: the group sync waits on (ram_069E)
+sync_group .macro group                 ; 89: the group sync waits on (trk_sync_group)
     .byte $89, \group
 .endm
 
 ctl_bits .macro bits                    ; 8A: other voices only: ORed into the level byte
-    .byte $8A, \bits                    ;   (ram_06BC, 4C8E)
+    .byte $8A, \bits                    ;   (trk_e1_ctl, 4C8E)
 .endm
 
-ctl_set .macro bits                     ; 8B: other voices only: control bits set (ram_0446)
+ctl_set .macro bits                     ; 8B: other voices only: control bits set (trk_scale_ptr_hi)
     .byte $8B, \bits
 .endm
 
 portamento .macro rate                  ; 8C: glide from the last pitch, 2 x rate (1/256
-    .byte $8C, \rate                    ;   note) every fourth tick (ram_06DA, 4DBE-4E11)
+    .byte $8C, \rate                    ;   note) every fourth tick (trk_glide_rate, 4DBE-4E11)
 .endm
 
 call .macro target                      ; 8D: run the stream at target until its ret
@@ -220,7 +221,7 @@ ym_ct .macro bits                       ; A5: register 1B bits 7-6 (CT1, CT2)
     .byte $A5, \bits
 .endm
 
-fine_tune .macro fraction               ; A6: the pitch fraction (ram_0464) = fraction x 4:
+fine_tune .macro fraction               ; A6: the pitch fraction (trk_key_fraction) = fraction x 4:
     .byte $A6, \fraction                ;   1/64 of a key step each, register 30 (4E32-4E44)
 .endm
 
@@ -310,14 +311,15 @@ var_cmp .macro value                    ; BA: result = var - value
     .byte $BA, \value
 .endm
 
-stop .macro op=$FF                      ; BB-FF: the track ends (ram_0248 = FF)
+stop .macro op=$FF                      ; BB-FF: the track ends (trk_sound = FF)
     .cerror \op < $BB, "stop: BB-FF"
     .byte \op
 .endm
 
 ; ---------------------------------------------------------------------------------------------
-; YM2151 patch records, 42 bytes (2A): what patch (9D: op_patch 553E-5584, load_patch 5585-55B3 and the register
-; loop 55B6-5637), lfo (9E, 563B) and noise (9F, 567F) read through the record's address.
+; YM2151 patch records, 42 bytes (2A): what patch (9D: op_patch 553E-5584, load_patch 5585-55B3 and
+; the register loop 55B6-5637), lfo (9E, 563B) and noise (9F, 567F) read through the record's
+; address.
 
 ym_voice .macro rl_fb_con, kc, kf, pms_ams      ; +00: registers 20, 28, 30, 38 (+ channel)
     .byte \rl_fb_con, \kc, \kf, \pms_ams

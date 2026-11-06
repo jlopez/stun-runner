@@ -1,0 +1,582 @@
+"""data/sound/commands.json, the sound commands of the 68010 -> 6502 protocol (docs/11-sound-
+protocol.md), against its own shape, data/oki/samples.json, the two images and the MAME traces.
+
+The shape, the OKI agreement, the routines against the IDA export and the 6502's command tables
+in the assembled source (asm/jsa, read at the addresses `tables` gives, so the region files'
+labels and layout do not matter) run everywhere (CI; the tables need 64tass). The image tests
+skip without build/stunrun-68k.bin and build/stunrun-jsa.bin (`make` needs the ROMs): the same
+tables in the image; the 68010's audio test list gives the names; every call of
+queue_sound_command (0301CA) and every direct send in the image is listed, with the value it
+pushes, or, for a computed site, the values its note's instructions or table give. The trace
+tests skip without the `make sndproto` traces (build/mame/sndproto-<run>.txt): the counts and
+call sites the file records are what MAME saw, no command was lost between the two CPUs, and the
+responses are the ones docs/11 lists.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import struct
+from pathlib import Path
+from typing import Any
+
+import pytest
+from test_jsa import assemble, tass
+
+from ida.code_map import CODE_MAP_68K
+
+REPO = Path(__file__).resolve().parent.parent
+COMMANDS = REPO / "data/sound/commands.json"
+SAMPLES = REPO / "data/oki/samples.json"
+IMAGE_68K = REPO / "build/stunrun-68k.bin"
+IMAGE_JSA = REPO / "build/stunrun-jsa.bin"
+TRACES = REPO / "build/mame"
+FUNCTIONS = REPO / "data/ida/stunrun-68k.functions.jsonl"
+SNAPSHOT = REPO / "data/ida/stunrun-68k.json"
+DOC = REPO / "docs/11-sound-protocol.md"
+
+RUNS = ("attract", "game", "selftest", "soundtest", "inject")
+# (byte, writing PC) of every response each run saw: docs/11 section 8's table
+_RESET = ("FF", "413E")
+RESPONSES = {
+    "attract": {_RESET},
+    "game": {_RESET},
+    "selftest": {_RESET, ("00", "455D")},
+    "soundtest": {_RESET, ("00", "455D"), ("34", "455D"), ("55", "4164"), ("6D", "455D"),
+                  ("AA", "455D")},
+    "inject": {_RESET, ("00", "455D"), ("55", "4164"), ("5A", "455D"), ("6D", "455D"),
+               ("AA", "455D")},
+}
+QUEUE = 0x0301CA  # queue_sound_command
+TYPES_USED = {"00", "01", "03", "05", "08", "09", "0A", "0B", "13", "14", "FF"}
+HEX2 = re.compile(r"^[0-9A-F]{2}$")
+HEX6 = re.compile(r"^[0-9A-F]{6}$")
+
+
+def load() -> dict[str, Any]:
+    doc: dict[str, Any] = json.loads(COMMANDS.read_text())
+    return doc
+
+
+def commands() -> list[dict[str, Any]]:
+    cmds: list[dict[str, Any]] = load()["commands"]
+    return cmds
+
+
+def h(text: str) -> int:
+    return int(text, 16)
+
+
+# --- shape (everywhere) -------------------------------------------------------------------------
+
+
+def test_every_value_00_to_6c_once_in_order() -> None:
+    doc = load()
+    assert doc["limit"] == "6D"
+    assert [c["value"] for c in doc["commands"]] == [f"{v:02X}" for v in range(0x6D)]
+
+
+def test_fields_and_names() -> None:
+    names = set()
+    for c in commands():
+        for key in ("class", "type", "param"):
+            assert HEX2.match(c[key]), (c["value"], key)
+        assert c["type"] in TYPES_USED, c["value"]
+        assert c["type"] in load()["types"], c["value"]
+        # bit 7 of the class: queued for main_loop, with a type; else an immediate command
+        assert (h(c["class"]) >= 0x80) == (c["type"] != "FF"), c["value"]
+        if c["type"] == "FF":
+            assert h(c["class"]) < 4, c["value"]
+        assert re.match(r"^[0-9A-F]{4}$", c["handler"]), c["value"]
+        assert re.match(r"^[a-z][a-z0-9_]*$", c["name"]), c["name"]
+        if c["audio_test"] is None:
+            assert c["name"] == f"cmd_{c['value']}_imm"
+            assert c["audio_test_entry"] is None
+        else:
+            assert c["name"] == "snd_" + c["audio_test"].lower()
+            assert HEX6.match(c["audio_test_entry"])
+        assert c["name"] not in names, c["name"]
+        names.add(c["name"])
+        assert set(c["mame"]) == set(RUNS)
+        assert all(isinstance(n, int) and n >= 0 for n in c["mame"].values())
+        for site, routine in c["call_sites"] + c["direct_sends"]:
+            assert HEX6.match(site) and HEX6.match(routine), c["value"]
+            assert h(routine) <= h(site)
+        sites = {s for s, _ in c["call_sites"]}
+        assert set(c["mame_sites"]) <= sites, c["value"]
+
+
+def test_type_fields() -> None:
+    by_value = {c["value"]: c for c in commands()}
+    for c in commands():
+        t = c["type"]
+        assert ("phrase" in c) == (t == "13"), c["value"]
+        assert ("stops_phrase" in c) == (t == "14"), c["value"]
+        assert ("stream" in c) == (t == "08"), c["value"]
+        assert ("target" in c) == (t in ("05", "0A")), c["value"]
+        assert ("group" in c) == (t == "0B"), c["value"]
+        if t == "08":
+            assert c["stream"] == c["param"]
+        if t in ("05", "0A"):
+            # the command whose stream is stopped or released starts a stream (type 08)
+            assert by_value[c["target"]]["type"] == "08", c["value"]
+            assert c["target"] == c["param"]
+        if t == "0B":
+            # cmdtype_0B_release_priority (4496-44C2) releases the voices whose group
+            # (trk_priority, y >> 2) is A
+            assert HEX2.match(c["group"]) and c["group"] == c["param"], c["value"]
+
+
+def test_site_notes_name_listed_sites() -> None:
+    doc = load()
+    listed = {s for c in doc["commands"] for s, _ in c["call_sites"]}
+    assert set(doc["site_notes"]) <= listed
+    # a site several commands share is a computed or alternative value, explained in a note
+    count: dict[str, int] = {}
+    for c in doc["commands"]:
+        for s, _ in c["call_sites"]:
+            count[s] = count.get(s, 0) + 1
+    assert {s for s, n in count.items() if n > 1} <= set(doc["site_notes"])
+
+
+def test_oki_commands_agree_with_samples_json() -> None:
+    """Each OKI play command (type 13) names its phrase; data/oki/samples.json's `commands` lists
+    exactly the play commands of each phrase (tools/adpcm survey wrote it from the same tables)."""
+    phrases = {p["number"]: p for p in json.loads(SAMPLES.read_text())["phrases"]}
+    plays: dict[int, list[str]] = {}
+    for c in commands():
+        if c["type"] == "13":
+            plays.setdefault(c["phrase"], []).append(c["value"])
+        if c["type"] == "14":
+            assert c["stops_phrase"] in phrases
+            assert h(c["param"]) == c["stops_phrase"]
+    assert set(plays) <= set(phrases)
+    for number, phrase in phrases.items():
+        assert sorted(phrase["commands"]) == sorted(plays.get(number, [])), number
+
+
+def ida_owners(address: int) -> list[int]:
+    """The starts of the functions of the committed 68k IDA export whose extent (or a chunk of
+    it) holds the address."""
+    owners = []
+    for line in FUNCTIONS.read_text().splitlines():
+        f = json.loads(line)
+        extents = [(f["start_ea"], f["end_ea"]), *(tuple(c) for c in f["chunks"])]
+        if any(lo <= address < hi for lo, hi in extents):
+            owners.append(int(f["start_ea"]))
+    return owners
+
+
+def ida_extents_of(address: int) -> list[list[tuple[int, int]]]:
+    """The extents (the function's own and its chunks) of each committed IDA function holding the
+    address."""
+    found = []
+    for line in FUNCTIONS.read_text().splitlines():
+        f = json.loads(line)
+        extents = [(f["start_ea"], f["end_ea"]), *(tuple(c) for c in f["chunks"])]
+        if any(lo <= address < hi for lo, hi in extents):
+            found.append(extents)
+    return found
+
+
+def test_routine_names_are_the_code_map_names() -> None:
+    """Each name of `routines` is the name ida/code_map.py and the committed IDA snapshot give its
+    address (a parenthesised remark after the name is not part of it)."""
+    code_map = {e.ea: e.name for e in CODE_MAP_68K if e.name}
+    snapshot = {int(n["ea"], 16): n["name"] for n in json.loads(SNAPSHOT.read_text())["names"]}
+    for address, text in load()["routines"].items():
+        name = text.split(" (")[0]
+        assert code_map.get(h(address)) == name, (address, text)
+        assert snapshot.get(h(address)) == name, (address, text)
+
+
+def test_routines_are_ida_functions() -> None:
+    """The routine given with each call site and direct send is the IDA function around it, or,
+    where the IDA export has no function there, a `link A6` the image test below checks."""
+    for c in commands():
+        for site, routine in c["call_sites"] + c["direct_sends"]:
+            assert ida_owners(h(site)) in ([h(routine)], []), (c["value"], site, routine)
+
+
+# --- against the images (skip without `make`) ---------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def m68k() -> bytes:
+    if not IMAGE_68K.exists():
+        pytest.skip(f"no {IMAGE_68K} (make needs the ROMs)")
+    return IMAGE_68K.read_bytes()
+
+
+@pytest.fixture(scope="module")
+def jsa() -> bytes:
+    if not IMAGE_JSA.exists():
+        pytest.skip(f"no {IMAGE_JSA} (make needs the ROMs)")
+    return IMAGE_JSA.read_bytes()
+
+
+@pytest.fixture(scope="module")
+def jsa_source(tmp_path_factory: pytest.TempPathFactory) -> bytes:
+    """The committed 6502 source (asm/jsa) assembled as tools/test_jsa.py assembles it: the
+    chip, read by address, so the tables are found where commands.json's `tables` says whatever
+    the region files call or lay them out (runs in CI, no ROMs needed)."""
+    if tass() is None:
+        pytest.skip("64tass not available")
+    out = tmp_path_factory.mktemp("jsa") / "jsa.bin"
+    r = assemble(REPO / "asm/jsa", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    return out.read_bytes()
+
+
+@pytest.mark.parametrize("which", ["source", "image"])
+def test_6502_tables(which: str, request: pytest.FixtureRequest) -> None:
+    """The class, type, parameter, handler and phrase of every command, in the assembled source
+    (CI) and in the built image (with the ROMs)."""
+    jsa: bytes = request.getfixturevalue("jsa_source" if which == "source" else "jsa")
+    tables = load()["tables"]
+    cls, typ, par = h(tables["cmd_class"]), h(tables["cmd_type"]), h(tables["cmd_param"])
+    imm, hnd = h(tables["imm_handlers"]), h(tables["cmdtype_handlers"])
+    assert typ == cls + 0x6D and par == typ + 0x6D and imm == par + 0x6D
+    for c in commands():
+        v = h(c["value"])
+        assert (jsa[cls + v], jsa[typ + v], jsa[par + v]) == (
+            h(c["class"]),
+            h(c["type"]),
+            h(c["param"]),
+        ), c["value"]
+        if c["type"] != "FF":
+            (word,) = struct.unpack_from("<H", jsa, hnd + 2 * h(c["type"]))
+        else:
+            (word,) = struct.unpack_from("<H", jsa, imm + 2 * (h(c["class"]) + 1))
+        assert word + 1 == h(c["handler"]), c["value"]  # RTS dispatch: address - 1
+        if c["type"] == "13":
+            assert jsa[h(tables["oki_phrase"]) + h(c["param"])] == c["phrase"]
+    # no command reaches type 10 (ymtimer.asm's way in) or the unused types
+    assert not {jsa[typ + v] for v in range(0x6D)} - {h(t) for t in TYPES_USED}
+
+
+def test_audio_test_list_names_the_commands(m68k: bytes) -> None:
+    """The game's audio test (043718) lists 22-byte entries, a word (the command it sends,
+    04394E-04395C) and a name, sorted by name, to a word FFFF."""
+    tables = load()["tables"]
+    entries = {}
+    a = h(tables["audio_test"])
+    while (word := struct.unpack_from(">H", m68k, a)[0]) != 0xFFFF:
+        name = m68k[a + 2 : a + 22].split(b"\0")[0].decode("ascii")
+        assert word not in entries
+        entries[word] = (a, name)
+        a += 22
+    assert a == h(tables["audio_test_end"])
+    names = [n for _, n in sorted(entries.values())]
+    assert names == sorted(names)
+    for c in commands():
+        v = h(c["value"])
+        if c["audio_test"] is None:
+            assert v not in entries
+        else:
+            assert entries[v] == (h(c["audio_test_entry"]), c["audio_test"])
+
+
+def _w(image: bytes, a: int) -> int:
+    return int(struct.unpack_from(">H", image, a)[0])
+
+
+def test_every_queue_call_is_listed(m68k: bytes) -> None:
+    """Each `jsr queue_sound_command` (4EB9 0003 01CA) of the image and each `jsr (A2)` (4E92)
+    after the load in the IDA function of the four routines that load A2 with it (247C 0003 01CA)
+    is a listed call site, and no other site is; a site without a note is preceded by `pea N.w`
+    and queues N; a note's `pea N at A` holds N."""
+    doc = load()
+    per_site: dict[str, set[int]] = {}
+    for c in doc["commands"]:
+        for s, _ in c["call_sites"]:
+            per_site.setdefault(s, set()).add(h(c["value"]))
+    found = set()
+    for a in range(0x020000, 0x0C0000, 2):
+        if _w(m68k, a) == 0x4EB9 and struct.unpack_from(">I", m68k, a + 2)[0] == QUEUE:
+            found.add(f"{a:06X}")
+    loads = [
+        a
+        for a in range(0x020000, 0x0C0000, 2)
+        if _w(m68k, a) == 0x247C and struct.unpack_from(">I", m68k, a + 2)[0] == QUEUE
+    ]
+    assert [f"{a:06X}" for a in loads] == ["02430E", "02819C", "028350", "029B82"]
+    # the `jsr (A2)` (4E92) of each loading routine: every one in the extents (and chunks) of the
+    # IDA function that holds the load, after the load, found in the image, not in the listing
+    indirect = set()
+    for load_at in loads:
+        (owner,) = ida_extents_of(load_at)
+        for lo, hi in owner:
+            for a in range(max(lo, load_at + 6), hi, 2):
+                if _w(m68k, a) == 0x4E92:
+                    indirect.add(f"{a:06X}")
+    assert len(indirect) == 37
+    assert not found & indirect
+    assert found | indirect == set(per_site)
+    for s, values in per_site.items():
+        a = h(s)
+        if s in doc["site_notes"]:
+            assert note_values(doc["site_notes"][s], m68k) == values, s
+            continue
+        assert _w(m68k, a - 4) == 0x4878, s
+        assert values == {_w(m68k, a - 2)}, s
+
+
+def _moveq(image: bytes, a: int, reg: int) -> int | None:
+    """N of `moveq #N,Dreg` (0111 rrr0 NNNNNNNN) at a, else None."""
+    return image[a + 1] if image[a] == 0x70 | reg << 1 else None
+
+
+def note_values(note: str, m68k: bytes) -> set[int]:
+    """The values a site note says its site can queue, each read from the instructions or the
+    table the note cites. A note in none of these forms fails: a new kind of note needs a check."""
+    peas = re.findall(r"pea ([0-9A-F]{2}) at ([0-9A-F]{6})", note)
+    if note.startswith("one of pea"):
+        # alternatives: each `pea N.w` (4878 00NN) at its address, then the call
+        for value, at in peas:
+            assert _w(m68k, h(at)) == 0x4878 and _w(m68k, h(at) + 2) == h(value), note
+        return {h(v) for v, _ in peas}
+    if m := re.match(r"table ([0-9A-F]{6}) \((\d+) bytes", note):
+        # a byte table indexed at run time: the values are the table's bytes
+        start, size = h(m[1]), int(m[2])
+        return set(m68k[start : start + size])
+    if m := re.search(r"of table ([0-9A-F]{6}) \((\w+) entries", note):
+        # 8-byte entries, the command the word at 2; a 0 word is not sent (04164E-041652)
+        start, count = h(m[1]), {"six": 6}[m[2]]
+        words = {_w(m68k, start + 8 * i + 2) for i in range(count)}
+        return words - {0}
+    if m := re.match(r"argument: the long at 20\(A6\) of sub_2589A", note):
+        # 025AFC reads the low word of that long (move.w 22(A6),D1); each caller pushes it
+        # first of seven arguments, 1C bytes before its jsr 02589A (8 + 6 longs = 20(A6))
+        assert _w(m68k, 0x025AFC) == 0x322E and _w(m68k, 0x025AFE) == 0x0022
+        values = set()
+        for value, call in re.findall(r"([0-9A-F]{2}) \(([0-9A-F]{6})\+\)", note):
+            assert _w(m68k, h(call)) == 0x4EB9
+            assert struct.unpack_from(">I", m68k, h(call) + 2)[0] == 0x02589A, call
+            assert _w(m68k, h(call) - 0x1C) == 0x4878, call
+            assert _w(m68k, h(call) - 0x1A) == h(value), call
+            values.add(h(value))
+        assert len(values) == 3, note
+        return values
+    if m := re.match(r"0x44 \+ the level word FF9578 .* levels (\d+)-(\d+), ([0-9A-F]{2})-", note):
+        # 029068-029076: move.w FF9578,D0; ext.l; moveq #45,D1; add.l D1,D0; subq.l #1,D0
+        assert _moveq(m68k, 0x029070, 1) == 0x45 and _w(m68k, 0x029074) == 0x5380
+        lo, hi = int(m[1]), int(m[2])
+        assert 0x44 + lo == h(m[3]), note
+        return {0x44 + level for level in range(lo, hi + 1)}
+    if m := re.match(
+        r"([0-9A-F]{2}) or ([0-9A-F]{2}) \(moveq at ([0-9A-F]{6}) / ([0-9A-F]{6})\)", note
+    ):
+        assert _moveq(m68k, h(m[3]), 0) == h(m[1]) and _moveq(m68k, h(m[4]), 0) == h(m[2]), note
+        return {h(m[1]), h(m[2])}
+    if m := re.match(r"D2 = ([0-9A-F/]+) by .*\(([0-9A-F]{6})-([0-9A-F]{6})\)", note):
+        # the results: each moveq #N,D2 that a bra.s follows, and the last one of the range
+        lo, hi = h(m[2]), h(m[3])
+        results = {
+            image_value
+            for a in range(lo, hi + 2, 2)
+            if (image_value := _moveq(m68k, a, 2)) is not None and (m68k[a + 2] == 0x60 or a == hi)
+        }
+        values = {h(v) for v in m[1].split("/")}
+        assert results == values, note
+        return values
+    raise AssertionError(f"no check for the site note {note!r}")
+
+
+def test_direct_sends(m68k: bytes) -> None:
+    """The boot program writes its test commands with move.b #N,$600000 (13FC 00NN 0060 0000);
+    the game's audio test and the watchdog push them for send_sound_byte (023EDA) or
+    send_sound_byte_once (023EDE): `pea N.w` (4878 00NN) or `clr.l -(A7)` (42A7, 00) before the
+    jsr, or at 04395C `move.l D1,-(A7)` (2F01), the audio test's entry word, which sends every
+    command of the list. Every such instruction of the image is listed, but for 030170, the
+    flush of the queue."""
+    listed: dict[str, set[int]] = {}
+    for c in commands():
+        for s, _ in c["direct_sends"]:
+            listed.setdefault(s, set()).add(h(c["value"]))
+    found = set()
+    for a in range(0, 0x0C0000, 2):
+        if m68k[a : a + 3] == bytes([0x13, 0xFC, 0]) and m68k[a + 4 : a + 8] == bytes(
+            [0, 0x60, 0, 0]
+        ):
+            found.add(f"{a:06X}")
+            assert listed.get(f"{a:06X}") == {m68k[a + 3]}, f"{a:06X}"
+        if _w(m68k, a) == 0x4EB9 and struct.unpack_from(">I", m68k, a + 2)[0] in (
+            0x023EDA,
+            0x023EDE,
+        ):
+            found.add(f"{a:06X}")
+    assert found - set(listed) == {"030170"}
+    assert set(listed) <= found
+    in_list = {h(c["value"]) for c in commands() if c["audio_test"] is not None}
+    for s, values in listed.items():
+        a = h(s)
+        if a < 0x020000:
+            continue
+        if _w(m68k, a - 2) == 0x2F01:
+            assert s == "04395C" and values == in_list, s
+        elif _w(m68k, a - 2) == 0x42A7:
+            assert values == {0}, s
+        else:
+            assert _w(m68k, a - 4) == 0x4878 and values == {_w(m68k, a - 2)}, s
+
+
+def test_routines_without_ida_function(m68k: bytes) -> None:
+    """Where the IDA export has no function around a site, its routine is the `link A6` (4E56)
+    the site follows, with no other `link A6` in between."""
+    for c in commands():
+        for site, routine in c["call_sites"] + c["direct_sends"]:
+            if ida_owners(h(site)):
+                continue
+            assert _w(m68k, h(routine)) == 0x4E56, routine
+            assert not [a for a in range(h(routine) + 2, h(site), 2) if _w(m68k, a) == 0x4E56]
+
+
+def test_sa_ii_messages_in_number_order(m68k: bytes) -> None:
+    """boot_sa_ii_test's messages 105-108, as ida/code_map.py and docs/11 list them, are the texts
+    the message pointers at 010136 give in number order; 008F68 shows 108 first, then 105 (status
+    0, 008FBE), 106 (008FC6) or 107 (008FDE)."""
+
+    def text(n: int) -> str:
+        p = struct.unpack_from(">I", m68k, 0x010136 + 4 * n)[0]
+        return m68k[p + 4 : m68k.index(b"\x01", p + 4)].decode().replace("*", " ")
+
+    comment = next(e.comment for e in CODE_MAP_68K if e.name == "boot_sa_ii_test")
+    for source in (comment, DOC.read_text()):
+        found = re.search(r"messages 105-108 \(SA II test ([^;)]*)", source)
+        assert found, source[:60]
+        items = [s.strip().upper() for s in found.group(1).split(",")]
+        assert len(items) == 4
+        for n, item in zip(range(0x105, 0x109), items, strict=True):
+            assert text(n).endswith(item), (hex(n), text(n), item)
+    for site, n in ((0x008F68, 0x108), (0x008FBE, 0x105), (0x008FC6, 0x106), (0x008FDE, 0x107)):
+        assert struct.unpack_from(">HH", m68k, site) == (0x303C, n), hex(site)
+
+
+def test_main_loop_restarts_on_the_self_test_switch(m68k: bytes) -> None:
+    """docs/11 section 8: the frame-445 restart. 0244F0 btst #5,$60C001; bne past; 0244FA jsr
+    02128A (soft_reset past its stop: ... movea.l $4.w,A0; jmp (A0)); then 024500 jsr
+    flush_sound_queue. boot_reset (000216) tests the same bit at 000254."""
+    assert struct.unpack_from(">HHI", m68k, 0x0244F0) == (0x0839, 5, 0x60C001)
+    assert struct.unpack_from(">HHI", m68k, 0x0244F8) == (0x6606, 0x4EB9, 0x02128A)
+    assert struct.unpack_from(">HI", m68k, 0x024500) == (0x4EB9, 0x03013C)
+    assert struct.unpack_from(">HH", m68k, 0x021286) == (0x4E72, 0x2700)
+    assert struct.unpack_from(">HHH", m68k, 0x0212A8) == (0x2078, 0x0004, 0x4ED0)
+    assert struct.unpack_from(">I", m68k, 4)[0] == 0x000216
+    assert struct.unpack_from(">HHI", m68k, 0x000254) == (0x0839, 5, 0x60C001)
+
+
+def test_sounds_in_attract_is_option_bit_11(m68k: bytes) -> None:
+    """The option menu's item decoder (042CE4-042D2C) takes the field from the item's first byte:
+    shift = low nibble, 2 << (high - low) choices. "SOUNDS IN ATTRACT" (text at 020F52) is bit 11
+    of option word 0D, which the game copies to FF94EE (0243B8-0243BE) and 028364 tests (0800)."""
+    item = m68k[0x020F51]
+    assert m68k[0x020F52 : 0x020F52 + 17] == b"SOUNDS IN ATTRACT"
+    shift, width = item & 0x0F, (item >> 4) - (item & 0x0F) + 1
+    assert (shift, width) == (11, 1)
+    assert struct.unpack_from(">HI", m68k, 0x028364)[1] == 0xFF94EE
+    assert struct.unpack_from(">HI", m68k, 0x02836A)[1] == 1 << shift
+
+
+# --- against the MAME traces (skip without `make sndproto`) -------------------------------------
+
+
+def trace(run: str) -> list[list[str]]:
+    path = TRACES / f"sndproto-{run}.txt"
+    if not path.exists():
+        pytest.skip(f"no {path} (make sndproto)")
+    return [line.split() for line in path.read_text().splitlines() if line]
+
+
+def header(lines: list[list[str]]) -> dict[str, str]:
+    return {p[1]: p[2] for p in lines if p[0] == "#" and len(p) == 3}
+
+
+@pytest.mark.parametrize("run", RUNS)
+def test_mame_counts_and_sites(run: str) -> None:
+    lines = trace(run)
+    sent: dict[int, int] = {}
+    queued: dict[int, set[str]] = {}
+    for p in lines:
+        if p[0] in ("send", "inject"):
+            sent[h(p[1])] = sent.get(h(p[1]), 0) + int(p[-2])
+        if p[0] == "queue":
+            queued.setdefault(h(p[1]), set()).add(p[2])
+    for c in commands():
+        v = h(c["value"])
+        assert c["mame"][run] == sent.get(v, 0), (run, c["value"])
+        sites = {s for s, _ in c["call_sites"]}
+        assert queued.get(v, set()) <= sites, (run, c["value"])
+        assert queued.get(v, set()) <= set(c["mame_sites"]), (run, c["value"])
+    assert sum(sent.values()) == int(header(lines)["commands"])
+
+
+@pytest.mark.parametrize("run", RUNS)
+def test_mame_protocol(run: str) -> None:
+    lines = trace(run)
+    head = header(lines)
+    taken = {p[1]: int(p[2]) for p in lines if p[0] == "taken"}
+    resets = sum(int(p[3]) for p in lines if p[0] == "reset")
+    # every command written was taken by h_nmi (5839) or as imm_04_loopback's data byte (57FC);
+    # 4139 is the read after each reset that drops what the latch holds
+    assert taken.get("5839", 0) + taken.get("57FC", 0) == int(head["commands"])
+    assert taken.get("4139", 0) == resets
+    responses = {(p[1], p[2]) for p in lines if p[0] == "response"}
+    # FF after reset (413E); 00 status for 07 and coin_state (coins modulo 4) for 03 (455D);
+    # 55 for 09 (main_loop 4164); 6D for 06, AA and the echoed byte for 08 (455D)
+    assert {r for r, pc in responses if pc == "413E"} <= {"FF"}
+    assert {pc for _, pc in responses} <= {"413E", "455D", "4164"}
+    assert {r for r, pc in responses if pc == "4164"} <= {"55"}
+    # and nothing else: per run exactly the responses of docs/11 section 8's table, FF once per
+    # reset
+    assert responses == RESPONSES[run], run
+    counts: dict[str, int] = {}
+    for p in lines:
+        if p[0] == "response":
+            counts[p[1]] = counts.get(p[1], 0) + int(p[3])
+    assert counts["FF"] == resets, run
+    # the game only resets the board (023FA8) through reset_sound; the boot program at 00023C,
+    # 000FC2 and 008DB8
+    assert {p[1] for p in lines if p[0] == "reset"} <= {"00023C", "000FC2", "008DB8", "023FA8"}
+    # the watchdog counters FFDB5C-FFDB63: written by reset_sound (030102-030110) and the RAM
+    # clears, never by the unreferenced routine at 03001E
+    for p in lines:
+        if p[0] == "watchdog_write":
+            assert not 0x03001E <= h(p[1]) < 0x0300F8, p
+    # the YM2151 timer registers 10-14: never selected (ymtimer.asm never runs)
+    assert not [p for p in lines if p[0] == "ym_timer_reg"]
+
+
+def test_mame_sites_are_what_the_runs_saw() -> None:
+    """mame_sites is exactly the union of the call sites the five runs saw queue the command."""
+    seen: dict[str, set[str]] = {}
+    for run in RUNS:
+        for p in trace(run):
+            if p[0] == "queue":
+                seen.setdefault(p[1], set()).add(p[2])
+    for c in commands():
+        assert set(c["mame_sites"]) == seen.get(c["value"], set()), c["value"]
+
+
+def test_mame_immediate_responses() -> None:
+    lines = trace("inject")
+    responses = {(p[1], p[2]) for p in lines if p[0] == "response"}
+    assert {("6D", "455D"), ("55", "4164"), ("AA", "455D"), ("5A", "455D"), ("00", "455D")} <= (
+        responses
+    )
+    # 6D, 7F, 80 and FF were written and taken, and h_nmi left each in its slot as the 6D it
+    # writes first (5836): the byte replaces the 6D only at 5846, and 5846 wrote none of them.
+    # That a 6D slot is then skipped is the code (dispatch_command's cpy #$6D at 4371-4373), not
+    # this trace: its dispatch lines come from the reads of cmd_type at 4375, after that test.
+    assert {p[1] for p in lines if p[0] == "inject"} >= {"6D", "7F", "80", "FF"}
+    assert {p[1] for p in lines if p[0] == "jsa_queue" and p[2] == "5836"} == {"6D"}
+    queued = {h(p[1]) for p in lines if p[0] == "jsa_queue" and p[2] == "5846"}
+    assert queued and max(queued) < 0x6D
+
+
+def test_mame_audio_test_plays_every_entry() -> None:
+    """PLAY SOUNDS: each entry of the list, played in turn, writes its own command (04395C)."""
+    lines = trace("soundtest")
+    played = {p[1] for p in lines if p[0] == "send" and p[3] == "04395C"}
+    assert played == {c["value"] for c in commands() if c["audio_test"] is not None}

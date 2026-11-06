@@ -10,8 +10,8 @@
 -- writes them, a byte write of the high byte at 600000, harddriv.cpp init_multisync installs
 -- main_command_w at 600000-603FFF with mask FF00): from frame MUSIC_FROM (1200), one window of
 -- MUSIC_WINDOW frames per command of MUSIC_SOUNDS (the commands of type 08): command 00 (the
--- sound initialisation, imm_00 through cmdtype_03: every track stopped), 02 four frames later
--- (zp_1E = 0: every priority may key on, docs/09 section 6), the sound command four frames after
+-- sound initialisation, init_sound through cmdtype_03_immediate: every track stopped), 02 four frames later
+-- (min_priority = 0: every priority may key on, docs/09 section 6), the sound command four frames after
 -- that. The 68010's own command writes are replaced by 6D, the byte h_nmi queues and
 -- dispatch_command ignores (a write tap that returns the changed value), so that only the
 -- injected commands reach the sequencer; they are counted as "suppressed". A sound-board reset
@@ -19,15 +19,15 @@
 -- window 120 frames later.
 --
 -- Taps (they read RAM and observe; the only values they change are the 68010's command bytes):
---   * reads of entry_stream (633E-6437) by cmdtype_08 at 4632: a track started, entry
---     (address - 633E) / 2, for the sound zp_03 (stored at 4569);
+--   * reads of entry_stream (633E-6437) by cmdtype_08_start_sound at 4632: a track started, entry
+--     (address - 633E) / 2, for the sound start_sound (stored at 4569);
 --   * reads of op_handlers (50AF-5124) by run_op at 506D (the handler's high byte, 50B0 + 2 x
 --     (op - 80)) and by call_op_handler at 50A3: an op dispatched;
 --   * reads of 65E6-AB47 by read_item at 485B (lda (stream_ptr),y with Y = 0): the address of a
 --     stream statement the reader took;
 --   * YM2151 writes (2000 register, 2001 data): a write of register 08 with a slot bit (78) is a
 --     key-on of channel value & 7, counted for the sound of the track that sounds on that
---     channel (the last track of the list headed at ram_0860 + 1E + channel, its sound ram_0248).
+--     channel (the last track of the list headed at trk_link + 1E + channel, its sound trk_sound).
 --     Only the key-ons of a window count, from the sound command to the window's last frame;
 --     a window restarted after a reset loses its counts, so the keyon lines are the sums of the
 --     windows' counts.

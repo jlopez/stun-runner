@@ -106,7 +106,7 @@ def _ops() -> dict[int, Op]:
         0xA1: ("carrier_tl_sub", "op_carrier_tl_sub"),
         0xA2: ("velocity", "op_velocity"),
         0xA3: ("velocity_add", "op_velocity_add"),
-        0xA5: ("ym_ct", "cmdtype_11"),
+        0xA5: ("ym_ct", "cmdtype_11_ym_ct"),
         0xA6: ("fine_tune", "op_fine_tune"),
         0xA7: ("bend", "op_bend"),
         0xA8: ("fade_mode", "op_fade_mode"),

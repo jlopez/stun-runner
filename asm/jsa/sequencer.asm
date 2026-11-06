@@ -1,33 +1,35 @@
 ; sequencer.asm: 4759-57E2, the stream interpreter (the sequencer) and its YM2151 output.
 ;
 ; Tracks. 30 track slots (X = 00-1D) each play one byte stream of data/streams_*.asm; a track's
-; variables are the 1E-byte arrays of ram.asm (0248-085F, index X). cmdtype_08 (commands.asm,
-; the commands of type 08) starts the tracks of sound N, one per entry of data/sounds.asm: the
-; sound number in ram_0248, priority x 4 + 1 in ram_03EC, the stream address in ram_0266/
-; ram_0284, and the YM2151 channel entry_channel: the track joins that channel's list.
+; variables are the 1E-byte arrays of ram.asm (0248-085F, index X). cmdtype_08_start_sound
+; (commands.asm, the commands of type 08) starts the tracks of sound N, one per entry of
+; data/sounds.asm: the sound number in trk_sound, priority x 4 + 1 in trk_priority, the stream
+; address in trk_ptr_lo/ trk_ptr_hi, and the YM2151 channel entry_channel: the track joins that
+; channel's list.
 ;
-; Channels. ram_0860 + 1E + c heads the list of the tracks on channel c, linked through
-; ram_0860,x (track + 1, 0 ends it) in rising priority (cmdtype_08, 4641-4677): an equal priority
-; replaces the track (465A-4668). Two groups of lists (group_first_chain): group 0, lists 1E-25,
-; the eight YM2151 channels (group_kind 02); group 1, lists 26-2B, six channels of a kind 03
+; Channels. trk_link + 1E + c heads the list of the tracks on channel c, linked through
+; trk_link,x (track + 1, 0 ends it) in rising priority (cmdtype_08_start_sound, 4641-4677): an equal
+; priority replaces the track (465A-4668). Two groups of lists (group_first_chain): group 0, lists
+; 1E-25, the eight YM2151 channels (group_kind 02); group 1, lists 26-2B, six channels of a kind 03
 ; whose output this program never writes and no entry_channel reaches (no track joins them).
 ; Every track of a list runs; only the last, the highest priority, is heard: run_track marks the
 ; others muted (track_muted = FF, 4759-4764), and they keep time without writing the chip. When
 ; the heard track ends, free_track reloads the patch of the track that is heard next (4966-4976).
 ;
 ; The tick. h_irq (system.asm, about 249.7 Hz) calls tick_group with X = 0 and 1 on alternate
-; ticks (sub_4229, 422B-4235): each group runs at about 124.9 Hz. tick_ym_group runs
+; ticks (tick_sequencer, 422B-4235): each group runs at about 124.9 Hz. tick_ym_group runs
 ; tick_ym_channel for channels 7 down to 0: the list's tracks (run_track), then the channel's
-; YM2151 registers from the shadow ram_08AE + register (key-off, key code, fraction, levels,
-; key-on; a note after a TIE note is not keyed on again). A track's time counter (24 bits: ram_02DE, ram_02FC, ram_031A) loses the tempo
-; (ram_0626/ram_0644) each tick (4794-47AB); when it runs out, read_item reads statements until a
-; note: an op byte (80-BA) runs its handler through op_handlers (run_op), a note sets the pitch
-; and adds its length (note_lengths, tables.asm tbl_5FE3) to the counter. The gate counter
-; (ram_0338, ram_0356, ram_0374) is the counter less twice the tempo (49C8-49F1): the key-off
-; comes two ticks before the next note, at half the length with GATE_HALF, never with TIE.
+; YM2151 registers from the shadow ym_shadow + register (key-off, key code, fraction, levels,
+; key-on; a note after a TIE note is not keyed on again). A track's time counter (24 bits:
+; trk_wait_frac, trk_wait_lo, trk_wait_hi) loses the tempo (trk_tempo_lo/trk_tempo_hi) each tick
+; (4794-47AB); when it runs out, read_item reads statements until a note: an op byte (80-BA) runs
+; its handler through op_handlers (run_op), a note sets the pitch and adds its length (note_lengths,
+; tables.asm note_lengths) to the counter. The gate counter (trk_gate_frac, trk_gate_lo,
+; trk_gate_hi) is the counter less twice the tempo (49C8-49F1): the key-off comes two ticks before
+; the next note, at half the length with GATE_HALF, never with TIE.
 ;
-; The other voice kind (kind 0 of ram_03EC bits 1-0, and group 1's output kind): read_item,
-; set_note_length and other_voice_update keep its paths (pitch from tbl_5DB9, the envelopes of
+; The other voice kind (kind 0 of trk_priority bits 1-0, and group 1's output kind): read_item,
+; set_note_length and other_voice_update keep its paths (pitch from note_periods, the envelopes of
 ; ops 86 and 87, the level and control bytes other_level/other_ctl_a/other_ctl_b); no stream of
 ; this program runs them (every track has kind 1 and a YM2151 channel) and the make sndtrace
 ; runs never executed them.
@@ -41,22 +43,22 @@
 ; Run track X for one tick, then the next track of its list (next_track). A = chain_mute: 0, or
 ; FF to mute every track of the list (tick_ym_channel, channels 6-7 while the timer voices own
 ; them, 4E8A-4E9D). track_muted = FF when A or a next track (a higher priority) exists. A track
-; with priority 0 or ram_0248 = FF (stopped by a command or the op stop) is freed (4765-4770).
+; with priority 0 or trk_sound = FF (stopped by a command or the op stop) is freed (4765-4770).
 ; Then the time counter loses the tempo; at 0 read_item reads the next statements; the gate
 ; counter at 0 asks for the key-off (key_flags bit 0, 47CD-47E0). On a YM2151 track: a fade step
 ; (fade_step) every LEN_32 of time while a fade runs, prepare_key_on again after it to write the
-; new TLs without a key-on (47F5-4845), and the same every fourth tick while a portamento runs (482F-4845).
-; from 4CBD, 4E6E, 4E9F
+; new TLs without a key-on (47F5-4845), and the same every fourth tick while a portamento runs
+; (482F-4845). from 4CBD, 4E6E, 4E9F
 run_track
     sta chain_mute
-    ora ram_0860,x
+    ora trk_link,x
     beq _l4762
     lda #$FF
 _l4762
     sta track_muted
-    lda ram_03EC,x
+    lda trk_priority,x
     beq _l4770
-    ldy ram_0248,x
+    ldy trk_sound,x
     iny
     bne _l4773
     tya
@@ -67,37 +69,37 @@ _l4773
     sta trk_kind
     and #$01
     tay
-    lda ram_03EC,x
+    lda trk_priority,x
     sta kind_prio,y
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     sta stream_ptr
-    lda ram_0284,x
+    lda trk_ptr_hi,x
     sta stream_ptr_hi
-    lda ram_0572,x
+    lda trk_keyon_flags,x
     sta key_flags
-    lda ram_02DE,x
+    lda trk_wait_frac,x
     sec
-    sbc ram_0626,x
-    sta ram_02DE,x
-    lda ram_02FC,x
-    sbc ram_0644,x
-    sta ram_02FC,x
+    sbc trk_tempo_lo,x
+    sta trk_wait_frac,x
+    lda trk_wait_lo,x
+    sbc trk_tempo_hi,x
+    sta trk_wait_lo,x
     bcs _l47AE
-    dec ram_031A,x
+    dec trk_wait_hi,x
     bpl _l47AE
     jmp read_item
 _l47AE
-    lda ram_0374,x
+    lda trk_gate_hi,x
     bmi _l47CD
-    lda ram_0338,x
+    lda trk_gate_frac,x
     sec
-    sbc ram_0626,x
-    sta ram_0338,x
-    lda ram_0356,x
-    sbc ram_0644,x
-    sta ram_0356,x
+    sbc trk_tempo_lo,x
+    sta trk_gate_frac,x
+    lda trk_gate_lo,x
+    sbc trk_tempo_hi,x
+    sta trk_gate_lo,x
     bcs _l47EB
-    dec ram_0374,x
+    dec trk_gate_hi,x
     bpl _l47EB
 _l47CD
     lda cur_group_kind
@@ -107,7 +109,7 @@ _l47CD
     ora key_flags
     sta key_flags
     lda #$7F
-    sta ram_0374,x
+    sta trk_gate_hi,x
     bne _l47F5
 _l47E3
     lda trk_kind
@@ -119,74 +121,74 @@ _l47EB
     beq _l47F5
     jmp other_voice_update
 _l47F5
-    lda ram_0608,x
+    lda trk_slide_step,x
     bne _l482F
-    lda ram_078E,x
-    ora ram_07AC,x
+    lda trk_slide_time_lo,x
+    ora trk_slide_time_hi,x
     bne _l480F
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     bne _l482F
-    inc ram_0248,x
+    inc trk_sound,x
     jmp free_track
 _l480F
-    lda ram_05AE,x
+    lda trk_slide_wait_frac,x
     sec
-    sbc ram_0626,x
-    sta ram_05AE,x
-    lda ram_05CC,x
-    sbc ram_0644,x
-    sta ram_05CC,x
+    sbc trk_tempo_lo,x
+    sta trk_slide_wait_frac,x
+    lda trk_slide_wait_lo,x
+    sbc trk_tempo_hi,x
+    sta trk_slide_wait_lo,x
     bcs _l482F
-    dec ram_05EA,x
+    dec trk_slide_wait_hi,x
     bpl _l482F
     jsr fade_step
     tya
     bne _l483A
 _l482F
-    lda ram_06DA,x
+    lda trk_glide_rate,x
     beq _l4848
-    lda zp_00
+    lda tick_count
     and #$06
     bne _l4848
 _l483A
-    lda ram_02A2,x
+    lda trk_pitch_lo,x
     beq _l4848
     sta key_note
-    lda ram_0392,x
+    lda trk_length_byte,x
     jsr prepare_key_on
 _l4848
     jmp next_track
 
-; Read the track's statements until a note (or the track stops): the pointer ram_0266/ram_0284
+; Read the track's statements until a note (or the track stops): the pointer trk_ptr_lo/trk_ptr_hi
 ; runs two bytes ahead of stream_ptr, which addresses the statement read (484B-4859). An op byte
 ; goes to run_op; a note byte (00-7F) plus the transpose (0662, not for 00) is the pitch (4887);
-; on a YM2151 track it goes into ram_02A2, the change since the last pitch into the portamento
-; offset (48DD-48F0), and the patch's register-20 byte (ram_0518) into the shadow (4900-490B).
+; on a YM2151 track it goes into trk_pitch_lo, the change since the last pitch into the portamento
+; offset (48DD-48F0), and the patch's register-20 byte (trk_reg20) into the shadow (4900-490B).
 ; A length byte 00 returns from a call (op 8D: the return address off the node list, 4919-493E)
 ; or frees the track (free_track); else set_note_length.
 ; Also the op_handlers entry of ops 90-94, 98, 9A, 9C (macro hang_op): entered by RTS from
-; run_op, it adds 2 to ram_0266 only; stream_ptr is reloaded only after run_op returns (4864-486C)
+; run_op, it adds 2 to trk_ptr_lo only; stream_ptr is reloaded only after run_op returns (4864-486C)
 ; and at 4781-4789 and 4934, so 485B reads the same op byte again and 485F dispatches it again,
 ; two more stack bytes each time: a loop that never returns, and the sound CPU would hang in its
-; IRQ (zp_11 turns nested IRQs away, 41E6-41EC). No stream uses these ops.
+; IRQ (irq_busy turns nested IRQs away, 41E6-41EC). No stream uses these ops.
 ; from 47AB, 493E
 read_item
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     clc
     adc #$02
-    sta ram_0266,x
+    sta trk_ptr_lo,x
     bcc _l4859
-    inc ram_0284,x
+    inc trk_ptr_hi,x
 _l4859
     ldy #$00
     lda (stream_ptr),y
     bpl _l487E
     jsr run_op
     bcc _l4870
-    lda ram_0284,x
+    lda trk_ptr_hi,x
     sta stream_ptr_hi
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     sta stream_ptr
     bcs read_item
 _l4870
@@ -203,7 +205,7 @@ _l487E
     beq _l488B
 _l4887
     clc
-    adc ram_0662,x
+    adc trk_transpose,x
 _l488B
     ldy cur_group_kind
     cpy #$02
@@ -215,104 +217,104 @@ _l488B
 _l489B
     pha
     sec
-    sbc ram_02A2,x
-    sta ram_06F8,x
+    sbc trk_pitch_lo,x
+    sta trk_glide_lo,x
     asl a
     lda #$FF
     bcs _l48AA
     lda #$00
 _l48AA
-    sta ram_0716,x
+    sta trk_glide_hi,x
     pla
-    sta ram_02A2,x
+    sta trk_pitch_lo,x
     lda #$00
-    sta ram_02C0,x
+    sta trk_pitch_hi,x
     jmp _l490C
 _l48B9
     asl a
     tay
     sec
-    lda ram_02A2,x
-    sbc tbl_5DB9,y
-    sta ram_06F8,x
-    lda ram_02C0,x
-    sbc tbl_5DB9+1,y
-    sta ram_0716,x
-    lda tbl_5DB9,y
-    sta ram_02A2,x
-    lda tbl_5DB9+1,y
-    sta ram_02C0,x
+    lda trk_pitch_lo,x
+    sbc note_periods,y
+    sta trk_glide_lo,x
+    lda trk_pitch_hi,x
+    sbc note_periods+1,y
+    sta trk_glide_hi,x
+    lda note_periods,y
+    sta trk_pitch_lo,x
+    lda note_periods+1,y
+    sta trk_pitch_hi,x
     jmp _l490C
 _l48DD
-    sta zp_1B
+    sta tmp_1B
     lda #$00
-    sta ram_06F8,x
-    sta ram_0716,x
-    lda zp_1B
+    sta trk_glide_lo,x
+    sta trk_glide_hi,x
+    lda tmp_1B
     beq _l48F6
-    lda ram_02A2,x
+    lda trk_pitch_lo,x
     sec
-    sbc zp_1B
-    sta ram_0716,x
-    lda zp_1B
+    sbc tmp_1B
+    sta trk_glide_hi,x
+    lda tmp_1B
 _l48F6
-    sta ram_02A2,x
+    sta trk_pitch_lo,x
     ldy track_muted
     bne _l490C
     sta key_note
     clc
     lda #$20
-    adc zp_0D
+    adc ym_channel
     tay
-    lda ram_0518,x
-    sta ram_08AE,y
+    lda trk_reg20,x
+    sta ym_shadow,y
 _l490C
     ldy #$01
     lda #$00
-    sta zp_1C
+    sta tmp_1C
     lda (stream_ptr),y
     beq _l4919
     jmp set_note_length
 _l4919
-    lda ram_0734,x
+    lda trk_call_frame,x
     beq free_track
     pha
-    jsr sub_431A
-    lda (zp_20),y
-    sta ram_0734,x
-    lda zp_1F
-    sta (zp_20),y
+    jsr frame_address
+    lda (frame_ptr),y
+    sta trk_call_frame,x
+    lda frame_free
+    sta (frame_ptr),y
     pla
-    sta zp_1F
+    sta frame_free
     iny
-    lda (zp_20),y
-    sta ram_0266,x
+    lda (frame_ptr),y
+    sta trk_ptr_lo,x
     sta stream_ptr
     iny
-    lda (zp_20),y
-    sta ram_0284,x
+    lda (frame_ptr),y
+    sta trk_ptr_hi,x
     sta stream_ptr_hi
     jmp read_item
 
 ; The track ends: its priority 0 (the slot is free), its call and loop nodes back on the free
-; list (sub_433C), unlinked from its list (chain_prev). When it was the heard track of a YM2151
-; channel and a track before it remains, that track's patch is written again (load_patch,
+; list (free_track_frames), unlinked from its list (chain_prev). When it was the heard track of a
+; YM2151 channel and a track before it remains, that track's patch is written again (load_patch,
 ; 4966-4976).
 ; from 4770, 480C, 4A71
 free_track
-    sta ram_03EC,x
-    sta ram_0464,x
-    sta ram_0392,x
-    sta ram_078E,x
-    sta ram_07AC,x
+    sta trk_priority,x
+    sta trk_key_fraction,x
+    sta trk_length_byte,x
+    sta trk_slide_time_lo,x
+    sta trk_slide_time_hi,x
     sta key_note
     lda #$01
     ora key_flags
     sta key_flags
-    jsr sub_433C
-    lda ram_0860,x
+    jsr free_track_frames
+    lda trk_link,x
     ldx chain_prev
-    sta ram_0860,x
+    sta trk_link,x
     ldy cur_group_kind
     cpy #$02
     bne _l497C
@@ -326,14 +328,14 @@ _l4979
 _l497C
     jmp other_voice_off
 
-; The note's length byte in A (not 00): bits 3-0 index note_lengths (tables.asm tbl_5FE3), whose
+; The note's length byte in A (not 00): bits 3-0 index note_lengths (tables.asm note_lengths), whose
 ; word is added to the time counter's bytes 1-2 (498B-49A1); DOT adds half of it again
 ; (49A2-49BC). Unless TIE: the gate counter = counter - 2 x tempo (49C8-49F1), halved with
-; GATE_HALF (49F4-4A02). Unless the previous length byte (ram_0392) had TIE: the portamento
+; GATE_HALF (49F4-4A02). Unless the previous length byte (trk_length_byte) had TIE: the portamento
 ; offset to 0 and key_flags bit 2, the key-on (4A05-4A2C); after a TIE note the offset stays
 ; (with a portamento rate) and the note is not keyed on again. Then the fade's step (fade_step)
 ; when one runs, and on a YM2151 track prepare_key_on with the length byte (its bits 5-4 select
-; the accent, key_flags), and ram_0392 = this length byte (4A85).
+; the accent, key_flags), and trk_length_byte = this length byte (4A85).
 ; from 4916
 set_note_length
     pha
@@ -342,113 +344,113 @@ set_note_length
     jmp _l4A32
 _l4988
     pla
-    sta zp_1C
+    sta tmp_1C
     and #$0F
     asl a
     tay
-    lda tbl_5FE3,y
+    lda note_lengths,y
     clc
-    adc ram_02FC,x
-    sta ram_02FC,x
-    lda tbl_5FE3+1,y
-    adc ram_031A,x
-    sta ram_031A,x
-    lda zp_1C
+    adc trk_wait_lo,x
+    sta trk_wait_lo,x
+    lda note_lengths+1,y
+    adc trk_wait_hi,x
+    sta trk_wait_hi,x
+    lda tmp_1C
     and #$40
     beq _l49BF
-    lda tbl_5FE3+1,y
+    lda note_lengths+1,y
     lsr a
     pha
-    lda tbl_5FE3,y
+    lda note_lengths,y
     ror a
     clc
-    adc ram_02FC,x
-    sta ram_02FC,x
+    adc trk_wait_lo,x
+    sta trk_wait_lo,x
     pla
-    adc ram_031A,x
-    sta ram_031A,x
+    adc trk_wait_hi,x
+    sta trk_wait_hi,x
 _l49BF
     lda #$7F
-    sta ram_0374,x
-    lda zp_1C
+    sta trk_gate_hi,x
+    lda tmp_1C
     bmi _l4A05
     lda #$00
-    sta zp_1B
-    lda ram_0644,x
-    sta zp_1A
-    lda ram_0626,x
+    sta tmp_1B
+    lda trk_tempo_hi,x
+    sta tmp_ptr+1
+    lda trk_tempo_lo,x
     asl a
-    rol zp_1A
-    rol zp_1B
-    sta zp_19
-    lda ram_02DE,x
+    rol tmp_ptr+1
+    rol tmp_1B
+    sta tmp_ptr
+    lda trk_wait_frac,x
     sec
-    sbc zp_19
-    sta ram_0338,x
-    lda ram_02FC,x
-    sbc zp_1A
-    sta ram_0356,x
-    lda ram_031A,x
-    sbc zp_1B
-    sta ram_0374,x
-    lda zp_1C
+    sbc tmp_ptr
+    sta trk_gate_frac,x
+    lda trk_wait_lo,x
+    sbc tmp_ptr+1
+    sta trk_gate_lo,x
+    lda trk_wait_hi,x
+    sbc tmp_1B
+    sta trk_gate_hi,x
+    lda tmp_1C
     and #$30
     cmp #$10
     bne _l4A05
-    lsr ram_0374,x
-    ror ram_0356,x
-    ror ram_0338,x
+    lsr trk_gate_hi,x
+    ror trk_gate_lo,x
+    ror trk_gate_frac,x
 _l4A05
-    lda ram_0392,x
+    lda trk_length_byte,x
     bpl _l4A17
-    lda ram_06DA,x
+    lda trk_glide_rate,x
     bne _l4A5F
-    sta ram_06F8,x
-    sta ram_0716,x
+    sta trk_glide_lo,x
+    sta trk_glide_hi,x
     beq _l4A5F
 _l4A17
     lda #$00
-    sta ram_06F8,x
-    sta ram_0716,x
-    lda zp_1C
+    sta trk_glide_lo,x
+    sta trk_glide_hi,x
+    lda tmp_1C
     and #$38
     asl a
-    sta ram_040A,x
+    sta trk_curve_index,x
     lda #$04
     ora key_flags
     sta key_flags
     jmp _l4A5F
 _l4A32
-    sta ram_040A,x
-    sta ram_06F8,x
-    sta ram_0716,x
+    sta trk_curve_index,x
+    sta trk_glide_lo,x
+    sta trk_glide_hi,x
     pla
     and #$7F
     lsr a
-    ror zp_1C
+    ror tmp_1C
     lsr a
-    ror zp_1C
+    ror tmp_1C
     lsr a
-    ror zp_1C
+    ror tmp_1C
     pha
     clc
-    lda zp_1C
-    adc ram_02FC,x
-    sta ram_02FC,x
+    lda tmp_1C
+    adc trk_wait_lo,x
+    sta trk_wait_lo,x
     pla
-    adc ram_031A,x
-    sta ram_031A,x
+    adc trk_wait_hi,x
+    sta trk_wait_hi,x
     lda (stream_ptr),y
-    sta zp_1C
-    sta ram_0392,x
+    sta tmp_1C
+    sta trk_length_byte,x
 _l4A5F
-    lda ram_078E,x
-    ora ram_07AC,x
+    lda trk_slide_time_lo,x
+    ora trk_slide_time_hi,x
     bne _l4A74
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     bne _l4A77
-    inc ram_0248,x
+    inc trk_sound,x
     jmp free_track
 _l4A74
     jsr fade_step
@@ -456,27 +458,27 @@ _l4A77
     lda cur_group_kind
     cmp #$02
     bne _l4A8B
-    lda zp_1C
+    lda tmp_1C
     jsr prepare_key_on
-    lda zp_1C
-    sta ram_0392,x
+    lda tmp_1C
+    sta trk_length_byte,x
     jmp next_track
 _l4A8B
-    lda ram_0392,x
+    lda trk_length_byte,x
     pha
-    lda zp_1C
-    sta ram_0392,x
+    lda tmp_1C
+    sta trk_length_byte,x
     pla
     bmi other_voice_update
     lda #$00
     tay
-    sta ram_05AE,x
-    sta ram_05CC,x
-    sta ram_05EA,x
-    sta ram_0608,x
-    lda ram_04BE,x
+    sta trk_slide_wait_frac,x
+    sta trk_slide_wait_lo,x
+    sta trk_slide_wait_hi,x
+    sta trk_slide_step,x
+    lda trk_op_tl+$3C,x
     sta stream_ptr
-    lda ram_04DC,x
+    lda trk_op_tl+$5A,x
     sta stream_ptr_hi
     lda (stream_ptr),y
     sta trk_penv_count,x
@@ -488,50 +490,50 @@ _l4A8B
     inc trk_penv_count,x
     tya
 _l4AC1
-    sta ram_0572,x
+    sta trk_keyon_flags,x
     lda #$00
     tay
     sta trk_patch_lo,x
-    sta ram_0554,x
-    lda ram_0482,x
+    sta trk_patch_hi,x
+    lda trk_op_tl,x
     sta stream_ptr
-    lda ram_04A0,x
+    lda trk_op_tl+$1E,x
     sta stream_ptr_hi
     lda (stream_ptr),y
-    sta ram_0518,x
+    sta trk_reg20,x
     iny
     ora (stream_ptr),y
     beq _l4AE5
-    inc ram_0518,x
+    inc trk_reg20,x
     tya
 _l4AE5
-    sta ram_04FA,x
+    sta trk_level_offset,x
 
-; The other voice kind's tick (no track of this program): the pitch envelope (ram_04BE/ram_04DC,
-; op 86: pairs of count and 16-bit step, FF loops) into the pitch, the level envelope
-; (ram_0482/ram_04A0, op 87) into the level, written to other_level/other_ctl_a/other_ctl_b.
-; from 47F2; not executed in the make sndtrace runs
+; The other voice kind's tick (no track of this program): the pitch envelope
+; (trk_op_tl+$3C/trk_op_tl+$5A, op 86: pairs of count and 16-bit step, FF loops) into the pitch, the
+; level envelope (trk_op_tl/trk_op_tl+$1E, op 87) into the level, written to
+; other_level/other_ctl_a/other_ctl_b. from 47F2; not executed in the make sndtrace runs
 other_voice_update
     ldy trk_kind
     beq _l4AF8
-    lda ram_02A2,x
-    ora ram_02C0,x
+    lda trk_pitch_lo,x
+    ora trk_pitch_hi,x
     bne _l4AF8
     jmp other_voice_off
 _l4AF8
-    lda zp_00
+    lda tick_count
     and #$06
     bne _l4B08
-    lda ram_0716,x
+    lda trk_glide_hi,x
     asl a
-    ror ram_0716,x
-    ror ram_06F8,x
+    ror trk_glide_hi,x
+    ror trk_glide_lo,x
 _l4B08
-    lda ram_04BE,x
+    lda trk_op_tl+$3C,x
     sta stream_ptr
-    lda ram_04DC,x
+    lda trk_op_tl+$5A,x
     sta stream_ptr_hi
-    ldy ram_0572,x
+    ldy trk_keyon_flags,x
     bne _l4B1C
     tya
     clc
@@ -546,25 +548,25 @@ _l4B21
     iny
     cmp #$FF
     bne _l4B52
-    lda ram_0608,x
+    lda trk_slide_step,x
     beq _l4B39
-    dec ram_0608,x
+    dec trk_slide_step,x
     bne _l4B3E
     iny
     bne _l4B21
 _l4B39
     lda (stream_ptr),y
-    sta ram_0608,x
+    sta trk_slide_step,x
 _l4B3E
     iny
     sec
     lda stream_ptr
     sbc (stream_ptr),y
     sta stream_ptr
-    sta ram_04BE,x
+    sta trk_op_tl+$3C,x
     bcs _l4B21
     dec stream_ptr_hi
-    dec ram_04DC,x
+    dec trk_op_tl+$5A,x
     bcc _l4B21
 _l4B52
     ora (stream_ptr),y
@@ -572,7 +574,7 @@ _l4B52
     cpy #$F9
     ora (stream_ptr),y
     bne _l4B62
-    sta ram_0572,x
+    sta trk_keyon_flags,x
     tay
     clc
     beq _l4BBB
@@ -580,13 +582,13 @@ _l4B62
     tya
     bcc _l4B74
     sbc #$02
-    adc ram_04BE,x
-    sta ram_04BE,x
+    adc trk_op_tl+$3C,x
+    sta trk_op_tl+$3C,x
     lda #$01
     bcc _l4B74
-    inc ram_04DC,x
+    inc trk_op_tl+$5A,x
 _l4B74
-    sta ram_0572,x
+    sta trk_keyon_flags,x
 _l4B77
     lda #$00
     sta seq_tmp
@@ -594,110 +596,110 @@ _l4B77
     bpl _l4B81
     dec seq_tmp
 _l4B81
-    sta zp_1C
+    sta tmp_1C
     dey
     lda (stream_ptr),y
     asl a
-    rol zp_1C
+    rol tmp_1C
     rol seq_tmp
     asl a
-    rol zp_1C
+    rol tmp_1C
     rol seq_tmp
     asl a
-    rol zp_1C
+    rol tmp_1C
     rol seq_tmp
     clc
-    adc ram_05AE,x
-    sta ram_05AE,x
-    lda zp_1C
-    adc ram_05CC,x
-    sta ram_05CC,x
-    sta zp_1C
+    adc trk_slide_wait_frac,x
+    sta trk_slide_wait_frac,x
+    lda tmp_1C
+    adc trk_slide_wait_lo,x
+    sta trk_slide_wait_lo,x
+    sta tmp_1C
     lda seq_tmp
-    adc ram_05EA,x
-    sta ram_05EA,x
+    adc trk_slide_wait_hi,x
+    sta trk_slide_wait_hi,x
     tay
     lda trk_kind
     cmp #$02
     bne _l4BB8
-    dec zp_1C
+    dec tmp_1C
 _l4BB8
-    lda zp_1C
+    lda tmp_1C
     clc
 _l4BBB
-    adc ram_02A2,x
-    sta zp_1C
+    adc trk_pitch_lo,x
+    sta tmp_1C
     tya
-    adc ram_02C0,x
+    adc trk_pitch_hi,x
     tay
     clc
-    lda zp_1C
-    adc ram_06F8,x
-    sta zp_1C
+    lda tmp_1C
+    adc trk_glide_lo,x
+    sta tmp_1C
     tya
-    adc ram_0716,x
+    adc trk_glide_hi,x
     sta glide_lo
     lda trk_kind
     and #$01
     tay
-    lda zp_1C
+    lda tmp_1C
     sta key_note,y
-    lda ram_0482,x
+    lda trk_op_tl,x
     sta stream_ptr
-    lda ram_04A0,x
+    lda trk_op_tl+$1E,x
     sta stream_ptr_hi
-    ldy ram_04FA,x
+    ldy trk_level_offset,x
     bne _l4BF4
 _l4BEE
-    lda ram_0464,x
+    lda trk_key_fraction,x
     jmp _l4C8E
 _l4BF4
-    dec ram_0518,x
+    dec trk_reg20,x
     bne _l4C4B
 _l4BF9
     iny
     lda (stream_ptr),y
-    sta ram_0518,x
+    sta trk_reg20,x
     iny
     cmp #$FF
     bne _l4C2A
-    lda ram_0554,x
+    lda trk_patch_hi,x
     beq _l4C11
-    dec ram_0554,x
+    dec trk_patch_hi,x
     bne _l4C16
     iny
     bne _l4BF9
 _l4C11
     lda (stream_ptr),y
-    sta ram_0554,x
+    sta trk_patch_hi,x
 _l4C16
     iny
     sec
     lda stream_ptr
     sbc (stream_ptr),y
     sta stream_ptr
-    sta ram_0482,x
+    sta trk_op_tl,x
     bcs _l4BF9
     dec stream_ptr_hi
-    dec ram_04A0,x
+    dec trk_op_tl+$1E,x
     bcc _l4BF9
 _l4C2A
     cpy #$F9
     ora (stream_ptr),y
     bne _l4C36
-    sta ram_04FA,x
+    sta trk_level_offset,x
     jmp _l4BEE
 _l4C36
     tya
     bcc _l4C48
     sbc #$02
-    adc ram_0482,x
-    sta ram_0482,x
+    adc trk_op_tl,x
+    sta trk_op_tl,x
     lda #$01
     bcc _l4C48
-    inc ram_04A0,x
+    inc trk_op_tl+$1E,x
 _l4C48
-    sta ram_04FA,x
+    sta trk_level_offset,x
 _l4C4B
     lda (stream_ptr),y
     clc
@@ -708,9 +710,9 @@ _l4C4B
     lda #$7F
 _l4C59
     sta trk_patch_lo,x
-    ldy ram_040A,x
+    ldy trk_curve_index,x
     clc
-    adc tbl_6013,y
+    adc level_curves,y
     bvc _l4C6B
     lda #$80
     bcs _l4C6B
@@ -721,7 +723,7 @@ _l4C6B
     and #$0F
     cmp #$0F
     beq _l4C76
-    inc ram_040A,x
+    inc trk_curve_index,x
 _l4C76
     pla
     lsr a
@@ -732,7 +734,7 @@ _l4C76
     ora #$F0
 _l4C80
     clc
-    adc ram_0464,x
+    adc trk_key_fraction,x
     bpl _l4C88
     lda #$00
 _l4C88
@@ -740,7 +742,7 @@ _l4C88
     bcc _l4C8E
     lda #$0F
 _l4C8E
-    ora ram_06BC,x
+    ora trk_e1_ctl,x
     jmp other_voice_level
 
 ; The other voice kind: level 0.
@@ -759,16 +761,16 @@ other_voice_level
     sta other_level,y
     cpx #$1E
     bcs next_track
-    lda ram_0446,x
+    lda trk_scale_ptr_hi,x
     sta other_ctl_a,y
-    lda ram_0428,x
+    lda trk_scale_ptr_lo,x
     sta other_ctl_b,y
 
-; The next track of the list (ram_0860,x): run it with the same chain_mute (chain_prev = this
+; The next track of the list (trk_link,x): run it with the same chain_mute (chain_prev = this
 ; track), else return.
 ; from 4848, 487B, 4979, 4A88
 next_track
-    lda ram_0860,x
+    lda trk_link,x
     beq _l4CC0
     stx chain_prev
     tax
@@ -778,96 +780,96 @@ next_track
 _l4CC0
     rts
 
-; One fade step of track X (op fade A4, op release 97, cmdtype_0A/0B): the remaining time
-; (ram_07AC:ram_078E) loses a step (fade_steps, tables.asm tbl_6003; entry 0A = 08 with fade_mode
-; 0); the amount (ram_07E8:ram_07CA, signed) shifted right by the step's position (4D1B-4D2B) is
-; added to the fraction ram_0806 and the whole part goes to add_volume (the carriers' TL, 4D63).
-; With fade_mode 0 the step timer is reloaded with LEN_32 (4CD1-4CDF). Returns Y = 0 when the
-; fade is over.
+; One fade step of track X (op fade A4, op release 97, cmdtype_0A_release_sound/0B): the remaining
+; time (trk_slide_time_hi:trk_slide_time_lo) loses a step (fade_steps, tables.asm slide_rates; entry
+; 0A = 08 with fade_mode 0); the amount (trk_slide_rate_hi:trk_slide_rate_lo, signed) shifted right
+; by the step's position (4D1B-4D2B) is added to the fraction trk_slide_frac and the whole part goes
+; to add_volume (the carriers' TL, 4D63). With fade_mode 0 the step timer is reloaded with LEN_32
+; (4CD1-4CDF). Returns Y = 0 when the fade is over.
 ; from 4829, 4A74
 fade_step
-    lda ram_07CA,x
-    sta zp_19
-    lda ram_07E8,x
-    sta zp_1A
-    lda zp_1C
+    lda trk_slide_rate_lo,x
+    sta tmp_ptr
+    lda trk_slide_rate_hi,x
+    sta tmp_ptr+1
+    lda tmp_1C
     pha
-    lda ram_0608,x
+    lda trk_slide_step,x
     bne _l4CE3
-    lda tbl_5FE3+$14
-    sta ram_05CC,x
-    lda tbl_5FE3+$15
-    sta ram_05EA,x
+    lda note_lengths+$14
+    sta trk_slide_wait_lo,x
+    lda note_lengths+$15
+    sta trk_slide_wait_hi,x
     lda #$0A
     bne _l4CE5
 _l4CE3
-    lda zp_1C
+    lda tmp_1C
 _l4CE5
     and #$0F
     tay
-    lda tbl_6003,y
-    sta zp_1C
+    lda slide_rates,y
+    sta tmp_1C
     cmp #$FF
     bne _l4D03
-    lda ram_07AC,x
+    lda trk_slide_time_hi,x
     bne _l4CFB
-    sta ram_078E,x
+    sta trk_slide_time_lo,x
     beq _l4CFE
 _l4CFB
-    dec ram_07AC,x
+    dec trk_slide_time_hi,x
 _l4CFE
-    lda zp_1A
+    lda tmp_ptr+1
     jmp _l4D63
 _l4D03
-    lda ram_078E,x
+    lda trk_slide_time_lo,x
     sec
-    sbc zp_1C
-    sta ram_078E,x
+    sbc tmp_1C
+    sta trk_slide_time_lo,x
     bcs _l4D1B
-    dec ram_07AC,x
+    dec trk_slide_time_hi,x
     bpl _l4D1B
     lda #$00
-    sta ram_078E,x
-    sta ram_07AC,x
+    sta trk_slide_time_lo,x
+    sta trk_slide_time_hi,x
 _l4D1B
     ldy #$07
-    lda zp_1A
+    lda tmp_ptr+1
 _l4D1F
     cmp #$80
     ror a
-    ror zp_19
+    ror tmp_ptr
     dey
     bmi _l4D2B
-    asl zp_1C
+    asl tmp_1C
     bcc _l4D1F
 _l4D2B
     ldy #$00
-    sty zp_1C
-    sta zp_1A
+    sty tmp_1C
+    sta tmp_ptr+1
     cmp #$80
     bcc _l4D48
-    sta zp_1C
+    sta tmp_1C
     eor #$FF
-    sta zp_1A
-    lda zp_19
+    sta tmp_ptr+1
+    lda tmp_ptr
     eor #$FF
     clc
     adc #$01
-    sta zp_19
+    sta tmp_ptr
     bcc _l4D48
-    inc zp_1A
+    inc tmp_ptr+1
 _l4D48
-    lda ram_0806,x
+    lda trk_slide_frac,x
     clc
-    adc zp_19
-    sta ram_0806,x
+    adc tmp_ptr
+    sta trk_slide_frac,x
     bcc _l4D55
-    inc zp_1A
+    inc tmp_ptr+1
 _l4D55
-    lda zp_1A
+    lda tmp_ptr+1
     tay
     beq _l4D68
-    ldy zp_1C
+    ldy tmp_1C
     bpl _l4D63
     eor #$FF
     clc
@@ -877,18 +879,18 @@ _l4D63
     ldy #$FF
 _l4D68
     pla
-    sta zp_1C
+    sta tmp_1C
     rts
 
 ; A YM2151 note, fade step or portamento step of the heard track: key_flags bit 1 (the key code
 ; and level update; the key-on itself is bit 2, set_note_length 4A27) and the length byte's
-; bits 5-4 (the accent, 4D6C-4D82); the track's four TLs (ram_0482 + n x 1E) into the shadow of registers
-; 60-78 (4D8D-4DA0); the patch's scaling bytes (record +1D to +23, through ram_0428/ram_0446 =
-; record + 1C) and the velocity (ram_04FA) into key_scaling and key_velocity (4DA3-4DBC). For every track with a
-; portamento: the offset ram_06F8/ram_0716 moves toward 0 by 2 x the rate (4DD5-4DDB) every
-; fourth tick (zp_00 & 6 = 0, 4DCB-4DCF; 4DBE-4E11); the heard
-; track's offset and fine tune go to the shadow of register 30 and the note (4E12-4E54).
-; from 4845, 4A80
+; bits 5-4 (the accent, 4D6C-4D82); the track's four TLs (trk_op_tl + n x 1E) into the shadow of
+; registers 60-78 (4D8D-4DA0); the patch's scaling bytes (record +1D to +23, through
+; trk_scale_ptr_lo/trk_scale_ptr_hi = record + 1C) and the velocity (trk_level_offset) into
+; key_scaling and key_velocity (4DA3-4DBC). For every track with a portamento: the offset
+; trk_glide_lo/trk_glide_hi moves toward 0 by 2 x the rate (4DD5-4DDB) every fourth tick (tick_count
+; & 6 = 0, 4DCB-4DCF; 4DBE-4E11); the heard track's offset and fine tune go to the shadow of
+; register 30 and the note (4E12-4E54). from 4845, 4A80
 prepare_key_on
     ldy track_muted
     bne _l4DBE
@@ -902,16 +904,16 @@ _l4D7C
     ora #$02
     sta key_flags
     lda #$03
-    sta zp_19
+    sta tmp_ptr
     txa
     pha
     clc
     lda #$60
-    adc zp_0D
+    adc ym_channel
     tay
 _l4D8D
-    lda ram_0482,x
-    sta ram_08AE,y
+    lda trk_op_tl,x
+    sta ym_shadow,y
     tya
     clc
     adc #$08
@@ -920,68 +922,68 @@ _l4D8D
     clc
     adc #$1E
     tax
-    dec zp_19
+    dec tmp_ptr
     bpl _l4D8D
     pla
     tax
-    lda ram_0428,x
-    sta zp_19
-    lda ram_0446,x
-    sta zp_1A
+    lda trk_scale_ptr_lo,x
+    sta tmp_ptr
+    lda trk_scale_ptr_hi,x
+    sta tmp_ptr+1
     ldy #$08
-    lda ram_04FA,x
+    lda trk_level_offset,x
     sta key_scaling,y
     dey
 _l4DB6
-    lda (zp_19),y
+    lda (tmp_ptr),y
     sta key_scaling,y
     dey
     bne _l4DB6
 _l4DBE
-    lda ram_06DA,x
+    lda trk_glide_rate,x
     beq _l4E12
-    lda ram_0716,x
-    ora ram_06F8,x
+    lda trk_glide_hi,x
+    ora trk_glide_lo,x
     beq _l4E12
-    lda zp_00
+    lda tick_count
     and #$06
     bne _l4E12
     lda #$00
-    sta zp_1A
-    lda ram_06DA,x
+    sta tmp_ptr+1
+    lda trk_glide_rate,x
     asl a
-    rol zp_1A
-    sta zp_19
-    lda ram_0716,x
+    rol tmp_ptr+1
+    sta tmp_ptr
+    lda trk_glide_hi,x
     bmi _l4DF7
-    lda ram_06F8,x
+    lda trk_glide_lo,x
     sec
-    sbc zp_19
-    sta ram_06F8,x
-    lda ram_0716,x
-    sbc zp_1A
-    sta ram_0716,x
+    sbc tmp_ptr
+    sta trk_glide_lo,x
+    lda trk_glide_hi,x
+    sbc tmp_ptr+1
+    sta trk_glide_hi,x
     bpl _l4E12
     bmi _l4E0A
 _l4DF7
-    lda ram_06F8,x
+    lda trk_glide_lo,x
     clc
-    adc zp_19
-    sta ram_06F8,x
-    lda ram_0716,x
-    adc zp_1A
-    sta ram_0716,x
+    adc tmp_ptr
+    sta trk_glide_lo,x
+    lda trk_glide_hi,x
+    adc tmp_ptr+1
+    sta trk_glide_hi,x
     bmi _l4E12
 _l4E0A
     lda #$00
-    sta ram_0716,x
-    sta ram_06F8,x
+    sta trk_glide_hi,x
+    sta trk_glide_lo,x
 _l4E12
     lda track_muted
     bne _l4E55
-    lda ram_06F8,x
+    lda trk_glide_lo,x
     sta glide_lo
-    lda ram_0716,x
+    lda trk_glide_hi,x
     sta glide_hi
     bpl _l4E32
     dec glide_hi
@@ -993,16 +995,16 @@ _l4E12
 _l4E32
     clc
     lda #$30
-    adc zp_0D
+    adc ym_channel
     tay
-    lda ram_0464,x
+    lda trk_key_fraction,x
     clc
     adc glide_lo
     bcc _l4E44
     inc glide_hi
 _l4E44
     and #$FC
-    sta ram_08AE,y
+    sta ym_shadow,y
     lda key_note
     beq _l4E55
     clc
@@ -1024,7 +1026,7 @@ tick_other_group
 _l4E61
     tya
     pha
-    ldx ram_0860,y
+    ldx trk_link,y
     beq _l4E71
     sty chain_prev
     dex
@@ -1038,15 +1040,15 @@ _l4E71
     bpl _l4E61
     rts
 
-; YM2151 channel zp_0D (list Y = 1E + channel): run its tracks (run_track; channels 6 and 7
-; muted while zp_10 is set, the timer voices of ymtimer.asm, 4E8A-4E9D). When the heard track
-; is not muted: registers 20 and 30 from the shadow (4EA7-4ECD); the key-off (key_flags bit 0:
+; YM2151 channel ym_channel (list Y = 1E + channel): run its tracks (run_track; channels 6 and 7
+; muted while ymtimer_active is set, the timer voices of ymtimer.asm, 4E8A-4E9D). When the heard
+; track is not muted: registers 20 and 30 from the shadow (4EA7-4ECD); the key-off (key_flags bit 0:
 ; register 08 = channel, 4ED0-4EE1); then, only when sounding_prio (the heard track's
-; priority x 4 + 1) is at least zp_1E (4EE3-4EE8; command 01 sets zp_1E to F0, 02 to 0), and a
-; update is asked (key_flags bit 1) for a pitch other than 0: the key code key_codes[note]
-; (tables.asm tbl_5E7D) into register 28 (4EF1-4F0E), each operator's TL = the track's TL +
+; priority x 4 + 1) is at least min_priority (4EE3-4EE8; command 01 sets min_priority to F0, 02 to
+; 0), and a update is asked (key_flags bit 1) for a pitch other than 0: the key code key_codes[note]
+; (tables.asm key_codes) into register 28 (4EF1-4F0E), each operator's TL = the track's TL +
 ; key scaling (key_level_curve by key code, depth nibble) - velocity scaling (velocity + the
-; accent, key_accent tbl_5FDF, by the sensitivity nibble: key_velocity holds -velocity, minus the
+; accent, key_accent level_bias, by the sensitivity nibble: key_velocity holds -velocity, minus the
 ; accent, 4F2C-4F54, negated back at 4F92-4F9D) clamped to 00-7F (4F16-4FD4); then, only with
 ; key_flags bit 2 (4FD7-4FDA: a note after one without TIE, set_note_length 4A27), the LFO reset
 ; on every key-on of a track that ran an lfo op (key_flags bit 7, bit 4 after the shifts:
@@ -1054,7 +1056,7 @@ _l4E71
 ; operators (4FFA-500B).
 ; from 501B
 tick_ym_channel
-    ldx ram_0860,y
+    ldx trk_link,y
     bne _l4E7F
     rts
 _l4E7F
@@ -1063,9 +1065,9 @@ _l4E7F
     sta sounding_prio
     sta key_note
     sty chain_prev
-    lda zp_10
+    lda ymtimer_active
     beq _l4E9F
-    lda zp_0D
+    lda ym_channel
     cmp #$06
     beq _l4E9D
     cmp #$07
@@ -1083,21 +1085,21 @@ _l4EA6
 _l4EA7
     clc
     lda #$20
-    adc zp_0D
+    adc ym_channel
     tay
     php
     sei
     jsr ym_wait
     sty YM2151_REG
-    lda ram_08AE,y
+    lda ym_shadow,y
     sta YM2151_DATA
     lda #$30
     clc
-    adc zp_0D
+    adc ym_channel
     tay
     jsr ym_wait
     sty YM2151_REG
-    lda ram_08AE,y
+    lda ym_shadow,y
     sta YM2151_DATA
     plp
     lsr key_flags
@@ -1107,57 +1109,57 @@ _l4EA7
     sei
     jsr ym_wait
     sty YM2151_REG
-    lda zp_0D
+    lda ym_channel
     sta YM2151_DATA
     plp
 _l4EE3
     lda sounding_prio
-    cmp zp_1E
+    cmp min_priority
     bcc _l4EA6
     lsr key_flags
     bcc _l4EA6
     ldx key_note
     beq _l4EA6
     clc
-    lda zp_0D
+    lda ym_channel
     adc #$28
     tay
     php
     sei
     jsr ym_wait
     sty YM2151_REG
-    lda tbl_5E7D,x
-    sta ram_08AE,y
+    lda key_codes,x
+    sta ym_shadow,y
     sta YM2151_DATA
     plp
     sta key_note
     lda #$20
     clc
-    adc zp_0D
+    adc ym_channel
     tax
-    lda ram_08AE,x
+    lda ym_shadow,x
     and #$07
     tax
     lda modulator_mask,x
-    sta zp_1A
+    sta tmp_ptr+1
     ldy #$06
-    sty zp_0C
+    sty fm_op_index
     lda key_flags
     lsr a
     lsr a
     and #$03
     tax
-    lda tbl_5FDF,x
+    lda level_bias,x
     sta trk_kind
-    lda key_velocity-6,y                ; Y = zp_0C = 6: key_velocity
+    lda key_velocity-6,y                ; Y = fm_op_index = 6: key_velocity
     sec
     sbc trk_kind
     bmi _l4F3F
     bvc _l4F3F
     lda #$80
 _l4F3F
-    sta zp_19
-    sta zp_1B
+    sta tmp_ptr
+    sta tmp_1B
     cmp #$80
     beq _l4F50
     bcc _l4F54
@@ -1168,11 +1170,11 @@ _l4F3F
 _l4F50
     lda #$7F
 _l4F52
-    sta zp_19
+    sta tmp_ptr
 _l4F54
-    asl zp_19
+    asl tmp_ptr
 _l4F56
-    ldy zp_0C
+    ldy fm_op_index
     lda key_scaling_depth,y
     lsr a
     lsr a
@@ -1187,33 +1189,33 @@ _l4F56
     and #$F0
     eor trk_kind
     tay
-    lda tbl_5EDF,y
+    lda nibble_scale,y
     sta key_tl_offset
-    ldy zp_0C
+    ldy fm_op_index
     lda key_scaling_depth,y
-    eor zp_19
+    eor tmp_ptr
     and #$0F
-    eor zp_19
+    eor tmp_ptr
     tay
-    lda tbl_5EDF,y
-    sta zp_1C
-    rol zp_1A
+    lda nibble_scale,y
+    sta tmp_1C
+    rol tmp_ptr+1
     bcs _l4F92
-    asl zp_1C
+    asl tmp_1C
 _l4F92
-    lda zp_1B
+    lda tmp_1B
     bpl _l4F9F
-    lda zp_1C
+    lda tmp_1C
     eor #$FF
     clc
     adc #$01
-    sta zp_1C
+    sta tmp_1C
 _l4F9F
     clc
-    lda zp_0C
+    lda fm_op_index
     asl a
     asl a
-    adc zp_0D
+    adc ym_channel
     adc #$60
     tay
     php
@@ -1222,11 +1224,11 @@ _l4F9F
     sty YM2151_REG
     clc
     jsr ym_wait
-    lda ram_08AE,y
+    lda ym_shadow,y
     adc key_tl_offset
     bmi _l4FC8
     clc
-    adc zp_1C
+    adc tmp_1C
     bpl _l4FCA
     bvs _l4FC8
     lda #$00
@@ -1236,8 +1238,8 @@ _l4FC8
 _l4FCA
     sta YM2151_DATA
     plp
-    dec zp_0C
-    dec zp_0C
+    dec fm_op_index
+    dec fm_op_index
     bmi _l4FD7
     jmp _l4F56
 _l4FD7
@@ -1260,10 +1262,10 @@ _l4FFA
     ldy #$08
     jsr ym_wait
     sty YM2151_REG
-    lda zp_0D
+    lda ym_channel
     ora #$78
     sta YM2151_DATA
-    sta ram_08AE,y
+    sta ym_shadow,y
     plp
 _l500D
     rts
@@ -1272,7 +1274,7 @@ _l500D
 ; from 505A
 tick_ym_group
     lda #$07
-    sta zp_0D
+    sta ym_channel
     clc
     lda group_first_chain,x
     adc #$07
@@ -1284,17 +1286,18 @@ _l5019
     pla
     tay
     dey
-    dec zp_0D
+    dec ym_channel
     bpl _l5019
     rts
 
 ; from 427A, 4286, 428E, 4295, 42A6, 42AE, 439A, 4EAF, 4EC1, 4ED7, 4EFC, 4FAB, 4FB2, 4FE7, 4FF2,
 ; 4FFC, 55B8, 55D0, 55F2, 5613, 56A8, 58A3, 58D3, 591A, 5925, 5938, 5943, 594E, 5959, 5964, 596F,
 ; 597A, 5985, 599C, 59A8, 59B5, 59D6, 59E1, 5A4D, 5A5E, 5A6A, 5A77, 5A88, 5A93, 5AA2, 5AAD, 5B66
-; Wait until the YM2151 is not busy (status bit 7), at most 255 reads: on a time-out set zp_0E
-; (later calls return at once) and zp_02 bit 1 (the status imm_03 sends). Keeps A.
+; Wait until the YM2151 is not busy (status bit 7), at most 255 reads: on a time-out set
+; ym_timed_out (later calls return at once) and board_status bit 1 (the status imm_03_send_status
+; sends). Keeps A.
 ym_wait
-    bit zp_0E
+    bit ym_timed_out
     bmi _l5042
     pha
     lda #$00
@@ -1305,24 +1308,24 @@ _l502E
     adc #$01
     cmp #$FF
     bne _l502E
-    sta zp_0E
-    lda zp_02
+    sta ym_timed_out
+    lda board_status
     ora #$02
-    sta zp_02
+    sta board_status
 _l5041
     pla
 _l5042
     rts
 
 ; One group per timed IRQ: X = 0, the YM2151 group (tick_ym_group), X = 1, the other kind
-; (tick_other_group); zp_08/zp_09 = the chip's base (group_chip_lo/hi), cur_group_kind = its
-; kind (group_kind).
+; (tick_other_group); engine_chip/engine_chip+1 = the chip's base (group_chip_lo/hi), cur_group_kind
+; = its kind (group_kind).
 ; from 4230, 4235
 tick_group
     lda group_chip_lo,x
-    sta zp_08
+    sta engine_chip
     lda group_chip_hi,x
-    sta zp_09
+    sta engine_chip+1
     lda group_kind,x
     sta cur_group_kind
     cmp #$03
@@ -1331,7 +1334,7 @@ tick_group
 _l505A
     jmp tick_ym_group
 
-; A stream byte A of 80 and up: BB and up stops the track (ram_0248 = FF, C clear); else
+; A stream byte A of 80 and up: BB and up stops the track (trk_sound = FF, C clear); else
 ; op_handlers entry A - 80, entered by RTS with Y = 1, A = the operand byte and C set. A handler
 ; returns C set to read on, C clear to end the tick (the op is read again when it backs the
 ; pointer up, op_sync).
@@ -1340,19 +1343,19 @@ run_op
     cmp #$BB
     bcc _l5068
     lda #$FF
-    sta ram_0248,x
+    sta trk_sound,x
     clc
     rts
 _l5068
     iny
-    stx zp_1C
+    stx tmp_1C
     asl a
     tax
     lda op_handlers+1,x
     pha
     lda op_handlers,x
     pha
-    ldx zp_1C
+    ldx tmp_1C
     lda (stream_ptr),y
     sec
     rts
@@ -1361,44 +1364,44 @@ _l5068
 ; from 518E, 5199, 51A9, 51B8, 5237, 52C2, 537D, 5380, 5389, 53A4, 53A7, 53B0, 547A, 547D, 5482,
 ; 5487, 5531, 554A, 555A, 5641, 5685
 next_operand
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     clc
     adc #$01
-    sta ram_0266,x
+    sta trk_ptr_lo,x
     bcc _l5089
-    inc ram_0284,x
+    inc trk_ptr_hi,x
 _l5089
     iny
     lda (stream_ptr),y
     rts
 
-; cmdtype_0D (no command has type 0D): along the list from X, the first track playing sound
-; ram_08AC runs the op handler Y (call_op_handler) with A = ram_08AD.
+; cmdtype_0D_run_op (no command has type 0D): along the list from X, the first track playing sound
+; cmd_target_sound runs the op handler Y (call_op_handler) with A = cmd_op_operand.
 ; from 452E; not executed in the make sndtrace runs
 chain_run_op
     php
     sei
 _l508F
-    lda ram_0860,x
+    lda trk_link,x
     beq _l50A1
     tax
     dex
-    lda ram_0248,x
-    cmp ram_08AC
+    lda trk_sound,x
+    cmp cmd_target_sound
     bne _l508F
     jsr call_op_handler
 _l50A1
     plp
     rts
 
-; Enter op handler Y (op_handlers + Y) by RTS with A = ram_08AD.
+; Enter op handler Y (op_handlers + Y) by RTS with A = cmd_op_operand.
 ; from 509E; not executed in the make sndtrace runs
 call_op_handler
     lda op_handlers+1,y
     pha
     lda op_handlers,y
     pha
-    lda ram_08AD
+    lda cmd_op_operand
     rts
 
 ; read at 506D, 5071, 50A3, 50A7
@@ -1443,7 +1446,7 @@ op_handlers
     .word op_velocity-1                 ; $A2 velocity
     .word op_velocity_add-1             ; $A3 velocity_add
     .word op_fade-1                     ; $A4 fade
-    .word cmdtype_11-1                  ; $A5 ym_ct
+    .word cmdtype_11_ym_ct-1                  ; $A5 ym_ct
     .word op_fine_tune-1                ; $A6 fine_tune
     .word op_bend-1                     ; $A7 bend
     .word op_fade_mode-1                ; $A8 fade_mode
@@ -1467,86 +1470,86 @@ op_handlers
     .word op_var_cmp-1                  ; $BA var_cmp
 
 ; op 88 (sync): the track's time counter to 0; each arriving track marks itself with its
-; group (ram_0680 = ram_069E, 513D-5140) and scans; it backs the pointer up two bytes and returns
-; C clear (5170-517E: the op is read again next tick) while an active track of the same group
-; has not arrived (a marked track waits without scanning again, 5130-5136); the last arrival
+; group (trk_sync_state = trk_sync_group, 513D-5140) and scans; it backs the pointer up two bytes
+; and returns C clear (5170-517E: the op is read again next tick) while an active track of the same
+; group has not arrived (a marked track waits without scanning again, 5130-5136); the last arrival
 ; marks every track of the group FF (515A-516A), which lets each go on and clears its mark
 ; (5138-513C)
 ; MAME: not dispatched in make musictrace
 op_sync
     lda #$00
-    sta ram_02DE,x
-    sta ram_02FC,x
-    sta ram_031A,x
-    ldy ram_0680,x
+    sta trk_wait_frac,x
+    sta trk_wait_lo,x
+    sta trk_wait_hi,x
+    ldy trk_sync_state,x
     beq _l513D
     iny
     bne _l5170
 _l5138
-    sta ram_0680,x
+    sta trk_sync_state,x
     sec
     rts
 _l513D
-    lda ram_069E,x
-    sta ram_0680,x
+    lda trk_sync_group,x
+    sta trk_sync_state,x
     ldy #$1D
 _l5145
-    cmp ram_069E,y
+    cmp trk_sync_group,y
     bne _l5157
-    cmp ram_0680,y
+    cmp trk_sync_state,y
     beq _l5157
-    lda ram_03EC,y
+    lda trk_priority,y
     bne _l5170
-    lda ram_069E,x
+    lda trk_sync_group,x
 _l5157
     dey
     bpl _l5145
     ldy #$1D
 _l515C
-    cmp ram_069E,y
+    cmp trk_sync_group,y
     bne _l5169
     lda #$FF
-    sta ram_0680,y
-    lda ram_069E,x
+    sta trk_sync_state,y
+    lda trk_sync_group,x
 _l5169
     dey
     bpl _l515C
     lda #$00
     beq _l5138
 _l5170
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     cmp #$02
     bcs _l517A
-    dec ram_0284,x
+    dec trk_ptr_hi,x
 _l517A
-    dec ram_0266,x
-    dec ram_0266,x
+    dec trk_ptr_lo,x
+    dec trk_ptr_lo,x
     clc
     rts
 
-; op 89 (sync_group): ram_069E = the group sync waits on, ram_0680 = 0
+; op 89 (sync_group): trk_sync_group = the group sync waits on, trk_sync_state = 0
 ; MAME: not dispatched in make musictrace
 op_sync_group
-    sta ram_069E,x
+    sta trk_sync_group,x
     lda #$00
-    sta ram_0680,x
+    sta trk_sync_state,x
     rts
 
-; op 87 (level_env): ram_0482/ram_04A0 = the level envelope (other voice kind)
+; op 87 (level_env): trk_op_tl/trk_op_tl+$1E = the level envelope (other voice kind)
 ; MAME: not dispatched in make musictrace
 op_level_env
-    sta ram_0482,x
+    sta trk_op_tl,x
     jsr next_operand
-    sta ram_04A0,x
+    sta trk_op_tl+$1E,x
     sec
     rts
 
-; op 86 (pitch_env): ram_04BE/ram_04DC = the pitch envelope (other voice kind)
+; op 86 (pitch_env): trk_op_tl+$3C/trk_op_tl+$5A = the pitch envelope (other voice kind)
 ; MAME: not dispatched in make musictrace
 op_pitch_env
-    sta ram_04BE,x
+    sta trk_op_tl+$3C,x
     jsr next_operand
-    sta ram_04DC,x
+    sta trk_op_tl+$5A,x
     sec
     rts
 
@@ -1554,8 +1557,8 @@ op_pitch_env
 ; MAME: not dispatched in make musictrace
 op_tempo_add
     clc
-    adc ram_0626,x
-    sta ram_0626,x
+    adc trk_tempo_lo,x
+    sta trk_tempo_lo,x
     php
     jsr next_operand
     plp
@@ -1563,29 +1566,29 @@ op_tempo_add
 ; the tempo's high byte + A with the carry (op_tempo_add, op_var_add_to register 1)
 ; from 5442; not executed in the make sndtrace runs
 tempo_add_hi
-    adc ram_0644,x
-    sta ram_0644,x
+    adc trk_tempo_hi,x
+    sta trk_tempo_hi,x
     sec
     rts
 
-; op 80 (tempo): the tempo (ram_0626/ram_0644) = the 16-bit operand
+; op 80 (tempo): the tempo (trk_tempo_lo/trk_tempo_hi) = the 16-bit operand
 ; MAME: dispatched in make musictrace
 op_tempo
-    sta ram_0626,x
+    sta trk_tempo_lo,x
     jsr next_operand
 
 ; the tempo's high byte = A (op_tempo, op_var_store register 1)
 ; from 5408
 set_tempo_hi
-    sta ram_0644,x
+    sta trk_tempo_hi,x
     sec
     rts
 
-; op 83 (volume_add): refused while the track is releasing (ram_0248 = FE); YM2151:
+; op 83 (volume_add): refused while the track is releasing (trk_sound = FE); YM2151:
 ; op_carrier_tl_sub (the carriers' TL - A); other kind: level + A within 0-F
 ; MAME: dispatched in make musictrace
 op_volume_add
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     beq op_refuse
 
@@ -1599,7 +1602,7 @@ add_volume
     jmp op_carrier_tl_sub
 _l51D1
     clc
-    adc ram_0464,x
+    adc trk_key_fraction,x
     bpl _l51D9
     lda #$00
 _l51D9
@@ -1611,7 +1614,7 @@ _l51D9
 ; op 82 (volume): refused while releasing; YM2151: volume_ym; other kind: level = A
 ; MAME: dispatched in make musictrace
 op_volume
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     beq op_refuse
     ldy cur_group_kind
@@ -1621,7 +1624,7 @@ op_volume
 
 ; the other kind's level = A
 store_volume
-    sta ram_0464,x
+    sta trk_key_fraction,x
     sec
     rts
 
@@ -1630,26 +1633,26 @@ op_refuse
     clc
     rts
 
-; op 85 (transpose_add): the transpose (ram_0662) + A
+; op 85 (transpose_add): the transpose (trk_transpose) + A
 ; MAME: not dispatched in make musictrace
 op_transpose_add
     clc
-    adc ram_0662,x
+    adc trk_transpose,x
 
-; op 84 (transpose): the transpose (ram_0662) = A, added to every pitch but 00
+; op 84 (transpose): the transpose (trk_transpose) = A, added to every pitch but 00
 ; MAME: dispatched in make musictrace
 op_transpose
-    sta ram_0662,x
+    sta trk_transpose,x
     sec
     rts
 
-; op 8A (ctl_bits): ram_06BC = A, ORed into the other kind's level byte (4C8E)
+; op 8A (ctl_bits): trk_e1_ctl = A, ORed into the other kind's level byte (4C8E)
 ; MAME: not dispatched in make musictrace
 op_ctl_bits
-    sta ram_06BC,x
+    sta trk_e1_ctl,x
     rts
 
-; op 8B (ctl_set): the other kind's control bits (ram_0446) | A
+; op 8B (ctl_set): the other kind's control bits (trk_scale_ptr_hi) | A
 ; MAME: not dispatched in make musictrace
 op_ctl_set
     ldy cur_group_kind
@@ -1658,8 +1661,8 @@ op_ctl_set
     and #$09
     eor other_ctl_a
 _l5213
-    ora ram_0446,x
-    sta ram_0446,x
+    ora trk_scale_ptr_hi,x
+    sta trk_scale_ptr_hi,x
     rts
 
 ; op 9B (ctl_clear): the other kind's control bits & ~A
@@ -1668,72 +1671,72 @@ op_ctl_clear
     eor #$FF
     ldy cur_group_kind
     bne _l5228
-    and ram_0428,x
-    sta ram_0428,x
+    and trk_scale_ptr_lo,x
+    sta trk_scale_ptr_lo,x
     rts
 _l5228
     ora #$F6
-    and ram_0446,x
-    sta ram_0446,x
+    and trk_scale_ptr_hi,x
+    sta trk_scale_ptr_hi,x
     rts
 
-; op 8C (portamento): ram_06DA = the glide rate (prepare_key_on 4DBE-4E11)
+; op 8C (portamento): trk_glide_rate = the glide rate (prepare_key_on 4DBE-4E11)
 ; MAME: not dispatched in make musictrace
 op_portamento
-    sta ram_06DA,x
+    sta trk_glide_rate,x
     rts
 
-; op 8D (call): push a node (sub_4309: ram_0734 link, return address) and go to the
+; op 8D (call): push a node (alloc_frame: trk_call_frame link, return address) and go to the
 ; operand address; a note with length 00 returns (read_item 4919)
 ; MAME: dispatched in make musictrace
 op_call
-    sta zp_1C
+    sta tmp_1C
     jsr next_operand
     sta seq_tmp
-    jsr sub_4309
+    jsr alloc_frame
     beq _l5261
     pha
-    lda ram_0734,x
-    sta (zp_20),y
+    lda trk_call_frame,x
+    sta (frame_ptr),y
     pla
-    sta ram_0734,x
+    sta trk_call_frame,x
     iny
-    lda ram_0266,x
-    sta (zp_20),y
+    lda trk_ptr_lo,x
+    sta (frame_ptr),y
     iny
-    lda ram_0284,x
-    sta (zp_20),y
-    lda zp_1C
-    sta ram_0266,x
+    lda trk_ptr_hi,x
+    sta (frame_ptr),y
+    lda tmp_1C
+    sta trk_ptr_lo,x
     lda seq_tmp
-    sta ram_0284,x
+    sta trk_ptr_hi,x
 _l5261
     sec
     rts
 
-; op 8E (loop): push a node (ram_0752 link, the address after the op, ram_0770 count)
+; op 8E (loop): push a node (trk_loop_frame link, the address after the op, trk_loop_count count)
 ; with count A
 ; MAME: dispatched in make musictrace
 op_loop
     pha
-    jsr sub_4309
+    jsr alloc_frame
     beq _l528B
     pha
-    lda ram_0752,x
-    sta (zp_20),y
+    lda trk_loop_frame,x
+    sta (frame_ptr),y
     pla
-    sta ram_0752,x
+    sta trk_loop_frame,x
     iny
-    lda ram_0266,x
-    sta (zp_20),y
+    lda trk_ptr_lo,x
+    sta (frame_ptr),y
     iny
-    lda ram_0284,x
-    sta (zp_20),y
+    lda trk_ptr_hi,x
+    sta (frame_ptr),y
     iny
-    lda ram_0770,x
-    sta (zp_20),y
+    lda trk_loop_count,x
+    sta (frame_ptr),y
     pla
-    sta ram_0770,x
+    sta trk_loop_count,x
     sec
     rts
 _l528B
@@ -1745,105 +1748,105 @@ _l528B
 ; operand byte is not read)
 ; MAME: dispatched in make musictrace
 op_loop_end
-    lda ram_0752,x
+    lda trk_loop_frame,x
     beq _l52A7
-    jsr sub_431A
-    dec ram_0770,x
+    jsr frame_address
+    dec trk_loop_count,x
     beq _l52A9
     iny
-    lda (zp_20),y
-    sta ram_0266,x
+    lda (frame_ptr),y
+    sta trk_ptr_lo,x
     iny
-    lda (zp_20),y
-    sta ram_0284,x
+    lda (frame_ptr),y
+    sta trk_ptr_hi,x
 _l52A7
     sec
     rts
 _l52A9
     pha
-    lda (zp_20),y
-    sta ram_0752,x
-    lda zp_1F
-    sta (zp_20),y
+    lda (frame_ptr),y
+    sta trk_loop_frame,x
+    lda frame_free
+    sta (frame_ptr),y
     pla
-    sta zp_1F
+    sta frame_free
     iny
     iny
     iny
-    lda (zp_20),y
-    sta ram_0770,x
+    lda (frame_ptr),y
+    sta trk_loop_count,x
     sec
     rts
 
-; op A4 (fade): refused while releasing; the remaining time ram_07AC = operand 1 >> 3,
-; ram_078E = 0, the amount ram_07E8 = operand 2, ram_07CA = operand 1 << 5, the fraction 0
-; MAME: dispatched in make musictrace
+; op A4 (fade): refused while releasing; the remaining time trk_slide_time_hi = operand 1 >> 3,
+; trk_slide_time_lo = 0, the amount trk_slide_rate_hi = operand 2, trk_slide_rate_lo = operand 1 <<
+; 5, the fraction 0 MAME: dispatched in make musictrace
 op_fade
-    sta zp_1C
+    sta tmp_1C
     jsr next_operand
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     beq _l52EB
-    sta ram_07E8,x
-    lda zp_1C
+    sta trk_slide_rate_hi,x
+    lda tmp_1C
     lsr a
     lsr a
     lsr a
-    sta ram_07AC,x
+    sta trk_slide_time_hi,x
     lda #$00
-    sta ram_078E,x
-    sta ram_0806,x
-    lda zp_1C
+    sta trk_slide_time_lo,x
+    sta trk_slide_frac,x
+    lda tmp_1C
     asl a
     asl a
     asl a
     asl a
     asl a
-    sta ram_07CA,x
+    sta trk_slide_rate_lo,x
     sec
     rts
 _l52EB
     clc
     rts
 
-; op A9 (var_add): var (ram_0824) + A; the result (ram_0842) = var
+; op A9 (var_add): var (trk_acc) + A; the result (trk_test) = var
 ; MAME: dispatched in make musictrace
 op_var_add
     clc
-    adc ram_0824,x
+    adc trk_acc,x
 
-; var (ram_0824) and the result (ram_0842) = A; C set
+; var (trk_acc) and the result (trk_test) = A; C set
 ; from 5300, 5306, 530C, 5312, 533F, 536C, 53C1, 544E
 store_var
-    sta ram_0824,x
-    sta ram_0842,x
+    sta trk_acc,x
+    sta trk_test,x
     sec
     rts
 
 ; op AA (var_sub): var - A (C set by run_op: no borrow in)
 ; MAME: not dispatched in make musictrace
 op_var_sub
-    sta zp_1C
-    lda ram_0824,x
-    sbc zp_1C
+    sta tmp_1C
+    lda trk_acc,x
+    sbc tmp_1C
     jmp store_var
 
 ; op AB (var_and): var & A
 ; MAME: dispatched in make musictrace
 op_var_and
-    and ram_0824,x
+    and trk_acc,x
     jmp store_var
 
 ; op AC (var_or): var | A
 ; MAME: not dispatched in make musictrace
 op_var_or
-    ora ram_0824,x
+    ora trk_acc,x
     jmp store_var
 
 ; op AD (var_xor): var ^ A
 ; MAME: not dispatched in make musictrace
 op_var_xor
-    eor ram_0824,x
+    eor trk_acc,x
     jmp store_var
 
 ; op B3 (var_shr): var >> A for A = 1-7 (other values: nothing)
@@ -1851,7 +1854,7 @@ op_var_xor
 op_var_shr
     clc
     tay
-    lda ram_0824,x
+    lda trk_acc,x
     cpy #$04
     beq _l533B
     cpy #$02
@@ -1889,7 +1892,7 @@ _l533E
 op_var_shl
     clc
     tay
-    lda ram_0824,x
+    lda trk_acc,x
     cpy #$04
     beq _l5368
     cpy #$02
@@ -1927,53 +1930,53 @@ _l536B
 ; run first in each tick by tick_ym_group 500E-5023, sets to random & 3)
 ; MAME: dispatched in make musictrace
 op_jump_table
-    sta zp_1C
-    lda ram_0824,x
+    sta tmp_1C
+    lda trk_acc,x
     bne _l537B
-    lda zp_1C
+    lda tmp_1C
     jmp _l5389
 _l537B
-    sta zp_1B
+    sta tmp_1B
 _l537D
     jsr next_operand
     jsr next_operand
-    sta zp_1C
-    dec zp_1B
+    sta tmp_1C
+    dec tmp_1B
     bne _l537D
 _l5389
     jsr next_operand
-    sta ram_0284,x
-    lda zp_1C
-    sta ram_0266,x
+    sta trk_ptr_hi,x
+    lda tmp_1C
+    sta trk_ptr_lo,x
     sec
     rts
 
 ; op AF (jump_table_inc): as AE, then var + 1
 ; MAME: not dispatched in make musictrace
 op_jump_table_inc
-    sta zp_1C
-    lda ram_0824,x
+    sta tmp_1C
+    lda trk_acc,x
     bne _l53A2
-    lda zp_1C
+    lda tmp_1C
     jmp _l53B0
 _l53A2
-    sta zp_1B
+    sta tmp_1B
 _l53A4
     jsr next_operand
     jsr next_operand
-    sta zp_1C
-    dec zp_1B
+    sta tmp_1C
+    dec tmp_1B
     bne _l53A4
 _l53B0
     jsr next_operand
-    sta ram_0284,x
-    lda zp_1C
-    sta ram_0266,x
-    inc ram_0824,x
-    lda ram_0824,x
+    sta trk_ptr_hi,x
+    lda tmp_1C
+    sta trk_ptr_lo,x
+    inc trk_acc,x
+    lda trk_acc,x
     jmp store_var
 
-; op B0 (var_store): register A = var (06-25: the global variables zp_23+n; YM2151
+; op B0 (var_store): register A = var (06-25: the global variables seq_vars+n; YM2151
 ; 0-4: volume, tempo high byte, transpose, velocity, fine tune; 5 and 26 up: nothing)
 ; MAME: dispatched in make musictrace
 op_var_store
@@ -1983,8 +1986,8 @@ op_var_store
     bcc _l53D8
     sbc #$06
     tay
-    lda ram_0824,x
-    sta @w zp_23,y
+    lda trk_acc,x
+    sta @w seq_vars,y
     jmp _l540F
 _l53D8
     cmp #$05
@@ -1993,7 +1996,7 @@ _l53D8
     cpy #$02
     bne _l53F5
     tay
-    lda ram_0824,x
+    lda trk_acc,x
     cpy #$04
     bcc _l53EE
     jmp op_fine_tune
@@ -2005,7 +2008,7 @@ _l53F5
     cmp #$03
     bcs _l540F
     tay
-    lda ram_0824,x
+    lda trk_acc,x
 _l53FD
     cpy #$02
     bcc _l5404
@@ -2033,7 +2036,7 @@ op_var_add_to
     tay
     cpy #$05
     bcs _l5449
-    lda ram_0824,x
+    lda trk_acc,x
     cpy #$04
     bcc _l5427
     jmp op_bend
@@ -2045,7 +2048,7 @@ _l542E
     cmp #$03
     bcs _l5449
     tay
-    lda ram_0824,x
+    lda trk_acc,x
 _l5436
     cpy #$02
     bcc _l543D
@@ -2075,13 +2078,13 @@ op_var_load
 op_var_cmp_reg
     jsr read_register
 
-; op BA (var_cmp): the result (ram_0842) = var - A
+; op BA (var_cmp): the result (trk_test) = var - A
 ; MAME: dispatched in make musictrace
 op_var_cmp
-    sta zp_1C
-    lda ram_0824,x
-    sbc zp_1C
-    sta ram_0842,x
+    sta tmp_1C
+    lda trk_acc,x
+    sbc tmp_1C
+    sta trk_test,x
     sec
     rts
 
@@ -2122,22 +2125,22 @@ branch_not_taken
 ; the pointer = the branch's address
 branch_taken
     jsr next_operand
-    sta zp_1C
+    sta tmp_1C
     jsr next_operand
-    sta ram_0284,x
-    lda zp_1C
-    sta ram_0266,x
+    sta trk_ptr_hi,x
+    lda tmp_1C
+    sta trk_ptr_lo,x
     sec
     rts
 
-; A = register A of the track (the variable ops): 26 and up, the last result (ram_0842); 06-25,
-; global variable A - 6 (zp_23+n, shared by every track; cmdtype_01 sets it); 05, the next random
-; byte; YM2151: 04 the pitch fraction ram_0464, 03 -ram_04FA (the velocity), 02 the transpose,
-; 01 the tempo's high byte, 00 the value 0; other kind: 00 the level, 01 and 02 the same, 03-04 the
-; result. Keeps Y.
+; A = register A of the track (the variable ops): 26 and up, the last result (trk_test); 06-25,
+; global variable A - 6 (seq_vars+n, shared by every track; cmdtype_01_set_var sets it); 05, the
+; next random byte; YM2151: 04 the pitch fraction trk_key_fraction, 03 -trk_level_offset (the
+; velocity), 02 the transpose, 01 the tempo's high byte, 00 the value 0; other kind: 00 the level,
+; 01 and 02 the same, 03-04 the result. Keeps Y.
 ; from 544B, 5451, 5460, 5467, 546E, 5475
 read_register
-    sty zp_1C
+    sty tmp_1C
     cmp #$26
     bcs _l54FE
     cmp #$06
@@ -2149,14 +2152,14 @@ read_register
     bne _l54CD
     cmp #$04
     bcc _l54B3
-    ldy zp_1C
-    lda ram_0464,x
+    ldy tmp_1C
+    lda trk_key_fraction,x
     rts
 _l54B3
     cmp #$03
     bcc _l54C2
-    ldy zp_1C
-    lda ram_04FA,x
+    ldy tmp_1C
+    lda trk_level_offset,x
     eor #$FF
     clc
     adc #$01
@@ -2166,7 +2169,7 @@ _l54C2
     beq _l54D5
     cmp #$01
     beq _l54DF
-    ldy zp_1C
+    ldy tmp_1C
     rts
 _l54CD
     cmp #$03
@@ -2174,49 +2177,49 @@ _l54CD
     cmp #$02
     bcc _l54DB
 _l54D5
-    ldy zp_1C
-    lda ram_0662,x
+    ldy tmp_1C
+    lda trk_transpose,x
     rts
 _l54DB
     cmp #$01
     bcc _l54E5
 _l54DF
-    ldy zp_1C
-    lda ram_0644,x
+    ldy tmp_1C
+    lda trk_tempo_hi,x
     rts
 _l54E5
-    ldy zp_1C
-    lda ram_0464,x
+    ldy tmp_1C
+    lda trk_key_fraction,x
     rts
 _l54EB
     sbc #$06
     tay
-    lda @w zp_23,y
+    lda @w seq_vars,y
     pha
-    ldy zp_1C
+    ldy tmp_1C
     pla
     rts
 _l54F6
     jsr random
     pha
-    ldy zp_1C
+    ldy tmp_1C
     pla
     rts
 _l54FE
-    ldy zp_1C
-    lda ram_0842,x
+    ldy tmp_1C
+    lda trk_test,x
     rts
 
-; The 8-bit random generator: zp_47 << 1, XOR 1D when a bit falls out (a maximal LFSR);
+; The 8-bit random generator: rng_state << 1, XOR 1D when a bit falls out (a maximal LFSR);
 ; main_loop runs it on every pass (4149), read_register for register 05.
 ; from 4149, 54F6
 random
-    lda zp_47
+    lda rng_state
     asl a
     bcc _l550B
     eor #$1D
 _l550B
-    sta zp_47
+    sta rng_state
     rts
 
 ; op 96 (respond): queue_response A for the 68010
@@ -2226,67 +2229,67 @@ op_respond
     sec
     rts
 
-; op 97 (release): the release fade (as cmdtype_0A/0B): amount D0, time 2, ram_0248
+; op 97 (release): the release fade (as cmdtype_0A_release_sound/0B): amount D0, time 2, trk_sound
 ; = FE; the track stops when the fade ends (4A5F-4A6E, 47F5-480C)
 ; MAME: not dispatched in make musictrace
 op_release
     lda #$00
-    sta ram_078E,x
-    sta ram_0806,x
-    sta ram_07CA,x
+    sta trk_slide_time_lo,x
+    sta trk_slide_frac,x
+    sta trk_slide_rate_lo,x
     lda #$D0
-    sta ram_07E8,x
+    sta trk_slide_rate_hi,x
     lda #$02
-    sta ram_07AC,x
+    sta trk_slide_time_hi,x
     lda #$FE
-    sta ram_0248,x
+    sta trk_sound,x
     sec
     rts
 
 ; op 99 (jump): the pointer = the operand address
 ; MAME: dispatched in make musictrace
 op_jump
-    sta zp_1C
+    sta tmp_1C
     jsr next_operand
-    sta ram_0284,x
-    lda zp_1C
-    sta ram_0266,x
+    sta trk_ptr_hi,x
+    lda tmp_1C
+    sta trk_ptr_lo,x
     sec
     rts
 
 ; op 9D (patch): the YM2151 patch record at the operand: while releasing, stop
-; instead (ram_0248 = FF); else trk_patch_lo/ram_0554 = the record, ram_0518 = its byte 00
-; (register 20), the four TLs (bytes 05, 0B, 11, 17) into ram_0482 + n x 1E, then load_patch
+; instead (trk_sound = FF); else trk_patch_lo/trk_patch_hi = the record, trk_reg20 = its byte 00
+; (register 20), the four TLs (bytes 05, 0B, 11, 17) into trk_op_tl + n x 1E, then load_patch
 ; MAME: dispatched in make musictrace
 op_patch
-    sta zp_1C
-    lda ram_0248,x
+    sta tmp_1C
+    lda trk_sound,x
     cmp #$FE
     bne _l554F
-    inc ram_0248,x
+    inc trk_sound,x
     jsr next_operand
     clc
     rts
 _l554F
     php
     sei
-    lda zp_1C
-    stx zp_1C
-    sta zp_19
+    lda tmp_1C
+    stx tmp_1C
+    sta tmp_ptr
     sta trk_patch_lo,x
     jsr next_operand
-    sta zp_1A
-    sta ram_0554,x
+    sta tmp_ptr+1
+    sta trk_patch_hi,x
     plp
     ldy #$00
-    lda (zp_19),y
-    sta ram_0518,x
+    lda (tmp_ptr),y
+    sta trk_reg20,x
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     ldy #$05
 _l5570
-    lda (zp_19),y
-    sta ram_0482,x
+    lda (tmp_ptr),y
+    sta trk_op_tl,x
     tya
     clc
     adc #$06
@@ -2295,9 +2298,9 @@ _l5570
     clc
     adc #$1E
     tax
-    dec zp_0C
+    dec fm_op_index
     bpl _l5570
-    ldx zp_1C
+    ldx tmp_1C
 
 ; Write the patch of track X into its YM2151 channel when the track is heard and the group
 ; is the YM2151 (else only C set); also from free_track for the track heard next.
@@ -2309,7 +2312,7 @@ load_patch
     beq _l558E
     jmp patch_done
 _l558E
-    stx zp_1C
+    stx tmp_1C
     ldy cur_group_kind
     cpy #$02
     beq write_patch
@@ -2321,85 +2324,85 @@ load_patch_regs
     php
     sei
 
-; zp_19 = the record (trk_patch_lo/ram_0554); ram_0428/ram_0446 = record + 1C, the scaling
-; bytes prepare_key_on copies.
+; tmp_ptr = the record (trk_patch_lo/trk_patch_hi); trk_scale_ptr_lo/trk_scale_ptr_hi = record + 1C,
+; the scaling bytes prepare_key_on copies.
 write_patch
     lda trk_patch_lo,x
-    sta zp_19
+    sta tmp_ptr
     clc
     adc #$1C
-    sta ram_0428,x
-    lda ram_0554,x
-    sta zp_1A
+    sta trk_scale_ptr_lo,x
+    lda trk_patch_hi,x
+    sta tmp_ptr+1
     adc #$00
-    sta ram_0446,x
+    sta trk_scale_ptr_hi,x
     jmp write_patch_regs
 
-; The timer voices' entry with zp_19 set (ymtimer.asm).
+; The timer voices' entry with tmp_ptr set (ymtimer.asm).
 ; from 589A, 58CA; not executed in the make sndtrace runs
 write_patch_regs_at
     php
     sei
 
-; The record at zp_19 into channel zp_0D: key-off (register 08), TL 7F on the four operators
+; The record at tmp_ptr into channel ym_channel: key-off (register 08), TL 7F on the four operators
 ; (60-78), record bytes 00-03 into 20, 28, 30, 38, then per operator M1, M2, C1, C2 (+00, +08,
 ; +10, +18) its bytes into 40, 80, A0, C0, E0, the TL byte skipped (55F1-5634); each written to
-; the shadow ram_08AE too.
+; the shadow ym_shadow too.
 ; from 55B1
 write_patch_regs
     ldx #$08
     jsr ym_wait
     stx YM2151_REG
-    lda zp_0D
+    lda ym_channel
     sta YM2151_DATA
-    sta ram_08AE,x
+    sta ym_shadow,x
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     clc
     lda #$60
-    adc zp_0D
+    adc ym_channel
 _l55CF
     tax
     jsr ym_wait
     stx YM2151_REG
     lda #$7F
-    sta ram_08AE,x
+    sta ym_shadow,x
     sta YM2151_DATA
     txa
     clc
     adc #$08
-    dec zp_0C
+    dec fm_op_index
     bpl _l55CF
     ldy #$00
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     clc
-    lda zp_0D
+    lda ym_channel
     adc #$20
 _l55F1
     tax
     jsr ym_wait
     stx YM2151_REG
-    lda (zp_19),y
-    sta ram_08AE,x
+    lda (tmp_ptr),y
+    sta ym_shadow,x
     sta YM2151_DATA
     txa
     clc
     adc #$08
     iny
-    dec zp_0C
+    dec fm_op_index
     bpl _l55F1
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     clc
     lda #$40
-    adc zp_0D
+    adc ym_channel
 _l5612
     tax
     jsr ym_wait
     stx YM2151_REG
-    lda (zp_19),y
-    sta ram_08AE,x
+    lda (tmp_ptr),y
+    sta ym_shadow,x
     sta YM2151_DATA
     iny
     txa
@@ -2413,9 +2416,9 @@ _l562B
     adc #$20
     bcc _l5612
     adc #$47
-    dec zp_0C
+    dec fm_op_index
     bpl _l5612
-    ldx zp_1C
+    ldx tmp_1C
 
 ; from 558B, 5597
 patch_done
@@ -2424,23 +2427,23 @@ patch_done
     rts
 
 ; op 9E (lfo): YM2151: registers 18, 19, 19 and 1B (bits 1-0, CT1-CT2 kept) from
-; record bytes 24-27, byte 28 into the shadow of 1B (nothing reads it); ram_0572 = 80: every
+; record bytes 24-27, byte 28 into the shadow of 1B (nothing reads it); trk_keyon_flags = 80: every
 ; key-on of the track from then on resets the LFO (key_flags bit 7, reloaded at 478B-478E)
 ; MAME: dispatched in make musictrace
 op_lfo
     clc
     adc #$24
-    sta zp_19
+    sta tmp_ptr
     php
     jsr next_operand
     plp
     adc #$00
-    sta zp_1A
+    sta tmp_ptr+1
     ldy cur_group_kind
     cpy #$02
     bne _l567D
     lda #$80
-    sta ram_0572,x
+    sta trk_keyon_flags,x
     ldy #$00
     tya
     ldx #$18
@@ -2456,9 +2459,9 @@ op_lfo
     ldx #$1B
     jsr ym_write_record
     sta ym_1b_shadow
-    lda (zp_19),y
-    sta ram_08AE,x
-    ldx zp_1C
+    lda (tmp_ptr),y
+    sta ym_shadow,x
+    ldx tmp_1C
 _l567D
     sec
     rts
@@ -2468,12 +2471,12 @@ _l567D
 op_noise
     clc
     adc #$29
-    sta zp_19
+    sta tmp_ptr
     php
     jsr next_operand
     plp
     adc #$00
-    sta zp_1A
+    sta tmp_ptr+1
     ldy cur_group_kind
     cpy #$02
     bne _l569F
@@ -2482,7 +2485,7 @@ op_noise
     tya
     ldx #$0F
     jsr ym_write_record
-    ldx zp_1C
+    ldx tmp_1C
 _l569F
     sec
     rts
@@ -2499,10 +2502,10 @@ ym_write_record
     jsr ym_wait
     stx YM2151_REG
     pla
-    ora (zp_19),y
+    ora (tmp_ptr),y
     iny
     sta YM2151_DATA
-    sta ram_08AE,x
+    sta ym_shadow,x
     plp
     rts
 _l56BA
@@ -2510,7 +2513,7 @@ _l56BA
     plp
     rts
 
-; op A0 (pan): YM2151: register 20 bits 7-6 of the track (ram_0518): A = 1 bit 7,
+; op A0 (pan): YM2151: register 20 bits 7-6 of the track (trk_reg20): A = 1 bit 7,
 ; 2 bit 6, 0 or 3 both
 ; MAME: dispatched in make musictrace
 op_pan
@@ -2529,16 +2532,16 @@ op_pan
     beq _l56D4
     eor #$C0
 _l56D4
-    sta zp_19
-    lda ram_0518,x
+    sta tmp_ptr
+    lda trk_reg20,x
     and #$3F
-    ora zp_19
-    sta ram_0518,x
+    ora tmp_ptr
+    sta trk_reg20,x
 _l56E0
     sec
     rts
 
-; op A3 (velocity_add): YM2151: ram_04FA - A, clamped to -80..7F
+; op A3 (velocity_add): YM2151: trk_level_offset - A, clamped to -80..7F
 ; MAME: dispatched in make musictrace
 op_velocity_add
     ldy cur_group_kind
@@ -2548,7 +2551,7 @@ op_velocity_add
     clc
     adc #$01
     clc
-    adc ram_04FA,x
+    adc trk_level_offset,x
     bvc store_velocity
     bpl _l56FA
     lda #$7F
@@ -2557,7 +2560,7 @@ _l56FA
     lda #$80
     bne store_velocity
 
-; op A2 (velocity): YM2151: ram_04FA = -A, the level the key-on scales by each
+; op A2 (velocity): YM2151: trk_level_offset = -A, the level the key-on scales by each
 ; operator's sensitivity (tick_ym_channel 4F2F-4F98)
 ; MAME: dispatched in make musictrace
 op_velocity
@@ -2568,9 +2571,9 @@ op_velocity
     clc
     adc #$01
 
-; ram_04FA = A
+; trk_level_offset = A
 store_velocity
-    sta ram_04FA,x
+    sta trk_level_offset,x
 
 ; C set: read on
 ; from 5733
@@ -2578,31 +2581,31 @@ op_done
     sec
     rts
 
-; op A7 (bend): YM2151: the pitch fraction ram_0464 + A x 4 (signed), the carry into
-; the transpose ram_0662
+; op A7 (bend): YM2151: the pitch fraction trk_key_fraction + A x 4 (signed), the carry into
+; the transpose trk_transpose
 ; MAME: dispatched in make musictrace
 op_bend
     ldy cur_group_kind
     cpy #$02
     bne op_done
     ldy #$00
-    sty zp_1B
+    sty tmp_1B
     asl a
     bcc _l5721
     ldy #$FF
-    sty zp_1B
+    sty tmp_1B
 _l5721
     asl a
-    rol zp_1B
+    rol tmp_1B
     clc
-    adc ram_0464,x
-    sta ram_0464,x
-    lda zp_1B
-    adc ram_0662,x
-    sta ram_0662,x
+    adc trk_key_fraction,x
+    sta trk_key_fraction,x
+    lda tmp_1B
+    adc trk_transpose,x
+    sta trk_transpose,x
     jmp op_done
 
-; op A6 (fine_tune): YM2151: the pitch fraction ram_0464 = A x 4 (register 30)
+; op A6 (fine_tune): YM2151: the pitch fraction trk_key_fraction = A x 4 (register 30)
 ; MAME: dispatched in make musictrace
 op_fine_tune
     ldy cur_group_kind
@@ -2610,18 +2613,18 @@ op_fine_tune
     bne op_done
     asl a
     asl a
-    sta ram_0464,x
+    sta trk_key_fraction,x
     sec
     rts
 
-; op A8 (fade_mode): ram_0608 = A: nonzero, fade steps only at note starts, the step
+; op A8 (fade_mode): trk_slide_step = A: nonzero, fade steps only at note starts, the step
 ; by the length byte's low nibble (fade_step 4CCE; the other kind: the pitch envelope's count)
 ; MAME: not dispatched in make musictrace
 op_fade_mode
-    sta ram_0608,x
+    sta trk_slide_step,x
     rts
 
-; op A1 (carrier_tl_sub): YM2151: each carrier's TL (ram_0482 + n x 1E for the
+; op A1 (carrier_tl_sub): YM2151: each carrier's TL (trk_op_tl + n x 1E for the
 ; operators M1, M2, C1, C2 whose modulator_mask bit for the patch's algorithm is clear) - A,
 ; clamped to 00-7F
 ; MAME: not dispatched in make musictrace
@@ -2631,22 +2634,22 @@ op_carrier_tl_sub
     beq _l5750
     rts
 _l5750
-    stx zp_1C
+    stx tmp_1C
     eor #$FF
     clc
     adc #$01
-    sta zp_19
-    lda ram_0518,x
+    sta tmp_ptr
+    lda trk_reg20,x
     and #$07
     tay
     lda modulator_mask,y
-    sta zp_1A
+    sta tmp_ptr+1
     ldy #$03
 _l5766
-    asl zp_1A
+    asl tmp_ptr+1
     bcs _l577C
-    lda ram_0482,x
-    adc zp_19
+    lda trk_op_tl,x
+    adc tmp_ptr
     bpl _l5779
     bvs _l5777
     lda #$00
@@ -2654,7 +2657,7 @@ _l5766
 _l5777
     lda #$7F
 _l5779
-    sta ram_0482,x
+    sta trk_op_tl,x
 _l577C
     txa
     clc
@@ -2662,7 +2665,7 @@ _l577C
     tax
     dey
     bpl _l5766
-    ldx zp_1C
+    ldx tmp_1C
     sec
     rts
 
@@ -2671,7 +2674,7 @@ _l577C
 ; (op_carrier_tl_sub).
 ; from 51EF
 volume_ym
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     bne _l5791
     clc
@@ -2681,15 +2684,15 @@ _l5791
     txa
     pha
     lda trk_patch_lo,x
-    sta zp_19
-    lda ram_0554,x
-    sta zp_1A
+    sta tmp_ptr
+    lda trk_patch_hi,x
+    sta tmp_ptr+1
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     ldy #$05
 _l57A4
-    lda (zp_19),y
-    sta ram_0482,x
+    lda (tmp_ptr),y
+    sta trk_op_tl,x
     tya
     clc
     adc #$06
@@ -2698,7 +2701,7 @@ _l57A4
     clc
     adc #$1E
     tax
-    dec zp_0C
+    dec fm_op_index
     bpl _l57A4
     pla
     tax
@@ -2722,11 +2725,11 @@ volume_steps
 modulator_mask
     .byte $E0, $E0, $E0, $E0, $C0, $80, $80, $00
 
-; read at 4269 and 5043: the group's chip base, low byte (zp_08)
+; read at 4269 and 5043: the group's chip base, low byte (engine_chip)
 group_chip_lo
     .byte $00, $00
 
-; read at 426E and 5048: high byte (zp_09): the YM2151 at 2000 for group 0
+; read at 426E and 5048: high byte (engine_chip+1): the YM2151 at 2000 for group 0
 group_chip_hi
     .byte $20, $00
 
@@ -2734,7 +2737,7 @@ group_chip_hi
 group_kind
     .byte $02, $03
 
-; read at 441C, 4E5A and 5013: the group's first list (ram_0860 + 1E / + 26)
+; read at 441C, 4E5A and 5013: the group's first list (trk_link + 1E / + 26)
 group_first_chain
     .byte $1E, $26
 

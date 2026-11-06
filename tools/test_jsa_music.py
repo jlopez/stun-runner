@@ -105,7 +105,7 @@ def handler_body(label: str) -> tuple[str, list[str]]:
 
 def test_hang_ops_redispatch_themselves() -> None:
     """The hang_op ops' handler is read_item, which reaches `jsr run_op` without writing
-    stream_ptr (only ram_0266/ram_0284 move): it reads the same op byte and dispatches it again,
+    stream_ptr (only trk_ptr_lo/trk_ptr_hi move): it reads the same op byte and dispatches it again,
     so the walk must end a path there (flow hang), never read on as if two bytes were skipped."""
     hang = [o for o in jm.OPS.values() if o.macro == "hang_op"]
     assert len(hang) == 8 and all(o.handler == "read_item" and o.flow == "hang" for o in hang)

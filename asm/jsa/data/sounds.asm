@@ -1,20 +1,20 @@
 ; sounds.asm: 61E4-65E5, the sound tables: what a sound command starts, and the OKI effects.
 ;
-; A command of type 08 (cmdtype_08, 4569) starts sound N, its parameter (00-1F; the commands
-; are in docs/12-sound-music.md section 6). sound_first_entry gives N's first entry E and
-; entry_next each next one up to 0: every entry is one track (one byte stream) that cmdtype_08
-; starts on a free track slot (or on the slot of the track it may take over, 459F-45E8) with
-; the priority entry_priority, on the YM2151 channel entry_channel, from the stream
+; A command of type 08 (cmdtype_08_start_sound, 4569) starts sound N, its parameter (00-1F; the
+; commands are in docs/12-sound-music.md section 6). sound_first_entry gives N's first entry E and
+; entry_next each next one up to 0: every entry is one track (one byte stream) that
+; cmdtype_08_start_sound starts on a free track slot (or on the slot of the track it may take over,
+; 459F-45E8) with the priority entry_priority, on the YM2151 channel entry_channel, from the stream
 ; entry_stream (the labels of the stream files: snd_NN_V is track V of sound N). The four
-; entry tables are parallel arrays indexed by E through (zp_15),y with the base as immediates
+; entry tables are parallel arrays indexed by E through (start_ptr),y with the base as immediates
 ; (45AB-468E), so their lengths are the 125 entries the chains use and they end where the next
-; one starts. cmdtype_13 (5BFE, the OKI start) indexes the three 53-entry effect tables with its
-; parameter (00-34; 5C43 ORs 80 into effect_phrase for the OKI's first command byte) and keeps
-; the effect in zp_52,x for the channel. cmdtype_14 (5C6F) does not index with its parameter:
-; it compares it with effect_phrase of each channel's current effect (zp_52,x, 5C73-5C76) and
-; stops the channel that matches (docs/10-adpcm.md section 4). cmdtype_01 (commands 1E-23,
-; parameters 00-05) and cmdtype_02 (no command) set a global variable of the stream ops from
-; global_set_index and global_set_value.
+; one starts. cmdtype_13_oki_play (5BFE, the OKI start) indexes the three 53-entry effect tables
+; with its parameter (00-34; 5C43 ORs 80 into effect_phrase for the OKI's first command byte) and
+; keeps the effect in oki_entry,x for the channel. cmdtype_14_oki_stop (5C6F) does not index with
+; its parameter: it compares it with effect_phrase of each channel's current effect (oki_entry,x,
+; 5C73-5C76) and stops the channel that matches (docs/10-adpcm.md section 4). cmdtype_01_set_var
+; (commands 1E-23, parameters 00-05) and cmdtype_02_add_var (no command) set a global variable of
+; the stream ops from global_set_index and global_set_value.
 
     .cerror * != $61E4, "sounds.asm must start at $61E4"
 
@@ -26,17 +26,17 @@ sound_first_entry
     .word $006A, $006B, $006C, $006D, $006E, $006F, $0070, $0071 ; 10-17
     .word $0072, $0075, $0076, $0078, $0079, $007A, $007B, $007C ; 18-1F
 
-; 32 bytes: read at 4586 with Y = N. Zero: cmdtype_08 does not start N while a track still
-; plays it (458B-459D); nonzero: it starts N again. Every sound here has FF.
+; 32 bytes: read at 4586 with Y = N. Zero: cmdtype_08_start_sound does not start N while a track
+; still plays it (458B-459D); nonzero: it starts N again. Every sound here has FF.
 sound_restartable
     .byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF ; 00-0F
     .byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF ; 10-1F
 
-; 125 bytes, one per entry E: the track's priority, read through (zp_15),y at 45B8 and 45FF
+; 125 bytes, one per entry E: the track's priority, read through (start_ptr),y at 45B8 and 45FF
 ; (base #<entry_priority + E, 45A9-45B6, 45F0-45FD). The track keeps priority x 4 + 1 in
-; ram_03EC (4600-4604); a new track takes over a busy channel's slot only with a priority at
+; trk_priority (4600-4604); a new track takes over a busy channel's slot only with a priority at
 ; least as high (45D8-45DC), an equal priority replaces the track (465A-4668), and the YM2151
-; keys on only when the sounding track's priority x 4 + 1 reaches zp_1E (4EE3-4EE8).
+; keys on only when the sounding track's priority x 4 + 1 reaches min_priority (4EE3-4EE8).
 entry_priority
     .byte $03, $03, $03, $03, $03, $03, $03, $03, $27, $27, $27, $27, $27, $29, $29, $29 ; 00-0F
     .byte $29, $29, $29, $29, $29, $29, $29, $29, $29, $28, $28, $28, $28, $28, $28, $2A ; 10-1F
@@ -47,8 +47,8 @@ entry_priority
     .byte $28, $28, $28, $28, $28, $28, $19, $19, $19, $19, $32, $32, $32, $32, $32, $32 ; 60-6F
     .byte $32, $32, $32, $32, $32, $32, $32, $32, $3F, $32, $32, $32, $32 ; 70-7C
 
-; 125 bytes, one per entry E: the YM2151 channel 0-7, read through (zp_15),y at 45C9 and 4614
-; (base #<entry_channel + E): the track joins the list headed at ram_0860+1E+channel (4617).
+; 125 bytes, one per entry E: the YM2151 channel 0-7, read through (start_ptr),y at 45C9 and 4614
+; (base #<entry_channel + E): the track joins the list headed at trk_link+1E+channel (4617).
 entry_channel
     .byte $00, $01, $02, $03, $04, $05, $06, $07, $07, $06, $05, $04, $03, $07, $06, $05 ; 00-0F
     .byte $04, $03, $02, $01, $07, $06, $05, $04, $03, $00, $01, $02, $03, $05, $06, $00 ; 10-1F
@@ -59,8 +59,8 @@ entry_channel
     .byte $07, $03, $04, $05, $06, $07, $00, $03, $01, $02, $04, $01, $05, $05, $00, $04 ; 60-6F
     .byte $00, $07, $05, $04, $06, $05, $05, $05, $03, $05, $04, $05, $07 ; 70-7C
 
-; 125 words, one per entry E: the stream, read at 4632 and 4638 through (zp_15),y (base
-; #<entry_stream + E x 2, 461B-4630) into the track's stream pointer ram_0266/ram_0284. Entries
+; 125 words, one per entry E: the stream, read at 4632 and 4638 through (start_ptr),y (base
+; #<entry_stream + E x 2, 461B-4630) into the track's stream pointer trk_ptr_lo/trk_ptr_hi. Entries
 ; 2E-33 (sound 07) start the same six streams as 19-1E (sound 04).
 entry_stream
     .word snd_00_0, snd_00_1, snd_00_2, snd_00_3       ; 00-03
@@ -97,7 +97,7 @@ entry_stream
     .word snd_1F_0                                     ; 7C-7C
 
 ; 125 words, one per entry E: the next entry of the sound, 0 for the last; read at 4694-469D
-; through (zp_15),y (base #<entry_next + E x 2, 467B-4692). Entry 0 is never a next entry, so
+; through (start_ptr),y (base #<entry_next + E x 2, 467B-4692). Entry 0 is never a next entry, so
 ; 0 can end the chain.
 entry_next
     .word $0001, $0002, $0003, $0004, $0005, $0006, $0007, $0000 ; 00-07
@@ -134,8 +134,8 @@ effect_voice
     .byte $80, $80, $80, $80, $00, $00, $10, $11, $12, $10, $20, $21, $20, $20, $20, $31 ; 20-2F
     .byte $30, $30, $31, $30, $31       ; 30-34
 
-; 53 bytes, one per effect: read at 5C56 into zp_5E,x, the channel's level, from which
-; sub_5C87 lowers the YM2151 volume in MIX while the effect plays (docs/10-adpcm.md section 4).
+; 53 bytes, one per effect: read at 5C56 into oki_duck,x, the channel's level, from which
+; oki_duck_ym lowers the YM2151 volume in MIX while the effect plays (docs/10-adpcm.md section 4).
 effect_duck
     .byte $00, $06, $06, $06, $06, $06, $06, $06, $06, $08, $08, $08, $08, $04, $04, $04 ; 00-0F
     .byte $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04 ; 10-1F
@@ -143,20 +143,21 @@ effect_duck
     .byte $00, $00, $00, $00, $00       ; 30-34
 
 ; 6 bytes: read at 43AE and 43BB with Y = the parameter 00-05: AND 1F, the global variable
-; (zp_23+n, the stream ops' registers R_GLOBAL+n) cmdtype_01 sets or cmdtype_02 adds to.
+; (seq_vars+n, the stream ops' registers R_GLOBAL+n) cmdtype_01_set_var sets or cmdtype_02_add_var
+; adds to.
 global_set_index
     .byte $00, $00, $00, $00, $00, $00
 
-; 6 bytes: the value cmdtype_01 stores (43B4) or cmdtype_02 adds (43C1). With these tables
-; commands 1E-23 set global 0 to 0-5 (var_load R_GLOBAL+0 reads it).
+; 6 bytes: the value cmdtype_01_set_var stores (43B4) or cmdtype_02_add_var adds (43C1). With these
+; tables commands 1E-23 set global 0 to 0-5 (var_load R_GLOBAL+0 reads it).
 global_set_value
     .byte $00, $01, $02, $03, $04, $05
 
 ; Role unknown (docs/12-sound-music.md section 7): 9 bytes up to the first stream (snd_0F_0);
-; read at 44C5 (Y: cmdtype_10), 44ED-451B (X: cmdtype_0D) and 58AB-590F (X = zp_4E and zp_4E x
-; 2: a word at 590A/590F becomes the pointer zp_49 of ymtimer.asm). No command has type 0D or
-; 10, none of these was executed in the make sndtrace runs and no index is bounded, so the
-; extent is the space left.
+; read at 44C5 (Y: cmdtype_10_ymtimer), 44ED-451B (X: cmdtype_0D_run_op) and 58AB-590F (X =
+; ymt_entry and ymt_entry x 2: a word at 590A/590F becomes the pointer ymt_ptr of ymtimer.asm). No
+; command has type 0D or 10, none of these was executed in the make sndtrace runs and no index is
+; bounded, so the extent is the space left.
 tbl_65DD
     .byte $00, $00, $00, $00, $00, $00, $00, $00, $00
 
