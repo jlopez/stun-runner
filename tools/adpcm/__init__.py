@@ -407,15 +407,20 @@ def step(signal: int, index: int, nibble: int) -> tuple[int, int]:
     return min(SIGNAL_MAX, max(SIGNAL_MIN, signal + d)), index
 
 
-def decode(data: bytes) -> list[int]:
-    """The 12-bit outputs (-2048..2047) the M6295 produces for a sample, one per nibble, from
-    the reset state (signal 0, step 0, as a voice starts: voice.m_adpcm.reset())."""
-    signal, index = 0, 0
+def decode_nibbles(nibs: list[int], start: tuple[int, int] = (0, 0)) -> list[int]:
+    """The decoder's outputs for a nibble sequence from a state (signal, step index)."""
+    signal, index = start
     out: list[int] = []
-    for n in nibbles(data):
+    for n in nibs:
         signal, index = step(signal, index, n)
         out.append(signal)
     return out
+
+
+def decode(data: bytes) -> list[int]:
+    """The 12-bit outputs (-2048..2047) the M6295 produces for a sample, one per nibble, from
+    the reset state (signal 0, step 0, as a voice starts: voice.m_adpcm.reset())."""
+    return decode_nibbles(nibbles(data))
 
 
 def pcm(data: bytes) -> list[int]:
@@ -428,30 +433,10 @@ def pcm(data: bytes) -> list[int]:
 Node = tuple[int, "Node"] | None  # a nibble history, newest first: (nibble, the history before)
 
 
-def encode(values: list[int]) -> bytes:
-    """ADPCM bytes for 16-bit PCM values, by the rule docs/10 section 6 states and proves:
-
-    The decoder state is (signal, step index), (0, 0) at the start. The encoder keeps a set of
-    candidate states, each with one nibble history that reaches it; at first only (0, 0). For
-    each value v in turn, every candidate and every nibble 0-15 gives a successor state, with
-    the error |SCALE * signal - v|. The new candidates are the successors whose error is the
-    smallest one this value allows (over all candidates and nibbles), one per distinct state,
-    each with the lexicographically smallest history that reaches it (candidates are kept in
-    history order and nibbles tried from 0 up, so the first successor found for a state is
-    that one). After the last value the first candidate's history is the result. An odd number
-    of values gets the last value once more, so the last byte has two nibbles.
-
-    Properties (docs/10 section 6): for any PCM the decoder produced, `pcm(encode(v)) == v`;
-    the bytes are the original ones unless some output is -2048 or 2047 (only a clamped output
-    can be reached by two nibbles from one state), and then they are the lexicographically
-    smallest bytes that decode to v. For any other PCM (an edit) each value is followed as
-    closely as the rule allows, one value at a time (not a global optimum); `round_trip` gives
-    the error. At most 98 candidates (two signals at the smallest distance x 49 step indices).
-    """
-    if not values:
-        raise FormatError("no samples")
-    targets = list(values) + ([values[-1]] if len(values) & 1 else [])
-    cands: list[tuple[int, int, Node]] = [(0, 0, None)]
+def encode_nibbles(targets: list[int], start: tuple[int, int] = (0, 0)) -> list[int]:
+    """The encoder's nibble for each 16-bit target, from a decoder state (signal, step
+    index): the rule `encode` states, one nibble per value."""
+    cands: list[tuple[int, int, Node]] = [(start[0], start[1], None)]
     for v in targets:
         if len(cands) == 1 and v % SCALE == 0:
             # the common case: one candidate and a value on the decoder's grid that one nibble
@@ -478,6 +463,32 @@ def encode(values: list[int]) -> bytes:
         out.append(node[0])
         node = node[1]
     out.reverse()
+    return out
+
+
+def encode(values: list[int]) -> bytes:
+    """ADPCM bytes for 16-bit PCM values, by the rule docs/10 section 6 states and proves:
+
+    The decoder state is (signal, step index), (0, 0) at the start. The encoder keeps a set of
+    candidate states, each with one nibble history that reaches it; at first only (0, 0). For
+    each value v in turn, every candidate and every nibble 0-15 gives a successor state, with
+    the error |SCALE * signal - v|. The new candidates are the successors whose error is the
+    smallest one this value allows (over all candidates and nibbles), one per distinct state,
+    each with the lexicographically smallest history that reaches it (candidates are kept in
+    history order and nibbles tried from 0 up, so the first successor found for a state is
+    that one). After the last value the first candidate's history is the result. An odd number
+    of values gets the last value once more, so the last byte has two nibbles.
+
+    Properties (docs/10 section 6): for any PCM the decoder produced, `pcm(encode(v)) == v`;
+    the bytes are the original ones unless some output is -2048 or 2047 (only a clamped output
+    can be reached by two nibbles from one state), and then they are the lexicographically
+    smallest bytes that decode to v. For any other PCM (an edit) each value is followed as
+    closely as the rule allows, one value at a time (not a global optimum); `round_trip` gives
+    the error. At most 98 candidates (two signals at the smallest distance x 49 step indices).
+    """
+    if not values:
+        raise FormatError("no samples")
+    out = encode_nibbles(list(values) + ([values[-1]] if len(values) & 1 else []))
     return bytes(out[i] << 4 | out[i + 1] for i in range(0, len(out), 2))
 
 

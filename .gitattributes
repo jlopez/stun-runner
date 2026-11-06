@@ -1,3 +1,6 @@
 # IDA databases are never committed (they embed the ROM bytes; docs/05-ida.md, .gitignore). The
 # LFS route stays as a guard for any large binary that is not ROM-derived.
 *.i64 filter=lfs diff=lfs merge=lfs -text
+
+# The committed samples (data/oki/*.wav, docs/10-adpcm.md): PCM audio, never diffed as text.
+*.wav binary
