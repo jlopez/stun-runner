@@ -30,7 +30,7 @@ ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate \
 	dasm oracle pcwatch objects objtrace objlevels pictures view somdump fieldext depthkeys vskip \
-	okitrace oki-pcm sndtrace soundcheck listen FORCE
+	okitrace oki-pcm sndtrace soundcheck listen sndproto FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -414,6 +414,37 @@ okitrace: $(OKI_RUNS:%=$(BUILD)/mame/okitrace-%.txt) $(BUILD)/$(SET)-oki.bin \
 		$(BUILD)/$(SET)-jsa.bin $(OKI_TOOLS)
 	$(PYTHON) tools/adpcm survey --image $(BUILD)/$(SET)-oki.bin --jsa $(BUILD)/$(SET)-jsa.bin \
 		--manifest $(OKI_MANIFEST) $(OKI_RUNS:%=$(BUILD)/mame/okitrace-%.txt)
+
+# The sound command protocol between the 68010 and the 6502 (docs/11-sound-protocol.md):
+# tools/mame/sndproto.lua taps both ends of the latch pair (the 68010's writes and reads at 600000,
+# its sound resets at 604000, its command queue at FFDB64, the 6502's reads of 2802, its responses
+# at 2A02 and its dispatch), in five runs, each from its own empty NVRAM and cfg: attract mode, a
+# game (coin at 900, start at 960, the trigger every 20 frames), attract mode with the immediate
+# commands and the bytes above 6C written to the sound latch, and the boot program's test menus
+# driven with the buttons: "SA SELF TEST" and "PLAY SOUNDS" (the game's audio test, every one of
+# its 108 entries played). Into build/mame/sndproto-<run>.txt (addresses, command and response
+# values, counts); `make test` (tools/test_sound_commands.py) checks data/sound/commands.json
+# against them when they are there. `make -j5 sndproto`. Needs MAME and the ROMs.
+SNDPROTO_RUNS := attract game inject selftest soundtest
+SNDPROTO_INJECT := 1200:07,1260:06,1320:03,1380:09,1440:08,1442:5A,1500:07,1560:6D,1620:7F
+SNDPROTO_INJECT := $(SNDPROTO_INJECT),1680:80,1740:FF,1800:07
+
+$(BUILD)/mame/sndproto-attract.txt: PROTO_ENV = PROTO_FRAMES=10800
+$(BUILD)/mame/sndproto-game.txt: PROTO_ENV = PROTO_FRAMES=10800 PROTO_PLAY=1
+$(BUILD)/mame/sndproto-inject.txt: PROTO_ENV = PROTO_FRAMES=1900 PROTO_INJECT=$(SNDPROTO_INJECT)
+$(BUILD)/mame/sndproto-selftest.txt: PROTO_ENV = PROTO_FRAMES=2800 PROTO_MENU=selftest
+$(BUILD)/mame/sndproto-soundtest.txt: PROTO_ENV = PROTO_FRAMES=6400 PROTO_MENU=soundtest
+
+$(SNDPROTO_RUNS:%=$(BUILD)/mame/sndproto-%.txt): $(BUILD)/mame/sndproto-%.txt: tools/mame/sndproto.lua FORCE
+	$(call TRACE_STATE,sndproto-$*)
+	rm -f $@ $(BUILD)/mame/sndproto-$*done
+	PROTO_DIR=$(BUILD)/mame/ PROTO_NAME=sndproto-$* $(PROTO_ENV) SDL_VIDEODRIVER=dummy $(MAME) \
+		stunrun $(MAME_FLAGS) $(call TRACE_DIRS,sndproto-$*) -autoboot_script tools/mame/sndproto.lua
+	@test -f $(BUILD)/mame/sndproto-$*done || { echo "sndproto: the $* run did not finish"; \
+		exit 1; }
+
+sndproto: $(SNDPROTO_RUNS:%=$(BUILD)/mame/sndproto-%.txt)
+	$(PYTHON) -m pytest -q tools/test_sound_commands.py
 
 # Every phrase the manifest names decoded to 16-bit PCM by MAME's M6295 decoder (tools/adpcm pcm;
 # a renamed phrase's old file is removed), at the rate
