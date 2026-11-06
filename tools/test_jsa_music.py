@@ -109,7 +109,7 @@ def test_op_lengths_are_the_handlers_reads() -> None:
     returns (run_op hands it the first operand byte in A). Branches read their target in
     branch_taken or skip it in branch_not_taken (two calls each)."""
     seq = (TREE / "sequencer.asm").read_text()
-    table = re.findall(r"^    \.word (\w+)-1\s+; \$([0-9A-F]{2})$", seq, re.M)
+    table = re.findall(r"^    \.word (\w+)-1\s+; \$([0-9A-F]{2}) \w+$", seq, re.M)
     assert len(table) == 0x3B
     for handler, op_hex in table:
         op = jm.OPS[int(op_hex, 16)]

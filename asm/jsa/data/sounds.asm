@@ -152,10 +152,11 @@ global_set_index
 global_set_value
     .byte $00, $01, $02, $03, $04, $05
 
-; Role unknown (docs/12-sound-music.md section 7): 9 bytes up to the first stream (snd_0F_0); read at 44C5 (Y), 44ED-451B (X: cmdtype_0D, no
-; command has type 0D) and 58AB-590F (X = zp_4E and zp_4E x 2: a word at 590A/590F becomes the
-; pointer zp_49 of ymtimer.asm). None of these was executed in the make sndtrace runs and no
-; command reaches them with a bounded index, so the extent is the space left.
+; Role unknown (docs/12-sound-music.md section 7): 9 bytes up to the first stream (snd_0F_0);
+; read at 44C5 (Y: cmdtype_10), 44ED-451B (X: cmdtype_0D) and 58AB-590F (X = zp_4E and zp_4E x
+; 2: a word at 590A/590F becomes the pointer zp_49 of ymtimer.asm). No command has type 0D or
+; 10, none of these was executed in the make sndtrace runs and no index is bounded, so the
+; extent is the space left.
 tbl_65DD
     .byte $00, $00, $00, $00, $00, $00, $00, $00, $00
 

@@ -4,7 +4,7 @@
 
     .cerror * != $9EFA, "patches_2.asm must start at $9EFA"
 
-; used by snd_06_0, snd_06_6
+; named by the patch, lfo or noise ops of snd_06_0, snd_06_6
 patch_1A
     #ym_voice $C4, $00, $00, $00
     #ym_operator $72, $1D, $94, $02, $00, $07 ; M1
@@ -18,7 +18,7 @@ patch_1A
     #ym_lfo $C3, $E4, $02, $02
     #ym_noise $00, $00
 
-; used by snd_0D_6
+; named by the patch, lfo or noise ops of snd_0D_6
 patch_1B
     #ym_voice $E8, $00, $00, $00
     #ym_operator $30, $0F, $DF, $0A, $09, $29 ; M1
@@ -32,7 +32,7 @@ patch_1B
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_01_4, snd_04_4, snd_0E_4
+; named by the patch, lfo or noise ops of snd_01_4, snd_04_4, snd_0E_4
 patch_1C
     #ym_voice $C7, $00, $00, $00
     #ym_operator $00, $00, $1F, $93, $00, $CF ; M1
@@ -46,7 +46,7 @@ patch_1C
     #ym_lfo $00, $80, $00, $01
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_1D
     #ym_voice $E9, $00, $00, $00
     #ym_operator $70, $1F, $1F, $0A, $06, $02 ; M1
@@ -60,7 +60,7 @@ patch_1D
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_0C_0, snd_0C_1
+; named by the patch, lfo or noise ops of snd_0C_0, snd_0C_1
 patch_1E
     #ym_voice $FB, $00, $00, $00
     #ym_operator $72, $1D, $12, $0E, $00, $4A ; M1
@@ -74,7 +74,7 @@ patch_1E
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_0C_5, snd_0C_7
+; named by the patch, lfo or noise ops of snd_0C_5, snd_0C_7
 patch_1F
     #ym_voice $FC, $00, $00, $30
     #ym_operator $31, $1B, $1F, $09, $00, $17 ; M1
@@ -88,7 +88,7 @@ patch_1F
     #ym_lfo $CD, $FF, $00, $02
     #ym_noise $02, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_20
     #ym_voice $C7, $00, $00, $00
     #ym_operator $01, $00, $10, $80, $80, $08 ; M1
@@ -102,7 +102,7 @@ patch_20
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_21
     #ym_voice $FB, $00, $00, $00
     #ym_operator $0F, $23, $DF, $0C, $0F, $F3 ; M1
@@ -116,7 +116,7 @@ patch_21
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_22
     #ym_voice $FB, $00, $00, $00
     #ym_operator $00, $7F, $1F, $18, $00, $F6 ; M1
@@ -130,8 +130,10 @@ patch_22
     #ym_lfo $00, $80, $00, $01
     #ym_noise $00, $00
 
-; used by snd_01_2, snd_01_3, snd_04_5, snd_08_5, snd_09_4, snd_0A_6, snd_0B_5, snd_0B_6, snd_0B_7, snd_0C_6, snd_0E_2, snd_0E_4, unused_stream_05, unused_stream_07
+; named by the patch, lfo or noise ops of snd_01_2, snd_01_3, snd_04_5, snd_08_5, snd_09_4,
 patch_23
+; snd_0A_6, snd_0B_5, snd_0B_6, snd_0B_7, snd_0C_6, snd_0E_2, snd_0E_4, unused_stream_05,
+; unused_stream_07
     #ym_voice $F4, $00, $00, $00
     #ym_operator $04, $08, $1F, $01, $C7, $F0 ; M1
     #ym_operator $02, $08, $1F, $07, $07, $54 ; M2
@@ -144,7 +146,7 @@ patch_23
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_24
     #ym_voice $F4, $00, $00, $00
     #ym_operator $04, $08, $1F, $01, $C7, $F7 ; M1
@@ -158,8 +160,9 @@ patch_24
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by unused_stream_03, unused_stream_04, unused_stream_06, unused_stream_07
+; named by the patch, lfo or noise ops of unused_stream_03, unused_stream_04, unused_stream_06,
 patch_25
+; unused_stream_07
     #ym_voice $E2, $00, $00, $00
     #ym_operator $65, $18, $9E, $1B, $01, $37 ; M1
     #ym_operator $71, $14, $9E, $02, $02, $86 ; M2
@@ -172,7 +175,7 @@ patch_25
     #ym_lfo $C8, $80, $01, $02
     #ym_noise $00, $07
 
-; used by snd_03_0, snd_05_6, snd_05_7
+; named by the patch, lfo or noise ops of snd_03_0, snd_05_6, snd_05_7
 patch_26
     #ym_voice $FC, $00, $00, $00
     #ym_operator $03, $2B, $5F, $0F, $12, $54 ; M1
@@ -186,7 +189,7 @@ patch_26
     #ym_lfo $C8, $00, $00, $02
     #ym_noise $00, $00
 
-; used by snd_0C_0, snd_0C_1, snd_0C_2, snd_0C_4
+; named by the patch, lfo or noise ops of snd_0C_0, snd_0C_1, snd_0C_2, snd_0C_4
 patch_27
     #ym_voice $F4, $00, $00, $00
     #ym_operator $72, $1A, $54, $05, $02, $22 ; M1
@@ -200,7 +203,7 @@ patch_27
     #ym_lfo $CA, $BC, $03, $02
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_28
     #ym_voice $D0, $00, $00, $00
     #ym_operator $06, $2D, $DF, $05, $00, $F7 ; M1
@@ -214,7 +217,7 @@ patch_28
     #ym_lfo $00, $80, $00, $00
     #ym_noise $02, $00
 
-; used by snd_06_3, snd_06_5
+; named by the patch, lfo or noise ops of snd_06_3, snd_06_5
 patch_29
     #ym_voice $E0, $00, $00, $00
     #ym_operator $36, $1A, $DF, $07, $07, $29 ; M1
@@ -228,7 +231,7 @@ patch_29
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_06_4
+; named by the patch, lfo or noise ops of snd_06_4
 patch_2A
     #ym_voice $F0, $00, $00, $01
     #ym_operator $30, $15, $9E, $0E, $08, $B6 ; M1
@@ -242,7 +245,7 @@ patch_2A
     #ym_lfo $C8, $80, $02, $02
     #ym_noise $00, $00
 
-; used by snd_08_5, snd_09_4, snd_0A_6
+; named by the patch, lfo or noise ops of snd_08_5, snd_09_4, snd_0A_6
 patch_2B
     #ym_voice $FC, $00, $00, $00
     #ym_operator $0F, $08, $1F, $14, $04, $08 ; M1
@@ -256,7 +259,7 @@ patch_2B
     #ym_lfo $C8, $FF, $00, $02
     #ym_noise $02, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_2C
     #ym_voice $C6, $00, $00, $00
     #ym_operator $00, $12, $1F, $0F, $0F, $0A ; M1
@@ -270,8 +273,9 @@ patch_2C
     #ym_lfo $AF, $FF, $00, $02
     #ym_noise $02, $00
 
-; used by snd_02_2, snd_02_3, snd_04_0, snd_04_1, snd_0B_0, snd_0B_1, snd_0B_2, snd_0B_3, snd_0B_4, snd_0B_5, unused_stream_04, unused_stream_06
+; named by the patch, lfo or noise ops of snd_02_2, snd_02_3, snd_04_0, snd_04_1, snd_0B_0,
 patch_2D
+; snd_0B_1, snd_0B_2, snd_0B_3, snd_0B_4, snd_0B_5, unused_stream_04, unused_stream_06
     #ym_voice $FA, $00, $00, $00
     #ym_operator $32, $1E, $1F, $00, $00, $03 ; M1
     #ym_operator $72, $19, $1F, $00, $00, $03 ; M2
@@ -284,7 +288,7 @@ patch_2D
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by unused_stream_09
+; named by the patch, lfo or noise ops of unused_stream_09
 patch_2E
     #ym_voice $C1, $00, $00, $00
     #ym_operator $60, $12, $1F, $00, $00, $03 ; M1
@@ -298,7 +302,7 @@ patch_2E
     #ym_lfo $D6, $CD, $00, $03
     #ym_noise $00, $00
 
-; used by snd_04_3
+; named by the patch, lfo or noise ops of snd_04_3
 patch_2F
     #ym_voice $C1, $00, $00, $00
     #ym_operator $60, $12, $1F, $00, $00, $03 ; M1
@@ -312,7 +316,7 @@ patch_2F
     #ym_lfo $D6, $CD, $00, $03
     #ym_noise $00, $00
 
-; used by unused_stream_10
+; named by the patch, lfo or noise ops of unused_stream_10
 patch_30
     #ym_voice $FB, $00, $00, $00
     #ym_operator $1D, $28, $0F, $13, $09, $06 ; M1
@@ -326,7 +330,7 @@ patch_30
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_31
     #ym_voice $DB, $00, $00, $00
     #ym_operator $72, $1F, $5F, $11, $07, $AA ; M1
@@ -340,8 +344,9 @@ patch_31
     #ym_lfo $BF, $EC, $01, $02
     #ym_noise $02, $00
 
-; used by snd_02_0, snd_02_1, snd_04_2, snd_0E_0, snd_0E_3, unused_stream_09
+; named by the patch, lfo or noise ops of snd_02_0, snd_02_1, snd_04_2, snd_0E_0, snd_0E_3,
 patch_32
+; unused_stream_09
     #ym_voice $E1, $00, $00, $00
     #ym_operator $50, $12, $17, $04, $05, $CB ; M1
     #ym_operator $30, $0E, $16, $01, $04, $2D ; M2
@@ -354,7 +359,7 @@ patch_32
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_01_3
+; named by the patch, lfo or noise ops of snd_01_3
 patch_33
     #ym_voice $E5, $00, $00, $00
     #ym_operator $00, $08, $1F, $00, $1F, $BD ; M1
@@ -368,7 +373,7 @@ patch_33
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_0D_0, snd_0D_1, snd_0D_2
+; named by the patch, lfo or noise ops of snd_0D_0, snd_0D_1, snd_0D_2
 patch_34
     #ym_voice $DD, $00, $00, $70
     #ym_operator $00, $08, $1F, $0B, $49, $04 ; M1
@@ -382,7 +387,7 @@ patch_34
     #ym_lfo $B4, $FF, $00, $03
     #ym_noise $02, $00
 
-; used by snd_06_2
+; named by the patch, lfo or noise ops of snd_06_2
 patch_35
     #ym_voice $EC, $00, $00, $00
     #ym_operator $71, $16, $C7, $02, $01, $07 ; M1
@@ -396,8 +401,9 @@ patch_35
     #ym_lfo $AF, $80, $02, $02
     #ym_noise $00, $00
 
-; used by snd_04_5, unused_stream_05, unused_stream_06, unused_stream_07
+; named by the patch, lfo or noise ops of snd_04_5, unused_stream_05, unused_stream_06,
 patch_36
+; unused_stream_07
     #ym_voice $FC, $00, $00, $00
     #ym_operator $79, $08, $1F, $00, $C0, $F0 ; M1
     #ym_operator $0F, $19, $1F, $00, $DF, $BF ; M2
@@ -410,7 +416,7 @@ patch_36
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_37
     #ym_voice $FC, $00, $00, $00
     #ym_operator $7F, $08, $1F, $0D, $DF, $AF ; M1
@@ -424,8 +430,9 @@ patch_37
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_01_2, snd_01_3, snd_02_5, snd_0B_6, snd_0B_7, snd_0E_2, snd_0E_3, snd_0E_4
+; named by the patch, lfo or noise ops of snd_01_2, snd_01_3, snd_02_5, snd_0B_6, snd_0B_7,
 patch_38
+; snd_0E_2, snd_0E_3, snd_0E_4
     #ym_voice $DB, $00, $00, $00
     #ym_operator $06, $2A, $1F, $00, $00, $FF ; M1
     #ym_operator $03, $08, $1F, $14, $00, $FF ; M2
@@ -438,7 +445,7 @@ patch_38
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by unused_stream_09
+; named by the patch, lfo or noise ops of unused_stream_09
 patch_39
     #ym_voice $D9, $00, $00, $00
     #ym_operator $70, $0F, $5B, $0B, $0A, $5B ; M1
@@ -452,7 +459,7 @@ patch_39
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by unused_stream_09
+; named by the patch, lfo or noise ops of unused_stream_09
 patch_3A
     #ym_voice $D9, $00, $00, $00
     #ym_operator $70, $0F, $5B, $04, $05, $5B ; M1
@@ -466,7 +473,7 @@ patch_3A
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by unused_stream_11
+; named by the patch, lfo or noise ops of unused_stream_11
 patch_3B
     #ym_voice $C1, $00, $00, $00
     #ym_operator $21, $17, $12, $02, $00, $2C ; M1
@@ -480,7 +487,7 @@ patch_3B
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_03_1
+; named by the patch, lfo or noise ops of snd_03_1
 patch_3C
     #ym_voice $F4, $00, $00, $00
     #ym_operator $32, $23, $1F, $00, $00, $00 ; M1
@@ -494,7 +501,7 @@ patch_3C
     #ym_lfo $CB, $EE, $05, $02
     #ym_noise $02, $00
 
-; used by snd_01_0, snd_01_1
+; named by the patch, lfo or noise ops of snd_01_0, snd_01_1
 patch_3D
     #ym_voice $F4, $00, $00, $00
     #ym_operator $32, $1B, $1F, $00, $00, $00 ; M1
@@ -508,7 +515,7 @@ patch_3D
     #ym_lfo $CB, $EE, $05, $02
     #ym_noise $02, $00
 
-; used by snd_06_1
+; named by the patch, lfo or noise ops of snd_06_1
 patch_3E
     #ym_voice $C2, $00, $00, $00
     #ym_operator $31, $19, $0E, $06, $00, $35 ; M1
@@ -522,7 +529,7 @@ patch_3E
     #ym_lfo $CD, $B9, $03, $02
     #ym_noise $00, $00
 
-; used by snd_0C_7
+; named by the patch, lfo or noise ops of snd_0C_7
 patch_3F
     #ym_voice $E5, $00, $00, $00
     #ym_operator $71, $0F, $8E, $0A, $00, $15 ; M1
@@ -536,7 +543,7 @@ patch_3F
     #ym_lfo $C8, $9E, $03, $02
     #ym_noise $00, $00
 
-; used by snd_0A_7, snd_0B_0, snd_0B_1, snd_0D_7
+; named by the patch, lfo or noise ops of snd_0A_7, snd_0B_0, snd_0B_1, snd_0D_7
 patch_40
     #ym_voice $FC, $00, $00, $00
     #ym_operator $32, $1C, $1F, $07, $00, $12 ; M1
@@ -550,7 +557,7 @@ patch_40
     #ym_lfo $C9, $A8, $00, $02
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_41
     #ym_voice $EC, $00, $00, $00
     #ym_operator $73, $1E, $DC, $02, $00, $07 ; M1
@@ -564,7 +571,7 @@ patch_41
     #ym_lfo $AF, $80, $02, $02
     #ym_noise $00, $00
 
-; used by snd_08_0, snd_08_3, snd_0A_1
+; named by the patch, lfo or noise ops of snd_08_0, snd_08_3, snd_0A_1
 patch_42
     #ym_voice $FE, $00, $00, $00
     #ym_operator $01, $29, $1F, $0A, $0F, $59 ; M1
@@ -578,7 +585,7 @@ patch_42
     #ym_lfo $CD, $9D, $04, $02
     #ym_noise $00, $00
 
-; used by snd_05_0
+; named by the patch, lfo or noise ops of snd_05_0
 patch_43
     #ym_voice $C4, $00, $00, $00
     #ym_operator $04, $23, $55, $0C, $07, $14 ; M1
@@ -592,7 +599,7 @@ patch_43
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_05_1
+; named by the patch, lfo or noise ops of snd_05_1
 patch_44
     #ym_voice $C4, $00, $00, $00
     #ym_operator $04, $23, $55, $0C, $07, $14 ; M1
@@ -606,7 +613,7 @@ patch_44
     #ym_lfo $00, $80, $00, $02
     #ym_noise $00, $00
 
-; used by unused_stream_05, unused_stream_07, unused_stream_12
+; named by the patch, lfo or noise ops of unused_stream_05, unused_stream_07, unused_stream_12
 patch_45
     #ym_voice $C0, $00, $00, $00
     #ym_operator $01, $24, $0C, $08, $C0, $F8 ; M1
@@ -620,8 +627,9 @@ patch_45
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_01_0, snd_01_2, snd_02_4, snd_04_2, snd_08_0, snd_09_4, snd_0A_5, snd_0B_0, snd_0B_1, snd_0B_5, snd_0B_7, snd_0E_3
+; named by the patch, lfo or noise ops of snd_01_0, snd_01_2, snd_02_4, snd_04_2, snd_08_0,
 patch_46
+; snd_09_4, snd_0A_5, snd_0B_0, snd_0B_1, snd_0B_5, snd_0B_7, snd_0E_3
     #ym_voice $C0, $00, $00, $00
     #ym_operator $01, $24, $16, $08, $C0, $F8 ; M1
     #ym_operator $00, $14, $1B, $00, $00, $08 ; M2
@@ -634,7 +642,7 @@ patch_46
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_02_6
+; named by the patch, lfo or noise ops of snd_02_6
 patch_47
     #ym_voice $E0, $00, $00, $00
     #ym_operator $36, $1A, $DF, $07, $07, $29 ; M1
@@ -648,8 +656,9 @@ patch_47
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_08_0, snd_08_1, snd_08_2, snd_0A_0, snd_0A_2, snd_0A_3, snd_0D_2, snd_0D_3
+; named by the patch, lfo or noise ops of snd_08_0, snd_08_1, snd_08_2, snd_0A_0, snd_0A_2,
 patch_48
+; snd_0A_3, snd_0D_2, snd_0D_3
     #ym_voice $F4, $00, $00, $00
     #ym_operator $01, $1E, $10, $01, $00, $18 ; M1
     #ym_operator $01, $1E, $10, $01, $00, $18 ; M2
@@ -662,7 +671,7 @@ patch_48
     #ym_lfo $00, $80, $00, $02
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_49
     #ym_voice $C4, $00, $00, $00
     #ym_operator $01, $19, $1E, $08, $05, $0A ; M1
@@ -676,8 +685,9 @@ patch_49
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_01_0, snd_01_1, snd_01_2, snd_03_0, snd_03_1, unused_stream_03, unused_stream_04, unused_stream_05, unused_stream_06, unused_stream_07
+; named by the patch, lfo or noise ops of snd_01_0, snd_01_1, snd_01_2, snd_03_0, snd_03_1,
 patch_4A
+; unused_stream_03, unused_stream_04, unused_stream_05, unused_stream_06, unused_stream_07
     #ym_voice $FA, $00, $00, $00
     #ym_operator $34, $22, $1F, $00, $00, $03 ; M1
     #ym_operator $72, $14, $1F, $00, $00, $03 ; M2
@@ -690,7 +700,7 @@ patch_4A
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_4B
     #ym_voice $E8, $00, $00, $00
     #ym_operator $3F, $12, $DF, $1F, $07, $00 ; M1
@@ -704,7 +714,7 @@ patch_4B
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_03_4
+; named by the patch, lfo or noise ops of snd_03_4
 patch_4C
     #ym_voice $FD, $00, $00, $00
     #ym_operator $01, $1C, $9F, $0A, $00, $13 ; M1
@@ -718,7 +728,7 @@ patch_4C
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by unused_stream_10
+; named by the patch, lfo or noise ops of unused_stream_10
 patch_4D
     #ym_voice $C7, $00, $00, $00
     #ym_operator $01, $00, $1F, $80, $1F, $FF ; M1
@@ -732,7 +742,7 @@ patch_4D
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_4E
     #ym_voice $C2, $00, $00, $31
     #ym_operator $37, $1E, $9F, $06, $02, $01 ; M1
@@ -746,7 +756,7 @@ patch_4E
     #ym_lfo $C8, $8A, $03, $02
     #ym_noise $00, $00
 
-; used by snd_02_5, snd_04_4, snd_0B_6, snd_0B_7, snd_0C_6
+; named by the patch, lfo or noise ops of snd_02_5, snd_04_4, snd_0B_6, snd_0B_7, snd_0C_6
 patch_4F
     #ym_voice $FC, $00, $00, $00
     #ym_operator $03, $0C, $1F, $00, $00, $08 ; M1
@@ -760,7 +770,7 @@ patch_4F
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_01_4, snd_0E_3, snd_0E_4
+; named by the patch, lfo or noise ops of snd_01_4, snd_0E_3, snd_0E_4
 patch_50
     #ym_voice $FC, $00, $00, $00
     #ym_operator $7F, $08, $1F, $05, $C5, $F8 ; M1
@@ -774,7 +784,7 @@ patch_50
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_09_4, snd_0E_0
+; named by the patch, lfo or noise ops of snd_09_4, snd_0E_0
 patch_51
     #ym_voice $F4, $00, $00, $00
     #ym_operator $73, $23, $18, $00, $C0, $0A ; M1
@@ -788,7 +798,7 @@ patch_51
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_0A_0, snd_0A_1
+; named by the patch, lfo or noise ops of snd_0A_0, snd_0A_1
 patch_52
     #ym_voice $EA, $00, $00, $00
     #ym_operator $10, $0F, $5C, $07, $00, $13 ; M1
@@ -802,7 +812,7 @@ patch_52
     #ym_lfo $CA, $BC, $03, $02
     #ym_noise $00, $00
 
-; used by snd_0D_5, snd_0D_6
+; named by the patch, lfo or noise ops of snd_0D_5, snd_0D_6
 patch_53
     #ym_voice $FC, $00, $00, $00
     #ym_operator $31, $20, $1F, $09, $00, $07 ; M1
@@ -816,7 +826,7 @@ patch_53
     #ym_lfo $CD, $FF, $00, $02
     #ym_noise $02, $00
 
-; used by snd_0D_0, snd_0D_1, snd_0D_2, snd_0D_3, snd_0D_4
+; named by the patch, lfo or noise ops of snd_0D_0, snd_0D_1, snd_0D_2, snd_0D_3, snd_0D_4
 patch_54
     #ym_voice $FC, $00, $00, $00
     #ym_operator $31, $1D, $1F, $0A, $00, $16 ; M1
@@ -830,7 +840,7 @@ patch_54
     #ym_lfo $CD, $FF, $00, $02
     #ym_noise $02, $00
 
-; used by snd_03_2, snd_03_3, snd_05_2, snd_05_3, snd_05_4
+; named by the patch, lfo or noise ops of snd_03_2, snd_03_3, snd_05_2, snd_05_3, snd_05_4
 patch_55
     #ym_voice $FC, $00, $00, $00
     #ym_operator $72, $1D, $1F, $07, $00, $15 ; M1
@@ -844,7 +854,7 @@ patch_55
     #ym_lfo $C9, $A8, $00, $02
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_56
     #ym_voice $EC, $00, $00, $00
     #ym_operator $72, $0F, $1F, $07, $00, $05 ; M1
@@ -858,7 +868,7 @@ patch_56
     #ym_lfo $C9, $A8, $00, $02
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_57
     #ym_voice $F3, $00, $00, $00
     #ym_operator $32, $18, $1F, $00, $00, $00 ; M1
@@ -872,7 +882,7 @@ patch_57
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_05_5
+; named by the patch, lfo or noise ops of snd_05_5
 patch_58
     #ym_voice $F9, $00, $00, $00
     #ym_operator $02, $16, $5F, $0C, $00, $F4 ; M1
@@ -886,8 +896,9 @@ patch_58
     #ym_lfo $C8, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_01_1, snd_09_4, snd_0B_0, snd_0B_1, snd_0B_6, snd_0B_7, snd_0E_1, unused_stream_05, unused_stream_06
+; named by the patch, lfo or noise ops of snd_01_1, snd_09_4, snd_0B_0, snd_0B_1, snd_0B_6,
 patch_59
+; snd_0B_7, snd_0E_1, unused_stream_05, unused_stream_06
     #ym_voice $DC, $00, $00, $00
     #ym_operator $72, $08, $1F, $07, $00, $18 ; M1
     #ym_operator $33, $0B, $1F, $07, $00, $18 ; M2
@@ -900,7 +911,7 @@ patch_59
     #ym_lfo $C9, $A8, $00, $02
     #ym_noise $00, $00
 
-; used by snd_02_5, snd_04_4, snd_0B_6, snd_0B_7
+; named by the patch, lfo or noise ops of snd_02_5, snd_04_4, snd_0B_6, snd_0B_7
 patch_5A
     #ym_voice $C4, $00, $00, $00
     #ym_operator $00, $7F, $1C, $1F, $1F, $BF ; M1
@@ -914,7 +925,7 @@ patch_5A
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by snd_01_4, snd_0E_4
+; named by the patch, lfo or noise ops of snd_01_4, snd_0E_4
 patch_5B
     #ym_voice $FC, $00, $00, $00
     #ym_operator $06, $7F, $1F, $00, $00, $06 ; M1
@@ -928,7 +939,7 @@ patch_5B
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_5C
     #ym_voice $FD, $00, $00, $00
     #ym_operator $01, $1D, $10, $07, $01, $24 ; M1
@@ -942,7 +953,7 @@ patch_5C
     #ym_lfo $C6, $E4, $05, $02
     #ym_noise $02, $00
 
-; used by snd_08_0, snd_08_1, snd_08_2, snd_08_3, snd_08_5
+; named by the patch, lfo or noise ops of snd_08_0, snd_08_1, snd_08_2, snd_08_3, snd_08_5
 patch_5D
     #ym_voice $FA, $00, $00, $00
     #ym_operator $01, $19, $8E, $0E, $00, $13 ; M1
@@ -956,8 +967,9 @@ patch_5D
     #ym_lfo $C8, $BC, $05, $02
     #ym_noise $00, $00
 
-; used by snd_08_2, snd_08_3, snd_08_4, snd_08_6, snd_0B_4, snd_0C_3, snd_0D_4, snd_0D_5
+; named by the patch, lfo or noise ops of snd_08_2, snd_08_3, snd_08_4, snd_08_6, snd_0B_4,
 patch_5E
+; snd_0C_3, snd_0D_4, snd_0D_5
     #ym_voice $FD, $00, $00, $00
     #ym_operator $01, $1C, $8D, $07, $00, $14 ; M1
     #ym_operator $01, $06, $14, $8E, $00, $18 ; M2
@@ -970,8 +982,9 @@ patch_5E
     #ym_lfo $C6, $A8, $03, $02
     #ym_noise $02, $00
 
-; used by snd_0A_2, snd_0A_3, snd_0B_0, snd_0B_1, snd_0B_2, snd_0B_3, snd_0B_7, snd_0C_0, snd_0C_1, snd_0C_2, snd_0C_4, snd_0C_5, snd_0D_0, snd_0D_1
+; named by the patch, lfo or noise ops of snd_0A_2, snd_0A_3, snd_0B_0, snd_0B_1, snd_0B_2,
 patch_5F
+; snd_0B_3, snd_0B_7, snd_0C_0, snd_0C_1, snd_0C_2, snd_0C_4, snd_0C_5, snd_0D_0, snd_0D_1
     #ym_voice $FD, $00, $00, $00
     #ym_operator $01, $1C, $8E, $08, $00, $14 ; M1
     #ym_operator $01, $02, $14, $8E, $00, $18 ; M2
@@ -984,7 +997,7 @@ patch_5F
     #ym_lfo $C8, $8A, $05, $02
     #ym_noise $02, $00
 
-; used by snd_0B_0, snd_0B_1
+; named by the patch, lfo or noise ops of snd_0B_0, snd_0B_1
 patch_60
     #ym_voice $F2, $00, $00, $00
     #ym_operator $01, $11, $8E, $0E, $00, $13 ; M1
@@ -998,8 +1011,9 @@ patch_60
     #ym_lfo $C5, $BC, $05, $02
     #ym_noise $00, $00
 
-; used by snd_08_7, snd_0A_4, snd_0A_5, snd_0C_4, snd_0C_5, snd_0D_7
+; named by the patch, lfo or noise ops of snd_08_7, snd_0A_4, snd_0A_5, snd_0C_4, snd_0C_5,
 patch_61
+; snd_0D_7
     #ym_voice $FD, $00, $00, $00
     #ym_operator $00, $1A, $0F, $08, $00, $14 ; M1
     #ym_operator $01, $00, $12, $8E, $00, $28 ; M2
@@ -1012,7 +1026,7 @@ patch_61
     #ym_lfo $C6, $9E, $03, $02
     #ym_noise $02, $00
 
-; no patch op points here
+; no patch, lfo or noise op names this record
 patch_62
     #ym_voice $DD, $00, $00, $00
     #ym_operator $01, $25, $1E, $0A, $14, $FA ; M1
@@ -1026,8 +1040,9 @@ patch_62
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by unused_stream_03, unused_stream_04, unused_stream_06, unused_stream_07
+; named by the patch, lfo or noise ops of unused_stream_03, unused_stream_04, unused_stream_06,
 patch_63
+; unused_stream_07
     #ym_voice $ED, $00, $00, $00
     #ym_operator $01, $25, $1E, $0A, $14, $FA ; M1
     #ym_operator $01, $07, $1F, $8A, $16, $1A ; M2
@@ -1040,7 +1055,7 @@ patch_63
     #ym_lfo $00, $80, $00, $00
     #ym_noise $00, $00
 
-; used by unused_stream_03, unused_stream_04
+; named by the patch, lfo or noise ops of unused_stream_03, unused_stream_04
 patch_64
     #ym_voice $DD, $00, $00, $00
     #ym_operator $01, $25, $1E, $00, $00, $1A ; M1

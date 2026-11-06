@@ -10,7 +10,8 @@
 
     .cerror * != $65E6, "streams_1.asm must start at $65E6"
 
-; entry 66: sound 0F (command 1D), track 0, YM2151 channel 0, priority 19; MAME: not started in the runs
+; entry 66: sound 0F (command 1D), track 0, YM2151 channel 0, priority 19; make musictrace: started
+; (1), its statements read
 snd_0F_0
     #patch patch_13
     #volume $0A
@@ -120,7 +121,8 @@ snd_0F_0_t8
     #note $0F, LEN_128
     #ret
 
-; entry 67: sound 0F (command 1D), track 1, YM2151 channel 3, priority 19; MAME: not started in the runs
+; entry 67: sound 0F (command 1D), track 1, YM2151 channel 3, priority 19; make musictrace: started
+; (1), its statements read
 snd_0F_1
     #patch patch_13
     #var_and $00
@@ -206,7 +208,8 @@ snd_0F_1_t9
     #note $0F, LEN_128
     #ret
 
-; entry 68: sound 0F (command 1D), track 2, YM2151 channel 1, priority 19; MAME: not started in the runs
+; entry 68: sound 0F (command 1D), track 2, YM2151 channel 1, priority 19; make musictrace: started
+; (1), its statements read
 snd_0F_2
     #patch patch_0B
     #tempo $1EB8
@@ -287,7 +290,8 @@ snd_0F_2_t8
     #note $22, LEN_128
     #ret
 
-; entry 69: sound 0F (command 1D), track 3, YM2151 channel 2, priority 19; MAME: not started in the runs
+; entry 69: sound 0F (command 1D), track 3, YM2151 channel 2, priority 19; make musictrace: started
+; (1), its statements read
 snd_0F_3
     #patch patch_16
     #tempo $1EB8
@@ -369,14 +373,16 @@ snd_0F_3_t8
     #note $03, LEN_128
     #ret
 
-; entry 78: sound 1B (command 32), track 0, YM2151 channel 3, priority 3F; MAME: not started in the runs
+; entry 78: sound 1B (command 32), track 0, YM2151 channel 3, priority 3F; make musictrace: started
+; (2), its statements read
 snd_1B_0
     #patch patch_05
     #note $19, LEN_2|DOT
     #ret
     #ret                                ; not reached: the stream never gets here
 
-; entry 7C: sound 1F (command 37), track 0, YM2151 channel 7, priority 32; MAME: not started in the runs
+; entry 7C: sound 1F (command 37), track 0, YM2151 channel 7, priority 32; make musictrace: started
+; (1), its statements read
 snd_1F_0
     #patch patch_06
     #velocity $7F
@@ -385,7 +391,8 @@ snd_1F_0
     #lfo patch_12
     #ret
 
-; entry 6C: sound 12 (command 26), track 0, YM2151 channel 5, priority 32; MAME: not started in the runs
+; entry 6C: sound 12 (command 26), track 0, YM2151 channel 5, priority 32; make musictrace: started
+; (2), its statements read
 snd_12_0
     #patch patch_03
     #tempo $1EB8
@@ -395,7 +402,8 @@ snd_12_0_t1
     #jump snd_12_0_t1
     #ret                                ; not reached: the stream never gets here
 
-; entry 6D: sound 13 (command 28), track 0, YM2151 channel 5, priority 32; MAME: not started in the runs
+; entry 6D: sound 13 (command 28), track 0, YM2151 channel 5, priority 32; make musictrace: started
+; (1), its statements read
 snd_13_0
     #patch patch_0E
     #tempo $13B6
@@ -416,7 +424,8 @@ snd_13_0_t1
     #jump snd_13_0_t1
     #ret                                ; not reached: the stream never gets here
 
-; entry 6B: sound 11 (command 25), track 0, YM2151 channel 1, priority 32; MAME: not started in the runs
+; entry 6B: sound 11 (command 25), track 0, YM2151 channel 1, priority 32; make musictrace: started
+; (1), its statements read
 snd_11_0
     #patch patch_02
     #tempo $3333
@@ -424,14 +433,16 @@ snd_11_0
     #note $25, LEN_4
     #ret
 
-; entry 6A: sound 10 (command 24), track 0, YM2151 channel 4, priority 32; MAME: not started in the runs
+; entry 6A: sound 10 (command 24), track 0, YM2151 channel 4, priority 32; make musictrace: started
+; (1), its statements read
 snd_10_0
     #patch patch_0A
     #volume $0D
     #note $22, LEN_32
     #ret
 
-; entry 71: sound 17 (command 2D), track 0, YM2151 channel 7, priority 32; MAME: not started in the runs
+; entry 71: sound 17 (command 2D), track 0, YM2151 channel 7, priority 32; make musictrace: started
+; (1), its statements read
 snd_17_0
     #patch patch_14
     #tempo $3852
@@ -456,13 +467,15 @@ unused_stream_01
     #note $2B, LEN_128
     #ret
 
-; entry 75: sound 19 (command 30), track 0, YM2151 channel 5, priority 32; MAME: not started in the runs
+; entry 75: sound 19 (command 30), track 0, YM2151 channel 5, priority 32; make musictrace: started
+; (1), its statements read
 snd_19_0
     #patch patch_15
     #note $59, LEN_8
     #ret
 
-; entry 6E: sound 14 (command 2A), track 0, YM2151 channel 0, priority 32; MAME: not started in the runs
+; entry 6E: sound 14 (command 2A), track 0, YM2151 channel 0, priority 32; make musictrace: started
+; (1), its statements read
 snd_14_0
     #patch patch_0F
     #velocity $6E
@@ -475,7 +488,8 @@ snd_14_0
     #note $33, LEN_16
     #ret
 
-; entry 6F: sound 15 (command 2B), track 0, YM2151 channel 4, priority 32; MAME: not started in the runs
+; entry 6F: sound 15 (command 2B), track 0, YM2151 channel 4, priority 32; make musictrace: started
+; (1), its statements read
 snd_15_0
     #patch patch_0F
     #tempo $199A
@@ -489,7 +503,8 @@ snd_15_0
     #note $34, LEN_16
     #ret
 
-; entry 70: sound 16 (command 2C), track 0, YM2151 channel 0, priority 32; MAME: not started in the runs
+; entry 70: sound 16 (command 2C), track 0, YM2151 channel 0, priority 32; make musictrace: started
+; (1), its statements read
 snd_16_0
     #patch patch_0F
     #volume $0A
@@ -502,14 +517,16 @@ snd_16_0
     #note $31, LEN_1
     #ret
 
-; entry 72: sound 18 (command 2F), track 0, YM2151 channel 5, priority 32; MAME: not started in the runs
+; entry 72: sound 18 (command 2F), track 0, YM2151 channel 5, priority 32; make musictrace: started
+; (1), its statements read
 snd_18_0
     #patch patch_17
     #tempo $1EB8
     #note $27, LEN_1
     #ret
 
-; entry 73: sound 18 (command 2F), track 1, YM2151 channel 4, priority 32; MAME: not started in the runs
+; entry 73: sound 18 (command 2F), track 1, YM2151 channel 4, priority 32; make musictrace: started
+; (1), its statements read
 snd_18_1
     #tempo $28F6
     #patch patch_09
@@ -517,7 +534,8 @@ snd_18_1
     #note $29, LEN_1
     #ret
 
-; entry 74: sound 18 (command 2F), track 2, YM2151 channel 6, priority 32; MAME: not started in the runs
+; entry 74: sound 18 (command 2F), track 2, YM2151 channel 6, priority 32; make musictrace: started
+; (1), its statements read
 snd_18_2
     #tempo $147B
     #patch patch_11
@@ -532,7 +550,8 @@ snd_18_2
     #lfo patch_12
     #ret
 
-; entry 76: sound 1A (command 31), track 0, YM2151 channel 5, priority 32; MAME: not started in the runs
+; entry 76: sound 1A (command 31), track 0, YM2151 channel 5, priority 32; make musictrace: started
+; (1), its statements never read
 snd_1A_0
     #patch patch_08
     #lfo patch_08
@@ -558,7 +577,8 @@ unused_stream_02
     #note $43, LEN_1
     #ret
 
-; entry 77: sound 1A (command 31), track 1, YM2151 channel 5, priority 32; MAME: not started in the runs
+; entry 77: sound 1A (command 31), track 1, YM2151 channel 5, priority 32; make musictrace: started
+; (1), its statements read
 snd_1A_1
     #var_and $00
     #var_add $01
@@ -590,7 +610,8 @@ snd_1A_1
     #jump snd_0F_1_t1
     #ret                                ; not reached: the stream never gets here
 
-; entry 7B: sound 1E (command 35), track 0, YM2151 channel 5, priority 32; MAME: not started in the runs
+; entry 7B: sound 1E (command 35), track 0, YM2151 channel 5, priority 32; make musictrace: started
+; (1), its statements read
 snd_1E_0
     #patch patch_18
     #tempo $199A
@@ -604,7 +625,8 @@ snd_1E_0
     #note $60, LEN_128
     #ret
 
-; entry 79: sound 1C (command 33), track 0, YM2151 channel 5, priority 32; MAME: not started in the runs
+; entry 79: sound 1C (command 33), track 0, YM2151 channel 5, priority 32; make musictrace: started
+; (1), its statements read
 snd_1C_0
     #patch patch_0C
     #tempo $2666
@@ -653,14 +675,16 @@ snd_1C_0_t4
     #transpose $00
     #ret
 
-; entry 7A: sound 1D (command 34), track 0, YM2151 channel 4, priority 32; MAME: not started in the runs
+; entry 7A: sound 1D (command 34), track 0, YM2151 channel 4, priority 32; make musictrace: started
+; (1), its statements read
 snd_1D_0
     #patch patch_01
     #velocity $7F
     #note $3F, LEN_4
     #ret
 
-; entry 00: sound 00 (command 04), track 0, YM2151 channel 0, priority 03; MAME: not started in the runs
+; entry 00: sound 00 (command 04), track 0, YM2151 channel 0, priority 03; make musictrace: started
+; (1), its statements read
 snd_00_0
     #patch patch_10
     #lfo patch_10
@@ -671,7 +695,8 @@ snd_00_0
     #note $31, LEN_8
     #ret
 
-; entry 01: sound 00 (command 04), track 1, YM2151 channel 1, priority 03; MAME: not started in the runs
+; entry 01: sound 00 (command 04), track 1, YM2151 channel 1, priority 03; make musictrace: started
+; (1), its statements read
 snd_00_1
     #patch patch_10
     #pan $01
@@ -681,7 +706,8 @@ snd_00_1
     #note $33, LEN_8
     #ret
 
-; entry 02: sound 00 (command 04), track 2, YM2151 channel 2, priority 03; MAME: not started in the runs
+; entry 02: sound 00 (command 04), track 2, YM2151 channel 2, priority 03; make musictrace: started
+; (1), its statements read
 snd_00_2
     #patch patch_10
     #pan $01
@@ -692,7 +718,8 @@ snd_00_2
     #note $35, LEN_8
     #ret
 
-; entry 03: sound 00 (command 04), track 3, YM2151 channel 3, priority 03; MAME: not started in the runs
+; entry 03: sound 00 (command 04), track 3, YM2151 channel 3, priority 03; make musictrace: started
+; (1), its statements read
 snd_00_3
     #patch patch_10
     #pan $01
@@ -704,7 +731,8 @@ snd_00_3
     #note $36, LEN_8
     #ret
 
-; entry 04: sound 00 (command 04), track 4, YM2151 channel 4, priority 03; MAME: not started in the runs
+; entry 04: sound 00 (command 04), track 4, YM2151 channel 4, priority 03; make musictrace: started
+; (1), its statements read
 snd_00_4
     #patch patch_10
     #rest LEN_1
@@ -714,7 +742,8 @@ snd_00_4
     #note $38, LEN_8
     #ret
 
-; entry 05: sound 00 (command 04), track 5, YM2151 channel 5, priority 03; MAME: not started in the runs
+; entry 05: sound 00 (command 04), track 5, YM2151 channel 5, priority 03; make musictrace: started
+; (1), its statements read
 snd_00_5
     #patch patch_10
     #rest LEN_1
@@ -725,7 +754,8 @@ snd_00_5
     #note $3A, LEN_8
     #ret
 
-; entry 06: sound 00 (command 04), track 6, YM2151 channel 6, priority 03; MAME: not started in the runs
+; entry 06: sound 00 (command 04), track 6, YM2151 channel 6, priority 03; make musictrace: started
+; (1), its statements read
 snd_00_6
     #patch patch_10
     #rest LEN_1
@@ -737,7 +767,8 @@ snd_00_6
     #note $3C, LEN_8
     #ret
 
-; entry 07: sound 00 (command 04), track 7, YM2151 channel 7, priority 03; MAME: not started in the runs
+; entry 07: sound 00 (command 04), track 7, YM2151 channel 7, priority 03; make musictrace: started
+; (1), its statements read
 snd_00_7
     #patch patch_10
     #rest LEN_1
