@@ -6,8 +6,8 @@
 ; tbl_5C6B are those bits for channels 1-4. sub_5BAC resets it (WRIO bit 2 low, then high: called by
 ; imm_00); sub_5BC6 (every eighth timed IRQ) counts down each playing channel and stops it when its
 ; count runs out; cmdtype_13 (the commands of type 13, and stream op 95 with cmd_param) starts
-; phrase tbl_6532,y on the channel tbl_6567,y names; cmdtype_14 (command 66) stops the channel whose
-; current entry (zp_52,x) has phrase A in tbl_6532; sub_5C87 sets the YM2151 volume in MIX from the
+; phrase effect_phrase,y on the channel effect_voice,y names; cmdtype_14 (command 66) stops the channel whose
+; current entry (zp_52,x) has phrase A in effect_phrase; sub_5C87 sets the YM2151 volume in MIX from the
 ; zp_5E values of the playing channels.
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
@@ -79,7 +79,7 @@ cmdtype_13
     tay
     txa
     pha
-    lda tbl_6567,y
+    lda effect_voice,y
     and #$30
     lsr a
     lsr a
@@ -91,7 +91,7 @@ cmdtype_13
     and OKI_READ_M
     beq _l5C23
     ldy zp_52,x
-    lda tbl_6567,y
+    lda effect_voice,y
     bmi _l5C5E
 _l5C23
     lda tbl_5C6B,x
@@ -110,14 +110,14 @@ _l5C2B
     sta zp_5A,x
     lda #$00
     sta zp_56,x
-    lda tbl_6532,y
+    lda effect_phrase,y
     ora #$80
     sta OKI_WRITE
-    lda tbl_6567,y
+    lda effect_voice,y
     and #$0F
     ora tbl_5C63,x
     sta OKI_WRITE
-    lda tbl_659C,y
+    lda effect_duck,y
     sta zp_5E,x
     jsr sub_5C87
 _l5C5E
@@ -147,7 +147,7 @@ cmdtype_14
     ldx #$03
 _l5C73
     ldy zp_52,x
-    cmp tbl_6532,y
+    cmp effect_phrase,y
     beq _l5C7F
     dex
     bpl _l5C73

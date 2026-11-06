@@ -255,20 +255,20 @@ cmdtype_11
 ; cmdtype_handlers entry $01
 cmdtype_01
     tay
-    lda tbl_65D1,y
+    lda global_set_index,y
     and #$1F
     tax
-    lda tbl_65D7,y
+    lda global_set_value,y
     sta zp_23,x
     rts
 
 ; cmdtype_handlers entry $02; not executed in the make sndtrace runs
 cmdtype_02
     tay
-    lda tbl_65D1,y
+    lda global_set_index,y
     and #$1F
     tax
-    lda tbl_65D7,y
+    lda global_set_value,y
     clc
     adc zp_23,x
     sta zp_23,x
@@ -577,20 +577,20 @@ cmdtype_08
     asl a
     tax
     bcs _l4575
-    lda tbl_61E4,x
+    lda sound_first_entry,x
     bcc _l4578
 _l4575
-    lda tbl_61E4+$100,x
+    lda sound_first_entry+$100,x
 _l4578
     sta zp_13
     bcs _l4581
-    lda tbl_61E4+1,x
+    lda sound_first_entry+1,x
     bcc _l4584
 _l4581
-    lda tbl_61E4+$101,x
+    lda sound_first_entry+$101,x
 _l4584
     sta zp_14
-    lda tbl_6224,y
+    lda sound_restartable,y
     bne _l459F
     lda zp_03
     ldy #$1D
@@ -613,20 +613,20 @@ _l45A1
     dey
     bpl _l45A1
     ldy #$00
-    lda #<tbl_6244
+    lda #<entry_priority
     clc
     adc zp_13
     sta zp_15
-    lda #>tbl_6244
+    lda #>entry_priority
     adc zp_14
     sta zp_16
     lda (zp_15),y
     sta zp_17
-    lda #<tbl_62C1
+    lda #<entry_channel
     clc
     adc zp_13
     sta zp_15
-    lda #>tbl_62C1
+    lda #>entry_channel
     adc zp_14
     sta zp_16
     lda (zp_15),y
@@ -657,11 +657,11 @@ _l45EB
     tax
     jsr sub_46A5
     ldy #$00
-    lda #<tbl_6244
+    lda #<entry_priority
     clc
     adc zp_13
     sta zp_15
-    lda #>tbl_6244
+    lda #>entry_priority
     adc zp_14
     sta zp_16
     lda (zp_15),y
@@ -669,11 +669,11 @@ _l45EB
     sec
     rol a
     sta ram_03EC,x
-    lda #<tbl_62C1
+    lda #<entry_channel
     clc
     adc zp_13
     sta zp_15
-    lda #>tbl_62C1
+    lda #>entry_channel
     adc zp_14
     sta zp_16
     lda (zp_15),y
@@ -686,11 +686,11 @@ _l45EB
     lda zp_14
     rol a
     sta zp_16
-    lda #<tbl_633E
+    lda #<entry_stream
     clc
     adc zp_15
     sta zp_15
-    lda #>tbl_633E
+    lda #>entry_stream
     adc zp_16
     sta zp_16
     lda (zp_15),y
@@ -743,11 +743,11 @@ _l4670
     lda zp_14
     rol a
     sta zp_16
-    lda #<tbl_6438
+    lda #<entry_next
     clc
     adc zp_15
     sta zp_15
-    lda #>tbl_6438
+    lda #>entry_next
     adc zp_16
     sta zp_16
     lda (zp_15),y

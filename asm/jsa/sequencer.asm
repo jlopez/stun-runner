@@ -2,7 +2,7 @@
 ;
 ; Up to 30 entries (the X of the 1E-byte arrays of ram.asm) each read a byte stream of
 ; data/music.asm through zp_06 (4859-486E: the pointer from ram_0266/ram_0284, which cmdtype_08
-; sets from tbl_633E). A byte below 80 is handled at 487E on; a byte 80-BA is an op, run by
+; sets from entry_stream). A byte below 80 is handled at 487E on; a byte 80-BA is an op, run by
 ; sub_505D through op_handlers with the next byte in A; BB and up ends the entry (ram_0248 =
 ; FF). The YM2151 register writes go through ym_wait. h_irq reaches this file through sub_4229
 ; (loc_5043, X = 0 and 1 on alternate ticks). What the ops and the bytes mean is for a later leg;
