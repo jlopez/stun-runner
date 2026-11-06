@@ -14,7 +14,7 @@ Decision (Jesus, 2026-11-05, card A7, option 2): the editable form of a sample i
 WAV, the only format, and the 52 WAVs are committed under `data/oki`. Like the meshes of
 `data/objects`, they are assets in their editable form and the build re-embeds them (CLAUDE.md
 section 2). The ROM files, hex dumps of them and MAME recordings still never enter the
-repository. The M4b container that carried the ADPCM bytes verbatim (format tag 0x0017) is gone.
+repository. M4b's container WAV, which carried the ADPCM bytes as they are, is gone.
 
 ## 1. Summary
 
@@ -398,8 +398,8 @@ Decision (Jesus, 2026-11-05, card A8): the samples are named from his listening,
 to his words, a doubt never upgraded to a fact. His words are in the table below; for 10-31 he
 wrote `"One" all the way to "Twenty-two"`.
 
-Convention taken by the implementer (leg M4g), pending Jesus (it is not part of his card A8
-answer): `name` is a lower_snake label derived from his words (the speech phrases by their
+Convention (card A12), a default taken by the implementer (leg M4g), pending Jesus, not approved
+(it is not part of his card A8 answer): `name` is a lower_snake label derived from his words (the speech phrases by their
 words, the effects by his description); phrases 10-31 are `number_01`-`number_22` and each
 one's `description` is its number word ("One" ... "Twenty-two"), derived from his range, not
 words he wrote per phrase; every other `description` holds his words verbatim, question marks

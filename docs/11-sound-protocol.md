@@ -545,5 +545,5 @@ What M5 (the 68k source) starts from on the sound path:
   sends at the third flush (section 2.1); what drives A80000 bit 15 (section 4).
 - **Questions for M7** (the hardware, not the code): the real board's pin 7 polarity (docs/10
   section 2), whether the JSA II coin inputs are wired on a STUN Runner cabinet (docs/09
-  section 1), the reset handshake's timing, and what the samples and sounds are (the listening
-  pass, Jesus's: `make listen`, `make oki-pcm`).
+  section 1) and the reset handshake's timing. The listening pass is done: Jesus ran
+  `make listen` on 2026-11-05, heard the sound and named the samples (docs/10 section 7).
