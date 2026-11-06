@@ -183,7 +183,7 @@ def layout(manifest: Manifest, lengths: dict[int, int]) -> Layout:
         if n < 1:
             raise FormatError(f"phrase {e.number}: an empty sample")
         if n < MIN_SAMPLE:
-            # okim6295_device::write starts a voice only when start < stop (okim6295.cpp:265)
+            # okim6295_device::write starts a voice only when start < stop (okim6295.cpp:266)
             raise FormatError(
                 f"phrase {e.number}: a sample of {n} byte would never play (the M6295 starts "
                 "a voice only when its start lies before its end); a WAV needs at least 3 samples"

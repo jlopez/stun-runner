@@ -61,14 +61,14 @@ from adpcm.__main__ import (
     jsa_commands,
     read_trace,
 )
-from romset import hashes, load_snapshot
+from romset import DEFAULT_ARCHIVE, hashes, load_snapshot, merge, read_set
 
 TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
 DATA = REPO / "data/oki"
 MANIFEST = DATA / "samples.json"
 COMMANDS = REPO / "data/sound/commands.json"
-IMAGE = REPO / "build/stunrun-oki.bin"
+SET = "stunrun"
 MAME_SRC = Path(os.environ.get("MAME_SRC", "~/.local/src/mame")).expanduser()
 OKIADPCM = MAME_SRC / "src/devices/sound/okiadpcm.cpp"
 
@@ -193,7 +193,7 @@ def test_layout_from_lengths() -> None:
         layout(manifest, {1: 5, 2: 2, 3: IMAGE_SIZE - 0x26})
     with pytest.raises(FormatError, match="an empty sample"):
         layout(manifest, {1: 5, 2: 0, 3: 2})
-    # a 1-byte sample (a WAV of 1 or 2 values) has start == end: okim6295.cpp:265 never plays it
+    # a 1-byte sample (a WAV of 1 or 2 values) has start == end: okim6295.cpp:266 never plays it
     with pytest.raises(FormatError, match="phrase 2: a sample of 1 byte would never play"):
         layout(manifest, {1: 5, 2: 1, 3: 2})
 
@@ -363,12 +363,35 @@ def test_committed_audio_is_the_52_samples() -> None:
     )
 
 
-@pytest.mark.skipif(not IMAGE.exists(), reason="build/stunrun-oki.bin absent (no reference set)")
+def reference_image() -> bytes | None:
+    """The OKI image merged in memory from the reference set (where `tools/check-roms` looks,
+    STUNRUN_ROMS), or None when the set is absent (CI). Never build/stunrun-oki.bin: since M4g
+    nothing in `make` needs that file, so it may be missing while the set is present. Fails on
+    an OKI chip whose hashes are not the snapshot's."""
+    files = read_set(DEFAULT_ARCHIVE / SET)
+    if files is None:
+        return None
+    snapshot = load_snapshot(SET)
+    for rom in snapshot["roms"]:
+        if rom["region"] == "mainpcb:jsa:oki1":
+            assert rom["name"] in files, f"reference set: {rom['name']} missing"
+            assert hashes(files[rom["name"]]) == (rom["crc"], rom["sha1"]), rom["name"]
+    return merge(snapshot, files)["stunrun-oki"]
+
+
+def require_reference_image() -> bytes:
+    image = reference_image()
+    if image is None:
+        pytest.skip(f"reference set absent ({DEFAULT_ARCHIVE / SET})")
+    return image
+
+
 def test_committed_wavs_are_what_the_image_decodes_to() -> None:
     """With the reference set: every committed WAV is exactly the decoder's output for its
     phrase of the image's own table (`make samples` rewrites them), and the layout their lengths
-    give is that table. Fails while data/oki and the image disagree."""
-    image = IMAGE.read_bytes()
+    give is that table. Fails while data/oki and the image disagree. Decided by the set, not by
+    build/stunrun-oki.bin (which `make` no longer writes)."""
+    image = require_reference_image()
     entries, spans = table_layout(image)
     manifest = read_manifest(MANIFEST)
     assert entries == manifest.entries
@@ -579,9 +602,9 @@ def test_decoder_equals_mame(tmp_path: Path) -> None:
     for length in (1, 7, 5000):
         data = rng.randbytes(length)
         assert decode(data) == mame_decode(exe, data)
-    if IMAGE.exists():
-        _, spans = table_layout(IMAGE.read_bytes())
-        image = IMAGE.read_bytes()
+    image = reference_image()
+    if image is not None:
+        _, spans = table_layout(image)
         for number, (s, e) in enumerate(spans, 1):
             data = image[s : e + 1]
             assert decode(data) == mame_decode(exe, data), f"phrase {number}"

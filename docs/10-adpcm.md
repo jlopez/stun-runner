@@ -285,7 +285,7 @@ Decision (Jesus, 2026-11-05, card A7, option 2): one format, a playable one, com
   of samples gets its last value once more (the last byte needs two nibbles; `tools/adpcm`
   says so). A sample needs at least 2 bytes, a WAV at least 3 values: a 1-byte sample would
   have start equal to end in the phrase table, and the M6295 starts a voice only when start <
-  stop (`devices/sound/okim6295.cpp:265`), so it would never play; `layout` fails on it.
+  stop (`devices/sound/okim6295.cpp:266`), so it would never play; `layout` fails on it.
 - **The build** (`Makefile`, docs/04 section 1): `tools/adpcm asm --data data/oki --out
   build/oki` writes `build/oki/samples.asm`; `asm/oki/samples.asm` (committed) is the phrase table
   as `dc.b` statements computed from the include's labels `phrase_NN` (first byte) and
@@ -306,10 +306,11 @@ Decision (Jesus, 2026-11-05, card A7, option 2): one format, a playable one, com
   WAV per phrase of the image's own table, named from the manifest, and removes any other WAV
   there: run it after changing the decoder or a name, as `make objects` for the meshes.
 - **Proof.** `make check`: 25 files, 0 differences, with `build/stunrun-oki.bin` deleted before
-  the OKI tree assembles. `tools/test_adpcm.py` (CI) encodes the committed WAVs and checks the
-  four chips' size, CRC-32 and SHA-1 against `tools/romsets/stunrun.json`; checks that
+  the OKI tree assembles (nothing in `make` writes it again). `tools/test_adpcm.py` (CI) encodes
+  the committed WAVs and checks the four chips' size, CRC-32 and SHA-1 against `tools/romsets/stunrun.json`; checks that
   `git ls-files` holds no audio but the 52 WAVs, each in the canonical form above, one per
-  manifest phrase; and, with the reference set, that every committed WAV is byte for byte what
+  manifest phrase; and, with the reference set (merged in memory from the set itself, so a
+  missing `build/stunrun-oki.bin` skips nothing), that every committed WAV is byte for byte what
   `make samples` would write from the image (so `make test` fails while the two disagree).
   `tools/test_build.py` (CI, synthetic set carrying the image the committed WAVs encode to)
   changes one sample of phrase 2's WAV through `make` and `bytecheck` reports a difference in
@@ -466,8 +467,10 @@ checks that `maybe_` is exactly where the description ends in `?` and that `audi
 | 51 | `bell_ding` | bell ding | BELL |
 | 52 | `maybe_higher_bell_ding` | higher pitched bell ding sound? | SWPIKUP |
 
-**Where the 68k names and his descriptions differ** (the names follow his words; this is for the
-progress page, not a rename):
+**Where the 68k's names and his descriptions do not obviously agree** (the names follow his
+words; this is for the progress page, not a rename). The 68k's names are abbreviations in the
+audio test (`data/sound/commands.json`); nothing in the repository expands them, so a reading
+after "perhaps" is a reading of the letters only and claims no role:
 
 - 36 `hmm_tsk` "hmm... tsk": the 68k calls it KISS (a kiss sound would fit "tsk").
 - 38 `shockwave` "shockwave sound": PRGUN (the 68k's name; role unknown), command 5E, queued at
@@ -477,22 +480,22 @@ progress page, not a rename):
   frequent phrase in a played game (312 starts in the game run).
 - 41 `maybe_mild_explosion` "another sfx, sounds like a mild explosion?": APAD; no call site in
   the 68k program queues command 5D (docs/11), only the audio test plays it.
-- 42 `maybe_turret_attached` "sound when turret is attached?": IRISOP (iris open).
+- 42 `maybe_turret_attached` "sound when turret is attached?": IRISOP (perhaps iris open;
+  role unknown).
 - 43 `maybe_gong` "kind of gong sound?": STAR.
-- 44 `metallic_bounce` "metallic bounce sound": TRKHIT (track hit); the two agree.
+- 44 `metallic_bounce` "metallic bounce sound": TRKHIT (perhaps track hit; role unknown).
 - 45 `whirring` "another whirring sound": ARMS.
-- 46 `maybe_attachment` "attachment sound?": RMPHIT (ramp hit).
+- 46 `maybe_attachment` "attachment sound?": RMPHIT (perhaps ramp hit; role unknown).
 - 47 `maybe_shockwave_hit` "shockwave hit?": SHIELD.
-- 48 `screeching_tires` "screeching tires sound": BRAKE; the two agree.
-- 49 `maybe_rejection` "rejection sound?": TYPE (a typing sound; the 68k queues it at 02792A and
+- 49 `maybe_rejection` "rejection sound?": TYPE (role unknown; the 68k queues it at 02792A and
   032B06).
-- 52 `maybe_higher_bell_ding` "higher pitched bell ding sound?": SWPIKUP (shockwave pick-up),
-  which names the role, not the sound.
+- 52 `maybe_higher_bell_ding` "higher pitched bell ding sound?": SWPIKUP (perhaps shockwave
+  pick-up; role unknown; docs/07 section 11.3 identifies no pickup object).
 
 The others agree: 1-35 are the words the 68k abbreviates (WELCOME, LUCK, CONGRATS, BETTER, RAILS,
 VSLOWS, OWALL, SWAVE, CLEVEL, ONE-TWENTY2, ULTIMATE, KILLC, MARKERC, BOOSTC), 37 YAHOO, 40 EXP2,
-50 BIRD, 51 BELL. Phrase 1 is also played by command 05 (ADTEST), which the boot program sends
-directly at 008EB0 (docs/11).
+48 BRAKE, 50 BIRD, 51 BELL. Phrase 1 is also played by command 05 (ADTEST), which the boot
+program sends directly at 008EB0 (docs/11).
 
 ## 8. Commands
 
