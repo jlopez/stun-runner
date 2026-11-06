@@ -285,11 +285,14 @@ def test_relocation(tmp_path: Path, image: tuple[bytes, dict[str, int]]) -> None
 
 def test_committed_summary_agrees_with_source() -> None:
     """artifacts/musictrace-summary.json: one window per command of type 08, every sound 00-1F
-    keyed the YM2151 on, and every stream it lists as read is a stream label of the source."""
+    keyed the YM2151 on, the key-on table adds up to the windows' counts, and every stream it
+    lists as read is a stream label of the source."""
     summary = json.loads(SUMMARY.read_text())
     windows = summary["windows"]
     assert sorted(int(w["sound"], 16) for w in windows) == list(range(0x20))
     assert all(w["key_ons"] > 0 for w in windows)
+    # the key-on table counts inside the windows only: its total is the windows' total
+    assert sum(summary["key_ons"].values()) == sum(w["key_ons"] for w in windows)
     labels = {lab for s in jm.statements() for lab in s.labels}
     assert set(summary["streams_read"]) <= labels
     for key in summary["ops_dispatched"]:
@@ -307,3 +310,30 @@ def test_mame_trace_agrees_with_source(tmp_path: Path) -> None:
     assert r.returncode == 0
     _, problems = jm.summarize(trace.read_text(), (tmp_path / "jsa.bin.lst").read_text())
     assert problems == []
+
+
+SND_TRACES = [REPO / f"build/mame/sndtrace-{run}.txt" for run in ("attract", "sound", "play")]
+
+
+def test_sndtrace_reads_lie_in_walked_statements(image: tuple[bytes, dict[str, int]]) -> None:
+    """When `make sndtrace` has run here: every data read of 65E6-AB47 (the D lines) lies in a
+    statement the walk of the streams reaches or in a patch record (no ROMs in CI: skipped)."""
+    traces = [t for t in SND_TRACES if t.exists()]
+    if not traces:
+        pytest.skip("no sndtrace run here")
+    img, syms = image
+    items, _ = walk_image(img, syms)
+    allowed: set[int] = set()
+    for a, item in items.items():
+        allowed.update(range(a, a + item.length))
+    for s in jm.statements():
+        if s.name in jm.PATCH_MACROS:
+            allowed.update(range(s.address, s.address + s.size))
+    reads = 0
+    for trace in traces:
+        for line in trace.read_text().splitlines():
+            f = line.split()
+            if f and f[0] == "D" and jm.DATA_LO <= int(f[1], 16) < jm.DATA_HI:
+                reads += 1
+                assert int(f[1], 16) in allowed, f"{trace.name}: read of {f[1]} by {f[2]}"
+    assert reads

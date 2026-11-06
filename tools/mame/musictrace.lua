@@ -28,6 +28,9 @@
 --   * YM2151 writes (2000 register, 2001 data): a write of register 08 with a slot bit (78) is a
 --     key-on of channel value & 7, counted for the sound of the track that sounds on that
 --     channel (the last track of the list headed at ram_0860 + 1E + channel, its sound ram_0248).
+--     Only the key-ons of a window count, from the sound command to the window's last frame;
+--     a window restarted after a reset loses its counts, so the keyon lines are the sums of the
+--     windows' counts.
 --
 -- Output, MUSIC_DIR..MUSIC_NAME..".txt" (addresses, counts, command and sound numbers only):
 --   # key value                  header
@@ -62,6 +65,8 @@ local frame = 0
 local injecting = false
 local k, wstart = 1, FROM
 local window_keyons = 0
+local window_table = {}
+local counting = false
 local resets, redone = 0, 0
 local ym_reg = 0
 
@@ -113,8 +118,11 @@ MUSIC_YM = prog:install_write_tap(0x2000, 0x2001, "music_ym", function(offset, v
   elseif ym_reg == 0x08 and (value & 0x78) ~= 0 then
     local ch = value & 7
     local snd = sounding_sound(ch)
-    bump(keyons, string.format("keyon %s %d", snd and string.format("%02X", snd) or "--", ch))
-    window_keyons = window_keyons + 1
+    if counting then
+      bump(window_table, string.format("keyon %s %d", snd and string.format("%02X", snd) or "--",
+        ch))
+      window_keyons = window_keyons + 1
+    end
   end
   return value
 end)
@@ -147,6 +155,8 @@ MUSIC_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
       redone = redone + 1
       wstart = frame + 120
       window_keyons = 0
+      window_table = {}
+      counting = false
       return
     end
     local at = frame - wstart
@@ -155,6 +165,8 @@ MUSIC_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
     if at == 8 then
       inject(SOUNDS[k])
       window_keyons = 0
+      window_table = {}
+      counting = true
     end
     if at == WINDOW - 1 then
       local t = prog:read_u8(0x6100 + SOUNDS[k])
@@ -162,6 +174,9 @@ MUSIC_SUBSCRIPTION = emu.add_machine_frame_notifier(function()
       assert(t == 0x08, "musictrace.lua: command is not of type 08")
       windows[#windows + 1] = string.format("window %02X %02X %d %d", SOUNDS[k], n,
         window_keyons, WINDOW - 8)
+      for key, n in pairs(window_table) do keyons[key] = (keyons[key] or 0) + n end
+      window_table = {}
+      counting = false
       k = k + 1
       wstart = frame + 1
     end

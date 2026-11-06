@@ -19,7 +19,7 @@
 ; ticks (sub_4229, 422B-4235): each group runs at about 124.9 Hz. tick_ym_group runs
 ; tick_ym_channel for channels 7 down to 0: the list's tracks (run_track), then the channel's
 ; YM2151 registers from the shadow ram_08AE + register (key-off, key code, fraction, levels,
-; key-on). A track's time counter (24 bits: ram_02DE, ram_02FC, ram_031A) loses the tempo
+; key-on; a note after a TIE note is not keyed on again). A track's time counter (24 bits: ram_02DE, ram_02FC, ram_031A) loses the tempo
 ; (ram_0626/ram_0644) each tick (4794-47AB); when it runs out, read_item reads statements until a
 ; note: an op byte (80-BA) runs its handler through op_handlers (run_op), a note sets the pitch
 ; and adds its length (note_lengths, tables.asm tbl_5FE3) to the counter. The gate counter
@@ -44,8 +44,8 @@
 ; with priority 0 or ram_0248 = FF (stopped by a command or the op stop) is freed (4765-4770).
 ; Then the time counter loses the tempo; at 0 read_item reads the next statements; the gate
 ; counter at 0 asks for the key-off (key_flags bit 0, 47CD-47E0). On a YM2151 track: a fade step
-; (fade_step) every LEN_32 of time while a fade runs, the key-on path again after it to write the
-; new TLs (47F5-4845), and the same every fourth tick while a portamento runs (482F-4845).
+; (fade_step) every LEN_32 of time while a fade runs, prepare_key_on again after it to write the
+; new TLs without a key-on (47F5-4845), and the same every fourth tick while a portamento runs (482F-4845).
 ; from 4CBD, 4E6E, 4E9F
 run_track
     sta chain_mute
@@ -326,8 +326,11 @@ _l497C
 ; The note's length byte in A (not 00): bits 3-0 index note_lengths (tables.asm tbl_5FE3), whose
 ; word is added to the time counter's bytes 1-2 (498B-49A1); DOT adds half of it again
 ; (49A2-49BC). Unless TIE: the gate counter = counter - 2 x tempo (49C8-49F1), halved with
-; GATE_HALF (49F4-4A02). Then the fade's step (fade_step) when one runs, and on a YM2151 track
-; the key-on (prepare_key_on with the length byte: its bits 5-4 select the accent, key_flags).
+; GATE_HALF (49F4-4A02). Unless the previous length byte (ram_0392) had TIE: the portamento
+; offset to 0 and key_flags bit 2, the key-on (4A05-4A2C); after a TIE note the offset stays
+; (with a portamento rate) and the note is not keyed on again. Then the fade's step (fade_step)
+; when one runs, and on a YM2151 track prepare_key_on with the length byte (its bits 5-4 select
+; the accent, key_flags), and ram_0392 = this length byte (4A85).
 ; from 4916
 set_note_length
     pha
@@ -874,10 +877,11 @@ _l4D68
     sta zp_1C
     rts
 
-; A YM2151 note of the heard track: key_flags bit 1 (key-on) and the length byte's bits 5-4
-; (the accent, 4D6C-4D82); the track's four TLs (ram_0482 + n x 1E) into the shadow of registers
+; A YM2151 note, fade step or portamento step of the heard track: key_flags bit 1 (the key code
+; and level update; the key-on itself is bit 2, set_note_length 4A27) and the length byte's
+; bits 5-4 (the accent, 4D6C-4D82); the track's four TLs (ram_0482 + n x 1E) into the shadow of registers
 ; 60-78 (4D8D-4DA0); the patch's scaling bytes (record +1D to +23, through ram_0428/ram_0446 =
-; record + 1C) and the velocity (ram_04FA) into key_scaling (4DA3-4DBC). For every track with a
+; record + 1C) and the velocity (ram_04FA) into key_scaling and key_velocity (4DA3-4DBC). For every track with a
 ; portamento: the offset ram_06F8/ram_0716 moves toward 0 by the rate (4DBE-4E11); the heard
 ; track's offset and fine tune go to the shadow of register 30 and the note (4E12-4E54).
 ; from 4845, 4A80
@@ -1035,12 +1039,15 @@ _l4E71
 ; is not muted: registers 20 and 30 from the shadow (4EA7-4ECD); the key-off (key_flags bit 0:
 ; register 08 = channel, 4ED0-4EE1); then, only when sounding_prio (the heard track's
 ; priority x 4 + 1) is at least zp_1E (4EE3-4EE8; command 01 sets zp_1E to F0, 02 to 0), and a
-; key-on is asked (key_flags bit 1) for a pitch other than 0: the key code key_codes[note]
+; update is asked (key_flags bit 1) for a pitch other than 0: the key code key_codes[note]
 ; (tables.asm tbl_5E7D) into register 28 (4EF1-4F0E), each operator's TL = the track's TL +
-; key scaling (key_level_curve by key code, depth nibble) + velocity scaling (velocity and the
-; accent, key_accent tbl_5FDF, by the sensitivity nibble) clamped to 00-7F (4F16-4FD4), the LFO
-; reset when the patch's lfo op asked for it (key_flags bit 4 after the shifts: register 01 = 02
-; then 00, 4FDE-4FF7), and the key-on: register 08 = channel + 78, all four operators (4FFA-500B).
+; key scaling (key_level_curve by key code, depth nibble) - velocity scaling (velocity + the
+; accent, key_accent tbl_5FDF, by the sensitivity nibble: key_velocity holds -velocity, minus the
+; accent, 4F2C-4F54, negated back at 4F92-4F9D) clamped to 00-7F (4F16-4FD4); then, only with
+; key_flags bit 2 (4FD7-4FDA: a note after one without TIE, set_note_length 4A27), the LFO reset
+; on every key-on of a track that ran an lfo op (key_flags bit 7, bit 4 after the shifts:
+; register 01 = 02 then 00, 4FDE-4FF7), and the key-on: register 08 = channel + 78, all four
+; operators (4FFA-500B).
 ; from 501B
 tick_ym_channel
     ldx ram_0860,y
@@ -1138,7 +1145,7 @@ _l4EE3
     tax
     lda tbl_5FDF,x
     sta trk_kind
-    lda key_scaling_2,y
+    lda key_velocity-6,y                ; Y = zp_0C = 6: key_velocity
     sec
     sbc trk_kind
     bmi _l4F3F
@@ -1455,10 +1462,12 @@ op_handlers
     .word op_var_cmp_reg-1              ; $B9 var_cmp_reg
     .word op_var_cmp-1                  ; $BA var_cmp
 
-; op 88 (sync): the track's time counter to 0; the first arrival marks the group's
-; wait (ram_0680 = ram_069E); it backs the pointer up two bytes and returns C clear (5170-517E:
-; the op is read again next tick) while a running track of the same group has not arrived; the
-; last arrival marks every track of the group FF, which lets each go on (5138-513C)
+; op 88 (sync): the track's time counter to 0; each arriving track marks itself with its
+; group (ram_0680 = ram_069E, 513D-5140) and scans; it backs the pointer up two bytes and returns
+; C clear (5170-517E: the op is read again next tick) while an active track of the same group
+; has not arrived (a marked track waits without scanning again, 5130-5136); the last arrival
+; marks every track of the group FF (515A-516A), which lets each go on and clears its mark
+; (5138-513C)
 ; MAME: not dispatched in make musictrace
 op_sync
     lda #$00
@@ -2405,8 +2414,8 @@ patch_done
     rts
 
 ; op 9E (lfo): YM2151: registers 18, 19, 19 and 1B (bits 1-0, CT1-CT2 kept) from
-; record bytes 24-27, byte 28 into the shadow of 1B (nothing reads it); ram_0572 = 80: the next
-; key-on resets the LFO (key_flags bit 4)
+; record bytes 24-27, byte 28 into the shadow of 1B (nothing reads it); ram_0572 = 80: every
+; key-on of the track from then on resets the LFO (key_flags bit 7, reloaded at 478B-478E)
 ; MAME: dispatched in make musictrace
 op_lfo
     clc

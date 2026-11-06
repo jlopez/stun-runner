@@ -35,11 +35,14 @@ LEN_10 = $0F                            ; $0300
 ; tick_ym_channel 4F24-4F2C).
 DOT = $40                               ; adds half the length again (49A2-49BC)
 TIE = $80                               ; no key-off at the end: the gate counter stays 7F
-                                        ;   (49BF-49C6); the next note keys on without one
+                                        ;   (49BF-49C6); and the next note is not keyed on
+                                        ;   again (legato): key_flags bit 2 only after a
+                                        ;   length byte without TIE (ram_0392, 4A05-4A2C;
+                                        ;   4FD7-4FDA)
 GATE_HALF = $10                         ; bits 5-4 = 01: the key-off comes at half the length
                                         ;   (49F4-4A02); velocity offset 0 (tbl_5FDF entry 1)
-ACCENT_1 = $20                          ; bits 5-4 = 10: velocity - 24 (tbl_5FDF entry 2)
-ACCENT_2 = $30                          ; bits 5-4 = 11: velocity - 58 (tbl_5FDF entry 3)
+ACCENT_1 = $20                          ; bits 5-4 = 10: velocity + 24 (tbl_5FDF entry 2)
+ACCENT_2 = $30                          ; bits 5-4 = 11: velocity + 58 (tbl_5FDF entry 3)
 
 ; Registers of the variable ops (var_store B0, var_add_to B1: 53C4-5449; var_load B2,
 ; var_cmp_reg B9, the branches B5-B8: read_register 5494-5503), for the YM2151 tracks. Each
