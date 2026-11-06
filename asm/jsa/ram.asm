@@ -208,8 +208,12 @@ ram_0590 = $0590
 trk_slide_wait_frac = $05AE
 trk_slide_wait_lo = $05CC
 trk_slide_wait_hi = $05EA
-trk_slide_step = $0608                  ; the slide step's note_lengths index, 0 for 0A (op A8,
-                                        ; 4CCE-4CE5); engine 1: an envelope loop count
+; engine 0: a mode flag, tested only for zero (47F5-47F8, 4CCE-4CD1; op A8 sets it). 0: the slide
+; also steps on its own timer (47F5-4829), each step presetting trk_slide_wait to note_lengths
+; entry 0A and taking slide_rates entry 0A (4CD3-4CDF). Non-zero: no timed step; the slide steps
+; once per note (4A74, while trk_slide_time is not 0) by slide_rates[tmp_1C AND 0F], tmp_1C the
+; note's length byte (4CE3-4CE8). Engine 1: an envelope loop count
+trk_slide_step = $0608
 trk_tempo_lo = $0626                    ; subtracted from the waits every tick (4795, 47B7,
 trk_tempo_hi = $0644                    ; 4813); op 80 sets it, op 81 adds; 1000 at the start
 trk_transpose = $0662                   ; added to each note (4888; op 84 sets, op 85 adds)

@@ -29,7 +29,7 @@ reset
     txs
     lda #WRIO_YM_RUN
     sta WRIO                            ; YM2151 out of reset
-    and #$FE
+    and #$FF ^ WRIO_YM_RUN
     sta WRIO                            ; YM2151 reset (bit 0 low)
     ora #WRIO_YM_RUN
     sta WRIO                            ; and out of it again
@@ -127,7 +127,7 @@ _checksum
     lda #$00                            ; A: the sum
     pha
     lda wrio_shadow
-    and #$3F
+    and #$FF ^ WRIO_BANK
     sta wrio_shadow
     sta WRIO                            ; bank page 0
     pla
@@ -136,7 +136,7 @@ _checksum
     jsr checksum_pages
     pha
     lda wrio_shadow
-    ora #$40
+    ora #WRIO_BANK_PAGE1
     sta WRIO                            ; bank page 1
     pla
     ldx #>BANK_WINDOW
@@ -144,7 +144,7 @@ _checksum
     jsr checksum_pages
     pha
     lda wrio_shadow
-    ora #$80
+    ora #WRIO_BANK_PAGE2
     sta WRIO                            ; bank page 2
     pla
     ldx #>BANK_WINDOW
@@ -152,7 +152,7 @@ _checksum
     jsr checksum_pages
     pha
     lda wrio_shadow
-    ora #$C0
+    ora #WRIO_BANK_PAGE3
     sta WRIO                            ; bank page 3
     pla
     ldx #>BANK_WINDOW

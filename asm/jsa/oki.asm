@@ -26,7 +26,7 @@
 ; -------------------------------------------------------------------------------------------------
 oki_reset
     lda wrio_shadow
-    and #$FB
+    and #$FF ^ WRIO_OKI_RUN
     sta WRIO                            ; M6295 reset (bit 2 low)
     ora #WRIO_OKI_RUN
     sta wrio_shadow

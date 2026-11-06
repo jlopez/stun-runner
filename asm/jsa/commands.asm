@@ -97,7 +97,7 @@ _set_mix
     sta unused_43
     lda #$00
     eor #$FF
-    and #$0F                            ; MIX_YM_VOLUME | MIX_OKI_FULL
+    and #MIX_YM_VOLUME|MIX_OKI_FULL
     sta mix_shadow
     php
     sei

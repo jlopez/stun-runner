@@ -131,7 +131,7 @@ _start
     sta MIX                             ; low-pass filter on
     sta MIX
     lda wrio_shadow
-    and #$3F
+    and #$FF ^ WRIO_BANK
     ora tbl_65DD+4,x
     sta wrio_shadow
     sta WRIO                            ; the page at 3000
@@ -469,7 +469,8 @@ _last
     rts
 
 ; read through tmp_ptr by sub_55B4 (5892-5898, 58C2-58C8): the patch ymtimer_start loads into
-; channels 6 and 7 (its layout is the sequencer's patch format, docs/12)
+; channels 6 and 7. Its layout is the sequencer's patch layout: sub_55B4 (55B4) writes a patch to
+; the YM2151, and 5553-5584 reads byte 0 as trk_reg20 and bytes 5 + 6k as the four trk_op_tl rows
 ymtimer_patch
     .byte $C7, $00, $00, $00, $02, $7F, $19
     .byte $9F, $DF, $0A, $0D, $7F, $19, $9F

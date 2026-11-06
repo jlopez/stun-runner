@@ -1,13 +1,15 @@
 ; tables.asm: 5DB5-61E3, lookup tables of the code and the command tables.
 ;
 ; Every table here is read by the code at the addresses its comment gives. The MAME trace
-; (artifacts/sndtrace-summary.json, data_read) confirms the reads of every table but three:
-; empty_envelope, note_periods and level_curves are read only by engine-1 code that no trace runs
-; (docs/09-sound-program.md section 10.11), so their reads rest on the code alone. A table's
-; length is what the index the code builds can reach where that is bounded (an AND, a compare),
-; else up to the next table. The first eight are the sequencer's (sequencer.asm reads them; engine 0 and engine 1 as
-; in ram.asm); the command tables (cmd_class, cmd_type, cmd_param, imm_handlers) are the protocol
-; with the 68010 (docs/09-sound-program.md section 5).
+; (artifacts/sndtrace-summary.json, data_read) confirms the reads of every table but four:
+; empty_envelope, note_periods and level_curves are read only by engine-1 code that no trace runs,
+; and imm_handlers only by cmdtype_03_immediate and nmi_immediate, which no committed trace runs
+; either (no immediate command is sent; the scratch probe of docs/09 section 10.2 ran them). Their
+; reads rest on the code, and imm_handlers' also on that probe (docs/09-sound-program.md section
+; 10.11). A table's length is what the index the code builds can reach where that is bounded (an
+; AND, a compare), else up to the next table. The first eight are the sequencer's (sequencer.asm
+; reads them; engine 0 and engine 1 as in ram.asm); the command tables (cmd_class, cmd_type,
+; cmd_param, imm_handlers) are the protocol with the 68010 (docs/09-sound-program.md section 5).
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
 ; program.md section 3); named in M4c (docs/09 section 10.7).
@@ -87,7 +89,8 @@ note_lengths
     .word $0000, $1E00, $0F00, $0780, $03C0, $0A00, $0500, $0280
     .word $0600, $01E0, $00F0, $0078, $003C, $0140, $00A0, $0300
 
-; 16 bytes: read at 4CE8 with Y = the slide step's note_lengths index AND 0F (4CE5): how much each
+; 16 bytes: read at 4CE8 with Y = 0A (trk_slide_step 0, the timed step) or tmp_1C AND 0F, the
+; note's length byte (trk_slide_step non-zero; 4CCE-4CE7): how much each
 ; level-slide step takes off trk_slide_time (4D03-4D1A) and how far it scales trk_slide_rate
 ; (4D1B-4D2A); FF instead applies trk_slide_rate_hi whole and takes 1 off trk_slide_time_hi, the
 ; slide ending at 0 (4CEF-4D00).

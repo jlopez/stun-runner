@@ -260,6 +260,30 @@ def test_system_files_are_named() -> None:
             assert seq, f"{m.group(1)} is used by no sequencer file: it is not M4d's"
 
 
+# A mask an AND or ORA applies just before a store to a WRIO or MIX register (or its shadow) is
+# made of the hardware equates (hardware.asm), not a raw number (the M4c decision, CLAUDE.md).
+RAW_MASK = re.compile(r"^\s*(?:and|ora)\s+#\$[0-9A-Fa-f]+\s*(?:;|$)")
+HW_STORE = re.compile(r"^\s*sta\s+(?:WRIO|MIX|wrio_shadow|mix_shadow)\b")
+
+
+def raw_hardware_masks(lines: list[str]) -> list[str]:
+    """The raw immediate masks whose next instruction stores to WRIO, MIX or their shadows."""
+    code = [t for t in lines if t.split(";", 1)[0].strip()]
+    return [a for a, b in zip(code, code[1:], strict=False) if RAW_MASK.match(a) and HW_STORE.match(b)]
+
+
+def test_hardware_masks_are_equates() -> None:
+    """System files: no raw AND/ORA mask feeds a WRIO or MIX store, and no line is over 100
+    columns (the repository's convention)."""
+    assert raw_hardware_masks(["    and #$FB", "    sta WRIO ; x"]) == ["    and #$FB"]
+    assert not raw_hardware_masks(["    and #$FF ^ WRIO_OKI_RUN", "    sta WRIO"])
+    for name in SYSTEM_FILES:
+        lines = (TREE / name).read_text().splitlines()
+        assert not raw_hardware_masks(lines), f"{name}: {raw_hardware_masks(lines)}"
+        long = [i + 1 for i, t in enumerate(lines) if len(t) > 100]
+        assert not long, f"{name}: lines over 100 columns: {long}"
+
+
 @needs_tass
 def test_committed_summary_agrees_with_source(tmp_path: Path) -> None:
     """CI: the executed ranges of artifacts/sndtrace-summary.json are whole instructions of the
