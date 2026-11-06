@@ -1,7 +1,7 @@
 ; unused_streams.asm: 6FC4-79E2, byte streams no pointer of the program reaches.
 ;
 ; No entry of entry_stream, no op of another stream and no instruction points into this range
-; (docs/12-sound-music.md section 6); its bytes parse as streams from 6FC4 on, statement after
+; (docs/12-sound-music.md section 7); its bytes parse as streams from 6FC4 on, statement after
 ; statement, with calls, jumps and jump tables that stay inside it and patch ops that name
 ; records of patches_2.asm. They are structured like the streams that play.
 

@@ -2699,7 +2699,7 @@ volume_steps
 ; operators M1, M2, C1, C2 (in that order) that are not carriers. op_carrier_tl_sub reads the bits
 ; in that order; tick_ym_channel's level loop runs the operators C2, C1, M2, M1 (registers 78-60)
 ; with the same bits from bit 7 down, so its doubling of the velocity term lands on other
-; operators (docs/12-sound-music.md section 3)
+; operators (docs/12-sound-music.md section 3.4)
 modulator_mask
     .byte $E0, $E0, $E0, $E0, $C0, $80, $80, $00
 

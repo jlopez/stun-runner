@@ -1,7 +1,7 @@
 ; sounds.asm: 61E4-65E5, the sound tables: what a sound command starts, and the OKI effects.
 ;
 ; A command of type 08 (cmdtype_08, 4569) starts sound N, its parameter (00-1F; the commands
-; are in docs/12-sound-music.md section 5). sound_first_entry gives N's first entry E and
+; are in docs/12-sound-music.md section 6). sound_first_entry gives N's first entry E and
 ; entry_next each next one up to 0: every entry is one track (one byte stream) that cmdtype_08
 ; starts on a free track slot (or on the slot of the track it may take over, 459F-45E8) with
 ; the priority entry_priority, on the YM2151 channel entry_channel, from the stream

@@ -125,7 +125,7 @@ The interpreter keeps a second output path: tracks of kind 0 (ram_03EC bits 1-0)
 
 ## 4. The ops
 
-One row per op byte. Length in bytes with the op; handler and its address (labels of the tree); "musictrace" counts the dispatches by `run_op` (506D) in `make musictrace` (section 8); "sndtrace" whether `make sndtrace` (docs/09 section 7) executed the handler's first instruction (for the skip ops that is `read_item` itself, so it says nothing); "streams" the uses in the streams the sound table reaches and in the unreached ones (section 6). Every op the data uses was dispatched in MAME but `transpose_add` (85, 42 uses: on tracks the runs did not reach far enough), and the two used only in unreached streams (AA, B3).
+One row per op byte. Length in bytes with the op; handler and its address (labels of the tree); "musictrace" counts the dispatches by `run_op` (506D) in `make musictrace` (section 8); "sndtrace" whether `make sndtrace` (docs/09 section 7) executed the handler's first instruction (for the skip ops that is `read_item` itself, so it says nothing); "streams" the uses in the streams the sound table reaches and in the unreached ones (section 6). Every op the reached streams use ran in MAME, in one trace or the other, but `transpose_add` (85, 42 uses, in statements the runs did not reach); AA and B3 occur only in unreached streams.
 
 | Op | Macro | Bytes | Handler | musictrace | sndtrace | streams (reached / unreached) | Effect |
 |---|---|---|---|---|---|---|---|

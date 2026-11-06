@@ -2,7 +2,7 @@
 ;
 ; A record is what the ops patch (9D), lfo (9E) and noise (9F) read through their address
 ; operand (the macros ym_voice, ym_operator, ym_scaling, ym_lfo and ym_noise of
-; data/macros.asm, in record order; docs/12-sound-music.md section 4). Each record's comment
+; data/macros.asm, in record order; docs/12-sound-music.md section 5). Each record's comment
 ; lists the streams whose patch, lfo or noise ops name it.
 
     .cerror * != $6B80, "patches_1.asm must start at $6B80"

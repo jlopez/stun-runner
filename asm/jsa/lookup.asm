@@ -9,7 +9,7 @@
 ; F7 to 00. The byte after it, AC48, is checksum_adjust (jsa.asm).
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
-; program.md section 3); hand-maintained from here on (docs/12-sound-music.md section 3).
+; program.md section 3); hand-maintained from here on (docs/12-sound-music.md section 3.4).
 
     .cerror * != $AB48, "lookup.asm must start at $AB48"
 

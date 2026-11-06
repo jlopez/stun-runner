@@ -5,7 +5,7 @@
 ; note or op, read by read_item (sequencer.asm, 484B). Labels inside a stream are where other
 ; statements of the data go: _subN a call target (op 8D), _tN a jump, branch or jump_table
 ; target. unused_stream_NN is a stream no pointer of the program reaches (docs/12-sound-
-; music.md section 6). A statement marked "not reached" follows a jump or a jump table in its
+; music.md section 7). A statement marked "not reached" follows a jump or a jump table in its
 ; stream and no pointer reaches it.
 
     .cerror * != $65E6, "streams_1.asm must start at $65E6"
