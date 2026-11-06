@@ -1,19 +1,19 @@
 ; sounds.asm: 61E4-65E5, the tables the command handlers index with their parameter.
 ;
-; cmdtype_08 (4569, the commands of type 08) takes a number N in A, the command's parameter (00-1F).
-; tbl_61E4 gives a first entry E (an N from 80 up would read its second half, tbl_61E4+$100 on, as
-; words, 4575/4581, but no parameter reaches 80), and E, then each next entry tbl_6438 gives until
-; 0, indexes four 125-entry tables: tbl_6244 and tbl_62C1 (bytes) and tbl_633E, whose words are the
-; addresses of byte streams in data/music.asm, copied to ram_0266/ram_0284 (4632-463A), the pointer
-; the stream reader at 4859 reads through zp_06 (4781-4786, 4864-486C). The 125 entries end where
-; the next table starts: tbl_6244 + 7D = tbl_62C1, + 7D = tbl_633E, + FA = tbl_6438, + FA =
-; tbl_6532. cmdtype_13 (5BFE, the OKI start) indexes the three 53-entry tables tbl_6532, tbl_6567
-; and tbl_659C with its parameter (00-34; 5C43 ORs 80 into tbl_6532's byte for the OKI's first
-; command byte) and keeps the entry in zp_52,x for the channel. cmdtype_14 (5C6F) does not index
-; with its parameter: it compares it with tbl_6532 of each channel's current entry (zp_52,x,
-; 5C73-5C76) and stops the channel that matches. cmdtype_01 (commands 1E-23, parameters 00-05) and
-; cmdtype_02 (no command) index tbl_65D1 and tbl_65D7. What N, E and the bytes mean for the sound is
-; for a later leg.
+; cmdtype_08_start_sound (4569, the commands of type 08) takes a number N in A, the command's
+; parameter (00-1F). tbl_61E4 gives a first entry E (an N from 80 up would read its second half,
+; tbl_61E4+$100 on, as words, 4575/4581, but no parameter reaches 80), and E, then each next entry
+; tbl_6438 gives until 0, indexes four 125-entry tables: tbl_6244 and tbl_62C1 (bytes) and tbl_633E,
+; whose words are the addresses of byte streams in data/music.asm, copied to trk_ptr_lo/trk_ptr_hi
+; (4632-463A), the pointer the stream reader at 4859 reads through zp_06 (4781-4786, 4864-486C). The
+; 125 entries end where the next table starts: tbl_6244 + 7D = tbl_62C1, + 7D = tbl_633E, + FA =
+; tbl_6438, + FA = tbl_6532. cmdtype_13_oki_play (5BFE, the OKI start) indexes the three 53-entry
+; tables tbl_6532, tbl_6567 and tbl_659C with its parameter (00-34; 5C43 ORs 80 into tbl_6532's byte
+; for the OKI's first command byte) and keeps the entry in oki_entry,x for the channel.
+; cmdtype_14_oki_stop (5C6F) does not index with its parameter: it compares it with tbl_6532 of each
+; channel's current entry (oki_entry,x, 5C73-5C76) and stops the channel that matches.
+; cmdtype_01_set_var (commands 1E-23, parameters 00-05) and cmdtype_02_add_var (no command) index
+; tbl_65D1 and tbl_65D7. What N, E and the bytes mean for the sound is for a later leg.
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
 ; program.md section 3); hand-maintained from here on.
@@ -32,7 +32,7 @@ tbl_6224
     .byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF ; 00-0F
     .byte $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF ; 10-1F
 
-; 125 bytes, one per entry E: read through (zp_15),y at 45B8 and 45FF (base #<tbl_6244 +
+; 125 bytes, one per entry E: read through (start_ptr),y at 45B8 and 45FF (base #<tbl_6244 +
 ; E, 45A9-45B6, 45F0-45FD).
 tbl_6244
     .byte $03, $03, $03, $03, $03, $03, $03, $03, $27, $27, $27, $27, $27, $29, $29, $29 ; 00-0F
@@ -44,7 +44,7 @@ tbl_6244
     .byte $28, $28, $28, $28, $28, $28, $19, $19, $19, $19, $32, $32, $32, $32, $32, $32 ; 60-6F
     .byte $32, $32, $32, $32, $32, $32, $32, $32, $3F, $32, $32, $32, $32 ; 70-7C
 
-; 125 bytes, one per entry E: read through (zp_15),y at 45C9 and 4614 (base #<tbl_62C1 + E).
+; 125 bytes, one per entry E: read through (start_ptr),y at 45C9 and 4614 (base #<tbl_62C1 + E).
 tbl_62C1
     .byte $00, $01, $02, $03, $04, $05, $06, $07, $07, $06, $05, $04, $03, $07, $06, $05 ; 00-0F
     .byte $04, $03, $02, $01, $07, $06, $05, $04, $03, $00, $01, $02, $03, $05, $06, $00 ; 10-1F
@@ -55,7 +55,7 @@ tbl_62C1
     .byte $07, $03, $04, $05, $06, $07, $00, $03, $01, $02, $04, $01, $05, $05, $00, $04 ; 60-6F
     .byte $00, $07, $05, $04, $06, $05, $05, $05, $03, $05, $04, $05, $07 ; 70-7C
 
-; 125 words, one per entry E: the stream addresses, read at 4632 and 4638 through (zp_15),y
+; 125 words, one per entry E: the stream addresses, read at 4632 and 4638 through (start_ptr),y
 ; (base #<tbl_633E + E x 2, 461B-4630).
 tbl_633E
     .word dat_6AE0, dat_6AF3, dat_6B02, dat_6B13 ; 00-03
@@ -92,7 +92,7 @@ tbl_633E
     .word dat_68F1                      ; 7C-7C
 
 ; 125 words, one per entry E: the next entry, 0 for the last; read at 4694-469D through
-; (zp_15),y (base #<tbl_6438 + E x 2, 467B-4692).
+; (start_ptr),y (base #<tbl_6438 + E x 2, 467B-4692).
 tbl_6438
     .word $0001, $0002, $0003, $0004, $0005, $0006, $0007, $0000 ; 00-07
     .word $0009, $000A, $000B, $000C, $0000, $000E, $000F, $0010 ; 08-0F
@@ -127,24 +127,24 @@ tbl_6567
     .byte $80, $80, $80, $80, $00, $00, $10, $11, $12, $10, $20, $21, $20, $20, $20, $31 ; 20-2F
     .byte $30, $30, $31, $30, $31       ; 30-34
 
-; 53 bytes: read at 5C56 (into zp_5E,x).
+; 53 bytes: read at 5C56 (into oki_duck,x).
 tbl_659C
     .byte $00, $06, $06, $06, $06, $06, $06, $06, $06, $08, $08, $08, $08, $04, $04, $04 ; 00-0F
     .byte $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04 ; 10-1F
     .byte $04, $04, $04, $04, $08, $07, $00, $00, $00, $02, $00, $00, $00, $00, $00, $00 ; 20-2F
     .byte $00, $00, $00, $00, $00       ; 30-34
 
-; 6 bytes: read at 43AE and 43BB (AND 1F: X, a zp_23 offset) with Y = 00-05.
+; 6 bytes: read at 43AE and 43BB (AND 1F: X, a seq_vars offset) with Y = 00-05.
 tbl_65D1
     .byte $00, $00, $00, $00, $00, $00
 
-; 6 bytes: read at 43B4 and 43C1 (the value for zp_23,x).
+; 6 bytes: read at 43B4 and 43C1 (the value for seq_vars,x).
 tbl_65D7
     .byte $00, $01, $02, $03, $04, $05
 
-; 9 bytes up to the first stream (dat_65E6); read at 44C5 (Y), 44ED-451B (X: cmdtype_0D, no
-; command has type 0D) and 58AB-590F (X = zp_4E and zp_4E x 2: a word at 590A/590F becomes the
-; pointer zp_49 of ymtimer.asm). None of these was executed in the make sndtrace runs and no
+; 9 bytes up to the first stream (dat_65E6); read at 44C5 (Y), 44ED-451B (X: cmdtype_0D_run_op, no
+; command has type 0D) and 58AB-590F (X = ymt_entry and ymt_entry x 2: a word at 590A/590F becomes
+; the pointer ymt_ptr of ymtimer.asm). None of these was executed in the make sndtrace runs and no
 ; command reaches them with a bounded index, so the extent is the space left.
 tbl_65DD
     .byte $00, $00, $00, $00, $00, $00, $00, $00, $00

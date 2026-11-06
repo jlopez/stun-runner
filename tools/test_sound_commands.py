@@ -123,7 +123,8 @@ def test_type_fields() -> None:
             assert by_value[c["target"]]["type"] == "08", c["value"]
             assert c["target"] == c["param"]
         if t == "0B":
-            # cmdtype_0B (4496-44C2) releases the voices whose group (ram_03EC, y >> 2) is A
+            # cmdtype_0B_release_priority (4496-44C2) releases the voices whose group
+            # (trk_priority, y >> 2) is A
             assert HEX2.match(c["group"]) and c["group"] == c["param"], c["value"]
 
 
@@ -517,12 +518,12 @@ def test_mame_protocol(run: str) -> None:
     head = header(lines)
     taken = {p[1]: int(p[2]) for p in lines if p[0] == "taken"}
     resets = sum(int(p[3]) for p in lines if p[0] == "reset")
-    # every command written was taken by h_nmi (5839) or as imm_04's data byte (57FC); 4139 is
-    # the read after each reset that drops what the latch holds
+    # every command written was taken by h_nmi (5839) or as imm_04_loopback's data byte (57FC);
+    # 4139 is the read after each reset that drops what the latch holds
     assert taken.get("5839", 0) + taken.get("57FC", 0) == int(head["commands"])
     assert taken.get("4139", 0) == resets
     responses = {(p[1], p[2]) for p in lines if p[0] == "response"}
-    # FF after reset (413E); 00 status for 07 and the input state for 03 (send_response 455D);
+    # FF after reset (413E); 00 status for 07 and coin_state (coins modulo 4) for 03 (455D);
     # 55 for 09 (main_loop 4164); 6D for 06, AA and the echoed byte for 08 (455D)
     assert {r for r, pc in responses if pc == "413E"} <= {"FF"}
     assert {pc for _, pc in responses} <= {"413E", "455D", "4164"}

@@ -2,10 +2,10 @@
 
 Runs in CI without the ROMs: asm/jsa/jsa.asm assembles with 64tass to 136070-2123.10c as MAME
 lists it (size, CRC-32, SHA-1), a planted change in an operand changes the hash, the region
-guards catch a moved region, the tree has no .binary, the IDA names are carried in, and the
-committed trace summary agrees with the source. The trace tools (tools/sndtrace.py) are tested
-on synthetic traces of a synthetic program; the MAME traces under build/mame/, when present, are
-checked against the source too.
+guards catch a moved region, the tree has no .binary, the IDA names are carried in, the system
+files carry no address-style label, and the committed trace summary agrees with the source. The
+trace tools (tools/sndtrace.py) are tested on synthetic traces of a synthetic program; the MAME
+traces under build/mame/, when present, are checked against the source too.
 """
 
 from __future__ import annotations
@@ -95,7 +95,8 @@ def test_guards_catch_a_moved_region(tmp_path: Path) -> None:
     tree = copy_tree(tmp_path)
     commands = tree / "commands.asm"
     text = commands.read_text()
-    at = text.index("\n    ", text.index("cmdtype_00"))  # the first instruction of cmdtype_00
+    label = text.index("\ncmdtype_00_min_priority\n")
+    at = text.index("\n    ", label + 1)  # the first instruction of cmdtype_00_min_priority
     commands.write_text(text[:at] + "\n    nop" + text[at:])
     r = assemble(tree, tmp_path / "moved.bin")
     assert r.returncode != 0
@@ -175,6 +176,154 @@ def test_loc_labels_follow_the_rule() -> None:
                         or any(lo < g < hi for g in globals_at if g != at)
                     )
             assert any(reasons), f"{path.name}: {name} could be an _l local"
+
+
+# The files leg M4c named (docs/09 section 10); sequencer.asm, data/** and lookup.asm are M4d's.
+SYSTEM_FILES = (
+    "jsa.asm",
+    "hardware.asm",
+    "ram.asm",
+    "system.asm",
+    "commands.asm",
+    "nmi.asm",
+    "ymtimer.asm",
+    "oki.asm",
+    "io.asm",
+    "tables.asm",
+)
+# The hex digits in either case: the build is case sensitive (-C), so loc_5d3a is its own symbol.
+ADDRESS_LABEL = re.compile(r"^(?:(?:sub|loc|tbl|dat)_[0-9A-Fa-f]{4}|_l[0-9A-Fa-f]{4})$")
+EQUATE = re.compile(r"^([A-Za-z_]\w*)\s*=")
+# The symbol a line defines: its first token, whatever follows it (a colon, an instruction, a data
+# statement, an equate's "=", a comment) and however far it is indented. A mnemonic or a directive
+# never has an address label's shape, so only definitions can match ADDRESS_LABEL.
+DEFINED = re.compile(r"^\s*(_?[A-Za-z]\w*)")
+NEUTRAL_EQUATE = re.compile(r"^(?:zp_[0-9A-Fa-f]{2}|ram_[0-9A-Fa-f]{4})$")
+# The sequencer's files (M4d's): the only users a neutral equate may have.
+SEQUENCER_FILES = ("sequencer.asm", "lookup.asm", "data")
+
+
+def address_labels(lines: list[str]) -> list[str]:
+    """The lines that define a symbol with an address label's shape."""
+    out = []
+    for t in lines:
+        m = DEFINED.match(t)
+        if m and ADDRESS_LABEL.match(m.group(1)):
+            out.append(t)
+    return out
+
+
+def test_address_label_guard_sees_every_form() -> None:
+    """The forms 64tass accepts for a label definition, each caught; references are not."""
+    planted = [
+        "loc_4400",
+        "loc_4400 ; x",
+        "loc_4400:",
+        "_l4400 ; x",
+        "tbl_5DB5 .byte $00, $01",
+        "_l5CE0 lda #0",
+        "    sub_4100 rts",
+        "dat_6000 = $6000",
+        "loc_5d3a",
+        "_l5cE0 ; x",
+    ]
+    assert address_labels(planted) == planted
+    assert not address_labels(["    jsr sub_4100", "    .word tbl_5DB5", "; loc_4400", "lda_ok"])
+
+
+def code_refers(lines: list[str], name: str) -> bool:
+    return any(re.search(rf"\b{name}\b", t.split(";", 1)[0]) for t in lines)
+
+
+def test_system_files_are_named() -> None:
+    """docs/09 section 10: no address-style label (sub_, loc_, tbl_, dat_ + address, or an _lXXXX
+    local) is left in the system files, and every RAM equate still called zp_XX or ram_XXXX is one
+    that the sequencer's files use and no system file does (the M4c/M4d split of ram.asm). When
+    M4d has named them all, none is left and the test still passes."""
+    for name in SYSTEM_FILES:
+        left = address_labels((TREE / name).read_text().splitlines())
+        assert not left, f"{name}: {left}"
+    system = {n: (TREE / n).read_text().splitlines() for n in SYSTEM_FILES if n != "ram.asm"}
+    paths = [
+        p
+        for n in SEQUENCER_FILES
+        for p in ((TREE / n).rglob("*.asm") if (TREE / n).is_dir() else [TREE / n])
+    ]
+    assert len(paths) > 2, paths
+    sequencer = {str(p.relative_to(TREE)): p.read_text().splitlines() for p in paths}
+    for t in (TREE / "ram.asm").read_text().splitlines():
+        m = EQUATE.match(t)
+        if m and NEUTRAL_EQUATE.match(m.group(1)):
+            users = [n for n, lines in system.items() if code_refers(lines, m.group(1))]
+            assert not users, f"{m.group(1)} is used by {users}: M4c names it"
+            seq = [n for n, lines in sequencer.items() if code_refers(lines, m.group(1))]
+            assert seq, f"{m.group(1)} is used by no sequencer file: it is not M4d's"
+
+
+# A mask an AND or ORA applies to a value that A then carries to a store to a WRIO or MIX register
+# (or its shadow) is made of the hardware equates (hardware.asm), not a raw number in any base
+# (the M4c decision, CLAUDE.md).
+RAW_MASK = re.compile(r"^(?:and|ora)\s+#(?:\$[0-9A-Fa-f]+|%[01]+|[0-9]+)$")
+HW_STORE = re.compile(r"^sta\s+(?:WRIO|MIX|wrio_shadow|mix_shadow)\b")
+# What may come between the mask and the store with A still derived from the mask: the other
+# logic operations and the shifts on A, stores, compares, flag and index instructions. Anything
+# else (a load or transfer into A, arithmetic, a call, a jump, a return, a branch, a directive)
+# ends the search.
+A_CARRIES = re.compile(
+    r"^(?:(?:and|ora|eor|sta|stx|sty|ldx|ldy|cmp|cpx|cpy|bit)\s|(?:asl|lsr|rol|ror)\s+a$"
+    r"|(?:clc|sec|cli|sei|cld|sed|clv|nop|inx|iny|dex|dey|tax|tay|pha|php)$)"
+)
+CODE_LABEL = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\s*(?:;|$)")
+
+
+def raw_hardware_masks(lines: list[str]) -> list[str]:
+    """The raw immediate AND/ORA masks whose value A carries, through what A_CARRIES allows, to a
+    store to WRIO, MIX or their shadows. A label in between does not stop the search: the masked
+    value still falls through it to the store."""
+    found = []
+    for i, line in enumerate(lines):
+        if not RAW_MASK.match(line.split(";", 1)[0].strip()):
+            continue
+        for later in lines[i + 1 :]:
+            text = later.split(";", 1)[0].strip()
+            if not text or CODE_LABEL.match(later):
+                continue
+            if HW_STORE.match(text):
+                found.append(line)
+                break
+            if not A_CARRIES.match(text):
+                break
+    return found
+
+
+def test_hardware_masks_are_equates() -> None:
+    """System files: no raw AND/ORA mask feeds a WRIO or MIX store, and no line is over 100
+    columns (the repository's convention)."""
+    assert raw_hardware_masks(["    and #$FB", "    sta WRIO ; x"]) == ["    and #$FB"]
+    planted = [
+        # ymtimer.asm's form (5903): another ORA, then the shadow, then WRIO
+        ["    lda wrio_shadow", "    and #$3F", "    ora tbl_65DD+4,x", "    sta wrio_shadow"],
+        ["    and #%00111111", "    sta wrio_shadow"],
+        ["    and #63", "    sta WRIO"],
+        ["    ora #$08 ; x", "_join", "    sta temp", "    sta MIX"],
+    ]
+    for case in planted:
+        assert len(raw_hardware_masks(case)) == 1, case
+    assert not raw_hardware_masks(["    and #$FF ^ WRIO_OKI_RUN", "    sta WRIO"])
+    assert not raw_hardware_masks(
+        ["    and #WRIO_BANK", "    ora #WRIO_BANK_PAGE1", "    sta WRIO"]
+    )
+    assert not raw_hardware_masks(["    and #$3F", "    lda wrio_shadow", "    sta WRIO"])
+    assert not raw_hardware_masks(["    and #$3F", "    jsr sub_5504", "    sta WRIO"])
+    assert not raw_hardware_masks(["    and #$3F", "    sta YM2151_DATA"])
+    for name in SYSTEM_FILES:
+        lines = (TREE / name).read_text().splitlines()
+        assert not raw_hardware_masks(lines), f"{name}: {raw_hardware_masks(lines)}"
+        long = [i + 1 for i, t in enumerate(lines) if len(t) > 100]
+        assert not long, f"{name}: lines over 100 columns: {long}"
+    # This file too: make lint does not run the formatter and ruff ignores E501.
+    long = [i + 1 for i, t in enumerate(Path(__file__).read_text().splitlines()) if len(t) > 100]
+    assert not long, f"{Path(__file__).name}: lines over 100 columns: {long}"
 
 
 @needs_tass

@@ -1,12 +1,12 @@
 ; sequencer.asm: 4759-57E2, the stream interpreter and its YM2151 output.
 ;
 ; Up to 30 entries (the X of the 1E-byte arrays of ram.asm) each read a byte stream of
-; data/music.asm through zp_06 (4859-486E: the pointer from ram_0266/ram_0284, which cmdtype_08
-; sets from tbl_633E). A byte below 80 is handled at 487E on; a byte 80-BA is an op, run by
-; sub_505D through op_handlers with the next byte in A; BB and up ends the entry (ram_0248 =
-; FF). The YM2151 register writes go through ym_wait. h_irq reaches this file through sub_4229
-; (loc_5043, X = 0 and 1 on alternate ticks). What the ops and the bytes mean is for a later leg;
-; the labels name the dispatch only.
+; data/music.asm through zp_06 (4859-486E: the pointer from trk_ptr_lo/trk_ptr_hi, which
+; cmdtype_08_start_sound sets from tbl_633E). A byte below 80 is handled at 487E on; a byte 80-BA is
+; an op, run by sub_505D through op_handlers with the next byte in A; BB and up ends the entry
+; (trk_sound = FF). The YM2151 register writes go through ym_wait. h_irq reaches this file through
+; tick_sequencer (loc_5043, X = 0 and 1 on alternate ticks). What the ops and the bytes mean is for
+; a later leg; the labels name the dispatch only.
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
 ; program.md section 3); hand-maintained from here on. sub_/loc_/tbl_/dat_/_lXXXX labels are
@@ -17,14 +17,14 @@
 ; from 4CBD, 4E6E, 4E9F
 sub_4759
     sta zp_0F
-    ora ram_0860,x
+    ora trk_link,x
     beq _l4762
     lda #$FF
 _l4762
     sta zp_22
-    lda ram_03EC,x
+    lda trk_priority,x
     beq _l4770
-    ldy ram_0248,x
+    ldy trk_sound,x
     iny
     bne _l4773
     tya
@@ -35,37 +35,37 @@ _l4773
     sta ram_088F
     and #$01
     tay
-    lda ram_03EC,x
+    lda trk_priority,x
     sta ram_088D,y
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     sta zp_06
-    lda ram_0284,x
+    lda trk_ptr_hi,x
     sta zp_07
-    lda ram_0572,x
+    lda trk_keyon_flags,x
     sta ram_08AB
-    lda ram_02DE,x
+    lda trk_wait_frac,x
     sec
-    sbc ram_0626,x
-    sta ram_02DE,x
-    lda ram_02FC,x
-    sbc ram_0644,x
-    sta ram_02FC,x
+    sbc trk_tempo_lo,x
+    sta trk_wait_frac,x
+    lda trk_wait_lo,x
+    sbc trk_tempo_hi,x
+    sta trk_wait_lo,x
     bcs _l47AE
-    dec ram_031A,x
+    dec trk_wait_hi,x
     bpl _l47AE
     jmp loc_484B
 _l47AE
-    lda ram_0374,x
+    lda trk_gate_hi,x
     bmi _l47CD
-    lda ram_0338,x
+    lda trk_gate_frac,x
     sec
-    sbc ram_0626,x
-    sta ram_0338,x
-    lda ram_0356,x
-    sbc ram_0644,x
-    sta ram_0356,x
+    sbc trk_tempo_lo,x
+    sta trk_gate_frac,x
+    lda trk_gate_lo,x
+    sbc trk_tempo_hi,x
+    sta trk_gate_lo,x
     bcs _l47EB
-    dec ram_0374,x
+    dec trk_gate_hi,x
     bpl _l47EB
 _l47CD
     lda ram_0899
@@ -75,7 +75,7 @@ _l47CD
     ora ram_08AB
     sta ram_08AB
     lda #$7F
-    sta ram_0374,x
+    sta trk_gate_hi,x
     bne _l47F5
 _l47E3
     lda ram_088F
@@ -87,62 +87,62 @@ _l47EB
     beq _l47F5
     jmp loc_4AE8
 _l47F5
-    lda ram_0608,x
+    lda trk_slide_step,x
     bne _l482F
-    lda ram_078E,x
-    ora ram_07AC,x
+    lda trk_slide_time_lo,x
+    ora trk_slide_time_hi,x
     bne _l480F
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     bne _l482F
-    inc ram_0248,x
+    inc trk_sound,x
     jmp loc_4941
 _l480F
-    lda ram_05AE,x
+    lda trk_slide_wait_frac,x
     sec
-    sbc ram_0626,x
-    sta ram_05AE,x
-    lda ram_05CC,x
-    sbc ram_0644,x
-    sta ram_05CC,x
+    sbc trk_tempo_lo,x
+    sta trk_slide_wait_frac,x
+    lda trk_slide_wait_lo,x
+    sbc trk_tempo_hi,x
+    sta trk_slide_wait_lo,x
     bcs _l482F
-    dec ram_05EA,x
+    dec trk_slide_wait_hi,x
     bpl _l482F
     jsr sub_4CC1
     tya
     bne _l483A
 _l482F
-    lda ram_06DA,x
+    lda trk_glide_rate,x
     beq _l4848
-    lda zp_00
+    lda tick_count
     and #$06
     bne _l4848
 _l483A
-    lda ram_02A2,x
+    lda trk_pitch_lo,x
     beq _l4848
     sta ram_0895
-    lda ram_0392,x
+    lda trk_length_byte,x
     jsr sub_4D6C
 _l4848
     jmp loc_4CB1
 
 ; op_handlers entry for stream byte $90, $91, $92, $93, $94, $98, $9A, $9C; from 47AB, 493E
 loc_484B
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     clc
     adc #$02
-    sta ram_0266,x
+    sta trk_ptr_lo,x
     bcc _l4859
-    inc ram_0284,x
+    inc trk_ptr_hi,x
 _l4859
     ldy #$00
     lda (zp_06),y
     bpl _l487E
     jsr sub_505D
     bcc _l4870
-    lda ram_0284,x
+    lda trk_ptr_hi,x
     sta zp_07
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     sta zp_06
     bcs loc_484B
 _l4870
@@ -159,7 +159,7 @@ _l487E
     beq _l488B
 _l4887
     clc
-    adc ram_0662,x
+    adc trk_transpose,x
 _l488B
     ldy ram_0899
     cpy #$02
@@ -171,100 +171,100 @@ _l488B
 _l489B
     pha
     sec
-    sbc ram_02A2,x
-    sta ram_06F8,x
+    sbc trk_pitch_lo,x
+    sta trk_glide_lo,x
     asl a
     lda #$FF
     bcs _l48AA
     lda #$00
 _l48AA
-    sta ram_0716,x
+    sta trk_glide_hi,x
     pla
-    sta ram_02A2,x
+    sta trk_pitch_lo,x
     lda #$00
-    sta ram_02C0,x
+    sta trk_pitch_hi,x
     jmp _l490C
 _l48B9
     asl a
     tay
     sec
-    lda ram_02A2,x
-    sbc tbl_5DB9,y
-    sta ram_06F8,x
-    lda ram_02C0,x
-    sbc tbl_5DB9+1,y
-    sta ram_0716,x
-    lda tbl_5DB9,y
-    sta ram_02A2,x
-    lda tbl_5DB9+1,y
-    sta ram_02C0,x
+    lda trk_pitch_lo,x
+    sbc note_periods,y
+    sta trk_glide_lo,x
+    lda trk_pitch_hi,x
+    sbc note_periods+1,y
+    sta trk_glide_hi,x
+    lda note_periods,y
+    sta trk_pitch_lo,x
+    lda note_periods+1,y
+    sta trk_pitch_hi,x
     jmp _l490C
 _l48DD
-    sta zp_1B
+    sta tmp_1B
     lda #$00
-    sta ram_06F8,x
-    sta ram_0716,x
-    lda zp_1B
+    sta trk_glide_lo,x
+    sta trk_glide_hi,x
+    lda tmp_1B
     beq _l48F6
-    lda ram_02A2,x
+    lda trk_pitch_lo,x
     sec
-    sbc zp_1B
-    sta ram_0716,x
-    lda zp_1B
+    sbc tmp_1B
+    sta trk_glide_hi,x
+    lda tmp_1B
 _l48F6
-    sta ram_02A2,x
+    sta trk_pitch_lo,x
     ldy zp_22
     bne _l490C
     sta ram_0895
     clc
     lda #$20
-    adc zp_0D
+    adc ym_channel
     tay
-    lda ram_0518,x
-    sta ram_08AE,y
+    lda trk_reg20,x
+    sta ym_shadow,y
 _l490C
     ldy #$01
     lda #$00
-    sta zp_1C
+    sta tmp_1C
     lda (zp_06),y
     beq _l4919
     jmp loc_497F
 _l4919
-    lda ram_0734,x
+    lda trk_call_frame,x
     beq loc_4941
     pha
-    jsr sub_431A
-    lda (zp_20),y
-    sta ram_0734,x
-    lda zp_1F
-    sta (zp_20),y
+    jsr frame_address
+    lda (frame_ptr),y
+    sta trk_call_frame,x
+    lda frame_free
+    sta (frame_ptr),y
     pla
-    sta zp_1F
+    sta frame_free
     iny
-    lda (zp_20),y
-    sta ram_0266,x
+    lda (frame_ptr),y
+    sta trk_ptr_lo,x
     sta zp_06
     iny
-    lda (zp_20),y
-    sta ram_0284,x
+    lda (frame_ptr),y
+    sta trk_ptr_hi,x
     sta zp_07
     jmp loc_484B
 
 ; from 4770, 480C, 4A71
 loc_4941
-    sta ram_03EC,x
-    sta ram_0464,x
-    sta ram_0392,x
-    sta ram_078E,x
-    sta ram_07AC,x
+    sta trk_priority,x
+    sta trk_key_fraction,x
+    sta trk_length_byte,x
+    sta trk_slide_time_lo,x
+    sta trk_slide_time_hi,x
     sta ram_0895
     lda #$01
     ora ram_08AB
     sta ram_08AB
-    jsr sub_433C
-    lda ram_0860,x
+    jsr free_track_frames
+    lda trk_link,x
     ldx ram_0898
-    sta ram_0860,x
+    sta trk_link,x
     ldy ram_0899
     cpy #$02
     bne _l497C
@@ -286,113 +286,113 @@ loc_497F
     jmp _l4A32
 _l4988
     pla
-    sta zp_1C
+    sta tmp_1C
     and #$0F
     asl a
     tay
-    lda tbl_5FE3,y
+    lda note_lengths,y
     clc
-    adc ram_02FC,x
-    sta ram_02FC,x
-    lda tbl_5FE3+1,y
-    adc ram_031A,x
-    sta ram_031A,x
-    lda zp_1C
+    adc trk_wait_lo,x
+    sta trk_wait_lo,x
+    lda note_lengths+1,y
+    adc trk_wait_hi,x
+    sta trk_wait_hi,x
+    lda tmp_1C
     and #$40
     beq _l49BF
-    lda tbl_5FE3+1,y
+    lda note_lengths+1,y
     lsr a
     pha
-    lda tbl_5FE3,y
+    lda note_lengths,y
     ror a
     clc
-    adc ram_02FC,x
-    sta ram_02FC,x
+    adc trk_wait_lo,x
+    sta trk_wait_lo,x
     pla
-    adc ram_031A,x
-    sta ram_031A,x
+    adc trk_wait_hi,x
+    sta trk_wait_hi,x
 _l49BF
     lda #$7F
-    sta ram_0374,x
-    lda zp_1C
+    sta trk_gate_hi,x
+    lda tmp_1C
     bmi _l4A05
     lda #$00
-    sta zp_1B
-    lda ram_0644,x
-    sta zp_1A
-    lda ram_0626,x
+    sta tmp_1B
+    lda trk_tempo_hi,x
+    sta tmp_ptr+1
+    lda trk_tempo_lo,x
     asl a
-    rol zp_1A
-    rol zp_1B
-    sta zp_19
-    lda ram_02DE,x
+    rol tmp_ptr+1
+    rol tmp_1B
+    sta tmp_ptr
+    lda trk_wait_frac,x
     sec
-    sbc zp_19
-    sta ram_0338,x
-    lda ram_02FC,x
-    sbc zp_1A
-    sta ram_0356,x
-    lda ram_031A,x
-    sbc zp_1B
-    sta ram_0374,x
-    lda zp_1C
+    sbc tmp_ptr
+    sta trk_gate_frac,x
+    lda trk_wait_lo,x
+    sbc tmp_ptr+1
+    sta trk_gate_lo,x
+    lda trk_wait_hi,x
+    sbc tmp_1B
+    sta trk_gate_hi,x
+    lda tmp_1C
     and #$30
     cmp #$10
     bne _l4A05
-    lsr ram_0374,x
-    ror ram_0356,x
-    ror ram_0338,x
+    lsr trk_gate_hi,x
+    ror trk_gate_lo,x
+    ror trk_gate_frac,x
 _l4A05
-    lda ram_0392,x
+    lda trk_length_byte,x
     bpl _l4A17
-    lda ram_06DA,x
+    lda trk_glide_rate,x
     bne _l4A5F
-    sta ram_06F8,x
-    sta ram_0716,x
+    sta trk_glide_lo,x
+    sta trk_glide_hi,x
     beq _l4A5F
 _l4A17
     lda #$00
-    sta ram_06F8,x
-    sta ram_0716,x
-    lda zp_1C
+    sta trk_glide_lo,x
+    sta trk_glide_hi,x
+    lda tmp_1C
     and #$38
     asl a
-    sta ram_040A,x
+    sta trk_curve_index,x
     lda #$04
     ora ram_08AB
     sta ram_08AB
     jmp _l4A5F
 _l4A32
-    sta ram_040A,x
-    sta ram_06F8,x
-    sta ram_0716,x
+    sta trk_curve_index,x
+    sta trk_glide_lo,x
+    sta trk_glide_hi,x
     pla
     and #$7F
     lsr a
-    ror zp_1C
+    ror tmp_1C
     lsr a
-    ror zp_1C
+    ror tmp_1C
     lsr a
-    ror zp_1C
+    ror tmp_1C
     pha
     clc
-    lda zp_1C
-    adc ram_02FC,x
-    sta ram_02FC,x
+    lda tmp_1C
+    adc trk_wait_lo,x
+    sta trk_wait_lo,x
     pla
-    adc ram_031A,x
-    sta ram_031A,x
+    adc trk_wait_hi,x
+    sta trk_wait_hi,x
     lda (zp_06),y
-    sta zp_1C
-    sta ram_0392,x
+    sta tmp_1C
+    sta trk_length_byte,x
 _l4A5F
-    lda ram_078E,x
-    ora ram_07AC,x
+    lda trk_slide_time_lo,x
+    ora trk_slide_time_hi,x
     bne _l4A74
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     bne _l4A77
-    inc ram_0248,x
+    inc trk_sound,x
     jmp loc_4941
 _l4A74
     jsr sub_4CC1
@@ -400,27 +400,27 @@ _l4A77
     lda ram_0899
     cmp #$02
     bne _l4A8B
-    lda zp_1C
+    lda tmp_1C
     jsr sub_4D6C
-    lda zp_1C
-    sta ram_0392,x
+    lda tmp_1C
+    sta trk_length_byte,x
     jmp loc_4CB1
 _l4A8B
-    lda ram_0392,x
+    lda trk_length_byte,x
     pha
-    lda zp_1C
-    sta ram_0392,x
+    lda tmp_1C
+    sta trk_length_byte,x
     pla
     bmi loc_4AE8
     lda #$00
     tay
-    sta ram_05AE,x
-    sta ram_05CC,x
-    sta ram_05EA,x
-    sta ram_0608,x
-    lda ram_04BE,x
+    sta trk_slide_wait_frac,x
+    sta trk_slide_wait_lo,x
+    sta trk_slide_wait_hi,x
+    sta trk_slide_step,x
+    lda trk_op_tl+$3C,x
     sta zp_06
-    lda ram_04DC,x
+    lda trk_op_tl+$5A,x
     sta zp_07
     lda (zp_06),y
     sta ram_0590,x
@@ -432,47 +432,47 @@ _l4A8B
     inc ram_0590,x
     tya
 _l4AC1
-    sta ram_0572,x
+    sta trk_keyon_flags,x
     lda #$00
     tay
     sta ram_0536,x
-    sta ram_0554,x
-    lda ram_0482,x
+    sta trk_patch_hi,x
+    lda trk_op_tl,x
     sta zp_06
-    lda ram_04A0,x
+    lda trk_op_tl+$1E,x
     sta zp_07
     lda (zp_06),y
-    sta ram_0518,x
+    sta trk_reg20,x
     iny
     ora (zp_06),y
     beq _l4AE5
-    inc ram_0518,x
+    inc trk_reg20,x
     tya
 _l4AE5
-    sta ram_04FA,x
+    sta trk_level_offset,x
 
 ; from 47F2; not executed in the make sndtrace runs
 loc_4AE8
     ldy ram_088F
     beq _l4AF8
-    lda ram_02A2,x
-    ora ram_02C0,x
+    lda trk_pitch_lo,x
+    ora trk_pitch_hi,x
     bne _l4AF8
     jmp loc_4C94
 _l4AF8
-    lda zp_00
+    lda tick_count
     and #$06
     bne _l4B08
-    lda ram_0716,x
+    lda trk_glide_hi,x
     asl a
-    ror ram_0716,x
-    ror ram_06F8,x
+    ror trk_glide_hi,x
+    ror trk_glide_lo,x
 _l4B08
-    lda ram_04BE,x
+    lda trk_op_tl+$3C,x
     sta zp_06
-    lda ram_04DC,x
+    lda trk_op_tl+$5A,x
     sta zp_07
-    ldy ram_0572,x
+    ldy trk_keyon_flags,x
     bne _l4B1C
     tya
     clc
@@ -487,25 +487,25 @@ _l4B21
     iny
     cmp #$FF
     bne _l4B52
-    lda ram_0608,x
+    lda trk_slide_step,x
     beq _l4B39
-    dec ram_0608,x
+    dec trk_slide_step,x
     bne _l4B3E
     iny
     bne _l4B21
 _l4B39
     lda (zp_06),y
-    sta ram_0608,x
+    sta trk_slide_step,x
 _l4B3E
     iny
     sec
     lda zp_06
     sbc (zp_06),y
     sta zp_06
-    sta ram_04BE,x
+    sta trk_op_tl+$3C,x
     bcs _l4B21
     dec zp_07
-    dec ram_04DC,x
+    dec trk_op_tl+$5A,x
     bcc _l4B21
 _l4B52
     ora (zp_06),y
@@ -513,7 +513,7 @@ _l4B52
     cpy #$F9
     ora (zp_06),y
     bne _l4B62
-    sta ram_0572,x
+    sta trk_keyon_flags,x
     tay
     clc
     beq _l4BBB
@@ -521,13 +521,13 @@ _l4B62
     tya
     bcc _l4B74
     sbc #$02
-    adc ram_04BE,x
-    sta ram_04BE,x
+    adc trk_op_tl+$3C,x
+    sta trk_op_tl+$3C,x
     lda #$01
     bcc _l4B74
-    inc ram_04DC,x
+    inc trk_op_tl+$5A,x
 _l4B74
-    sta ram_0572,x
+    sta trk_keyon_flags,x
 _l4B77
     lda #$00
     sta zp_1D
@@ -535,110 +535,110 @@ _l4B77
     bpl _l4B81
     dec zp_1D
 _l4B81
-    sta zp_1C
+    sta tmp_1C
     dey
     lda (zp_06),y
     asl a
-    rol zp_1C
+    rol tmp_1C
     rol zp_1D
     asl a
-    rol zp_1C
+    rol tmp_1C
     rol zp_1D
     asl a
-    rol zp_1C
+    rol tmp_1C
     rol zp_1D
     clc
-    adc ram_05AE,x
-    sta ram_05AE,x
-    lda zp_1C
-    adc ram_05CC,x
-    sta ram_05CC,x
-    sta zp_1C
+    adc trk_slide_wait_frac,x
+    sta trk_slide_wait_frac,x
+    lda tmp_1C
+    adc trk_slide_wait_lo,x
+    sta trk_slide_wait_lo,x
+    sta tmp_1C
     lda zp_1D
-    adc ram_05EA,x
-    sta ram_05EA,x
+    adc trk_slide_wait_hi,x
+    sta trk_slide_wait_hi,x
     tay
     lda ram_088F
     cmp #$02
     bne _l4BB8
-    dec zp_1C
+    dec tmp_1C
 _l4BB8
-    lda zp_1C
+    lda tmp_1C
     clc
 _l4BBB
-    adc ram_02A2,x
-    sta zp_1C
+    adc trk_pitch_lo,x
+    sta tmp_1C
     tya
-    adc ram_02C0,x
+    adc trk_pitch_hi,x
     tay
     clc
-    lda zp_1C
-    adc ram_06F8,x
-    sta zp_1C
+    lda tmp_1C
+    adc trk_glide_lo,x
+    sta tmp_1C
     tya
-    adc ram_0716,x
+    adc trk_glide_hi,x
     sta ram_0897
     lda ram_088F
     and #$01
     tay
-    lda zp_1C
+    lda tmp_1C
     sta ram_0895,y
-    lda ram_0482,x
+    lda trk_op_tl,x
     sta zp_06
-    lda ram_04A0,x
+    lda trk_op_tl+$1E,x
     sta zp_07
-    ldy ram_04FA,x
+    ldy trk_level_offset,x
     bne _l4BF4
 _l4BEE
-    lda ram_0464,x
+    lda trk_key_fraction,x
     jmp _l4C8E
 _l4BF4
-    dec ram_0518,x
+    dec trk_reg20,x
     bne _l4C4B
 _l4BF9
     iny
     lda (zp_06),y
-    sta ram_0518,x
+    sta trk_reg20,x
     iny
     cmp #$FF
     bne _l4C2A
-    lda ram_0554,x
+    lda trk_patch_hi,x
     beq _l4C11
-    dec ram_0554,x
+    dec trk_patch_hi,x
     bne _l4C16
     iny
     bne _l4BF9
 _l4C11
     lda (zp_06),y
-    sta ram_0554,x
+    sta trk_patch_hi,x
 _l4C16
     iny
     sec
     lda zp_06
     sbc (zp_06),y
     sta zp_06
-    sta ram_0482,x
+    sta trk_op_tl,x
     bcs _l4BF9
     dec zp_07
-    dec ram_04A0,x
+    dec trk_op_tl+$1E,x
     bcc _l4BF9
 _l4C2A
     cpy #$F9
     ora (zp_06),y
     bne _l4C36
-    sta ram_04FA,x
+    sta trk_level_offset,x
     jmp _l4BEE
 _l4C36
     tya
     bcc _l4C48
     sbc #$02
-    adc ram_0482,x
-    sta ram_0482,x
+    adc trk_op_tl,x
+    sta trk_op_tl,x
     lda #$01
     bcc _l4C48
-    inc ram_04A0,x
+    inc trk_op_tl+$1E,x
 _l4C48
-    sta ram_04FA,x
+    sta trk_level_offset,x
 _l4C4B
     lda (zp_06),y
     clc
@@ -649,9 +649,9 @@ _l4C4B
     lda #$7F
 _l4C59
     sta ram_0536,x
-    ldy ram_040A,x
+    ldy trk_curve_index,x
     clc
-    adc tbl_6013,y
+    adc level_curves,y
     bvc _l4C6B
     lda #$80
     bcs _l4C6B
@@ -662,7 +662,7 @@ _l4C6B
     and #$0F
     cmp #$0F
     beq _l4C76
-    inc ram_040A,x
+    inc trk_curve_index,x
 _l4C76
     pla
     lsr a
@@ -673,7 +673,7 @@ _l4C76
     ora #$F0
 _l4C80
     clc
-    adc ram_0464,x
+    adc trk_key_fraction,x
     bpl _l4C88
     lda #$00
 _l4C88
@@ -681,7 +681,7 @@ _l4C88
     bcc _l4C8E
     lda #$0F
 _l4C8E
-    ora ram_06BC,x
+    ora trk_e1_ctl,x
     jmp loc_4C96
 
 ; from 47E8, 497C, 4AF5; not executed in the make sndtrace runs
@@ -698,14 +698,14 @@ loc_4C96
     sta ram_0893,y
     cpx #$1E
     bcs loc_4CB1
-    lda ram_0446,x
+    lda trk_scale_ptr_hi,x
     sta ram_089A,y
-    lda ram_0428,x
+    lda trk_scale_ptr_lo,x
     sta ram_089E,y
 
 ; from 4848, 487B, 4979, 4A88
 loc_4CB1
-    lda ram_0860,x
+    lda trk_link,x
     beq _l4CC0
     stx ram_0898
     tax
@@ -717,88 +717,88 @@ _l4CC0
 
 ; from 4829, 4A74
 sub_4CC1
-    lda ram_07CA,x
-    sta zp_19
-    lda ram_07E8,x
-    sta zp_1A
-    lda zp_1C
+    lda trk_slide_rate_lo,x
+    sta tmp_ptr
+    lda trk_slide_rate_hi,x
+    sta tmp_ptr+1
+    lda tmp_1C
     pha
-    lda ram_0608,x
+    lda trk_slide_step,x
     bne _l4CE3
-    lda tbl_5FE3+$14
-    sta ram_05CC,x
-    lda tbl_5FE3+$15
-    sta ram_05EA,x
+    lda note_lengths+$14
+    sta trk_slide_wait_lo,x
+    lda note_lengths+$15
+    sta trk_slide_wait_hi,x
     lda #$0A
     bne _l4CE5
 _l4CE3
-    lda zp_1C
+    lda tmp_1C
 _l4CE5
     and #$0F
     tay
-    lda tbl_6003,y
-    sta zp_1C
+    lda slide_rates,y
+    sta tmp_1C
     cmp #$FF
     bne _l4D03
-    lda ram_07AC,x
+    lda trk_slide_time_hi,x
     bne _l4CFB
-    sta ram_078E,x
+    sta trk_slide_time_lo,x
     beq _l4CFE
 _l4CFB
-    dec ram_07AC,x
+    dec trk_slide_time_hi,x
 _l4CFE
-    lda zp_1A
+    lda tmp_ptr+1
     jmp _l4D63
 _l4D03
-    lda ram_078E,x
+    lda trk_slide_time_lo,x
     sec
-    sbc zp_1C
-    sta ram_078E,x
+    sbc tmp_1C
+    sta trk_slide_time_lo,x
     bcs _l4D1B
-    dec ram_07AC,x
+    dec trk_slide_time_hi,x
     bpl _l4D1B
     lda #$00
-    sta ram_078E,x
-    sta ram_07AC,x
+    sta trk_slide_time_lo,x
+    sta trk_slide_time_hi,x
 _l4D1B
     ldy #$07
-    lda zp_1A
+    lda tmp_ptr+1
 _l4D1F
     cmp #$80
     ror a
-    ror zp_19
+    ror tmp_ptr
     dey
     bmi _l4D2B
-    asl zp_1C
+    asl tmp_1C
     bcc _l4D1F
 _l4D2B
     ldy #$00
-    sty zp_1C
-    sta zp_1A
+    sty tmp_1C
+    sta tmp_ptr+1
     cmp #$80
     bcc _l4D48
-    sta zp_1C
+    sta tmp_1C
     eor #$FF
-    sta zp_1A
-    lda zp_19
+    sta tmp_ptr+1
+    lda tmp_ptr
     eor #$FF
     clc
     adc #$01
-    sta zp_19
+    sta tmp_ptr
     bcc _l4D48
-    inc zp_1A
+    inc tmp_ptr+1
 _l4D48
-    lda ram_0806,x
+    lda trk_slide_frac,x
     clc
-    adc zp_19
-    sta ram_0806,x
+    adc tmp_ptr
+    sta trk_slide_frac,x
     bcc _l4D55
-    inc zp_1A
+    inc tmp_ptr+1
 _l4D55
-    lda zp_1A
+    lda tmp_ptr+1
     tay
     beq _l4D68
-    ldy zp_1C
+    ldy tmp_1C
     bpl _l4D63
     eor #$FF
     clc
@@ -808,7 +808,7 @@ _l4D63
     ldy #$FF
 _l4D68
     pla
-    sta zp_1C
+    sta tmp_1C
     rts
 
 ; from 4845, 4A80
@@ -825,16 +825,16 @@ _l4D7C
     ora #$02
     sta ram_08AB
     lda #$03
-    sta zp_19
+    sta tmp_ptr
     txa
     pha
     clc
     lda #$60
-    adc zp_0D
+    adc ym_channel
     tay
 _l4D8D
-    lda ram_0482,x
-    sta ram_08AE,y
+    lda trk_op_tl,x
+    sta ym_shadow,y
     tya
     clc
     adc #$08
@@ -843,68 +843,68 @@ _l4D8D
     clc
     adc #$1E
     tax
-    dec zp_19
+    dec tmp_ptr
     bpl _l4D8D
     pla
     tax
-    lda ram_0428,x
-    sta zp_19
-    lda ram_0446,x
-    sta zp_1A
+    lda trk_scale_ptr_lo,x
+    sta tmp_ptr
+    lda trk_scale_ptr_hi,x
+    sta tmp_ptr+1
     ldy #$08
-    lda ram_04FA,x
+    lda trk_level_offset,x
     sta ram_08A2,y
     dey
 _l4DB6
-    lda (zp_19),y
+    lda (tmp_ptr),y
     sta ram_08A2,y
     dey
     bne _l4DB6
 _l4DBE
-    lda ram_06DA,x
+    lda trk_glide_rate,x
     beq _l4E12
-    lda ram_0716,x
-    ora ram_06F8,x
+    lda trk_glide_hi,x
+    ora trk_glide_lo,x
     beq _l4E12
-    lda zp_00
+    lda tick_count
     and #$06
     bne _l4E12
     lda #$00
-    sta zp_1A
-    lda ram_06DA,x
+    sta tmp_ptr+1
+    lda trk_glide_rate,x
     asl a
-    rol zp_1A
-    sta zp_19
-    lda ram_0716,x
+    rol tmp_ptr+1
+    sta tmp_ptr
+    lda trk_glide_hi,x
     bmi _l4DF7
-    lda ram_06F8,x
+    lda trk_glide_lo,x
     sec
-    sbc zp_19
-    sta ram_06F8,x
-    lda ram_0716,x
-    sbc zp_1A
-    sta ram_0716,x
+    sbc tmp_ptr
+    sta trk_glide_lo,x
+    lda trk_glide_hi,x
+    sbc tmp_ptr+1
+    sta trk_glide_hi,x
     bpl _l4E12
     bmi _l4E0A
 _l4DF7
-    lda ram_06F8,x
+    lda trk_glide_lo,x
     clc
-    adc zp_19
-    sta ram_06F8,x
-    lda ram_0716,x
-    adc zp_1A
-    sta ram_0716,x
+    adc tmp_ptr
+    sta trk_glide_lo,x
+    lda trk_glide_hi,x
+    adc tmp_ptr+1
+    sta trk_glide_hi,x
     bmi _l4E12
 _l4E0A
     lda #$00
-    sta ram_0716,x
-    sta ram_06F8,x
+    sta trk_glide_hi,x
+    sta trk_glide_lo,x
 _l4E12
     lda zp_22
     bne _l4E55
-    lda ram_06F8,x
+    lda trk_glide_lo,x
     sta ram_0897
-    lda ram_0716,x
+    lda trk_glide_hi,x
     sta ram_0896
     bpl _l4E32
     dec ram_0896
@@ -916,16 +916,16 @@ _l4E12
 _l4E32
     clc
     lda #$30
-    adc zp_0D
+    adc ym_channel
     tay
-    lda ram_0464,x
+    lda trk_key_fraction,x
     clc
     adc ram_0897
     bcc _l4E44
     inc ram_0896
 _l4E44
     and #$FC
-    sta ram_08AE,y
+    sta ym_shadow,y
     lda ram_0895
     beq _l4E55
     clc
@@ -945,7 +945,7 @@ loc_4E56
 _l4E61
     tya
     pha
-    ldx ram_0860,y
+    ldx trk_link,y
     beq _l4E71
     sty ram_0898
     dex
@@ -961,7 +961,7 @@ _l4E71
 
 ; from 501B
 sub_4E79
-    ldx ram_0860,y
+    ldx trk_link,y
     bne _l4E7F
     rts
 _l4E7F
@@ -970,9 +970,9 @@ _l4E7F
     sta ram_088E
     sta ram_0895
     sty ram_0898
-    lda zp_10
+    lda ymtimer_active
     beq _l4E9F
-    lda zp_0D
+    lda ym_channel
     cmp #$06
     beq _l4E9D
     cmp #$07
@@ -990,21 +990,21 @@ _l4EA6
 _l4EA7
     clc
     lda #$20
-    adc zp_0D
+    adc ym_channel
     tay
     php
     sei
     jsr ym_wait
     sty YM2151_REG
-    lda ram_08AE,y
+    lda ym_shadow,y
     sta YM2151_DATA
     lda #$30
     clc
-    adc zp_0D
+    adc ym_channel
     tay
     jsr ym_wait
     sty YM2151_REG
-    lda ram_08AE,y
+    lda ym_shadow,y
     sta YM2151_DATA
     plp
     lsr ram_08AB
@@ -1014,47 +1014,47 @@ _l4EA7
     sei
     jsr ym_wait
     sty YM2151_REG
-    lda zp_0D
+    lda ym_channel
     sta YM2151_DATA
     plp
 _l4EE3
     lda ram_088E
-    cmp zp_1E
+    cmp min_priority
     bcc _l4EA6
     lsr ram_08AB
     bcc _l4EA6
     ldx ram_0895
     beq _l4EA6
     clc
-    lda zp_0D
+    lda ym_channel
     adc #$28
     tay
     php
     sei
     jsr ym_wait
     sty YM2151_REG
-    lda tbl_5E7D,x
-    sta ram_08AE,y
+    lda key_codes,x
+    sta ym_shadow,y
     sta YM2151_DATA
     plp
     sta ram_0895
     lda #$20
     clc
-    adc zp_0D
+    adc ym_channel
     tax
-    lda ram_08AE,x
+    lda ym_shadow,x
     and #$07
     tax
     lda tbl_57D3,x
-    sta zp_1A
+    sta tmp_ptr+1
     ldy #$06
-    sty zp_0C
+    sty fm_op_index
     lda ram_08AB
     lsr a
     lsr a
     and #$03
     tax
-    lda tbl_5FDF,x
+    lda level_bias,x
     sta ram_088F
     lda ram_08A4,y
     sec
@@ -1063,8 +1063,8 @@ _l4EE3
     bvc _l4F3F
     lda #$80
 _l4F3F
-    sta zp_19
-    sta zp_1B
+    sta tmp_ptr
+    sta tmp_1B
     cmp #$80
     beq _l4F50
     bcc _l4F54
@@ -1075,11 +1075,11 @@ _l4F3F
 _l4F50
     lda #$7F
 _l4F52
-    sta zp_19
+    sta tmp_ptr
 _l4F54
-    asl zp_19
+    asl tmp_ptr
 _l4F56
-    ldy zp_0C
+    ldy fm_op_index
     lda ram_08A3,y
     lsr a
     lsr a
@@ -1094,33 +1094,33 @@ _l4F56
     and #$F0
     eor ram_088F
     tay
-    lda tbl_5EDF,y
+    lda nibble_scale,y
     sta ram_088C
-    ldy zp_0C
+    ldy fm_op_index
     lda ram_08A3,y
-    eor zp_19
+    eor tmp_ptr
     and #$0F
-    eor zp_19
+    eor tmp_ptr
     tay
-    lda tbl_5EDF,y
-    sta zp_1C
-    rol zp_1A
+    lda nibble_scale,y
+    sta tmp_1C
+    rol tmp_ptr+1
     bcs _l4F92
-    asl zp_1C
+    asl tmp_1C
 _l4F92
-    lda zp_1B
+    lda tmp_1B
     bpl _l4F9F
-    lda zp_1C
+    lda tmp_1C
     eor #$FF
     clc
     adc #$01
-    sta zp_1C
+    sta tmp_1C
 _l4F9F
     clc
-    lda zp_0C
+    lda fm_op_index
     asl a
     asl a
-    adc zp_0D
+    adc ym_channel
     adc #$60
     tay
     php
@@ -1129,11 +1129,11 @@ _l4F9F
     sty YM2151_REG
     clc
     jsr ym_wait
-    lda ram_08AE,y
+    lda ym_shadow,y
     adc ram_088C
     bmi _l4FC8
     clc
-    adc zp_1C
+    adc tmp_1C
     bpl _l4FCA
     bvs _l4FC8
     lda #$00
@@ -1143,8 +1143,8 @@ _l4FC8
 _l4FCA
     sta YM2151_DATA
     plp
-    dec zp_0C
-    dec zp_0C
+    dec fm_op_index
+    dec fm_op_index
     bmi _l4FD7
     jmp _l4F56
 _l4FD7
@@ -1167,10 +1167,10 @@ _l4FFA
     ldy #$08
     jsr ym_wait
     sty YM2151_REG
-    lda zp_0D
+    lda ym_channel
     ora #$78
     sta YM2151_DATA
-    sta ram_08AE,y
+    sta ym_shadow,y
     plp
 _l500D
     rts
@@ -1178,7 +1178,7 @@ _l500D
 ; from 505A
 loc_500E
     lda #$07
-    sta zp_0D
+    sta ym_channel
     clc
     lda tbl_57E1,x
     adc #$07
@@ -1190,17 +1190,18 @@ _l5019
     pla
     tay
     dey
-    dec zp_0D
+    dec ym_channel
     bpl _l5019
     rts
 
 ; from 427A, 4286, 428E, 4295, 42A6, 42AE, 439A, 4EAF, 4EC1, 4ED7, 4EFC, 4FAB, 4FB2, 4FE7, 4FF2,
 ; 4FFC, 55B8, 55D0, 55F2, 5613, 56A8, 58A3, 58D3, 591A, 5925, 5938, 5943, 594E, 5959, 5964, 596F,
 ; 597A, 5985, 599C, 59A8, 59B5, 59D6, 59E1, 5A4D, 5A5E, 5A6A, 5A77, 5A88, 5A93, 5AA2, 5AAD, 5B66
-; Wait until the YM2151 is not busy (status bit 7), at most 255 reads: on a time-out set zp_0E
-; (later calls return at once) and zp_02 bit 1 (the status imm_03 sends). Keeps A.
+; Wait until the YM2151 is not busy (status bit 7), at most 255 reads: on a time-out set
+; ym_timed_out (later calls return at once) and board_status bit 1 (the status imm_03_send_status
+; sends). Keeps A.
 ym_wait
-    bit zp_0E
+    bit ym_timed_out
     bmi _l5042
     pha
     lda #$00
@@ -1211,10 +1212,10 @@ _l502E
     adc #$01
     cmp #$FF
     bne _l502E
-    sta zp_0E
-    lda zp_02
+    sta ym_timed_out
+    lda board_status
     ora #$02
-    sta zp_02
+    sta board_status
 _l5041
     pla
 _l5042
@@ -1223,9 +1224,9 @@ _l5042
 ; from 4230, 4235
 loc_5043
     lda tbl_57DB,x
-    sta zp_08
+    sta engine_chip
     lda tbl_57DD,x
-    sta zp_09
+    sta engine_chip+1
     lda tbl_57DF,x
     sta ram_0899
     cmp #$03
@@ -1241,19 +1242,19 @@ sub_505D
     cmp #$BB
     bcc _l5068
     lda #$FF
-    sta ram_0248,x
+    sta trk_sound,x
     clc
     rts
 _l5068
     iny
-    stx zp_1C
+    stx tmp_1C
     asl a
     tax
     lda op_handlers+1,x
     pha
     lda op_handlers,x
     pha
-    ldx zp_1C
+    ldx tmp_1C
     lda (zp_06),y
     sec
     rts
@@ -1261,12 +1262,12 @@ _l5068
 ; from 518E, 5199, 51A9, 51B8, 5237, 52C2, 537D, 5380, 5389, 53A4, 53A7, 53B0, 547A, 547D, 5482,
 ; 5487, 5531, 554A, 555A, 5641, 5685
 sub_507B
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     clc
     adc #$01
-    sta ram_0266,x
+    sta trk_ptr_lo,x
     bcc _l5089
-    inc ram_0284,x
+    inc trk_ptr_hi,x
 _l5089
     iny
     lda (zp_06),y
@@ -1277,12 +1278,12 @@ loc_508D
     php
     sei
 _l508F
-    lda ram_0860,x
+    lda trk_link,x
     beq _l50A1
     tax
     dex
-    lda ram_0248,x
-    cmp ram_08AC
+    lda trk_sound,x
+    cmp cmd_target_sound
     bne _l508F
     jsr sub_50A3
 _l50A1
@@ -1295,7 +1296,7 @@ sub_50A3
     pha
     lda op_handlers,y
     pha
-    lda ram_08AD
+    lda cmd_op_operand
     rts
 
 ; read at 506D, 5071, 50A3, 50A7
@@ -1340,7 +1341,7 @@ op_handlers
     .word op_A2-1                       ; $A2
     .word op_A3-1                       ; $A3
     .word op_A4-1                       ; $A4
-    .word cmdtype_11-1                  ; $A5
+    .word cmdtype_11_ym_ct-1                  ; $A5
     .word op_A6-1                       ; $A6
     .word op_A7-1                       ; $A7
     .word op_A8-1                       ; $A8
@@ -1366,108 +1367,108 @@ op_handlers
 ; op_handlers entry for stream byte $88; not executed in the make sndtrace runs
 op_88
     lda #$00
-    sta ram_02DE,x
-    sta ram_02FC,x
-    sta ram_031A,x
-    ldy ram_0680,x
+    sta trk_wait_frac,x
+    sta trk_wait_lo,x
+    sta trk_wait_hi,x
+    ldy trk_sync_state,x
     beq _l513D
     iny
     bne _l5170
 _l5138
-    sta ram_0680,x
+    sta trk_sync_state,x
     sec
     rts
 _l513D
-    lda ram_069E,x
-    sta ram_0680,x
+    lda trk_sync_group,x
+    sta trk_sync_state,x
     ldy #$1D
 _l5145
-    cmp ram_069E,y
+    cmp trk_sync_group,y
     bne _l5157
-    cmp ram_0680,y
+    cmp trk_sync_state,y
     beq _l5157
-    lda ram_03EC,y
+    lda trk_priority,y
     bne _l5170
-    lda ram_069E,x
+    lda trk_sync_group,x
 _l5157
     dey
     bpl _l5145
     ldy #$1D
 _l515C
-    cmp ram_069E,y
+    cmp trk_sync_group,y
     bne _l5169
     lda #$FF
-    sta ram_0680,y
-    lda ram_069E,x
+    sta trk_sync_state,y
+    lda trk_sync_group,x
 _l5169
     dey
     bpl _l515C
     lda #$00
     beq _l5138
 _l5170
-    lda ram_0266,x
+    lda trk_ptr_lo,x
     cmp #$02
     bcs _l517A
-    dec ram_0284,x
+    dec trk_ptr_hi,x
 _l517A
-    dec ram_0266,x
-    dec ram_0266,x
+    dec trk_ptr_lo,x
+    dec trk_ptr_lo,x
     clc
     rts
 
 ; op_handlers entry for stream byte $89; not executed in the make sndtrace runs
 op_89
-    sta ram_069E,x
+    sta trk_sync_group,x
     lda #$00
-    sta ram_0680,x
+    sta trk_sync_state,x
     rts
 
 ; op_handlers entry for stream byte $87; not executed in the make sndtrace runs
 op_87
-    sta ram_0482,x
+    sta trk_op_tl,x
     jsr sub_507B
-    sta ram_04A0,x
+    sta trk_op_tl+$1E,x
     sec
     rts
 
 ; op_handlers entry for stream byte $86; not executed in the make sndtrace runs
 op_86
-    sta ram_04BE,x
+    sta trk_op_tl+$3C,x
     jsr sub_507B
-    sta ram_04DC,x
+    sta trk_op_tl+$5A,x
     sec
     rts
 
 ; op_handlers entry for stream byte $81; not executed in the make sndtrace runs
 op_81
     clc
-    adc ram_0626,x
-    sta ram_0626,x
+    adc trk_tempo_lo,x
+    sta trk_tempo_lo,x
     php
     jsr sub_507B
     plp
 
 ; from 5442; not executed in the make sndtrace runs
 loc_51AD
-    adc ram_0644,x
-    sta ram_0644,x
+    adc trk_tempo_hi,x
+    sta trk_tempo_hi,x
     sec
     rts
 
 ; op_handlers entry for stream byte $80
 op_80
-    sta ram_0626,x
+    sta trk_tempo_lo,x
     jsr sub_507B
 
 ; from 5408
 loc_51BB
-    sta ram_0644,x
+    sta trk_tempo_hi,x
     sec
     rts
 
 ; op_handlers entry for stream byte $83; from 5446
 op_83
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     beq loc_51F7
 
@@ -1479,7 +1480,7 @@ sub_51C7
     jmp op_A1
 _l51D1
     clc
-    adc ram_0464,x
+    adc trk_key_fraction,x
     bpl _l51D9
     lda #$00
 _l51D9
@@ -1490,7 +1491,7 @@ _l51D9
 
 ; op_handlers entry for stream byte $82; from 540C
 op_82
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     beq loc_51F7
     ldy ram_0899
@@ -1500,7 +1501,7 @@ op_82
 
 ; not executed in the make sndtrace runs
 loc_51F2
-    sta ram_0464,x
+    sta trk_key_fraction,x
     sec
     rts
 
@@ -1511,17 +1512,17 @@ loc_51F7
 ; op_handlers entry for stream byte $85; from 543A; not executed in the make sndtrace runs
 op_85
     clc
-    adc ram_0662,x
+    adc trk_transpose,x
 
 ; op_handlers entry for stream byte $84; from 5401
 op_84
-    sta ram_0662,x
+    sta trk_transpose,x
     sec
     rts
 
 ; op_handlers entry for stream byte $8A; not executed in the make sndtrace runs
 op_8A
-    sta ram_06BC,x
+    sta trk_e1_ctl,x
     rts
 
 ; op_handlers entry for stream byte $8B; not executed in the make sndtrace runs
@@ -1532,8 +1533,8 @@ op_8B
     and #$09
     eor ram_089A
 _l5213
-    ora ram_0446,x
-    sta ram_0446,x
+    ora trk_scale_ptr_hi,x
+    sta trk_scale_ptr_hi,x
     rts
 
 ; op_handlers entry for stream byte $9B; not executed in the make sndtrace runs
@@ -1541,42 +1542,42 @@ op_9B
     eor #$FF
     ldy ram_0899
     bne _l5228
-    and ram_0428,x
-    sta ram_0428,x
+    and trk_scale_ptr_lo,x
+    sta trk_scale_ptr_lo,x
     rts
 _l5228
     ora #$F6
-    and ram_0446,x
-    sta ram_0446,x
+    and trk_scale_ptr_hi,x
+    sta trk_scale_ptr_hi,x
     rts
 
 ; op_handlers entry for stream byte $8C; not executed in the make sndtrace runs
 op_8C
-    sta ram_06DA,x
+    sta trk_glide_rate,x
     rts
 
 ; op_handlers entry for stream byte $8D
 op_8D
-    sta zp_1C
+    sta tmp_1C
     jsr sub_507B
     sta zp_1D
-    jsr sub_4309
+    jsr alloc_frame
     beq _l5261
     pha
-    lda ram_0734,x
-    sta (zp_20),y
+    lda trk_call_frame,x
+    sta (frame_ptr),y
     pla
-    sta ram_0734,x
+    sta trk_call_frame,x
     iny
-    lda ram_0266,x
-    sta (zp_20),y
+    lda trk_ptr_lo,x
+    sta (frame_ptr),y
     iny
-    lda ram_0284,x
-    sta (zp_20),y
-    lda zp_1C
-    sta ram_0266,x
+    lda trk_ptr_hi,x
+    sta (frame_ptr),y
+    lda tmp_1C
+    sta trk_ptr_lo,x
     lda zp_1D
-    sta ram_0284,x
+    sta trk_ptr_hi,x
 _l5261
     sec
     rts
@@ -1584,24 +1585,24 @@ _l5261
 ; op_handlers entry for stream byte $8E
 op_8E
     pha
-    jsr sub_4309
+    jsr alloc_frame
     beq _l528B
     pha
-    lda ram_0752,x
-    sta (zp_20),y
+    lda trk_loop_frame,x
+    sta (frame_ptr),y
     pla
-    sta ram_0752,x
+    sta trk_loop_frame,x
     iny
-    lda ram_0266,x
-    sta (zp_20),y
+    lda trk_ptr_lo,x
+    sta (frame_ptr),y
     iny
-    lda ram_0284,x
-    sta (zp_20),y
+    lda trk_ptr_hi,x
+    sta (frame_ptr),y
     iny
-    lda ram_0770,x
-    sta (zp_20),y
+    lda trk_loop_count,x
+    sta (frame_ptr),y
     pla
-    sta ram_0770,x
+    sta trk_loop_count,x
     sec
     rts
 _l528B
@@ -1611,59 +1612,59 @@ _l528B
 
 ; op_handlers entry for stream byte $8F
 op_8F
-    lda ram_0752,x
+    lda trk_loop_frame,x
     beq _l52A7
-    jsr sub_431A
-    dec ram_0770,x
+    jsr frame_address
+    dec trk_loop_count,x
     beq _l52A9
     iny
-    lda (zp_20),y
-    sta ram_0266,x
+    lda (frame_ptr),y
+    sta trk_ptr_lo,x
     iny
-    lda (zp_20),y
-    sta ram_0284,x
+    lda (frame_ptr),y
+    sta trk_ptr_hi,x
 _l52A7
     sec
     rts
 _l52A9
     pha
-    lda (zp_20),y
-    sta ram_0752,x
-    lda zp_1F
-    sta (zp_20),y
+    lda (frame_ptr),y
+    sta trk_loop_frame,x
+    lda frame_free
+    sta (frame_ptr),y
     pla
-    sta zp_1F
+    sta frame_free
     iny
     iny
     iny
-    lda (zp_20),y
-    sta ram_0770,x
+    lda (frame_ptr),y
+    sta trk_loop_count,x
     sec
     rts
 
 ; op_handlers entry for stream byte $A4
 op_A4
-    sta zp_1C
+    sta tmp_1C
     jsr sub_507B
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     beq _l52EB
-    sta ram_07E8,x
-    lda zp_1C
+    sta trk_slide_rate_hi,x
+    lda tmp_1C
     lsr a
     lsr a
     lsr a
-    sta ram_07AC,x
+    sta trk_slide_time_hi,x
     lda #$00
-    sta ram_078E,x
-    sta ram_0806,x
-    lda zp_1C
+    sta trk_slide_time_lo,x
+    sta trk_slide_frac,x
+    lda tmp_1C
     asl a
     asl a
     asl a
     asl a
     asl a
-    sta ram_07CA,x
+    sta trk_slide_rate_lo,x
     sec
     rts
 _l52EB
@@ -1673,42 +1674,42 @@ _l52EB
 ; op_handlers entry for stream byte $A9
 op_A9
     clc
-    adc ram_0824,x
+    adc trk_acc,x
 
 ; from 5300, 5306, 530C, 5312, 533F, 536C, 53C1, 544E
 loc_52F1
-    sta ram_0824,x
-    sta ram_0842,x
+    sta trk_acc,x
+    sta trk_test,x
     sec
     rts
 
 ; op_handlers entry for stream byte $AA; not executed in the make sndtrace runs
 op_AA
-    sta zp_1C
-    lda ram_0824,x
-    sbc zp_1C
+    sta tmp_1C
+    lda trk_acc,x
+    sbc tmp_1C
     jmp loc_52F1
 
 ; op_handlers entry for stream byte $AB
 op_AB
-    and ram_0824,x
+    and trk_acc,x
     jmp loc_52F1
 
 ; op_handlers entry for stream byte $AC; not executed in the make sndtrace runs
 op_AC
-    ora ram_0824,x
+    ora trk_acc,x
     jmp loc_52F1
 
 ; op_handlers entry for stream byte $AD; not executed in the make sndtrace runs
 op_AD
-    eor ram_0824,x
+    eor trk_acc,x
     jmp loc_52F1
 
 ; op_handlers entry for stream byte $B3; not executed in the make sndtrace runs
 op_B3
     clc
     tay
-    lda ram_0824,x
+    lda trk_acc,x
     cpy #$04
     beq _l533B
     cpy #$02
@@ -1745,7 +1746,7 @@ _l533E
 op_B4
     clc
     tay
-    lda ram_0824,x
+    lda trk_acc,x
     cpy #$04
     beq _l5368
     cpy #$02
@@ -1780,49 +1781,49 @@ _l536B
 
 ; op_handlers entry for stream byte $AE
 op_AE
-    sta zp_1C
-    lda ram_0824,x
+    sta tmp_1C
+    lda trk_acc,x
     bne _l537B
-    lda zp_1C
+    lda tmp_1C
     jmp _l5389
 _l537B
-    sta zp_1B
+    sta tmp_1B
 _l537D
     jsr sub_507B
     jsr sub_507B
-    sta zp_1C
-    dec zp_1B
+    sta tmp_1C
+    dec tmp_1B
     bne _l537D
 _l5389
     jsr sub_507B
-    sta ram_0284,x
-    lda zp_1C
-    sta ram_0266,x
+    sta trk_ptr_hi,x
+    lda tmp_1C
+    sta trk_ptr_lo,x
     sec
     rts
 
 ; op_handlers entry for stream byte $AF; not executed in the make sndtrace runs
 op_AF
-    sta zp_1C
-    lda ram_0824,x
+    sta tmp_1C
+    lda trk_acc,x
     bne _l53A2
-    lda zp_1C
+    lda tmp_1C
     jmp _l53B0
 _l53A2
-    sta zp_1B
+    sta tmp_1B
 _l53A4
     jsr sub_507B
     jsr sub_507B
-    sta zp_1C
-    dec zp_1B
+    sta tmp_1C
+    dec tmp_1B
     bne _l53A4
 _l53B0
     jsr sub_507B
-    sta ram_0284,x
-    lda zp_1C
-    sta ram_0266,x
-    inc ram_0824,x
-    lda ram_0824,x
+    sta trk_ptr_hi,x
+    lda tmp_1C
+    sta trk_ptr_lo,x
+    inc trk_acc,x
+    lda trk_acc,x
     jmp loc_52F1
 
 ; op_handlers entry for stream byte $B0
@@ -1833,8 +1834,8 @@ op_B0
     bcc _l53D8
     sbc #$06
     tay
-    lda ram_0824,x
-    sta @w zp_23,y
+    lda trk_acc,x
+    sta @w seq_vars,y
     jmp _l540F
 _l53D8
     cmp #$05
@@ -1843,7 +1844,7 @@ _l53D8
     cpy #$02
     bne _l53F5
     tay
-    lda ram_0824,x
+    lda trk_acc,x
     cpy #$04
     bcc _l53EE
     jmp op_A6
@@ -1855,7 +1856,7 @@ _l53F5
     cmp #$03
     bcs _l540F
     tay
-    lda ram_0824,x
+    lda trk_acc,x
 _l53FD
     cpy #$02
     bcc _l5404
@@ -1879,7 +1880,7 @@ op_B1
     tay
     cpy #$05
     bcs _l5449
-    lda ram_0824,x
+    lda trk_acc,x
     cpy #$04
     bcc _l5427
     jmp op_A7
@@ -1891,7 +1892,7 @@ _l542E
     cmp #$03
     bcs _l5449
     tay
-    lda ram_0824,x
+    lda trk_acc,x
 _l5436
     cpy #$02
     bcc _l543D
@@ -1919,10 +1920,10 @@ op_B9
 
 ; op_handlers entry for stream byte $BA
 op_BA
-    sta zp_1C
-    lda ram_0824,x
-    sbc zp_1C
-    sta ram_0842,x
+    sta tmp_1C
+    lda trk_acc,x
+    sbc tmp_1C
+    sta trk_test,x
     sec
     rts
 
@@ -1957,17 +1958,17 @@ loc_547A
 
 loc_5482
     jsr sub_507B
-    sta zp_1C
+    sta tmp_1C
     jsr sub_507B
-    sta ram_0284,x
-    lda zp_1C
-    sta ram_0266,x
+    sta trk_ptr_hi,x
+    lda tmp_1C
+    sta trk_ptr_lo,x
     sec
     rts
 
 ; from 544B, 5451, 5460, 5467, 546E, 5475
 sub_5494
-    sty zp_1C
+    sty tmp_1C
     cmp #$26
     bcs _l54FE
     cmp #$06
@@ -1979,14 +1980,14 @@ sub_5494
     bne _l54CD
     cmp #$04
     bcc _l54B3
-    ldy zp_1C
-    lda ram_0464,x
+    ldy tmp_1C
+    lda trk_key_fraction,x
     rts
 _l54B3
     cmp #$03
     bcc _l54C2
-    ldy zp_1C
-    lda ram_04FA,x
+    ldy tmp_1C
+    lda trk_level_offset,x
     eor #$FF
     clc
     adc #$01
@@ -1996,7 +1997,7 @@ _l54C2
     beq _l54D5
     cmp #$01
     beq _l54DF
-    ldy zp_1C
+    ldy tmp_1C
     rts
 _l54CD
     cmp #$03
@@ -2004,47 +2005,47 @@ _l54CD
     cmp #$02
     bcc _l54DB
 _l54D5
-    ldy zp_1C
-    lda ram_0662,x
+    ldy tmp_1C
+    lda trk_transpose,x
     rts
 _l54DB
     cmp #$01
     bcc _l54E5
 _l54DF
-    ldy zp_1C
-    lda ram_0644,x
+    ldy tmp_1C
+    lda trk_tempo_hi,x
     rts
 _l54E5
-    ldy zp_1C
-    lda ram_0464,x
+    ldy tmp_1C
+    lda trk_key_fraction,x
     rts
 _l54EB
     sbc #$06
     tay
-    lda @w zp_23,y
+    lda @w seq_vars,y
     pha
-    ldy zp_1C
+    ldy tmp_1C
     pla
     rts
 _l54F6
     jsr sub_5504
     pha
-    ldy zp_1C
+    ldy tmp_1C
     pla
     rts
 _l54FE
-    ldy zp_1C
-    lda ram_0842,x
+    ldy tmp_1C
+    lda trk_test,x
     rts
 
 ; from 4149, 54F6
 sub_5504
-    lda zp_47
+    lda rng_state
     asl a
     bcc _l550B
     eor #$1D
 _l550B
-    sta zp_47
+    sta rng_state
     rts
 
 ; op_handlers entry for stream byte $96; not executed in the make sndtrace runs
@@ -2056,58 +2057,58 @@ op_96
 ; op_handlers entry for stream byte $97; not executed in the make sndtrace runs
 op_97
     lda #$00
-    sta ram_078E,x
-    sta ram_0806,x
-    sta ram_07CA,x
+    sta trk_slide_time_lo,x
+    sta trk_slide_frac,x
+    sta trk_slide_rate_lo,x
     lda #$D0
-    sta ram_07E8,x
+    sta trk_slide_rate_hi,x
     lda #$02
-    sta ram_07AC,x
+    sta trk_slide_time_hi,x
     lda #$FE
-    sta ram_0248,x
+    sta trk_sound,x
     sec
     rts
 
 ; op_handlers entry for stream byte $99
 op_99
-    sta zp_1C
+    sta tmp_1C
     jsr sub_507B
-    sta ram_0284,x
-    lda zp_1C
-    sta ram_0266,x
+    sta trk_ptr_hi,x
+    lda tmp_1C
+    sta trk_ptr_lo,x
     sec
     rts
 
 ; op_handlers entry for stream byte $9D
 op_9D
-    sta zp_1C
-    lda ram_0248,x
+    sta tmp_1C
+    lda trk_sound,x
     cmp #$FE
     bne _l554F
-    inc ram_0248,x
+    inc trk_sound,x
     jsr sub_507B
     clc
     rts
 _l554F
     php
     sei
-    lda zp_1C
-    stx zp_1C
-    sta zp_19
+    lda tmp_1C
+    stx tmp_1C
+    sta tmp_ptr
     sta ram_0536,x
     jsr sub_507B
-    sta zp_1A
-    sta ram_0554,x
+    sta tmp_ptr+1
+    sta trk_patch_hi,x
     plp
     ldy #$00
-    lda (zp_19),y
-    sta ram_0518,x
+    lda (tmp_ptr),y
+    sta trk_reg20,x
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     ldy #$05
 _l5570
-    lda (zp_19),y
-    sta ram_0482,x
+    lda (tmp_ptr),y
+    sta trk_op_tl,x
     tya
     clc
     adc #$06
@@ -2116,9 +2117,9 @@ _l5570
     clc
     adc #$1E
     tax
-    dec zp_0C
+    dec fm_op_index
     bpl _l5570
-    ldx zp_1C
+    ldx tmp_1C
 
 ; from 4976
 sub_5585
@@ -2128,7 +2129,7 @@ sub_5585
     beq _l558E
     jmp loc_5638
 _l558E
-    stx zp_1C
+    stx tmp_1C
     ldy ram_0899
     cpy #$02
     beq loc_559C
@@ -2141,14 +2142,14 @@ sub_559A
 
 loc_559C
     lda ram_0536,x
-    sta zp_19
+    sta tmp_ptr
     clc
     adc #$1C
-    sta ram_0428,x
-    lda ram_0554,x
-    sta zp_1A
+    sta trk_scale_ptr_lo,x
+    lda trk_patch_hi,x
+    sta tmp_ptr+1
     adc #$00
-    sta ram_0446,x
+    sta trk_scale_ptr_hi,x
     jmp loc_55B6
 
 ; from 589A, 58CA; not executed in the make sndtrace runs
@@ -2161,56 +2162,56 @@ loc_55B6
     ldx #$08
     jsr ym_wait
     stx YM2151_REG
-    lda zp_0D
+    lda ym_channel
     sta YM2151_DATA
-    sta ram_08AE,x
+    sta ym_shadow,x
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     clc
     lda #$60
-    adc zp_0D
+    adc ym_channel
 _l55CF
     tax
     jsr ym_wait
     stx YM2151_REG
     lda #$7F
-    sta ram_08AE,x
+    sta ym_shadow,x
     sta YM2151_DATA
     txa
     clc
     adc #$08
-    dec zp_0C
+    dec fm_op_index
     bpl _l55CF
     ldy #$00
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     clc
-    lda zp_0D
+    lda ym_channel
     adc #$20
 _l55F1
     tax
     jsr ym_wait
     stx YM2151_REG
-    lda (zp_19),y
-    sta ram_08AE,x
+    lda (tmp_ptr),y
+    sta ym_shadow,x
     sta YM2151_DATA
     txa
     clc
     adc #$08
     iny
-    dec zp_0C
+    dec fm_op_index
     bpl _l55F1
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     clc
     lda #$40
-    adc zp_0D
+    adc ym_channel
 _l5612
     tax
     jsr ym_wait
     stx YM2151_REG
-    lda (zp_19),y
-    sta ram_08AE,x
+    lda (tmp_ptr),y
+    sta ym_shadow,x
     sta YM2151_DATA
     iny
     txa
@@ -2224,9 +2225,9 @@ _l562B
     adc #$20
     bcc _l5612
     adc #$47
-    dec zp_0C
+    dec fm_op_index
     bpl _l5612
-    ldx zp_1C
+    ldx tmp_1C
 
 ; from 558B, 5597
 loc_5638
@@ -2238,17 +2239,17 @@ loc_5638
 op_9E
     clc
     adc #$24
-    sta zp_19
+    sta tmp_ptr
     php
     jsr sub_507B
     plp
     adc #$00
-    sta zp_1A
+    sta tmp_ptr+1
     ldy ram_0899
     cpy #$02
     bne _l567D
     lda #$80
-    sta ram_0572,x
+    sta trk_keyon_flags,x
     ldy #$00
     tya
     ldx #$18
@@ -2264,9 +2265,9 @@ op_9E
     ldx #$1B
     jsr sub_56A1
     sta ym_1b_shadow
-    lda (zp_19),y
-    sta ram_08AE,x
-    ldx zp_1C
+    lda (tmp_ptr),y
+    sta ym_shadow,x
+    ldx tmp_1C
 _l567D
     sec
     rts
@@ -2275,12 +2276,12 @@ _l567D
 op_9F
     clc
     adc #$29
-    sta zp_19
+    sta tmp_ptr
     php
     jsr sub_507B
     plp
     adc #$00
-    sta zp_1A
+    sta tmp_ptr+1
     ldy ram_0899
     cpy #$02
     bne _l569F
@@ -2289,7 +2290,7 @@ op_9F
     tya
     ldx #$0F
     jsr sub_56A1
-    ldx zp_1C
+    ldx tmp_1C
 _l569F
     sec
     rts
@@ -2304,10 +2305,10 @@ sub_56A1
     jsr ym_wait
     stx YM2151_REG
     pla
-    ora (zp_19),y
+    ora (tmp_ptr),y
     iny
     sta YM2151_DATA
-    sta ram_08AE,x
+    sta ym_shadow,x
     plp
     rts
 _l56BA
@@ -2332,11 +2333,11 @@ op_A0
     beq _l56D4
     eor #$C0
 _l56D4
-    sta zp_19
-    lda ram_0518,x
+    sta tmp_ptr
+    lda trk_reg20,x
     and #$3F
-    ora zp_19
-    sta ram_0518,x
+    ora tmp_ptr
+    sta trk_reg20,x
 _l56E0
     sec
     rts
@@ -2350,7 +2351,7 @@ op_A3
     clc
     adc #$01
     clc
-    adc ram_04FA,x
+    adc trk_level_offset,x
     bvc loc_570A
     bpl _l56FA
     lda #$7F
@@ -2369,7 +2370,7 @@ op_A2
     adc #$01
 
 loc_570A
-    sta ram_04FA,x
+    sta trk_level_offset,x
 
 ; from 5733
 loc_570D
@@ -2382,20 +2383,20 @@ op_A7
     cpy #$02
     bne loc_570D
     ldy #$00
-    sty zp_1B
+    sty tmp_1B
     asl a
     bcc _l5721
     ldy #$FF
-    sty zp_1B
+    sty tmp_1B
 _l5721
     asl a
-    rol zp_1B
+    rol tmp_1B
     clc
-    adc ram_0464,x
-    sta ram_0464,x
-    lda zp_1B
-    adc ram_0662,x
-    sta ram_0662,x
+    adc trk_key_fraction,x
+    sta trk_key_fraction,x
+    lda tmp_1B
+    adc trk_transpose,x
+    sta trk_transpose,x
     jmp loc_570D
 
 ; op_handlers entry for stream byte $A6; from 53EB
@@ -2405,13 +2406,13 @@ op_A6
     bne loc_570D
     asl a
     asl a
-    sta ram_0464,x
+    sta trk_key_fraction,x
     sec
     rts
 
 ; op_handlers entry for stream byte $A8; not executed in the make sndtrace runs
 op_A8
-    sta ram_0608,x
+    sta trk_slide_step,x
     rts
 
 ; op_handlers entry for stream byte $A1; from 51CE, 57C0
@@ -2421,22 +2422,22 @@ op_A1
     beq _l5750
     rts
 _l5750
-    stx zp_1C
+    stx tmp_1C
     eor #$FF
     clc
     adc #$01
-    sta zp_19
-    lda ram_0518,x
+    sta tmp_ptr
+    lda trk_reg20,x
     and #$07
     tay
     lda tbl_57D3,y
-    sta zp_1A
+    sta tmp_ptr+1
     ldy #$03
 _l5766
-    asl zp_1A
+    asl tmp_ptr+1
     bcs _l577C
-    lda ram_0482,x
-    adc zp_19
+    lda trk_op_tl,x
+    adc tmp_ptr
     bpl _l5779
     bvs _l5777
     lda #$00
@@ -2444,7 +2445,7 @@ _l5766
 _l5777
     lda #$7F
 _l5779
-    sta ram_0482,x
+    sta trk_op_tl,x
 _l577C
     txa
     clc
@@ -2452,13 +2453,13 @@ _l577C
     tax
     dey
     bpl _l5766
-    ldx zp_1C
+    ldx tmp_1C
     sec
     rts
 
 ; from 51EF
 loc_5788
-    ldy ram_0248,x
+    ldy trk_sound,x
     cpy #$FE
     bne _l5791
     clc
@@ -2468,15 +2469,15 @@ _l5791
     txa
     pha
     lda ram_0536,x
-    sta zp_19
-    lda ram_0554,x
-    sta zp_1A
+    sta tmp_ptr
+    lda trk_patch_hi,x
+    sta tmp_ptr+1
     lda #$03
-    sta zp_0C
+    sta fm_op_index
     ldy #$05
 _l57A4
-    lda (zp_19),y
-    sta ram_0482,x
+    lda (tmp_ptr),y
+    sta trk_op_tl,x
     tya
     clc
     adc #$06
@@ -2485,7 +2486,7 @@ _l57A4
     clc
     adc #$1E
     tax
-    dec zp_0C
+    dec fm_op_index
     bpl _l57A4
     pla
     tax

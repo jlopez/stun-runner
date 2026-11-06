@@ -516,7 +516,8 @@ soundcheck: check
 # "SOUNDS IN ATTRACT" on (tools/mame/listen.lua; LISTEN_ATTRACT_SOUND=0 leaves the factory
 # setting, under which attract mode is silent). Sound plays only during each attract demo: the
 # 68010 sends 02 at the demo's start (frames 831, 5534, 10238: about 14 s, 92 s, 170 s after boot)
-# and 01 at its end (2301, 7005: about 38 s, 116 s) whatever the option is, so a silence from
+# and 01 at its end (2301, 7005: about 38 s, 116 s; from 024E3E/0253A0, docs/11 section 2.1)
+# whatever the option is, so a silence from
 # about 38 s to 92 s is expected (docs/09-sound-program.md section 6).
 LISTEN_ATTRACT_SOUND ?= 1
 
