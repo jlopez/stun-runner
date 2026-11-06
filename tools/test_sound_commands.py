@@ -1,7 +1,8 @@
 """data/sound/commands.json, the sound commands of the 68010 -> 6502 protocol (docs/11-sound-
 protocol.md), against its own shape, data/oki/samples.json, the two images and the MAME traces.
 
-The shape and the OKI agreement run everywhere (CI). The image tests skip without
+The shape, the OKI agreement and the 6502 source's command tables (asm/jsa/tables.asm, the phrase
+table in asm/jsa/data/sounds.asm) run everywhere (CI). The image tests skip without
 build/stunrun-68k.bin and build/stunrun-jsa.bin (`make` needs the ROMs): the 6502's command tables
 give each command's class, type, parameter, handler and phrase; the 68010's audio test list gives
 the names; every call of queue_sound_command (0301CA) in the image is listed, with the value its
@@ -130,6 +131,35 @@ def test_oki_commands_agree_with_samples_json() -> None:
     assert set(plays) <= set(phrases)
     for number, phrase in phrases.items():
         assert sorted(phrase["commands"]) == sorted(plays.get(number, [])), number
+
+
+def source_table(path: Path, label: str) -> list[int]:
+    """The bytes of the `.byte` rows under a label of the 6502 source (asm/jsa, 64tass)."""
+    values: list[int] = []
+    lines = path.read_text().splitlines()
+    start = lines.index(label) + 1
+    for line in lines[start:]:
+        code = line.split(";")[0].strip()
+        if not code.startswith(".byte"):
+            break
+        values += [int(v.strip().lstrip("$"), 16) for v in code[len(".byte") :].split(",")]
+    return values
+
+
+def test_6502_source_tables() -> None:
+    """The committed 6502 source (asm/jsa, M4a) holds the same class, type and parameter for every
+    command and the same OKI phrase for every play command (runs in CI, no ROMs needed)."""
+    tables, sounds = REPO / "asm/jsa/tables.asm", REPO / "asm/jsa/data/sounds.asm"
+    if not tables.exists():
+        pytest.skip("no asm/jsa/tables.asm")
+    cls, typ, par = (source_table(tables, n) for n in ("cmd_class", "cmd_type", "cmd_param"))
+    phrase = source_table(sounds, "tbl_6532")
+    assert len(cls) == len(typ) == len(par) == 0x6D and len(phrase) == 0x35
+    for c in commands():
+        v = h(c["value"])
+        assert (cls[v], typ[v], par[v]) == (h(c["class"]), h(c["type"]), h(c["param"])), v
+        if c["type"] == "13":
+            assert phrase[h(c["param"])] == c["phrase"], c["value"]
 
 
 # --- against the images (skip without `make`) ---------------------------------------------------

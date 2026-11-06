@@ -4,8 +4,8 @@
 6502: the latch pair at 600000, the reset at 604000, the level 4 interrupt, both programs' code
 for it, the command set 00-6C with the 68010's own name for each command, and the MAME runs that
 show it. Addresses: 68010 addresses as six hex digits, 6502 addresses as four. **CODE** means
-read off the image (`build/stunrun-68k.bin` with `unidasm -arch m68010`, `build/stunrun-jsa.bin`
-with the 6502 source of leg M4a, PR #14, `asm/jsa/`), **MAME** a run of the committed script
+read off the image (`build/stunrun-68k.bin` with `unidasm -arch m68010`; the 6502 program in its
+source `asm/jsa/`, leg M4a, docs/09), **MAME** a run of the committed script
 `tools/mame/sndproto.lua` (`make sndproto`, MAME 0.289, section 8), **SRC** MAME's source
 (`~/.local/src/mame`, tag mame0289, file:line). 6502 label names are M4a's (`h_nmi`,
 `dispatch_command`, `cmd_class` ...); they will change in later legs, the addresses will not.
@@ -228,7 +228,9 @@ case (`snd_tubmus` for 0A); 03, which the list leaves out, is `cmd_03_imm`.
 
 ## 6. The command set
 
-Classes, types and parameters are the 6502's tables at 6093, 6100 and 616D **CODE**; the types:
+Classes, types and parameters are the 6502's tables at 6093, 6100 and 616D (`cmd_class`,
+`cmd_type` and `cmd_param` in `asm/jsa/tables.asm`, which `tools/test_sound_commands.py` checks
+`data/sound/commands.json` against in CI) **CODE**; the types:
 
 | Type | Handler | What it does |
 |---|---|---|
