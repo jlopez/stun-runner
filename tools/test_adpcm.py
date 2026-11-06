@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 from adpcm import (
@@ -294,10 +295,22 @@ def test_manifest_reader(tmp_path: Path) -> None:
         read_manifest(path)
 
 
+def sample_name(commands: list[dict[str, Any]], phrase: int) -> str:
+    """The name card A12 gives phrase `phrase`: the 68010's audio-test name, in lower case, of
+    the one command in 38-6C (the 6502's OKI play commands, type 13) that plays it; phrase 1 is
+    also played by 05 (ADTEST), which the rule leaves out (command snd_<name> plays <name>)."""
+    plays = [c for c in commands if c["type"] == "13" and c["phrase"] == phrase]
+    named = [c for c in plays if int(c["value"], 16) >= 0x38]
+    assert len(named) == 1, (phrase, [c["value"] for c in plays])
+    assert named[0]["name"] == "snd_" + named[0]["audio_test"].lower(), phrase
+    return str(named[0]["audio_test"]).lower()
+
+
 def test_committed_manifest() -> None:
-    """52 phrases named from Jesus's listening (card A8): a lower_snake label, his words
-    verbatim in description, maybe_ exactly where he marked a doubt, and as cross evidence the
-    68010's audio-test names of the commands that play the phrase (data/sound/commands.json)."""
+    """52 phrases named by the 68010's audio test (card A12, derived here from
+    data/sound/commands.json so the two files cannot drift), Jesus's words from listening
+    verbatim in description (card A8), and the audio-test names of every command that plays the
+    phrase in audio_test."""
     manifest = read_manifest(MANIFEST)
     assert manifest.entries == 53 and len(manifest.phrases) == 52
     doc = json.loads(MANIFEST.read_text())
@@ -307,14 +320,45 @@ def test_committed_manifest() -> None:
         # every phrase is played by some command (the 6502's tables) and MAME saw it start
         assert p["commands"], n
         assert sum(p["starts"].values()) > 0, n
-        assert p["name"] == p["name"].lower() and p["name"].isidentifier(), n
+        assert p["name"] == sample_name(commands, n), n
         assert isinstance(p["description"], str) and p["description"], n
-        assert p["name"].startswith("maybe_") == p["description"].endswith("?"), n
         plays = [c["audio_test"] for c in commands if c["type"] == "13" and c["phrase"] == n]
         assert p["audio_test"] == plays, n
+    assert [p["name"] for p in doc["phrases"]][:2] == ["welcome", "luck"]
+    assert doc["phrases"][0]["audio_test"] == ["ADTEST", "WELCOME"]
     numbers = [p for p in doc["phrases"] if 10 <= p["number"] <= 31]
-    assert [p["name"] for p in numbers] == [f"number_{k:02d}" for k in range(1, 23)]
     assert (numbers[0]["description"], numbers[-1]["description"]) == ("One", "Twenty-two")
+
+
+def test_docs_attribute_names_to_audio_test() -> None:
+    """Card A12: the names come from the 68010's audio test, only the descriptions from Jesus's
+    listening (card A8). No sentence of docs/10 or CLAUDE.md may say the names are his hearing."""
+    import re
+
+    stale = re.compile(r"names\s+(?:are|come\s+from)\s+Jesus's\s+(?:hearing|listening)", re.I)
+    for path in (REPO / "docs/10-adpcm.md", REPO / "CLAUDE.md"):
+        text = " ".join(path.read_text().split())
+        assert not stale.search(text), path
+    assert "audio-test abbreviations (card A12)" in " ".join(
+        (REPO / "docs/10-adpcm.md").read_text().split()
+    )
+
+
+def test_sample_name_follows_commands() -> None:
+    """The name rule fails when the manifest and data/sound/commands.json disagree: a command's
+    audio-test name changed, or a phrase played by no command in 38-6C."""
+    commands = json.loads(COMMANDS.read_text())["commands"]
+    assert sample_name(commands, 39) == "gun1" and sample_name(commands, 1) == "welcome"
+    changed = [dict(c) for c in commands]
+    gun1 = next(c for c in changed if c["value"] == "67")
+    gun1["audio_test"] = "GUN2"
+    with pytest.raises(AssertionError):
+        sample_name(changed, 39)  # the command's own name (snd_gun1) no longer follows
+    gun1["name"] = "snd_gun2"
+    assert sample_name(changed, 39) == "gun2"  # ... and the committed gun1 would fail
+    only_05 = [c for c in commands if c["value"] != "38"]
+    with pytest.raises(AssertionError):
+        sample_name(only_05, 1)
 
 
 # --- the committed samples (CI, no ROMs) -------------------------------------------------------
@@ -515,13 +559,13 @@ def test_asm_reports_edits_and_refuses_strays(tmp_path: Path) -> None:
     assert r.returncode == 0, r.stderr
     assert "edited" not in r.stdout and "856 bytes free" in r.stdout
     # one sample of phrase 2 changed: built, with its round-trip error
-    wav = data / "02-good_luck.wav"
+    wav = data / "02-luck.wav"
     values = read_wav(wav.read_bytes())
     values[1000] = values[1000] - 4000 if values[1000] > 0 else values[1000] + 4000
     wav.write_bytes(pcm_wav(values))
     r = run(sys.executable, adpcm, "asm", "--data", data, "--out", out)
     assert r.returncode == 0, r.stderr
-    assert "phrase 2 (02-good_luck.wav): edited" in r.stdout
+    assert "phrase 2 (02-luck.wav): edited" in r.stdout
     r = run(sys.executable, adpcm, "check", "--data", data)
     assert r.returncode == 0 and "51 of 52 WAVs come back exactly" in r.stdout, r.stdout
     # a WAV no phrase names, a missing WAV, samples past 256 KB
@@ -531,7 +575,7 @@ def test_asm_reports_edits_and_refuses_strays(tmp_path: Path) -> None:
     (data / "02-renamed.wav").unlink()
     wav.unlink()
     r = run(sys.executable, adpcm, "asm", "--data", data, "--out", out)
-    assert r.returncode == 1 and "02-good_luck.wav absent" in r.stderr
+    assert r.returncode == 1 and "02-luck.wav absent" in r.stderr
     wav.write_bytes(pcm_wav(values + [0] * 2 * 857))
     r = run(sys.executable, adpcm, "asm", "--data", data, "--out", out)
     assert r.returncode == 1 and "1 bytes more than the 256 KB image holds" in r.stderr, r.stderr
