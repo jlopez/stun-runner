@@ -399,7 +399,7 @@ CODE_MAP_68K = [
         "words 80/88 down to 01/8F): prints the message of each bit set (002326, message "
         "pointers at 010136): 80-20 6502 program PROM, 10 first RAM (0000), 08 second RAM "
         "(0800), 04 IRQs not present, 02 YM2151 timed out, 01 main loop not running; message "
-        "91 (audio test OK) when none is. The 6502 sets these bits in zp_02 (docs/11).",
+        "91 (audio test OK) when none is. The 6502 sets these bits in board_status (docs/11).",
     ),
     Entry(
         0x008E84,

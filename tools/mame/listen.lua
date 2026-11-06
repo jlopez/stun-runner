@@ -11,7 +11,7 @@
 -- 02 at each demo's start.
 --
 -- The sound is not continuous: whatever bit 11 is, the 68010 also sends 01 at the end of each
--- attract demo (from a path not identified, docs/09-sound-program.md section 6). Sound plays in
+-- attract demo (the main loop's state switch, 024E3E/0253A0, docs/11 section 2.1). Sound plays in
 -- frames 831-2300 (about 14 s to 38 s after boot), 5534-7004 (about 92 s to 116 s), and from 10238
 -- (about 170 s), one window in each 4,704-frame (78 s) cycle; the silence between is the game,
 -- not the rebuilt file.

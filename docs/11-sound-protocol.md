@@ -131,7 +131,7 @@ game's queue **CODE, MAME**:
   80, 40, 20 the 6502 program PROM (P1BAD, P2BAD, P3BAD; the JSA II program sets only bit 7), 10
   the first RAM at 0000 (R1BAD), 08 the second RAM at 0800 (R2BAD), 04 IRQs not present (IRBAD),
   02 the YM2151 timed out (YMBAD), 01 the main loop not running (MLBAD) **CODE**. This is the
-  68010's reading of the 6502's `zp_02` (section 3.3).
+  68010's reading of the 6502's `board_status` (section 3.3).
 - `boot_sa_ii_test` (008F68), called from the power-up self-test sequence (00533C): the same with
   messages 105-108 (SA II test OK, error, timeout error, in progress): status 0 is OK **CODE**.
 - PLAY SOUNDS enters the game program's `audio_test` (043718) through `game_entry_2` (021378):
@@ -168,10 +168,10 @@ of `cmd_type` at 4375, after that test, so they cannot show it.
 |---|---|---|
 | FF | after every reset, once the initialisation has dropped any pending command (4139) | 413C-413E |
 | 10 | the self-test found the zero page or the stack bad; the 6502 then stops (never in MAME: RDIO bit 7 cannot be set, docs/09 section 1) | 41A1-41A3 |
-| the status byte `zp_02` | command 07 (imm_03, 4533) | `send_response` 4553-4568 (the write at 455D) |
-| 6D | command 06 (imm_02, 4543) | `send_response` |
-| `zp_75` | command 03 (imm_01, 5DAD): `sub_5CE8`'s four 2-bit coin counters (5D11-5D57: RDIO bits 0-3 debounced in `zp_6F`,x, `tbl_5D09`,x added inside the field mask `tbl_5D0D`,x), or the raw RDIO bits 0-3 when RDIO bit 7, the self-test, is set (5CE8-5D08; never in MAME) | `send_response` |
-| AA, then the next byte written | command 08 (imm_04, 5CB8): a loop-back | `send_response` |
+| the status byte `board_status` | command 07 (imm_03_send_status, 4533) | `send_response` 4553-4568 (the write at 455D) |
+| 6D | command 06 (imm_02_send_count, 4543) | `send_response` |
+| `coin_state` | command 03 (imm_01_send_inputs, 5DAD): `read_inputs`'s four 2-bit coin counters (5D11-5D57: RDIO bits 0-3 debounced in `coin_debounce`,x, `coin_field_one`,x added inside the field mask `coin_field_mask`,x), or the raw RDIO bits 0-3 when RDIO bit 7, the self-test, is set (5CE8-5D08; never in MAME) | `send_response` |
+| AA, then the next byte written | command 08 (imm_04_loopback, 5CB8): a loop-back | `send_response` |
 | 55 | command 09 (type 09, `queue_response` 44D0) | `main_loop` 4159-4164 |
 | a stream's operand | stream op 96 (`op_96`, 550E, through `queue_response`) | `main_loop` |
 
@@ -186,11 +186,11 @@ MAME saw FF after every reset (29 resets over the five runs), 00 for 07, 00 for 
 written is the cursor command 34, which comes back), and nothing else; no stream sent an op 96
 response **MAME**.
 
-### 3.3 The status byte (`zp_02`)
+### 3.3 The status byte (`board_status`)
 
 The self-test (402A-4112, only when RDIO bit 7 is set) leaves bits 7 (ROM checksum not FF,
 40E4-40EC), 4 or 3 (a RAM page below 0800 or from 0800 bad, 418C-419F) and 2 (no timed IRQ in
-65,536 loops, 410D-4111). `ym_wait` sets bit 1 on a YM2151 time-out. `imm_03` sends the byte,
+65,536 loops, 410D-4111). `ym_wait` sets bit 1 on a YM2151 time-out. `imm_03_send_status` sends the byte,
 then sets bits 0 and 2; `main_loop` clears bit 0 every pass (414C-4150) and the timed IRQ clears
 bit 2 (41F3-41F7), so a second 07 reads 0 in those bits only if both still run **CODE**. The
 68010's messages for the bits are in section 2.2.
@@ -243,20 +243,20 @@ Classes, types and parameters are the 6502's tables at 6093, 6100 and 616D (`cmd
 
 | Type | Handler | What it does |
 |---|---|---|
-| 00 | `cmdtype_00` 438A | `zp_1E` = 4 x param: F0 for 01, 0 for 02. While `zp_1E` is not 0 the OKI start returns at once (5BFE-5C01) and a YM2151 key-on needs `ram_088E` >= `zp_1E` (4EE3-4EF0) |
-| 01 | `cmdtype_01` 43AD | `zp_23` + (`tbl_65D1`+param AND 1F) = `tbl_65D7`+param; a stream op reads `zp_23,y` (54EE) |
-| 03 | `cmdtype_03` 43CA | `imm_handlers` entry param: entry 0 is `imm_00` (4238), the initialisation reset also runs (OKI reset, response queue emptied, voice tables cleared, key-off on the eight YM2151 channels, MIX set) |
-| 05 | `cmdtype_05` 43EE | if command param is of type 08, every voice playing its stream gets `ram_0248` = FF (stopped) |
-| 08 | `cmdtype_08` 4569 | starts stream param on its voices (`tbl_61E4` first entry, `tbl_6438` next; group `tbl_6244`, YM2151 channel `tbl_62C1`, byte stream `tbl_633E`) |
+| 00 | `cmdtype_00_min_priority` 438A | `min_priority` = 4 x param, a floor on the track priority (docs/09 section 10.2): F0 for 01, 0 for 02. While `min_priority` is not 0 the OKI start returns at once (5BFE-5C01), and a YM2151 key-on needs the track's priority byte `ram_088E` >= `min_priority` (4EE3-4EF0): with F0 only the priority-3F sound (command 32, byte FD) keys on |
+| 01 | `cmdtype_01_set_var` 43AD | `seq_vars` + (`tbl_65D1`+param AND 1F) = `tbl_65D7`+param; a stream op reads `seq_vars,y` (54EE) |
+| 03 | `cmdtype_03_immediate` 43CA | `imm_handlers` entry param: entry 0 is `init_sound` (4238), the initialisation reset also runs (OKI reset, response queue emptied, voice tables cleared, key-off on the eight YM2151 channels, MIX set) |
+| 05 | `cmdtype_05_stop_sound` 43EE | if command param is of type 08, every voice playing its stream gets `trk_sound` = FF (stopped) |
+| 08 | `cmdtype_08_start_sound` 4569 | starts stream param on its voices (`tbl_61E4` first entry, `tbl_6438` next; group `tbl_6244`, YM2151 channel `tbl_62C1`, byte stream `tbl_633E`) |
 | 09 | `queue_response` 44D0 | param into `resp_queue` |
-| 0A | `cmdtype_0A` 445F | if command param is of type 08, every voice playing its stream is released (`ram_07E8` = D0, `ram_07AC` = 2, `ram_0248` = FE) |
-| 0B | `cmdtype_0B` 4496 | every voice whose group (`ram_03EC` / 4) is param is released as by type 0A |
-| 13 | `cmdtype_13` 5BFE | OKI phrase `tbl_6532`+param on the channel and attenuation of `tbl_6567`+param, unless `zp_1E` is not 0 (docs/10) |
-| 14 | `cmdtype_14` 5C6F | stops the OKI channel whose current phrase is param |
+| 0A | `cmdtype_0A_release_sound` 445F | if command param is of type 08, every voice playing its stream is released (`trk_slide_rate_hi` = D0, `trk_slide_time_hi` = 2, `trk_sound` = FE) |
+| 0B | `cmdtype_0B_release_priority` 4496 | every voice whose group (`trk_priority` / 4) is param is released as by type 0A |
+| 13 | `cmdtype_13_oki_play` 5BFE | OKI phrase `tbl_6532`+param on the channel and attenuation of `tbl_6567`+param, unless `min_priority` is not 0 (docs/10) |
+| 14 | `cmdtype_14_oki_stop` 5C6F | stops the OKI channel whose current phrase is param |
 | FF | `imm_handlers` 61DA | an immediate command (class 00-03), inside `h_nmi` |
 
-The names fit what the 6502 does with them, which is a check on both: SOFF/SON are the mute and
-unmute, STAT the status, SMAX sends the command count 6D, ECHO queues 55; the K names (KSCRAP
+The names fit what the 6502 does with them, which is a check on both: SOFF/SON raise and clear the
+priority floor (`min_priority` F0 starts no OKI sample and keys on only priority 3F), STAT the status, SMAX sends the command count 6D, ECHO queues 55; the K names (KSCRAP
 2E, KDIVE 36) are type 05 and stop exactly the stream of SCRAP (2D) and DIVE (35); the F names
 of type 0A (FSUBFAN 13, FSTBEG 15, FHISCOR 19, FHELCPT 27, FVRCFT 29) release the stream of
 SUBFAN, STBEG, HISCOR, HELCPT and HVRCFT; FTUBMUS (0B) releases group 27, the voices of TUBMUS
@@ -272,14 +272,14 @@ except the audio test's 04395C.
 
 | Cmd | 68k name | Class | Type | Param | What the 6502 does | MAME attract / game | Call sites (queue_sound_command) |
 |---|---|---|---|---|---|---|---|
-| 00 | STOP | FF | 03 | 00 | the sound initialisation (imm_00, 4238) | 0 / 0 | none; written by 008E9A, 008EC6, 04393E |
-| 01 | SOFF | FF | 00 | 3C | mute: zp_1E = F0 | 5 / 1 | 024E42, 0253A4, 02837E |
-| 02 | SON | FF | 00 | 00 | unmute: zp_1E = 0 | 0 / 1 | 027178, 02837E |
-| 03 | (not listed) | 00 | FF | 00 | sends zp_75, sub_5CE8's four 2-bit coin counters (raw RDIO bits 0-3 under the self-test) | 0 / 0 | none |
+| 00 | STOP | FF | 03 | 00 | the sound initialisation (init_sound, 4238) | 0 / 0 | none; written by 008E9A, 008EC6, 04393E |
+| 01 | SOFF | FF | 00 | 3C | priority floor: min_priority = F0 (no OKI start, only priority 3F keys on) | 5 / 1 | 024E42, 0253A4, 02837E |
+| 02 | SON | FF | 00 | 00 | no floor: min_priority = 0 | 0 / 1 | 027178, 02837E |
+| 03 | (not listed) | 00 | FF | 00 | sends coin_state, read_inputs's four 2-bit coin counters (raw RDIO bits 0-3 under the self-test) | 0 / 0 | none |
 | 04 | YTST | FF | 08 | 00 | starts stream 00 | 0 / 0 | none; written by 008E84 |
 | 05 | ADTEST | FF | 13 | 00 | plays OKI phrase 1 | 0 / 0 | none; written by 008EB0 |
 | 06 | SMAX | 01 | FF | 00 | sends 6D, the number of command values the tables cover | 0 / 0 | none (audio test only) |
-| 07 | STAT | 02 | FF | 00 | sends zp_02, the status byte, then sets its bits 0 and 2 | 0 / 0 | none; written by 008DDA, 008F94, 0300B8 |
+| 07 | STAT | 02 | FF | 00 | sends board_status, the status byte, then sets its bits 0 and 2 | 0 / 0 | none; written by 008DDA, 008F94, 0300B8 |
 | 08 | SCUM | 03 | FF | 00 | sends AA, takes the next byte written and sends it back | 0 / 0 | none (audio test only) |
 | 09 | ECHO | FF | 09 | 55 | queues the response 55 | 0 / 0 | none (audio test only) |
 | 0A | TUBMUS | FF | 08 | 01 | starts stream 01 | 3 / 8 | 032278 |
@@ -302,12 +302,12 @@ except the audio test's 04395C.
 | 1B | ATRCTMUS | FF | 08 | 0D | starts stream 0D | 0 / 0 | 0245F4, 02466A |
 | 1C | TUBEG | FF | 08 | 0E | starts stream 0E | 3 / 5 | 024B98, 028498 |
 | 1D | ENG | FF | 08 | 0F | starts stream 0F | 3 / 5 | 024B92, 027BFC, 028492 |
-| 1E | SAME | FF | 01 | 00 | zp_23 = 00 | 62 / 124 | 02822A, 028244, 028C54, 03ADD0 and 1 more |
-| 1F | ACL | FF | 01 | 01 | zp_23 = 01 | 44 / 120 | 02822A, 03ADD0 |
-| 20 | DCL | FF | 01 | 02 | zp_23 = 02 | 45 / 71 | 03ADD0 |
-| 21 | SENG | FF | 01 | 03 | zp_23 = 03 | 2 / 6 | 024E54, 0253B6, 0268B2, 028B8A and 2 more |
-| 22 | FACL | FF | 01 | 04 | zp_23 = 04 | 29 / 87 | 028244, 028332, 03ADD0 |
-| 23 | FDCL | FF | 01 | 05 | zp_23 = 05 | 25 / 33 | 03ADD0 |
+| 1E | SAME | FF | 01 | 00 | seq_vars = 00 | 62 / 124 | 02822A, 028244, 028C54, 03ADD0 and 1 more |
+| 1F | ACL | FF | 01 | 01 | seq_vars = 01 | 44 / 120 | 02822A, 03ADD0 |
+| 20 | DCL | FF | 01 | 02 | seq_vars = 02 | 45 / 71 | 03ADD0 |
+| 21 | SENG | FF | 01 | 03 | seq_vars = 03 | 2 / 6 | 024E54, 0253B6, 0268B2, 028B8A and 2 more |
+| 22 | FACL | FF | 01 | 04 | seq_vars = 04 | 29 / 87 | 028244, 028332, 03ADD0 |
+| 23 | FDCL | FF | 01 | 05 | seq_vars = 05 | 25 / 33 | 03ADD0 |
 | 24 | CD | FF | 08 | 10 | starts stream 10 | 0 / 21 | 02912A, 03E7FA, 03EAF4, 03EEDE and 1 more |
 | 25 | WARN | FF | 08 | 11 | starts stream 11 | 0 / 24 | 0280C0 |
 | 26 | HELCPT | FF | 08 | 12 | starts stream 12 | 3 / 0 | 033B82 |
@@ -422,12 +422,12 @@ from the menu item to the bit, so it was not needed.
 
 1. `cmd_type` (6100-616C) holds only 00, 01, 03, 05, 08, 09, 0A, 0B, 13, 14 and FF: no command
    is of type 10 **CODE** (checked by `tools/test_sound_commands.py`).
-2. `cmdtype_10` (44C4) is referenced once in the whole file, by its entry in `cmdtype_handlers`
+2. `cmdtype_10_ymtimer` (44C4) is referenced once in the whole file, by its entry in `cmdtype_handlers`
    (474F, the word 44C3); the only reader of that table is `dispatch_command` (437E, 4382), with
    the type from `cmd_type`. No `jsr` or `jmp` reaches 44C4, and no stream op: `op_handlers`
    (50AF, 59 words) has no entry inside 44C4-44CF or 585E-5BAB **CODE**.
-3. The only ways into `ymtimer.asm` are `cmdtype_10`'s `jmp loc_5869` (44CC), `imm_00`'s `jsr
-   sub_585E` (42A9), which clears its state, and `h_irq`'s `jsr sub_59C0` (41D1), taken only when
+3. The only ways into `ymtimer.asm` are `cmdtype_10_ymtimer`'s `jmp ymtimer_start` (44CC), `init_sound`'s `jsr
+   ymtimer_reset` (42A9), which clears its state, and `h_irq`'s `jsr ymtimer_irq` (41D1), taken only when
    the YM2151's status has the timer A flag. Timer A is loaded and started only inside
    `ymtimer.asm` (registers 10, 11 and 14 at 5A59-5A7C); no other code loads 10, 11 or 14 as a
    register number **CODE**.
@@ -457,7 +457,7 @@ address) of the table below, FF once per reset.
 | soundtest (PLAY SOUNDS, 108 entries) | 6,400 | 216 | 108 | 1 | 6 | FF x6, 00, 34, 55, 6D, AA |
 | inject (07, 06, 03, 09, 08 5A, 07, 6D, 7F, 80, FF, 07) | 1,900 | 165 (12 injected) | 33 | 155 | 3 | FF x3, 00 x4, 55, 5A, 6D, AA |
 
-- In every run the number of command bytes the 6502 read in `h_nmi` (5839) and as `imm_04`'s data
+- In every run the number of command bytes the 6502 read in `h_nmi` (5839) and as `imm_04_loopback`'s data
   byte (57FC) equals the number the 68010 wrote; the other reads of 2802 are the one after each
   reset (4139). No command is lost in MAME.
 - Queued but not written (2 in attract, 2 in the game): commands still in `sound_queue` when
@@ -496,7 +496,7 @@ address) of the table below, FF once per reset.
 5. **Thirteen commands the game never sends**: besides the test and immediate commands, the
    streams WARPMUS (10) and EXP3 (37), the OKI phrases CONGRATS (3A) and APAD (5D), and KBRAKE
    (66), which would stop BRAKE (section 6).
-6. **The end-of-demo mute** comes from the main loop's state switch (024E3E, 0253A0: 01, 0B, 21).
+6. **The end-of-demo command 01** comes from the main loop's state switch (024E3E, 0253A0: 01, 0B, 21).
 7. docs/01 section 6's /RDIO row was wrong (bits 4-2 "+5V"): MAME's `jsa_ii_ioports` has bits 4-3
    unused and bit 2 coin 3, and bit 7 always reads 0 for stunrun; corrected there.
 
@@ -509,6 +509,6 @@ address) of the table below, FF once per reset.
   The routine around each site is in `data/sound/commands.json`.
 - Stream op 96's responses: no stream sent one in the runs; which streams contain it is the data
   leg's.
-- What the streams do with `zp_23` (type 01, the SAME/ACL/DCL/SENG/FACL/FDCL commands): the
+- What the streams do with `seq_vars` (type 01, the SAME/ACL/DCL/SENG/FACL/FDCL commands): the
   sequencer reads it at 54EE; its role is the sequencer legs'.
 - Real-hardware timing of the reset handshake (MAME answers FF within a frame).

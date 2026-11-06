@@ -207,8 +207,8 @@ channel in RAM 0D, from the table 5E7D); the register-08 write at 4ED3-4EDF (A =
 channel with no slot bits) comes before the compare and does not depend on it. So with 1E = F0
 some YM2151 events are suppressed too. A second compare, 44C5-44CC (a byte of the table 65E0+Y
 below 1E returns, otherwise it jumps to 5869), is in handler type 10h, which no command has
-(section 2), so it never runs. What 1E is (a level or priority floor) is named by the 6502 leg (docs/09); here
-it is "RAM 1E" and "muted" means only that the OKI play handler returned at 5C01.
+(section 2), so it never runs. The 6502 leg named 1E `min_priority`, a floor on the track priority, not a volume (docs/09
+section 10.2: with F0 the priority-3F sound still keys on); here it is "RAM 1E" and "muted" means only that the OKI play handler returned at 5C01.
 
 **The MAME runs** (`make -j3 okitrace`, tools/mame/okitrace.lua, each from an empty private
 NVRAM and cfg). The script taps the 6502's writes to 2A00-2BFF (OKI, /WRP, /WRIO, /MIX) and its
