@@ -1,182 +1,211 @@
 ; system.asm: 4000-4237, reset, power-up self-test, main loop, IRQ handler.
 ;
-; reset (the reset vector) starts the board: the self-test when RDIO bit 7 asks for it, then the
-; initialisation, the FF it sends the 68010 to say it is up, and main_loop, which runs the
-; commands h_nmi queued and sends the responses others queued. h_irq (the IRQ vector) serves the
-; two interrupt sources atarijsa.cpp ORs into the 6502's IRQ: the YM2151's (timer A flag, bit 0
-; of its status) and the timed one (about 250 Hz, acknowledged by reading IRQ_ACK_M).
+; reset (the reset vector) starts the board: self_test when RDIO bit 7 asks for it, then
+; init_board, which sends the 68010 FF to say the board is up, and warm_start, which runs
+; init_sound and falls into main_loop: one queued command and one queued response per pass.
+; h_irq (the IRQ vector) serves the two interrupt sources atarijsa.cpp ORs into the 6502's IRQ:
+; the YM2151's (timer A flag, bit 0 of its status: ymtimer_irq) and the timed one (about 250 Hz,
+; acknowledged by reading IRQ_ACK_M), which runs the sequencer, the OKI driver and the inputs.
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
-; program.md section 3); hand-maintained from here on. sub_/loc_/_lXXXX labels are neutral
-; address labels for later legs to rename.
+; program.md section 3); named in M4c (docs/09 section 10.1).
 
     .cerror * != $4000, "system.asm must start at $4000"
 
-; --- The reset vector. A pulse of WRIO bit 0 (YM2151 reset, active low) with every other WRIO bit
-; 0 (bank 0, OKI reset held low). RDIO bit 7, the self-test request: clear, the normal start,
-; which clears the zero page and goes to the initialisation (_l4113); set, the self-test
-; (_l402A): the zero page with a walking bit (402A-4052), then pages 01-1F through (zp_19)
-; (405B-408A; page 01, the stack, fails fatally through sub_418C), the ROM checksum and the timed
-; IRQ, each failure a bit in zp_02 (the byte imm_03 sends the 68010, 4533). The
-; self-test cannot run in MAME 0.289, where RDIO bit 7 is always 0 (hardware.asm).
+; -------------------------------------------------------------------------------------------------
+; The reset vector.
+;
+; Pulses the YM2151's reset (WRIO bit 0 low, 4005-4011) with every other WRIO bit 0: bank 0, the
+; M6295 held in reset. Then RDIO bit 7: clear, the normal start, which clears the zero page and
+; goes to init_board; set, self_test. In MAME 0.289 RDIO bit 7 always reads 0 (hardware.asm), so
+; the self-test never runs there.
+;
+; Input: none. Output: the zero page cleared, X = 0. Never returns.
+; -------------------------------------------------------------------------------------------------
 reset
     sei
     cld
     ldx #$FF
     txs
-    lda #$01
+    lda #WRIO_YM_RUN
     sta WRIO                            ; YM2151 out of reset
     and #$FE
     sta WRIO                            ; YM2151 reset (bit 0 low)
-    ora #$01
+    ora #WRIO_YM_RUN
     sta WRIO                            ; and out of it again
     ldx #$00
     lda RDIO_M
-    and #$80                            ; RDIO bit 7: self-test
-    bne _l402A
+    and #RDIO_SELF_TEST
+    bne self_test
     lda #$00
-_l401F
-    sta zp_00,x                         ; the normal start: clear the zero page
+_clear_zero_page
+    sta $00,x                           ; the normal start: clear the zero page
     inx
-    bne _l401F
-    jsr sub_41BD                        ; acknowledge the timed IRQ
-    jmp _l4113
-_l402A
-    ldy #$00                            ; self-test: the zero page (Y 00-FF), a walking bit
+    bne _clear_zero_page
+    jsr ack_timed_irq
+    jmp init_board
+
+; -------------------------------------------------------------------------------------------------
+; The power-up self-test (from reset, RDIO bit 7 set; not executed in the make sndtrace runs, and
+; unreachable in MAME 0.289).
+;
+; 1. The zero page, a walking bit and its complement in each byte (402A-4052); a bad byte is fatal
+;    (self_test_fatal).
+; 2. Pages 01-1F through (tmp_ptr), X = the page, the same pattern (4053-408A); a bad page goes to
+;    self_test_bad_page (page 01, the stack, is fatal there).
+; 3. The ROM checksum (408B-40ED): the four bank pages at 3000 (WRIO bits 7-6 = 0-3), then
+;    4000-FFFF, added with checksum_pages; a sum other than FF (checksum_adjust, AC48, makes it
+;    FF) sets board_status bit 7.
+; 4. The timed IRQ (40EE-4112): with irq_test_mode set h_irq only increments tick_count; if it
+;    has not moved after 65536 loops, board_status bit 2.
+;
+; Then falls into init_board. The result bits are what imm_03_send_status sends the 68010.
+; -------------------------------------------------------------------------------------------------
+self_test
+    ldy #$00                            ; the zero page (Y 00-FF): a walking bit
     lda #$01
-_l402E
-    sta @w zp_00,y
-    cmp @w zp_00,y
-    beq _l4039
-    jmp loc_41A1                        ; zero page bad: fatal
-_l4039
+_zp_byte
+    sta @w $0000,y
+    cmp @w $0000,y
+    beq _zp_bit_ok
+    jmp self_test_fatal                 ; zero page bad: fatal
+_zp_bit_ok
     eor #$FF
-    sta @w zp_00,y
-    cmp @w zp_00,y
-    beq _l4046
-    jmp loc_41A1
-_l4046
+    sta @w $0000,y
+    cmp @w $0000,y
+    beq _zp_complement_ok
+    jmp self_test_fatal
+_zp_complement_ok
     eor #$FF
     clc
     rol a
-    bcc _l402E
-    sta @w zp_00,y
+    bcc _zp_byte
+    sta @w $0000,y
     rol a
     iny
-    bne _l402E
-    lda #$00                            ; pages 01-1F through (zp_19), X = the page (0 since 4014)
-    sta zp_19
+    bne _zp_byte
+    lda #$00                            ; pages 01-1F through (tmp_ptr), X = the page (0 since 4014)
+    sta tmp_ptr
     lda #$00
-    sta zp_02                           ; the self-test result bits
-_l405B
+    sta board_status                    ; the self-test result bits
+_next_page
     inx
     cpx #$20
-    bne _l4063
-    jmp _l408B
-_l4063
-    stx zp_1A
+    bne _test_page
+    jmp _checksum
+_test_page
+    stx tmp_ptr+1
     ldy #$00
     lda #$01
-_l4069
-    sta (zp_19),y
-    cmp (zp_19),y
-    beq _l4072
-    jsr sub_418C
-_l4072
+_page_byte
+    sta (tmp_ptr),y
+    cmp (tmp_ptr),y
+    beq _page_bit_ok
+    jsr self_test_bad_page
+_page_bit_ok
     eor #$FF
-    sta (zp_19),y
-    cmp (zp_19),y
-    beq _l407D
-    jsr sub_418C
-_l407D
+    sta (tmp_ptr),y
+    cmp (tmp_ptr),y
+    beq _page_complement_ok
+    jsr self_test_bad_page
+_page_complement_ok
     eor #$FF
     clc
     rol a
-    bcc _l4069
-    sta (zp_19),y
+    bcc _page_byte
+    sta (tmp_ptr),y
     rol a
     iny
-    bne _l4069
-    beq _l405B
-_l408B
+    bne _page_byte
+    beq _next_page
+_checksum
     ldx #$FF                            ; ROM checksum: the four bank pages at 3000 (WRIO bits
     txs                                 ; 7-6 = 0-3), then 4000-FFFF; the sum must be FF
-    lda #$01
-    ora #$04
+    lda #WRIO_YM_RUN
+    ora #WRIO_OKI_RUN
     sta wrio_shadow
-    lda #$00
+    lda #$00                            ; A: the sum
     pha
     lda wrio_shadow
     and #$3F
     sta wrio_shadow
-    sta WRIO
+    sta WRIO                            ; bank page 0
     pla
-    ldx #$30
+    ldx #>BANK_WINDOW
     ldy #$0F
-    jsr sub_41A9
+    jsr checksum_pages
     pha
     lda wrio_shadow
     ora #$40
-    sta WRIO
+    sta WRIO                            ; bank page 1
     pla
-    ldx #$30
+    ldx #>BANK_WINDOW
     ldy #$0F
-    jsr sub_41A9
+    jsr checksum_pages
     pha
     lda wrio_shadow
     ora #$80
-    sta WRIO
+    sta WRIO                            ; bank page 2
     pla
-    ldx #$30
+    ldx #>BANK_WINDOW
     ldy #$0F
-    jsr sub_41A9
+    jsr checksum_pages
     pha
     lda wrio_shadow
     ora #$C0
-    sta WRIO
+    sta WRIO                            ; bank page 3
     pla
-    ldx #$30
+    ldx #>BANK_WINDOW
     ldy #$0F
-    jsr sub_41A9
-    ldy #$7F
+    jsr checksum_pages
+    ldy #$7F                            ; 4000-BFFF
     ldx #$40
-    jsr sub_41A9
-    ldy #$3F
-    jsr sub_41A9
+    jsr checksum_pages
+    ldy #$3F                            ; C000-FFFF (X = C0 after the call above)
+    jsr checksum_pages
     cmp #$FF                            ; checksum_adjust (AC48) makes it FF
-    beq _l40EE
-    lda zp_02
+    beq _test_irq
+    lda board_status
     ora #$80                            ; bit 7: ROM checksum bad
-    sta zp_02
-_l40EE
-    lda #$FF                            ; the timed IRQ: h_irq counts zp_00 while zp_01 is set
-    sta zp_01
-    jsr sub_41BD
+    sta board_status
+_test_irq
+    lda #$FF                            ; the timed IRQ: h_irq counts tick_count while
+    sta irq_test_mode                   ; irq_test_mode is set
+    jsr ack_timed_irq
     lda #$00
-    sta zp_00
-    sta zp_19
-    sta zp_1A
+    sta tick_count
+    sta tmp_ptr
+    sta tmp_ptr+1
     cli
-_l40FE
-    lda zp_00
-    bne _l4113
+_wait_irq
+    lda tick_count
+    bne init_board
     nop
     nop
     nop
-    inc zp_19
-    bne _l40FE
-    inc zp_1A
-    bne _l40FE
-    lda zp_02
+    inc tmp_ptr
+    bne _wait_irq
+    inc tmp_ptr+1
+    bne _wait_irq
+    lda board_status
     ora #$04                            ; bit 2: no IRQ in 65536 loops
-    sta zp_02
-; the initialisation, after either start
-_l4113
+    sta board_status
+
+; -------------------------------------------------------------------------------------------------
+; The initialisation, after either start (from reset 4027 and self_test).
+;
+; WRIO 05: bank 0, the M6295 and the YM2151 out of reset; ym_1b_shadow C0 (CT2 and CT1 high:
+; init_sound writes it to YM2151 register 1B, and CT1 lets the M6295 be heard); nmi_mode FF (h_nmi
+; queues commands); min_priority 0; both queues empty. Drops a pending command byte (the read
+; clears the NMI) and sends FF, the response the 68010 sees after every sound reset
+; (docs/09-sound-program.md section 5). Falls into warm_start.
+; -------------------------------------------------------------------------------------------------
+init_board
     sei
     lda #$00
-    sta zp_01
-    lda #$01
-    ora #$04
+    sta irq_test_mode
+    lda #WRIO_YM_RUN
+    ora #WRIO_OKI_RUN
     sta wrio_shadow
     sta WRIO                            ; bank 0, OKI and YM2151 out of reset
     lda #$C0
@@ -184,7 +213,7 @@ _l4113
     ldx #$FF
     stx nmi_mode                        ; FF: h_nmi queues command bytes
     inx
-    stx zp_1E
+    stx min_priority
     stx resp_queue_out                  ; both queues empty
     stx resp_queue_in
     stx cmd_queue_out
@@ -193,181 +222,208 @@ _l4113
     ldx #$FF
     stx RESP_TO_68K                     ; FF: the sound board is up (the response after every reset)
 
-; from 4204 (h_irq, after a BRK)
-loc_4141
-    jsr imm_00                          ; the sound initialisation (also command 00)
+; -------------------------------------------------------------------------------------------------
+; The sound initialisation, then main_loop (from init_board, and from h_irq 4204 after a BRK,
+; with an empty stack). Seeds rng_state with 0D.
+; -------------------------------------------------------------------------------------------------
+warm_start
+    jsr init_sound                      ; the sound initialisation (also command 00)
     lda #$0D
-    sta zp_47                           ; the seed of sub_5504
+    sta rng_state                       ; the seed of sub_5504
     cli
 
-; --- The main loop, forever: one response out (when the 68010 has read the last one: RDIO bit 5,
-; output buffer full, is clear) and one queued command run, each per pass. h_nmi fills cmd_queue
-; (48 entries), queue_response fills resp_queue (16).
+; -------------------------------------------------------------------------------------------------
+; The main loop, forever.
+;
+; Each pass: steps rng_state (sub_5504), clears board_status bit 0 (imm_03_send_status sets it:
+; the next status shows whether the loop still runs), sends one queued response when the 68010
+; has read the last one (RDIO bit 5, output buffer full, is clear), and runs one queued command
+; through dispatch_command. h_nmi fills cmd_queue (48 entries), queue_response fills resp_queue
+; (16).
+; -------------------------------------------------------------------------------------------------
 main_loop
     jsr sub_5504
-    lda zp_02
+    lda board_status
     and #$FE
-    sta zp_02
-    lda #$20
+    sta board_status
+    lda #RDIO_RESP_FULL
     bit RDIO_M                          ; RDIO bit 5: the 68010 has not read RESP_TO_68K yet
-    bne _l4171
+    bne _take_command
     ldy resp_queue_out
     cpy resp_queue_in
-    beq _l4171                          ; no response queued
+    beq _take_command                   ; no response queued
     lda resp_queue,y
     sta RESP_TO_68K
     iny
     cpy #$10
-    bcc _l416E
+    bcc _response_sent
     ldy #$00
-_l416E
+_response_sent
     sty resp_queue_out
-_l4171
+_take_command
     ldx cmd_queue_out
     cpx cmd_queue_in
-    beq _l4189                          ; no command queued
+    beq _again                          ; no command queued
     inx
     cpx #$30
-    bcc _l4180
+    bcc _command_taken
     ldx #$00
-_l4180
+_command_taken
     stx cmd_queue_out
     ldy cmd_queue,x                     ; the command byte
     jsr dispatch_command
-_l4189
+_again
     jmp main_loop
 
-; from 406F, 407A; not executed in the make sndtrace runs
-; Self-test: a RAM page failed (X = the page). Page 01 (the stack) is fatal; the result bits are
-; 10 for a page below 08, bit 3 added for the others.
-sub_418C
+; -------------------------------------------------------------------------------------------------
+; Self-test: a RAM page failed (from 406F, 407A; not executed in the make sndtrace runs).
+;
+; Input: X = the page. Page 01 (the stack) is fatal (self_test_fatal). A page below 08 sets
+; board_status to 10 (the other bits lost), a page from 08 up ORs in bit 3. Keeps A.
+; -------------------------------------------------------------------------------------------------
+self_test_bad_page
     cpx #$01
-    beq loc_41A1
+    beq self_test_fatal
     pha
     cpx #$08
-    bcs _l4199
+    bcs _high_page
     lda #$10
-    bne _l419D
-_l4199
-    lda zp_02
+    bne _store
+_high_page
+    lda board_status
     ora #$08
-_l419D
-    sta zp_02
+_store
+    sta board_status
     pla
     rts
 
-; from 4036, 4043, 418E; not executed in the make sndtrace runs
-; Self-test: zero page (4036, 4043) or stack page (418E, from sub_418C) bad. Sends 10 to the
-; 68010 and stops.
-loc_41A1
+; -------------------------------------------------------------------------------------------------
+; Self-test: the zero page (4036, 4043) or the stack page (418E) is bad. Sends 10 to the 68010
+; and stops (not executed in the make sndtrace runs).
+; -------------------------------------------------------------------------------------------------
+self_test_fatal
     lda #$10
     sta RESP_TO_68K
-_l41A6
-    jmp _l41A6
+_halt
+    jmp _halt
 
-; from 40A5, 40B5, 40C5, 40D5, 40DC, 40E1; not executed in the make sndtrace runs
-; A += every byte of Y+1 pages from page X (each add with carry clear).
-sub_41A9
-    sty zp_1B
-_l41AB
+; -------------------------------------------------------------------------------------------------
+; Add pages to a sum (from the ROM checksum, 40A5-40E1; not executed in the make sndtrace runs).
+;
+; Input: A = the sum so far, X = the first page, Y = the number of pages - 1. Output: A += every
+; byte of the pages (each add with carry clear), X = the page after the last. Uses tmp_ptr and
+; tmp_1B.
+; -------------------------------------------------------------------------------------------------
+checksum_pages
+    sty tmp_1B
+_page
     ldy #$00
-    sty zp_19
-    stx zp_1A
-_l41B1
+    sty tmp_ptr
+    stx tmp_ptr+1
+_byte
     clc
-    adc (zp_19),y
+    adc (tmp_ptr),y
     iny
-    bne _l41B1
+    bne _byte
     inx
-    dec zp_1B
-    bpl _l41AB
+    dec tmp_1B
+    bpl _page
     rts
 
-; from 4024, 40F2
-sub_41BD
-    lda IRQ_ACK_M                       ; acknowledge the timed IRQ
+; -------------------------------------------------------------------------------------------------
+; Acknowledge the timed IRQ (from reset 4024 and self_test 40F2).
+; -------------------------------------------------------------------------------------------------
+ack_timed_irq
+    lda IRQ_ACK_M
     rts
 
-; --- The IRQ vector. YM2151 status bit 0 (timer A) set: sub_59C0 only (ymtimer.asm; never in the
-; make sndtrace runs, nothing there starts timer A). Otherwise the timed IRQ, acknowledged here:
-; during the self-test (zp_01 set) it only counts zp_00; else, unless it interrupted itself
-; (zp_11), it runs, with interrupts enabled, sub_4229 (into sequencer.asm at loc_5043, X = 0
-; and 1 on alternate ticks), sub_5BC6 (oki.asm) and sub_5CE8 (io.asm), again as long as a nested
-; IRQ came in meanwhile (zp_12). A BRK (status bit 4 on the stack) restarts at loc_4141 with an
-; empty stack.
+; -------------------------------------------------------------------------------------------------
+; The IRQ vector.
+;
+; YM2151 status bit 0 (timer A) set: ymtimer_irq only (ymtimer.asm; never in the make sndtrace
+; runs, nothing there starts timer A). Otherwise the timed IRQ, acknowledged here (the read of
+; IRQ_ACK_M happens on both paths): during the self-test (irq_test_mode set) it only counts
+; tick_count. Else, unless it interrupted its own tick (irq_busy: it sets irq_again and returns),
+; it counts tick_count and runs, with interrupts enabled, tick_sequencer, oki_tick and
+; read_inputs, again as long as a nested IRQ set irq_again meanwhile. A BRK (status bit 4 on the
+; stack) restarts at warm_start with an empty stack instead.
+; -------------------------------------------------------------------------------------------------
 h_irq
     pha
     txa
     pha
     cld
     lda YM2151_DATA                     ; YM2151 status
-    and #$01                            ; bit 0: timer A
+    and #YM_TIMER_A                     ; bit 0: timer A
     pha
     lda IRQ_ACK_M                       ; acknowledge the timed IRQ
     pla
-    beq _l41D7
-    jsr sub_59C0
-    jmp _l4225
-_l41D7
-    lda zp_01
-    beq _l41E6
-    inc zp_00
-    lda zp_02
+    beq _timed
+    jsr ymtimer_irq
+    jmp _return
+_timed
+    lda irq_test_mode
+    beq _not_self_test
+    inc tick_count
+    lda board_status
     and #$FB
-    sta zp_02
-    jmp _l4225
-_l41E6
-    lda zp_11
-    beq _l41EE
-    sta zp_12
-    bne _l4225
-_l41EE
+    sta board_status
+    jmp _return
+_not_self_test
+    lda irq_busy
+    beq _tick
+    sta irq_again                       ; the tick is running below us: run it once more
+    bne _return
+_tick
     lda #$FF
-    sta zp_11
+    sta irq_busy
     cli
-_l41F3
-    lda zp_02
-    and #$FB
-    sta zp_02
+_tick_again
+    lda board_status
+    and #$FB                            ; bit 2: the timed IRQ runs
+    sta board_status
     tsx
     lda stack+$03,x                     ; the status pushed on entry
     and #$10                            ; B: a BRK, not an IRQ
-    beq _l4207
+    beq _run_tick
     ldx #$FF
     txs
-    jmp loc_4141
-_l4207
+    jmp warm_start
+_run_tick
     tya
     pha
-    inc zp_00
-    jsr sub_4229
-    jsr sub_5BC6
-    jsr sub_5CE8
+    inc tick_count
+    jsr tick_sequencer
+    jsr oki_tick
+    jsr read_inputs
     pla
     tay
-    lda zp_12
+    lda irq_again
     pha
     lda #$00
-    sta zp_12
+    sta irq_again
     pla
-    bne _l41F3
+    bne _tick_again
     sei
     lda #$00
-    sta zp_11
-_l4225
+    sta irq_busy
+_return
     pla
     tax
     pla
     rti
 
-; from 420B
-sub_4229
-    lda zp_00
+; -------------------------------------------------------------------------------------------------
+; One sequencer tick (from h_irq 420B): engine 0, the YM2151 channels (X = 0), on odd values of
+; tick_count, engine 1 (X = 1) on even ones, through loc_5043 (sequencer.asm).
+; -------------------------------------------------------------------------------------------------
+tick_sequencer
+    lda tick_count
     lsr a
-    bcc _l4233
+    bcc _engine_1
     ldx #$00
     jmp loc_5043
-_l4233
+_engine_1
     ldx #$01
     jmp loc_5043
 

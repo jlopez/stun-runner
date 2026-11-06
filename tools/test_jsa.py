@@ -2,8 +2,8 @@
 
 Runs in CI without the ROMs: asm/jsa/jsa.asm assembles with 64tass to 136070-2123.10c as MAME
 lists it (size, CRC-32, SHA-1), a planted change in an operand changes the hash, the region
-guards catch a moved region, the tree has no .binary, the IDA names are carried in, and the
-committed trace summary agrees with the source. The trace tools (tools/sndtrace.py) are tested
+guards catch a moved region, the tree has no .binary, the IDA names are carried in, the system
+files carry no address-style label, and the committed trace summary agrees with the source. The trace tools (tools/sndtrace.py) are tested
 on synthetic traces of a synthetic program; the MAME traces under build/mame/, when present, are
 checked against the source too.
 """
@@ -95,7 +95,8 @@ def test_guards_catch_a_moved_region(tmp_path: Path) -> None:
     tree = copy_tree(tmp_path)
     commands = tree / "commands.asm"
     text = commands.read_text()
-    at = text.index("\n    ", text.index("cmdtype_00"))  # the first instruction of cmdtype_00
+    label = text.index("\ncmdtype_00_min_priority\n")
+    at = text.index("\n    ", label + 1)  # the first instruction of cmdtype_00_min_priority
     commands.write_text(text[:at] + "\n    nop" + text[at:])
     r = assemble(tree, tmp_path / "moved.bin")
     assert r.returncode != 0
@@ -175,6 +176,47 @@ def test_loc_labels_follow_the_rule() -> None:
                         or any(lo < g < hi for g in globals_at if g != at)
                     )
             assert any(reasons), f"{path.name}: {name} could be an _l local"
+
+
+# The files leg M4c named (docs/09 section 10); sequencer.asm, data/** and lookup.asm are M4d's.
+SYSTEM_FILES = (
+    "jsa.asm",
+    "hardware.asm",
+    "ram.asm",
+    "system.asm",
+    "commands.asm",
+    "nmi.asm",
+    "ymtimer.asm",
+    "oki.asm",
+    "io.asm",
+    "tables.asm",
+)
+ADDRESS_LABEL = re.compile(r"^(?:(?:sub|loc|tbl|dat)_[0-9A-F]{4}|_l[0-9A-F]{4})$")
+EQUATE = re.compile(r"^([A-Za-z_]\w*)\s*=")
+NEUTRAL_EQUATE = re.compile(r"^(?:zp_[0-9A-F]{2}|ram_[0-9A-F]{4})$")
+
+
+def code_refers(lines: list[str], name: str) -> bool:
+    return any(re.search(rf"\b{name}\b", t.split(";", 1)[0]) for t in lines)
+
+
+def test_system_files_are_named() -> None:
+    """docs/09 section 10: no address-style label (sub_, loc_, tbl_, dat_ + address, or an _lXXXX
+    local) is left in the system files, and every RAM equate still called zp_XX or ram_XXXX is one
+    that only the sequencer's files use (the M4c/M4d split of ram.asm)."""
+    for name in SYSTEM_FILES:
+        for t in (TREE / name).read_text().splitlines():
+            m = GLOBAL_LABEL.match(t) or re.match(r"^(_\w+)\s*$", t)
+            assert not (m and ADDRESS_LABEL.match(m.group(1))), f"{name}: {t}"
+    system = {n: (TREE / n).read_text().splitlines() for n in SYSTEM_FILES if n != "ram.asm"}
+    neutral = []
+    for t in (TREE / "ram.asm").read_text().splitlines():
+        m = EQUATE.match(t)
+        if m and NEUTRAL_EQUATE.match(m.group(1)):
+            neutral.append(m.group(1))
+            users = [n for n, lines in system.items() if code_refers(lines, m.group(1))]
+            assert not users, f"{m.group(1)} is used by {users}: M4c names it"
+    assert neutral, "the split has M4d variables"
 
 
 @needs_tass
