@@ -385,8 +385,26 @@ def read_trace(path: Path) -> dict[int, dict[str, int]]:
     return out
 
 
-# the fields survey keeps from the old manifest, as they are (names are Jesus's, card A8)
+# the fields survey keeps from the old manifest, as they are (names: the 68010's audio-test
+# names, card A12; descriptions: Jesus's listening, card A8)
 KEPT = ("name", "description", "audio_test")
+
+
+# the manifest's comment, which survey writes
+MANIFEST_COMMENT = (
+    "The OKI M6295 image's phrases, each the PCM WAV data/oki/NN-name.wav. The build "
+    "lays the samples out after the table (table_entries entries of 8 bytes from "
+    "00000, entry 0 zero) back to back in phrase order from the WAV lengths, then zero "
+    "to 3FFFF; no address is written here. name: the 68010's audio-test name, in lower "
+    "case, of the command in 38-6C that plays the phrase (card A12; command snd_<name> "
+    "plays sample <name>; data/sound/commands.json is the authority); description: "
+    "Jesus's words from listening, verbatim (card A8; 10-31: the number word of his "
+    "range); audio_test: the 68010's audio-test names of every command that plays the "
+    "phrase (phrase 1 also ADTEST, 05). commands: the sound commands whose "
+    "6502 handler plays the phrase (tables at 6100, 616D, 6532). starts: how often each "
+    "MAME run of tools/mame/okitrace.lua saw the 6502 start it. pin7: the rate the "
+    "WAVs are at (CLOCK / 165)."
+)
 
 
 def manifest_text(manifest: dict[str, Any]) -> str:
@@ -423,19 +441,7 @@ def cmd_survey(args: argparse.Namespace) -> int:
     manifest = {
         "format": FORMAT,
         "doc": "docs/10-adpcm.md; the format is tools/adpcm/__init__.py",
-        "comment": (
-            "The OKI M6295 image's phrases, each the PCM WAV data/oki/NN-name.wav. The build "
-            "lays the samples out after the table (table_entries entries of 8 bytes from "
-            "00000, entry 0 zero) back to back in phrase order from the WAV lengths, then zero "
-            "to 3FFFF; no address is written here. name: a label from Jesus's listening "
-            "(card A8; maybe_ where he marked a doubt; the convention is card A12, pending "
-            "Jesus); description: his words verbatim (10-31: the number word of his range); "
-            "audio_test: cross evidence, the 68010's audio-test names of the commands that "
-            "play the phrase (data/sound/commands.json). commands: the sound commands whose "
-            "6502 handler plays the phrase (tables at 6100, 616D, 6532). starts: how often each "
-            "MAME run of tools/mame/okitrace.lua saw the 6502 start it. pin7: the rate the "
-            "WAVs are at (CLOCK / 165)."
-        ),
+        "comment": MANIFEST_COMMENT,
         "table_entries": entries,
         "pin7": PIN7,
         "phrases": phrases,

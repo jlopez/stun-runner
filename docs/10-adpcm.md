@@ -47,8 +47,9 @@ repository. M4b's container WAV, which carried the ADPCM bytes as they are, is g
   lexicographically smallest bytes. The 52 samples have one such output (phrase 50), and the
   ROM agrees with the rule there (section 6). An edited WAV encodes to the nearest ADPCM by the
   same rule and does not come back exactly: `tools/adpcm` reports the error.
-- The samples are named from Jesus's listening (card A8, section 7), with the 68010's own
-  audio-test names alongside as cross evidence.
+- The samples are named by the 68010's own audio test (card A12, section 7): command
+  `snd_gun1` plays sample `gun1`. Jesus's words from listening (card A8) are each sample's
+  description.
 
 ## 2. The M6295 as MAME emulates it (SRC)
 
@@ -122,58 +123,58 @@ seconds at 7231.40 Hz; commands per section 4; starts = how many times each MAME
 
 | Phrase | Name | Start | End | Bytes | Seconds | Commands | Starts attract / game / inject |
 |---|---|---|---|---|---|---|---|
-| 1 | `welcome_stun_runner` | 001A8 | 01AA7 | 6,400 | 1.770 | 05, 38 | 0 / 1 / 2 |
-| 2 | `good_luck` | 01AA8 | 028A7 | 3,584 | 0.991 | 39 | 0 / 3 / 1 |
-| 3 | `congratulations` | 028A8 | 03C27 | 4,992 | 1.381 | 3A | 0 / 0 / 1 |
-| 4 | `better_luck_next_time` | 03C28 | 055A7 | 6,528 | 1.805 | 3B | 0 / 0 / 1 |
-| 5 | `stay_off_the_rails` | 055A8 | 06A27 | 5,248 | 1.451 | 3C | 0 / 1 / 1 |
-| 6 | `vehicle_slows_on_open_areas` | 06A28 | 08F27 | 9,472 | 2.620 | 3D | 0 / 0 / 1 |
-| 7 | `outside_wall_is_faster_in_turns` | 08F28 | 0B227 | 8,960 | 2.478 | 3E | 0 / 0 / 1 |
-| 8 | `press_fire_button_to_fire_shockwaves` | 0B228 | 0DB27 | 10,496 | 2.903 | 3F | 0 / 1 / 1 |
-| 9 | `you_have_completed_level` | 0DB28 | 0F327 | 6,144 | 1.699 | 44 | 0 / 3 / 1 |
-| 10 | `number_01` | 0F328 | 0FCA7 | 2,432 | 0.673 | 45 | 0 / 1 / 1 |
-| 11 | `number_02` | 0FCA8 | 10627 | 2,432 | 0.673 | 46 | 0 / 1 / 1 |
-| 12 | `number_03` | 10628 | 10FA7 | 2,432 | 0.673 | 47 | 0 / 1 / 1 |
-| 13 | `number_04` | 10FA8 | 11A27 | 2,688 | 0.743 | 48 | 0 / 0 / 1 |
-| 14 | `number_05` | 11A28 | 122A7 | 2,176 | 0.602 | 49 | 0 / 0 / 1 |
-| 15 | `number_06` | 122A8 | 12AA7 | 2,048 | 0.566 | 4A | 0 / 0 / 1 |
-| 16 | `number_07` | 12AA8 | 134A7 | 2,560 | 0.708 | 4B | 0 / 0 / 1 |
-| 17 | `number_08` | 134A8 | 13BA7 | 1,792 | 0.496 | 4C | 0 / 0 / 1 |
-| 18 | `number_09` | 13BA8 | 14627 | 2,688 | 0.743 | 4D | 0 / 0 / 1 |
-| 19 | `number_10` | 14628 | 14FA7 | 2,432 | 0.673 | 4E | 0 / 0 / 1 |
-| 20 | `number_11` | 14FA8 | 15A27 | 2,688 | 0.743 | 4F | 0 / 0 / 1 |
-| 21 | `number_12` | 15A28 | 16327 | 2,304 | 0.637 | 50 | 0 / 0 / 1 |
-| 22 | `number_13` | 16328 | 16F27 | 3,072 | 0.850 | 51 | 0 / 0 / 1 |
-| 23 | `number_14` | 16F28 | 17A27 | 2,816 | 0.779 | 52 | 0 / 0 / 1 |
-| 24 | `number_15` | 17A28 | 18527 | 2,816 | 0.779 | 53 | 0 / 0 / 1 |
-| 25 | `number_16` | 18528 | 191A7 | 3,200 | 0.885 | 54 | 0 / 0 / 1 |
-| 26 | `number_17` | 191A8 | 19E27 | 3,200 | 0.885 | 55 | 0 / 0 / 1 |
-| 27 | `number_18` | 19E28 | 1AAA7 | 3,200 | 0.885 | 56 | 0 / 0 / 1 |
-| 28 | `number_19` | 1AAA8 | 1BA27 | 3,968 | 1.097 | 57 | 0 / 0 / 1 |
-| 29 | `number_20` | 1BA28 | 1C4A7 | 2,688 | 0.743 | 58 | 0 / 0 / 1 |
-| 30 | `number_21` | 1C4A8 | 1D4A7 | 4,096 | 1.133 | 59 | 0 / 0 / 1 |
-| 31 | `number_22` | 1D4A8 | 1E527 | 4,224 | 1.168 | 5A | 0 / 0 / 1 |
-| 32 | `welcome_to_the_ultimate_challenge` | 1E528 | 207A7 | 8,832 | 2.443 | 40 | 0 / 0 / 1 |
-| 33 | `welcome_to_the_kill_challenge` | 207A8 | 22BA7 | 9,216 | 2.549 | 42 | 0 / 0 / 1 |
-| 34 | `welcome_to_the_marker_challenge` | 22BA8 | 24AA7 | 7,936 | 2.195 | 41 | 0 / 0 / 1 |
-| 35 | `welcome_to_the_boost_challenge` | 24AA8 | 26FA7 | 9,472 | 2.620 | 43 | 0 / 0 / 1 |
-| 36 | `hmm_tsk` | 26FA8 | 27EA7 | 3,840 | 1.062 | 5B | 0 / 0 / 1 |
-| 37 | `yeehoo` | 27EA8 | 29027 | 4,480 | 1.239 | 5C | 0 / 0 / 1 |
-| 38 | `shockwave` | 29028 | 29AA7 | 2,688 | 0.743 | 5E | 0 / 0 / 29 |
-| 39 | `maybe_missile_launch` | 29AA8 | 2BBA7 | 8,448 | 2.336 | 67 | 0 / 312 / 287 |
-| 40 | `explosion` | 2BBA8 | 30227 | 18,048 | 4.992 | 61 | 0 / 27 / 40 |
-| 41 | `maybe_mild_explosion` | 30228 | 32AA7 | 10,368 | 2.867 | 5D | 0 / 0 / 1 |
-| 42 | `maybe_turret_attached` | 32AA8 | 356A7 | 11,264 | 3.115 | 68 | 0 / 8 / 16 |
-| 43 | `maybe_gong` | 356A8 | 36527 | 3,712 | 1.027 | 6C | 0 / 51 / 1 |
-| 44 | `metallic_bounce` | 36528 | 37BA7 | 5,760 | 1.593 | 62 | 0 / 25 / 1 |
-| 45 | `whirring` | 37BA8 | 38FA7 | 5,120 | 1.416 | 64 | 0 / 0 / 1 |
-| 46 | `maybe_attachment` | 38FA8 | 39A27 | 2,688 | 0.743 | 60 | 0 / 0 / 5 |
-| 47 | `maybe_shockwave_hit` | 39A28 | 3A3A7 | 2,432 | 0.673 | 63 | 0 / 4 / 1 |
-| 48 | `screeching_tires` | 3A3A8 | 3BA27 | 5,760 | 1.593 | 65 | 0 / 0 / 5 |
-| 49 | `maybe_rejection` | 3BA28 | 3BC27 | 512 | 0.142 | 6A | 0 / 20 / 18 |
-| 50 | `crow_caw` | 3BC28 | 3D227 | 5,632 | 1.558 | 69 | 0 / 0 / 17 |
-| 51 | `bell_ding` | 3D228 | 3E327 | 4,352 | 1.204 | 5F | 0 / 21 / 1 |
-| 52 | `maybe_higher_bell_ding` | 3E328 | 3FCA7 | 6,528 | 1.805 | 6B | 0 / 0 / 1 |
+| 1 | `welcome` | 001A8 | 01AA7 | 6,400 | 1.770 | 05, 38 | 0 / 1 / 2 |
+| 2 | `luck` | 01AA8 | 028A7 | 3,584 | 0.991 | 39 | 0 / 3 / 1 |
+| 3 | `congrats` | 028A8 | 03C27 | 4,992 | 1.381 | 3A | 0 / 0 / 1 |
+| 4 | `better` | 03C28 | 055A7 | 6,528 | 1.805 | 3B | 0 / 0 / 1 |
+| 5 | `rails` | 055A8 | 06A27 | 5,248 | 1.451 | 3C | 0 / 1 / 1 |
+| 6 | `vslows` | 06A28 | 08F27 | 9,472 | 2.620 | 3D | 0 / 0 / 1 |
+| 7 | `owall` | 08F28 | 0B227 | 8,960 | 2.478 | 3E | 0 / 0 / 1 |
+| 8 | `swave` | 0B228 | 0DB27 | 10,496 | 2.903 | 3F | 0 / 1 / 1 |
+| 9 | `clevel` | 0DB28 | 0F327 | 6,144 | 1.699 | 44 | 0 / 3 / 1 |
+| 10 | `one` | 0F328 | 0FCA7 | 2,432 | 0.673 | 45 | 0 / 1 / 1 |
+| 11 | `two` | 0FCA8 | 10627 | 2,432 | 0.673 | 46 | 0 / 1 / 1 |
+| 12 | `three` | 10628 | 10FA7 | 2,432 | 0.673 | 47 | 0 / 1 / 1 |
+| 13 | `four` | 10FA8 | 11A27 | 2,688 | 0.743 | 48 | 0 / 0 / 1 |
+| 14 | `five` | 11A28 | 122A7 | 2,176 | 0.602 | 49 | 0 / 0 / 1 |
+| 15 | `six` | 122A8 | 12AA7 | 2,048 | 0.566 | 4A | 0 / 0 / 1 |
+| 16 | `seven` | 12AA8 | 134A7 | 2,560 | 0.708 | 4B | 0 / 0 / 1 |
+| 17 | `eight` | 134A8 | 13BA7 | 1,792 | 0.496 | 4C | 0 / 0 / 1 |
+| 18 | `nine` | 13BA8 | 14627 | 2,688 | 0.743 | 4D | 0 / 0 / 1 |
+| 19 | `ten` | 14628 | 14FA7 | 2,432 | 0.673 | 4E | 0 / 0 / 1 |
+| 20 | `eleven` | 14FA8 | 15A27 | 2,688 | 0.743 | 4F | 0 / 0 / 1 |
+| 21 | `twelve` | 15A28 | 16327 | 2,304 | 0.637 | 50 | 0 / 0 / 1 |
+| 22 | `thirt` | 16328 | 16F27 | 3,072 | 0.850 | 51 | 0 / 0 / 1 |
+| 23 | `fourt` | 16F28 | 17A27 | 2,816 | 0.779 | 52 | 0 / 0 / 1 |
+| 24 | `fift` | 17A28 | 18527 | 2,816 | 0.779 | 53 | 0 / 0 / 1 |
+| 25 | `sixt` | 18528 | 191A7 | 3,200 | 0.885 | 54 | 0 / 0 / 1 |
+| 26 | `sevent` | 191A8 | 19E27 | 3,200 | 0.885 | 55 | 0 / 0 / 1 |
+| 27 | `eightt` | 19E28 | 1AAA7 | 3,200 | 0.885 | 56 | 0 / 0 / 1 |
+| 28 | `ninet` | 1AAA8 | 1BA27 | 3,968 | 1.097 | 57 | 0 / 0 / 1 |
+| 29 | `twenty` | 1BA28 | 1C4A7 | 2,688 | 0.743 | 58 | 0 / 0 / 1 |
+| 30 | `twenty1` | 1C4A8 | 1D4A7 | 4,096 | 1.133 | 59 | 0 / 0 / 1 |
+| 31 | `twenty2` | 1D4A8 | 1E527 | 4,224 | 1.168 | 5A | 0 / 0 / 1 |
+| 32 | `ultimate` | 1E528 | 207A7 | 8,832 | 2.443 | 40 | 0 / 0 / 1 |
+| 33 | `killc` | 207A8 | 22BA7 | 9,216 | 2.549 | 42 | 0 / 0 / 1 |
+| 34 | `markerc` | 22BA8 | 24AA7 | 7,936 | 2.195 | 41 | 0 / 0 / 1 |
+| 35 | `boostc` | 24AA8 | 26FA7 | 9,472 | 2.620 | 43 | 0 / 0 / 1 |
+| 36 | `kiss` | 26FA8 | 27EA7 | 3,840 | 1.062 | 5B | 0 / 0 / 1 |
+| 37 | `yahoo` | 27EA8 | 29027 | 4,480 | 1.239 | 5C | 0 / 0 / 1 |
+| 38 | `prgun` | 29028 | 29AA7 | 2,688 | 0.743 | 5E | 0 / 0 / 29 |
+| 39 | `gun1` | 29AA8 | 2BBA7 | 8,448 | 2.336 | 67 | 0 / 312 / 287 |
+| 40 | `exp2` | 2BBA8 | 30227 | 18,048 | 4.992 | 61 | 0 / 27 / 40 |
+| 41 | `apad` | 30228 | 32AA7 | 10,368 | 2.867 | 5D | 0 / 0 / 1 |
+| 42 | `irisop` | 32AA8 | 356A7 | 11,264 | 3.115 | 68 | 0 / 8 / 16 |
+| 43 | `star` | 356A8 | 36527 | 3,712 | 1.027 | 6C | 0 / 51 / 1 |
+| 44 | `trkhit` | 36528 | 37BA7 | 5,760 | 1.593 | 62 | 0 / 25 / 1 |
+| 45 | `arms` | 37BA8 | 38FA7 | 5,120 | 1.416 | 64 | 0 / 0 / 1 |
+| 46 | `rmphit` | 38FA8 | 39A27 | 2,688 | 0.743 | 60 | 0 / 0 / 5 |
+| 47 | `shield` | 39A28 | 3A3A7 | 2,432 | 0.673 | 63 | 0 / 4 / 1 |
+| 48 | `brake` | 3A3A8 | 3BA27 | 5,760 | 1.593 | 65 | 0 / 0 / 5 |
+| 49 | `type` | 3BA28 | 3BC27 | 512 | 0.142 | 6A | 0 / 20 / 18 |
+| 50 | `bird` | 3BC28 | 3D227 | 5,632 | 1.558 | 69 | 0 / 0 / 17 |
+| 51 | `bell` | 3D228 | 3E327 | 4,352 | 1.204 | 5F | 0 / 21 / 1 |
+| 52 | `swpikup` | 3E328 | 3FCA7 | 6,528 | 1.805 | 6B | 0 / 0 / 1 |
 
 ## 4. Which phrases the 6502 plays (CODE, MAME)
 
@@ -385,7 +386,7 @@ reach the same output only when the clamp to -2048..2047 makes them equal, and t
    decoding it gives a PCM other than the edit. `tools/adpcm check [WAV ...]` prints, per WAV,
    `exact` or how many samples decode to another value and the largest and rms error (16-bit
    units); `make` (`tools/adpcm asm`) prints the same line for every WAV that is not exact
-   (`phrase 2 (02-good_luck.wav): edited, the build plays the encoder's nearest ADPCM: ...`).
+   (`phrase 2 (02-luck.wav): edited, the build plays the encoder's nearest ADPCM: ...`).
    ADPCM has no leak, so an offset the encoder cannot catch up with at once persists: the
    one-sample edit of section 5 changed 7 bytes but left 6,167 of the 7,168 samples a little
    off (rms 41.7, largest 3,296, the edited sample). Re-encoding what an edit decodes to is
@@ -394,103 +395,108 @@ reach the same output only when the clamp to -2048..2047 makes them equal, and t
 
 ## 7. Names
 
-Decision (Jesus, 2026-11-05, card A8): the samples are named from his listening, the name close
-to his words, a doubt never upgraded to a fact. His words are in the table below; for 10-31 he
-wrote `"One" all the way to "Twenty-two"`.
+Decision (Jesus, 2026-11-06, card A12): a sample's name is the 68010's own audio-test name of
+the command that plays it, in lower case, as the sound commands are named (docs/11): command
+`snd_gun1` plays sample `gun1`. The audio test (the table at 05C63C, `data/sound/commands.json`)
+is the authority. The rule covers all 52 samples (decision of the M4 coordinator, 2026-11-06,
+so that there is one scheme). Phrase 1 is played by two commands, 05 (ADTEST) and 38 (WELCOME);
+its name is `welcome`, from the command in 38-6C (the OKI commands: each plays one phrase but
+66, `snd_kbrake`, which stops phrase 48) whose only job is that phrase, and ADTEST stays listed
+in `audio_test`. The names this replaced (M4g's, from Jesus's words,
+with a `maybe_` prefix and `number_NN` for 10-31) are gone.
 
-Convention (card A12), a default taken by the implementer (leg M4g), pending Jesus, not approved
-(it is not part of his card A8 answer): `name` is a lower_snake label derived from his words (the speech phrases by their
-words, the effects by his description); phrases 10-31 are `number_01`-`number_22` and each
-one's `description` is its number word ("One" ... "Twenty-two"), derived from his range, not
-words he wrote per phrase; every other `description` holds his words verbatim, question marks
-included. Where he marked a doubt with `?`, the name keeps his words behind the prefix `maybe_`
-(8 labels and 8 file names), so the label does not state as a fact what he heard as a guess. `audio_test` is cross evidence, not a name: the 68010's audio-test names of the commands
-that play the phrase (`data/sound/commands.json`, docs/11). The file names
-(`data/oki/NN-name.wav`), the labels of the include and this table follow `name`; the build uses
-the name as a label alias, so it may not be one of the OKI tree's own labels (`phrase_NN`,
-`phrase_NN_last` or any `oki_` label; the manifest reader refuses those). `tools/test_adpcm.py`
-checks that `maybe_` is exactly where the description ends in `?` and that `audio_test` matches
-`data/sound/commands.json`.
+Decision (Jesus, 2026-11-05, card A8): `description` holds Jesus's words from listening,
+verbatim, question marks included: they are the listening evidence, and a question mark is his
+doubt, not a fact. For 10-31 he wrote `"One" all the way to "Twenty-two"`, so each of those
+descriptions is its number word, derived from his range, not words he wrote per phrase.
+
+`audio_test` lists the audio-test names of every command that plays the phrase (the 6502's
+tables, section 4). The file names (`data/oki/NN-name.wav`), the labels of the include and the
+tables of this document follow `name`; the build uses the name as a label alias, so it may not
+be one of the OKI tree's own labels (`phrase_NN`, `phrase_NN_last` or any `oki_` label; the
+manifest reader refuses those). `tools/test_adpcm.py` derives each expected name from
+`data/sound/commands.json` (the one command in 38-6C of type 13 that plays the phrase, whose
+`name` must be `snd_` + its audio-test name) and fails when the manifest differs, so the two
+files cannot drift; it also checks `audio_test` against the same file. All 52 lower-cased names
+are unique label identifiers, none starts with a digit, and none is an OKI tree label.
 
 | Phrase | Name | Jesus's words | 68k audio test |
 |---|---|---|---|
-| 1 | `welcome_stun_runner` | Welcome S.T.U.N. Runner | ADTEST, WELCOME |
-| 2 | `good_luck` | Good luck! | LUCK |
-| 3 | `congratulations` | Congratulations | CONGRATS |
-| 4 | `better_luck_next_time` | Better luck next time | BETTER |
-| 5 | `stay_off_the_rails` | Stay off the rails! | RAILS |
-| 6 | `vehicle_slows_on_open_areas` | Vehicle slows on open areas | VSLOWS |
-| 7 | `outside_wall_is_faster_in_turns` | The outside wall is faster in turns | OWALL |
-| 8 | `press_fire_button_to_fire_shockwaves` | Press FIRE button to fire shockwaves | SWAVE |
-| 9 | `you_have_completed_level` | You have completed level... | CLEVEL |
-| 10 | `number_01` | One | ONE |
-| 11 | `number_02` | Two | TWO |
-| 12 | `number_03` | Three | THREE |
-| 13 | `number_04` | Four | FOUR |
-| 14 | `number_05` | Five | FIVE |
-| 15 | `number_06` | Six | SIX |
-| 16 | `number_07` | Seven | SEVEN |
-| 17 | `number_08` | Eight | EIGHT |
-| 18 | `number_09` | Nine | NINE |
-| 19 | `number_10` | Ten | TEN |
-| 20 | `number_11` | Eleven | ELEVEN |
-| 21 | `number_12` | Twelve | TWELVE |
-| 22 | `number_13` | Thirteen | THIRT |
-| 23 | `number_14` | Fourteen | FOURT |
-| 24 | `number_15` | Fifteen | FIFT |
-| 25 | `number_16` | Sixteen | SIXT |
-| 26 | `number_17` | Seventeen | SEVENT |
-| 27 | `number_18` | Eighteen | EIGHTT |
-| 28 | `number_19` | Nineteen | NINET |
-| 29 | `number_20` | Twenty | TWENTY |
-| 30 | `number_21` | Twenty-one | TWENTY1 |
-| 31 | `number_22` | Twenty-two | TWENTY2 |
-| 32 | `welcome_to_the_ultimate_challenge` | Welcome to the Ultimate Challenge! | ULTIMATE |
-| 33 | `welcome_to_the_kill_challenge` | Welcome to the Kill Challenge! | KILLC |
-| 34 | `welcome_to_the_marker_challenge` | Welcome to the Marker Challenge! | MARKERC |
-| 35 | `welcome_to_the_boost_challenge` | Welcome to the Boost Challenge! | BOOSTC |
-| 36 | `hmm_tsk` | hmm... tsk | KISS |
-| 37 | `yeehoo` | yeehoo! | YAHOO |
-| 38 | `shockwave` | shockwave sound | PRGUN |
-| 39 | `maybe_missile_launch` | missile launch? | GUN1 |
-| 40 | `explosion` | explosion | EXP2 |
-| 41 | `maybe_mild_explosion` | another sfx, sounds like a mild explosion? | APAD |
-| 42 | `maybe_turret_attached` | sound when turret is attached? | IRISOP |
-| 43 | `maybe_gong` | kind of gong sound? | STAR |
-| 44 | `metallic_bounce` | metallic bounce sound | TRKHIT |
-| 45 | `whirring` | another whirring sound | ARMS |
-| 46 | `maybe_attachment` | attachment sound? | RMPHIT |
-| 47 | `maybe_shockwave_hit` | shockwave hit? | SHIELD |
-| 48 | `screeching_tires` | screeching tires sound | BRAKE |
-| 49 | `maybe_rejection` | rejection sound? | TYPE |
-| 50 | `crow_caw` | crow caw | BIRD |
-| 51 | `bell_ding` | bell ding | BELL |
-| 52 | `maybe_higher_bell_ding` | higher pitched bell ding sound? | SWPIKUP |
+| 1 | `welcome` | Welcome S.T.U.N. Runner | ADTEST, WELCOME |
+| 2 | `luck` | Good luck! | LUCK |
+| 3 | `congrats` | Congratulations | CONGRATS |
+| 4 | `better` | Better luck next time | BETTER |
+| 5 | `rails` | Stay off the rails! | RAILS |
+| 6 | `vslows` | Vehicle slows on open areas | VSLOWS |
+| 7 | `owall` | The outside wall is faster in turns | OWALL |
+| 8 | `swave` | Press FIRE button to fire shockwaves | SWAVE |
+| 9 | `clevel` | You have completed level... | CLEVEL |
+| 10 | `one` | One | ONE |
+| 11 | `two` | Two | TWO |
+| 12 | `three` | Three | THREE |
+| 13 | `four` | Four | FOUR |
+| 14 | `five` | Five | FIVE |
+| 15 | `six` | Six | SIX |
+| 16 | `seven` | Seven | SEVEN |
+| 17 | `eight` | Eight | EIGHT |
+| 18 | `nine` | Nine | NINE |
+| 19 | `ten` | Ten | TEN |
+| 20 | `eleven` | Eleven | ELEVEN |
+| 21 | `twelve` | Twelve | TWELVE |
+| 22 | `thirt` | Thirteen | THIRT |
+| 23 | `fourt` | Fourteen | FOURT |
+| 24 | `fift` | Fifteen | FIFT |
+| 25 | `sixt` | Sixteen | SIXT |
+| 26 | `sevent` | Seventeen | SEVENT |
+| 27 | `eightt` | Eighteen | EIGHTT |
+| 28 | `ninet` | Nineteen | NINET |
+| 29 | `twenty` | Twenty | TWENTY |
+| 30 | `twenty1` | Twenty-one | TWENTY1 |
+| 31 | `twenty2` | Twenty-two | TWENTY2 |
+| 32 | `ultimate` | Welcome to the Ultimate Challenge! | ULTIMATE |
+| 33 | `killc` | Welcome to the Kill Challenge! | KILLC |
+| 34 | `markerc` | Welcome to the Marker Challenge! | MARKERC |
+| 35 | `boostc` | Welcome to the Boost Challenge! | BOOSTC |
+| 36 | `kiss` | hmm... tsk | KISS |
+| 37 | `yahoo` | yeehoo! | YAHOO |
+| 38 | `prgun` | shockwave sound | PRGUN |
+| 39 | `gun1` | missile launch? | GUN1 |
+| 40 | `exp2` | explosion | EXP2 |
+| 41 | `apad` | another sfx, sounds like a mild explosion? | APAD |
+| 42 | `irisop` | sound when turret is attached? | IRISOP |
+| 43 | `star` | kind of gong sound? | STAR |
+| 44 | `trkhit` | metallic bounce sound | TRKHIT |
+| 45 | `arms` | another whirring sound | ARMS |
+| 46 | `rmphit` | attachment sound? | RMPHIT |
+| 47 | `shield` | shockwave hit? | SHIELD |
+| 48 | `brake` | screeching tires sound | BRAKE |
+| 49 | `type` | rejection sound? | TYPE |
+| 50 | `bird` | crow caw | BIRD |
+| 51 | `bell` | bell ding | BELL |
+| 52 | `swpikup` | higher pitched bell ding sound? | SWPIKUP |
 
-**Where the 68k's names and his descriptions do not obviously agree** (the names follow his
-words; this is for the progress page, not a rename). The 68k's names are abbreviations in the
-audio test (`data/sound/commands.json`); nothing in the repository expands them, so a reading
-after "perhaps" is a reading of the letters only and claims no role:
+**Where the 68k's names and his descriptions do not obviously agree** (evidence kept from
+M4g, when the names followed his words; the names now follow the 68k). The 68k's names are
+abbreviations in the audio test (`data/sound/commands.json`); nothing in the repository
+expands them, so a reading after "perhaps" is a reading of the letters only and claims no role:
 
-- 36 `hmm_tsk` "hmm... tsk": the 68k calls it KISS (a kiss sound would fit "tsk").
-- 38 `shockwave` "shockwave sound": PRGUN (the 68k's name; role unknown), command 5E, queued at
-  036DFC. In the game run, with button 1 pressed every 20 frames from frame 1020
-  (`tools/mame/okitrace.lua`), 5E never played, while 67 (GUN1, phrase 39) played 312 times.
-- 39 `maybe_missile_launch` "missile launch?": GUN1 (the 68k's name; possibly a gun); the most
-  frequent phrase in a played game (312 starts in the game run).
-- 41 `maybe_mild_explosion` "another sfx, sounds like a mild explosion?": APAD; no call site in
-  the 68k program queues command 5D (docs/11), only the audio test plays it.
-- 42 `maybe_turret_attached` "sound when turret is attached?": IRISOP (perhaps iris open;
-  role unknown).
-- 43 `maybe_gong` "kind of gong sound?": STAR.
-- 44 `metallic_bounce` "metallic bounce sound": TRKHIT (perhaps track hit; role unknown).
-- 45 `whirring` "another whirring sound": ARMS.
-- 46 `maybe_attachment` "attachment sound?": RMPHIT (perhaps ramp hit; role unknown).
-- 47 `maybe_shockwave_hit` "shockwave hit?": SHIELD.
-- 49 `maybe_rejection` "rejection sound?": TYPE (role unknown; the 68k queues it at 02792A and
-  032B06).
-- 52 `maybe_higher_bell_ding` "higher pitched bell ding sound?": SWPIKUP (perhaps shockwave
-  pick-up; role unknown; docs/07 section 11.3 identifies no pickup object).
+- 36 `kiss` "hmm... tsk": a kiss sound would fit "tsk".
+- 38 `prgun` "shockwave sound": role unknown, command 5E, queued at 036DFC. In the game run,
+  with button 1 pressed every 20 frames from frame 1020 (`tools/mame/okitrace.lua`), 5E never
+  played, while 67 (GUN1, phrase 39) played 312 times.
+- 39 `gun1` "missile launch?": possibly a gun; the most frequent phrase in a played game
+  (312 starts in the game run).
+- 41 `apad` "another sfx, sounds like a mild explosion?": no call site in the 68k program
+  queues command 5D (docs/11), only the audio test plays it.
+- 42 `irisop` "sound when turret is attached?": perhaps iris open; role unknown.
+- 43 `star` "kind of gong sound?".
+- 44 `trkhit` "metallic bounce sound": perhaps track hit; role unknown.
+- 45 `arms` "another whirring sound".
+- 46 `rmphit` "attachment sound?": perhaps ramp hit; role unknown.
+- 47 `shield` "shockwave hit?".
+- 49 `type` "rejection sound?": role unknown; the 68k queues it at 02792A and 032B06.
+- 52 `swpikup` "higher pitched bell ding sound?": perhaps shockwave pick-up; role unknown;
+  docs/07 section 11.3 identifies no pickup object.
 
 The others agree: 1-35 are the words the 68k abbreviates (WELCOME, LUCK, CONGRATS, BETTER, RAILS,
 VSLOWS, OWALL, SWAVE, CLEVEL, ONE-TWENTY2, ULTIMATE, KILLC, MARKERC, BOOSTC), 37 YAHOO, 40 EXP2,
