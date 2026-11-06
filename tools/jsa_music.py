@@ -12,9 +12,10 @@ lays them out (one macro or .word line after another from each file's start guar
 follows the streams through an assembled image from their starts as the interpreter would:
 tools/test_jsa_music.py checks that both agree on every byte of the data region. `summary`
 checks the MAME run against the source (every statement the reader took is a statement start
-of the listing) and writes the committed summary: per injected command the sound and its key-ons,
-the entries started, the ops dispatched, the streams whose statements were read, the key-ons per
-sound and channel. Addresses, labels, counts and command/sound numbers only: no ROM byte.
+of the source, never an operand byte inside one) and writes the committed summary: per
+injected command the sound and its key-ons, the entries started, the ops dispatched, the
+streams whose statements were read, the key-ons per sound and channel. The data files and the
+region's bounds come from jsa.asm's includes and the files' guards. Addresses, labels, counts and command/sound numbers only: no ROM byte.
 """
 
 from __future__ import annotations
@@ -27,15 +28,49 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-DATA_LO, DATA_HI = 0x65E6, 0xAB48  # streams and patch records, data/streams_1.asm-patches_2.asm
-DATA_FILES = [
-    "data/streams_1.asm",
-    "data/patches_1.asm",
-    "data/unused_streams.asm",
-    "data/streams_2.asm",
-    "data/patches_2.asm",
-]
 PATCH_SIZE = 0x2A
+GUARD = re.compile(r"^\s+\.cerror \* != \$([0-9A-Fa-f]{4}),")
+
+
+def data_files(tree: Path = REPO / "asm/jsa") -> list[str]:
+    """The data region's files: the data/ includes of jsa.asm after data/sounds.asm (the
+    sounds table, not part of the region) up to the first include outside data/ (lookup.asm).
+    A file split or renamed in jsa.asm is followed here without an edit."""
+    out: list[str] = []
+    seen_sounds = False
+    for raw in (tree / "jsa.asm").read_text().splitlines():
+        m = re.match(r'^\s+\.include "([^"]+)"', raw)
+        if not m:
+            continue
+        name = m.group(1)
+        if name == "data/sounds.asm":
+            seen_sounds = True
+        elif seen_sounds:
+            if not name.startswith("data/"):
+                break
+            out.append(name)
+    if not out:
+        raise ValueError("jsa.asm: no data/ include after data/sounds.asm")
+    return out
+
+
+def data_bounds(tree: Path = REPO / "asm/jsa", files: list[str] | None = None) -> tuple[int, int]:
+    """The region's first address and the address after it: the first file's first guard and the
+    last file's last guard (each data file opens and closes with `.cerror * != $addr`)."""
+    files = data_files(tree) if files is None else files
+
+    def guards(name: str) -> list[int]:
+        return [int(m.group(1), 16) for line in (tree / name).read_text().splitlines()
+                if (m := GUARD.match(line))]
+
+    first, last = guards(files[0]), guards(files[-1])
+    if not first or not last:
+        raise ValueError("a data file without its start and end guards")
+    return first[0], last[-1]
+
+
+DATA_FILES = data_files()
+DATA_LO, DATA_HI = data_bounds(files=DATA_FILES)  # 65E6, AB48: the streams and patch records
 
 
 @dataclass(frozen=True)
@@ -45,7 +80,7 @@ class Op:
 
     macro: str
     length: int
-    flow: str  # next, call, jump, branch, table, stop
+    flow: str  # next, call, jump, branch, table, stop, hang (never returns)
     pointer: int
     handler: str
 
@@ -90,7 +125,7 @@ def _ops() -> dict[int, Op]:
     }
     ops = {op: Op(m, 2, "next", 0, h) for op, (m, h) in two.items()}
     for op in (0x90, 0x91, 0x92, 0x93, 0x94, 0x98, 0x9A, 0x9C):
-        ops[op] = Op("skip", 2, "next", 0, "read_item")
+        ops[op] = Op("hang_op", 2, "hang", 0, "read_item")  # re-dispatches itself (484B)
     ops[0x80] = Op("tempo", 3, "next", 0, "op_tempo")
     ops[0x81] = Op("tempo_add", 3, "next", 0, "op_tempo_add")
     ops[0x86] = Op("pitch_env", 3, "next", 1, "op_pitch_env")
@@ -134,19 +169,18 @@ class Statement:
 
 
 LABEL = re.compile(r"^([A-Za-z]\w*)\s*(;.*)?$")
-GUARD = re.compile(r"^\s+\.cerror \* != \$([0-9A-Fa-f]{4}),")
 
 
 def split_args(text: str) -> list[str]:
     return [a.strip() for a in text.split(",")] if text.strip() else []
 
 
-def statements(tree: Path = REPO / "asm/jsa", files: list[str] = DATA_FILES) -> list[Statement]:
+def statements(tree: Path = REPO / "asm/jsa", files: list[str] | None = None) -> list[Statement]:
     """The data files' statements in address order, each address counted from the file's start
     guard. Raises ValueError on a line that is not a label, a macro statement, a .word of
     labels, a guard, a comment or blank (a raw .byte, for one)."""
     out: list[Statement] = []
-    for name in files:
+    for name in data_files(tree) if files is None else files:
         address: int | None = None
         pending: list[str] = []
         for n, raw in enumerate((tree / name).read_text().splitlines(), 1):
@@ -180,6 +214,33 @@ def statements(tree: Path = REPO / "asm/jsa", files: list[str] = DATA_FILES) -> 
             pending = []
             address += size
     return out
+
+
+RECORD_OPS = ("patch", "lfo", "noise")
+TARGET_LABEL = re.compile(r"_(t|sub)\d+$")
+
+
+def named_by(sts: list[Statement] | None = None) -> dict[str, list[str]]:
+    """Per patch record label, the streams whose patch, lfo or noise ops name it, sorted by
+    name; a statement belongs to the last stream label at or before it (a
+    `_tK` or `_subK` target label belongs to its stream). Records no op names map to []."""
+    sts = statements() if sts is None else sts
+    out: dict[str, list[str]] = {
+        lab: [] for st in sts if st.name in PATCH_MACROS for lab in st.labels
+    }
+    owner: str | None = None
+    for st in sts:
+        if st.name in PATCH_MACROS:
+            continue
+        for lab in st.labels:
+            if not TARGET_LABEL.search(lab):
+                owner = lab
+        if st.name in RECORD_OPS:
+            if owner is None or st.args[0] not in out:
+                raise ValueError(f"{st.file}:{st.line}: {st.name} before a stream or of no record")
+            if owner not in out[st.args[0]]:
+                out[st.args[0]].append(owner)
+    return {lab: sorted(names) for lab, names in out.items()}
 
 
 @dataclass
@@ -235,7 +296,7 @@ def walk(img: bytes, roots: list[int], table_len: dict[int, int]) -> dict[int, I
                     work.append(word(img, p))
                 else:
                     item.record = word(img, p)
-            if op.flow == "jump":
+            if op.flow in ("jump", "hang"):
                 break
             a += op.length
     return items
@@ -257,8 +318,10 @@ def listing_labels(listing: str) -> dict[int, str]:
 
 
 def listing_starts(listing: str) -> set[int]:
-    """Addresses where a macro expansion line of the listing starts (">65e6\\t9d ..."): every
-    statement start is one (a multi-line macro adds lines inside its statement)."""
+    """Addresses where a macro expansion line of the listing starts (">65e6\\t9d ..."). Every
+    statement start is one, but a multi-line macro adds lines inside its statement (`patch`:
+    the op byte, then its .word), so this set is wider than the statement starts: summarize
+    checks the trace against statements() and uses this only to tie the listing to the tree."""
     out = set()
     for line in listing.splitlines():
         m = re.match(r"^>([0-9a-f]{4})\t", line)
@@ -267,7 +330,15 @@ def listing_starts(listing: str) -> set[int]:
     return out
 
 
-def summarize(trace: str, listing: str) -> tuple[dict[str, object], list[str]]:
+def summarize(
+    trace: str, listing: str, heads: set[int] | None = None
+) -> tuple[dict[str, object], list[str]]:
+    """The committed summary of a musictrace output and its problems: every statement the trace
+    read must be a statement start of the source (heads: by default the addresses of
+    statements(), the first byte of each macro or .word statement, never an operand byte inside
+    one) and a line start of the listing."""
+    if heads is None:
+        heads = {s.address for s in statements()}
     header: dict[str, str] = {}
     windows, starts, ops, items, keyons, suppressed = [], {}, {}, {}, {}, {}
     for line in trace.splitlines():
@@ -292,8 +363,10 @@ def summarize(trace: str, listing: str) -> tuple[dict[str, object], list[str]]:
             suppressed[f[1]] = int(f[2])
     labels = listing_labels(listing)
     begins = listing_starts(listing)
-    problems = [f"item {a:04X}: not a statement start of the listing" for a in items
-                if a not in begins]
+    problems = [f"item {a:04X}: not a statement start of the source" for a in items
+                if a not in heads]
+    problems += [f"item {a:04X}: not a line start of the listing" for a in items
+                 if a in heads and a not in begins]
     # the streams read: the label at or before each statement read, among the stream labels
     stream_labels = sorted((a, n) for a, n in labels.items() if not n.startswith("patch_"))
     read: dict[str, int] = {}

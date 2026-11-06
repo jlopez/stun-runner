@@ -131,8 +131,8 @@ ctl_set .macro bits                     ; 8B: other voices only: control bits se
     .byte $8B, \bits
 .endm
 
-portamento .macro rate                  ; 8C: glide from the last pitch, rate per 4 ticks
-    .byte $8C, \rate                    ;   (ram_06DA, 4DBE-4E11)
+portamento .macro rate                  ; 8C: glide from the last pitch, 2 x rate (1/256
+    .byte $8C, \rate                    ;   note) every fourth tick (ram_06DA, 4DBE-4E11)
 .endm
 
 call .macro target                      ; 8D: run the stream at target until its ret
@@ -148,10 +148,10 @@ loop_end .macro                         ; 8F: back to the loop's start until its
     .byte $8F, $00                      ;   (the operand byte is not read)
 .endm
 
-skip .macro op, unused=$00              ; 90-94, 98, 9A, 9C: two bytes the reader passes over
-    .cerror (\op < $90 || \op > $94) && \op != $98 && \op != $9A && \op != $9C, "skip: op"
-    .byte \op, \unused                  ;   by re-entering itself (read_item, 484B)
-.endm
+hang_op .macro op, unused=$00           ; 90-94, 98, 9A, 9C: handler read_item (484B), which
+    .cerror (\op < $90 || \op > $94) && \op != $98 && \op != $9A && \op != $9C, "hang_op: op"
+    .byte \op, \unused                  ;   reads the same op again and dispatches it again,
+.endm                                   ;   never returning: a stream using it hangs the CPU
 
 oki .macro command                      ; 95: start the OKI sample of command (cmd_param)
     .byte $95, \command
@@ -206,7 +206,9 @@ velocity_add .macro delta               ; A3
 .endm
 
 ; A4: for steps x LEN_1 of time the carriers' TL loses rate + frac / 8 (signed) per LEN_1, in
-; 32 fade steps per LEN_1 (52C3-52EA, fade_step 4CC1; with fade_mode 0)
+; 32 fade steps per LEN_1 (52C3-52EA, fade_step 4CC1; with fade_mode 0). A running fade also
+; takes a full step, and restarts its LEN_32 timer, at every note start (4A5F-4A74): the rate
+; holds only while the notes are multiples of LEN_32, shorter notes fade faster
 fade .macro steps, rate, frac=0
     .cerror \steps < 0 || \steps > $1F || \frac < 0 || \frac > 7, "fade: steps 0-1F, frac 0-7"
     .byte $A4, (\steps << 3) | \frac, \rate
@@ -224,8 +226,8 @@ bend .macro delta                       ; A7: pitch fraction + delta x 4 (signed
     .byte $A7, \delta                   ;   the transpose (5711-5733)
 .endm
 
-fade_mode .macro value                  ; A8: nonzero: fade steps only at note starts, by the
-    .byte $A8, \value                   ;   note's length nibble (ram_0608, 47F5, 4CCF)
+fade_mode .macro value                  ; A8: nonzero: no step timer, the fade steps only at
+    .byte $A8, \value                   ;   note starts, by the length nibble (47F5, 4CCF)
 .endm
 
 var_add .macro value                    ; A9: var + value
@@ -296,8 +298,10 @@ branch_minus .macro reg, target         ; B8: bit 7 set
     .word \target
 .endm
 
-var_cmp_reg .macro reg                  ; B9: result = var - register reg
-    .byte $B9, \reg
+var_cmp_reg .macro reg                  ; B9: result = var - register reg, minus 1 when
+    .byte $B9, \reg                     ;   read_register leaves C clear: R_VOLUME,
+                                        ;   R_VELOCITY on a YM2151 track unless it is 0, R_RANDOM
+                                        ;   with its old bit 7 clear (54BE-54C8, 5506)
 .endm
 
 var_cmp .macro value                    ; BA: result = var - value

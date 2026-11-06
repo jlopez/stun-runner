@@ -119,7 +119,8 @@ patch_07
     #ym_lfo $CB, $F8, $08, $02
     #ym_noise $00, $00
 
-; named by the patch, lfo or noise ops of snd_18_1, snd_18_2, snd_1A_0, snd_1A_1, unused_stream_02
+; named by the patch, lfo or noise ops of snd_18_1, snd_18_2, snd_1A_0, snd_1A_1,
+; unused_stream_02
 patch_08
     #ym_voice $DD, $00, $00, $70
     #ym_operator $00, $08, $1F, $0B, $49, $04 ; M1
@@ -232,8 +233,8 @@ patch_0F
     #ym_noise $00, $00
 
 ; named by the patch, lfo or noise ops of snd_00_0, snd_00_1, snd_00_2, snd_00_3, snd_00_4,
-patch_10
 ; snd_00_5, snd_00_6, snd_00_7
+patch_10
     #ym_voice $DC, $00, $00, $01
     #ym_operator $7F, $23, $1F, $0F, $00, $8A ; M1
     #ym_operator $01, $23, $9E, $06, $0B, $F6 ; M2

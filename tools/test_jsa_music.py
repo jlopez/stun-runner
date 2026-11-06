@@ -79,7 +79,7 @@ def test_macros_emit_the_op_table(tmp_path: Path) -> None:
     for name, nxt in zip(order, order[1:], strict=False):
         start, end = syms[f"m_{name}"], syms[f"m_{nxt}"]
         assert end - start == jm.MACRO_SIZE[name], name
-        ops = [op for op, o in jm.OPS.items() if o.macro == name and name != "skip"]
+        ops = [op for op, o in jm.OPS.items() if o.macro == name and name != "hang_op"]
         if ops:
             assert data[start - 0x1000] == ops[0], name
 
@@ -103,6 +103,18 @@ def handler_body(label: str) -> tuple[str, list[str]]:
     raise AssertionError(f"no handler {label}")
 
 
+def test_hang_ops_redispatch_themselves() -> None:
+    """The hang_op ops' handler is read_item, which reaches `jsr run_op` without writing
+    stream_ptr (only ram_0266/ram_0284 move): it reads the same op byte and dispatches it again,
+    so the walk must end a path there (flow hang), never read on as if two bytes were skipped."""
+    hang = [o for o in jm.OPS.values() if o.macro == "hang_op"]
+    assert len(hang) == 8 and all(o.handler == "read_item" and o.flow == "hang" for o in hang)
+    _, body = handler_body("read_item")
+    head = body[: next(i for i, line in enumerate(body) if "jsr run_op" in line)]
+    assert any("lda (stream_ptr),y" in line for line in head)
+    assert not any(re.search(r"\bst[axy] stream_ptr", line) for line in head)
+
+
 def test_op_lengths_are_the_handlers_reads() -> None:
     """The op table against the code: op_handlers lists each op's handler (entry op - 80), and a
     handler of a fixed-length op reads op length - 2 bytes through next_operand before it
@@ -115,7 +127,7 @@ def test_op_lengths_are_the_handlers_reads() -> None:
         op = jm.OPS[int(op_hex, 16)]
         assert op.handler == handler, op_hex
     for op_byte, op in jm.OPS.items():
-        if op.flow == "table" or op.macro == "skip":
+        if op.flow == "table" or op.macro == "hang_op":
             continue
         _, body = handler_body(op.handler)
         calls = sum("jsr next_operand" in line for line in body)
@@ -310,6 +322,69 @@ def test_mame_trace_agrees_with_source(tmp_path: Path) -> None:
     assert r.returncode == 0
     _, problems = jm.summarize(trace.read_text(), (tmp_path / "jsa.bin.lst").read_text())
     assert problems == []
+
+
+def test_summary_refuses_operand_addresses() -> None:
+    """An item recorded at an operand byte inside a statement is a problem, even where the
+    listing has a line (`patch` lists its .word on a line of its own): the check uses the
+    statement starts of the source, not every listing line."""
+    sts = jm.statements()
+    st = next(s for s in sts if s.name == "patch")
+    inside = st.address + 1
+    listing = f".{jm.DATA_LO:04x}\t\t\t\t\t{sts[0].labels[0]}\n"
+    listing += "".join(f">{a:04x}\t00\n" for a in (st.address, inside))
+    trace = f"# frames 1\nitem {st.address:04X} 1\n"
+    _, problems = jm.summarize(trace, listing)
+    assert problems == []
+    _, problems = jm.summarize(trace + f"item {inside:04X} 1\n", listing)
+    assert problems == [f"item {inside:04X}: not a statement start of the source"]
+
+
+def test_named_by_lists_are_whole() -> None:
+    """Each record's comment (the comment lines just above its label) and docs/12 section 5's
+    "Named by" column list every stream whose patch, lfo or noise ops name the record, in full:
+    the lists of the streams, not a cut-off copy."""
+    nb = jm.named_by()
+    assert len(nb) == 101 and sum(not v for v in nb.values()) == 22
+    assert len(nb["patch_10"]) == 8 and len(nb["patch_23"]) == 14
+    for name in ("patches_1.asm", "patches_2.asm"):
+        lines = (TREE / "data" / name).read_text().splitlines()
+        for i, line in enumerate(lines):
+            if not re.fullmatch(r"patch_[0-9A-F]{2}", line):
+                continue
+            assert not lines[i + 1].startswith(";"), (name, line)
+            k = i
+            while lines[k - 1].startswith(";"):
+                k -= 1
+            text = " ".join(c[1:].strip() for c in lines[k:i])
+            if nb[line]:
+                assert text == "named by the patch, lfo or noise ops of " + ", ".join(nb[line])
+            else:
+                assert text == "no patch, lfo or noise op names this record", line
+    doc = (REPO / "docs/12-sound-music.md").read_text()
+    rows = dict(re.findall(r"^\| `(patch_[0-9A-F]{2})` \|[^\n]*\| ([^|\n]*) \|$", doc, re.M))
+    assert rows == {k: ", ".join(v) if v else "-" for k, v in nb.items()}
+
+
+def test_data_files_follow_jsa_asm(tmp_path: Path) -> None:
+    """The region's files are jsa.asm's data/ includes after data/sounds.asm, and its bounds the
+    first file's start guard and the last file's end guard: a split in jsa.asm needs no edit
+    of the tool."""
+    (tmp_path / "data").mkdir()
+    (tmp_path / "jsa.asm").write_text(
+        '    .include "data/macros.asm"\n    .include "data/sounds.asm"\n'
+        '    .include "data/a.asm"\n    .include "data/b.asm"\n    .include "lookup.asm"\n'
+    )
+    (tmp_path / "data/a.asm").write_text(
+        '    .cerror * != $65E6, "a"\nx\n    #ret\n    .cerror * != $65E8, "a"\n'
+    )
+    (tmp_path / "data/b.asm").write_text(
+        '    .cerror * != $65E8, "b"\n    #ret\n    .cerror * != $65EA, "b"\n'
+    )
+    assert jm.data_files(tmp_path) == ["data/a.asm", "data/b.asm"]
+    assert jm.data_bounds(tmp_path) == (0x65E6, 0x65EA)
+    assert [s.address for s in jm.statements(tmp_path)] == [0x65E6, 0x65E8]
+    assert jm.data_files() == jm.DATA_FILES and (jm.DATA_LO, jm.DATA_HI) == (0x65E6, 0xAB48)
 
 
 SND_TRACES = [REPO / f"build/mame/sndtrace-{run}.txt" for run in ("attract", "sound", "play")]

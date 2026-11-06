@@ -101,8 +101,8 @@ Two things the code does that the data's author may not have meant, recorded as 
 - `volume` (82) on a YM2151 track (`volume_ym`, 5788): the four TLs again from the patch record, then the carriers' TL + 40, 2A, 24, 1F, 17, 1A, 12, 15, 0E, 10, 0A, 0B, 06, 05, 02, 00 for volume 0-F (`volume_steps`, 57C3, negated by `op_carrier_tl_sub`).
 - `volume_add` (83) and `carrier_tl_sub` (A1): the carriers' TL - A, clamped 00-7F (5750-5785).
 - `velocity` (A2) and `velocity_add` (A3): ram_04FA (negated), the level the key-on scales per operator (3.4).
-- `fade` (A4) and `release` (97): `fade_step` (4CC1) runs every LEN_32 of the track's time (the step timer ram_05AE-05EA, 480F-482C) while the remaining time ram_07AC:078E is not 0: it loses 8 (`fade_steps`, tables.asm tbl_6003 entry 0A), and the amount ram_07E8:07CA shifted right 5 places goes, with its fraction kept in ram_0806, to `add_volume` (4D63), then `prepare_key_on` writes the new TLs without a new key-on (482C-4845). So `fade steps, rate, frac` changes the carriers' TL by -(rate + frac / 8) per LEN_1 for steps x LEN_1. `release` is a fade of rate D0 for 2 x LEN_1 with ram_0248 = FE; the track ends when it runs out (4A5F-4A6E, 47F5-480C). Commands 0A (a sound) and 0B (a priority) start the same release on the tracks they name (cmdtype_0A 4460, cmdtype_0B 4496).
-- `fade_mode` (A8) nonzero: the step timer is not used; the fade steps only at note starts, by the note's length nibble through tbl_6003 (47F5, 4CCF). The data never sets it.
+- `fade` (A4) and `release` (97): `fade_step` (4CC1) runs every LEN_32 of the track's time (the step timer ram_05AE-05EA, 480F-482C) while the remaining time ram_07AC:078E is not 0: it loses 8 (`fade_steps`, tables.asm tbl_6003 entry 0A), and the amount ram_07E8:07CA shifted right 5 places goes, with its fraction kept in ram_0806, to `add_volume` (4D63), then `prepare_key_on` writes the new TLs without a new key-on (482C-4845). A running fade also steps at every note start: `set_note_length` calls `fade_step` on every note while the remaining time is not 0 (4A5F-4A74), whatever `fade_mode` holds, and in mode 0 that step is a full one (8) and reloads the step timer with LEN_32 (4CD3-4CDF). On a note-start tick `run_track` goes to `read_item` at 47AB, before the timer code at 480F, so the two do not add on the same tick. So `fade steps, rate, frac` changes the carriers' TL by -(rate + frac / 8) per LEN_1 for steps x LEN_1 only while the notes are multiples of LEN_32; with shorter notes (LEN_48, LEN_64 and LEN_128 occur in the data) the fade steps once per note and runs faster. `release` is a fade of rate D0 for 2 x LEN_1 with ram_0248 = FE; the track ends when it runs out (4A5F-4A6E, 47F5-480C). Commands 0A (a sound) and 0B (a priority) start the same release on the tracks they name (cmdtype_0A 4460, cmdtype_0B 4496).
+- `fade_mode` (A8) nonzero: the step timer is not used; the fade steps only at the note starts above, by the note's length nibble through tbl_6003 (47F5, 4CCF). The data never sets it.
 
 ### 3.6 Pitch
 
@@ -112,7 +112,7 @@ Two things the code does that the data's author may not have meant, recorded as 
 ### 3.7 Flow and variables
 
 - `call` (8D) / `ret`; `loop count` (8E) / `loop_end` (8F): nodes, section 2. `jump` (99).
-- `var` (ram_0824) is the track's one variable; every write also sets the result ram_0842 (`store_var`, 52F1). `var_add`, `var_sub`, `var_and`, `var_or`, `var_xor` (A9-AD) with the operand; `var_shr`, `var_shl` (B3, B4) by 1-7; `var_load reg` (B2), `var_store reg` (B0), `var_add_to reg` (B1); `var_cmp value` (BA) and `var_cmp_reg reg` (B9) set the result to var - value.
+- `var` (ram_0824) is the track's one variable; every write also sets the result ram_0842 (`store_var`, 52F1). `var_add`, `var_sub`, `var_and`, `var_or`, `var_xor` (A9-AD) with the operand; `var_shr`, `var_shl` (B3, B4) by 1-7; `var_load reg` (B2), `var_store reg` (B0), `var_add_to reg` (B1); `var_cmp value` (BA) sets the result to var - value (C set by `run_op`, 5079). `var_cmp_reg reg` (B9) calls `read_register` and falls into `var_cmp`'s `sbc` (5459) with the carry `read_register` leaves, so it gives var - reg - 1 for R_VOLUME (`cmp #$02`/`cmp #$01` at 54C2-54C8, or 54CD-54E5 on the other kind, leave C clear), for R_VELOCITY on a YM2151 track unless the velocity is 0 (`clc / adc #$01`, 54BE) and for R_RANDOM when the random byte's old bit 7 is clear (`random`'s `asl`, 5506); var - reg otherwise. No stream uses B9.
 - `jump_table` (AE): the word number var of the list after the op is the next statement (536F-5395); no bound, so the streams mask var first (`var_and 7` before eight entries, `var_and 3` or `1` before four or two). `jump_table_inc` (AF) adds 1 to var after it.
 - `branch_zero`, `branch_nonzero`, `branch_plus`, `branch_minus` (B5-B8): register operand, then the target, taken when the register is 0, not 0, bit 7 clear, bit 7 set (545A-5493).
 - Registers (`read_register` 5494 for reads, `op_var_store` 53C4 and `op_var_add_to` 5411 for writes), the `R_` constants of macros.asm: 00 volume (a read gives 0 on a YM2151 track), 01 the tempo's high byte, 02 the transpose, 03 the velocity, 04 the fine tune (a write stores A x 4, a read gives the fraction itself), 05 a random byte (`random`, 5504: an 8-bit LFSR, x2 then XOR 1D on carry, also run by `main_loop` on every pass at 4149), 06-25 the 32 global variables zp_23-zp_42 shared by all tracks, 26 and up the last result. Commands 1E-23 (cmdtype_01, `global_set_index`/`global_set_value`) set global 0 to 0-5: the streams of sound 0F branch on it (`var_load R_GLOBAL+0`, `var_and 7`, `jump_table`).
@@ -125,7 +125,7 @@ The interpreter keeps a second output path: tracks of kind 0 (ram_03EC bits 1-0)
 
 ## 4. The ops
 
-One row per op byte. Length in bytes with the op; handler and its address (labels of the tree); "musictrace" counts the dispatches by `run_op` (506D) in `make musictrace` (section 8); "sndtrace" whether `make sndtrace` (docs/09 section 7) executed the handler's first instruction (for the skip ops that is `read_item` itself, so it says nothing); "streams" the uses in the streams the sound table reaches and in the unreached ones (section 6). Every op the reached streams use ran in MAME, in one trace or the other, but `transpose_add` (85, 42 uses, in statements the runs did not reach); AA and B3 occur only in unreached streams.
+One row per op byte. Length in bytes with the op; handler and its address (labels of the tree); "musictrace" counts the dispatches by `run_op` (506D) in `make musictrace` (section 8); "sndtrace" whether `make sndtrace` (docs/09 section 7) executed the handler's first instruction (for the `hang_op` ops that is `read_item` itself, so it says nothing); "streams" the uses in the streams the sound table reaches and in the unreached ones (section 6). Every op the reached streams use ran in MAME, in one trace or the other, but `transpose_add` (85, 42 uses, in statements the runs did not reach); AA and B3 occur only in unreached streams.
 
 | Op | Macro | Bytes | Handler | musictrace | sndtrace | streams (reached / unreached) | Effect |
 |---|---|---|---|---|---|---|---|
@@ -145,7 +145,7 @@ One row per op byte. Length in bytes with the op; handler and its address (label
 | 8D | `call target` | 3 | `op_call` 5235 | 107 | yes | 14 / 52 | 3.7 |
 | 8E | `loop count` | 2 | `op_loop` 5263 | 190 | yes | 210 / 127 | 3.7 |
 | 8F | `loop_end` | 2 | `op_loop_end` 528E | 1760 | yes | 205 / 128 | 3.7 (operand not read) |
-| 90-94, 98, 9A, 9C | `skip op` | 2 | `read_item` 484B | - | (n/a) | 0 / 0 | the reader re-entered from run_op: it skips two bytes and reads on as a nested call, returning into run_op's caller later; unused |
+| 90-94, 98, 9A, 9C | `hang_op op` | 2 | `read_item` 484B | - | (n/a) | 0 / 0 | a loop that never returns: entered by RTS from run_op, read_item adds 2 to ram_0266 only (484B-4858) and reads the same op byte through the unchanged stream_ptr (485B; it is reloaded only at 4781-4789, 4864-486C, 4934), so 485F dispatches it again, two stack bytes deeper each time; nested IRQs are turned away (zp_11, 41E6-41EC), so the sound CPU would hang in its IRQ; unused (the walker ends a path there) |
 | 95 | `oki command` | 2 | `op_95` 5BFA | 4 | yes | 5 / 0 | the OKI effect of command |
 | 96 | `respond value` | 2 | `op_respond` 550E | - | no | 0 / 0 | a response byte |
 | 97 | `release` | 2 | `op_release` 5513 | - | no | 0 / 0 | release fade, then the end |
@@ -197,7 +197,7 @@ A record is 42 (2A) bytes, the operand of `patch`, `lfo` and `noise`; the macros
 | 24-27 | `ym_lfo` | `lfrq` (18), `pmd` (19), `amd` (19), `ct_w` (1B, ORed with the CT bits kept) | op_lfo 5655-5674 |
 | 28-29 | `ym_noise` | `shadow_1b` (into the shadow of register 1B, 5677, which nothing reads), `ne_nfrq` (0F) | op_lfo 5676-5678, op_noise 5695-569A |
 
-There are two banks: 26 records at 6B80-6FC3 (`patches_1.asm`, `patch_00`-`patch_19`) and 75 at 9EFA-AB47 (`patches_2.asm`, `patch_1A`-`patch_64`). No byte between or after them is outside a record. 22 records no op names (each such record's comment says so); they are still records by position and shape. Byte 1C (M1's curve, never loaded) is 80 in six records. Byte 28 is 02 in 18 records, 00 in the rest; byte 29 (noise) is 07 in two (the two `noise` ops). Bytes 01-02 (key code and fraction) are 00 in every record; the key-on writes registers 28 and 30 itself.
+There are two banks: 26 records at 6B80-6FC3 (`patches_1.asm`, `patch_00`-`patch_19`) and 75 at 9EFA-AB47 (`patches_2.asm`, `patch_1A`-`patch_64`). No byte between or after them is outside a record. 22 records no op names (each such record's comment says so); they are still records by position and shape. Byte 1C (M1's curve, never loaded) is 80 in six records. Byte 28 is 02 in 18 records, 00 in the rest; byte 29 (noise) is 07 in only two records, `patch_02` and `patch_25`, which no `noise` op names; the two `noise` ops name `patch_10` and `patch_12` (streams_1.asm), whose byte 29 is 00, so op 9F writes 00 into register 0F both times (5695-569A). Bytes 01-02 (key code and fraction) are 00 in every record; the key-on writes registers 28 and 30 itself.
 
 | Patch | Address | Algorithm | Feedback | Named by |
 |---|---|---|---|---|
@@ -217,7 +217,7 @@ There are two banks: 26 records at 6B80-6FC3 (`patches_1.asm`, `patch_00`-`patch
 | `patch_0D` | 6DA2 | 2 | 0 | - |
 | `patch_0E` | 6DCC | 2 | 0 | snd_13_0 |
 | `patch_0F` | 6DF6 | 0 | 0 | snd_14_0, snd_15_0, snd_16_0 |
-| `patch_10` | 6E20 | 4 | 3 | snd_00_0, snd_00_1, snd_00_2, snd_00_3, snd_00_4, |
+| `patch_10` | 6E20 | 4 | 3 | snd_00_0, snd_00_1, snd_00_2, snd_00_3, snd_00_4, snd_00_5, snd_00_6, snd_00_7 |
 | `patch_11` | 6E4A | 3 | 6 | snd_18_2 |
 | `patch_12` | 6E74 | 7 | 0 | snd_00_7, snd_18_2, snd_1F_0 |
 | `patch_13` | 6E9E | 4 | 6 | snd_0F_0, snd_0F_1, snd_1A_1 |
@@ -236,9 +236,9 @@ There are two banks: 26 records at 6B80-6FC3 (`patches_1.asm`, `patch_00`-`patch
 | `patch_20` | 9FF6 | 7 | 0 | - |
 | `patch_21` | A020 | 3 | 7 | - |
 | `patch_22` | A04A | 3 | 7 | - |
-| `patch_23` | A074 | 4 | 6 | snd_01_2, snd_01_3, snd_04_5, snd_08_5, snd_09_4, |
+| `patch_23` | A074 | 4 | 6 | snd_01_2, snd_01_3, snd_04_5, snd_08_5, snd_09_4, snd_0A_6, snd_0B_5, snd_0B_6, snd_0B_7, snd_0C_6, snd_0E_2, snd_0E_4, unused_stream_05, unused_stream_07 |
 | `patch_24` | A09E | 4 | 6 | - |
-| `patch_25` | A0C8 | 2 | 4 | unused_stream_03, unused_stream_04, unused_stream_06, |
+| `patch_25` | A0C8 | 2 | 4 | unused_stream_03, unused_stream_04, unused_stream_06, unused_stream_07 |
 | `patch_26` | A0F2 | 4 | 7 | snd_03_0, snd_05_6, snd_05_7 |
 | `patch_27` | A11C | 4 | 6 | snd_0C_0, snd_0C_1, snd_0C_2, snd_0C_4 |
 | `patch_28` | A146 | 0 | 2 | - |
@@ -246,18 +246,18 @@ There are two banks: 26 records at 6B80-6FC3 (`patches_1.asm`, `patch_00`-`patch
 | `patch_2A` | A19A | 0 | 6 | snd_06_4 |
 | `patch_2B` | A1C4 | 4 | 7 | snd_08_5, snd_09_4, snd_0A_6 |
 | `patch_2C` | A1EE | 6 | 0 | - |
-| `patch_2D` | A218 | 2 | 7 | snd_02_2, snd_02_3, snd_04_0, snd_04_1, snd_0B_0, |
+| `patch_2D` | A218 | 2 | 7 | snd_02_2, snd_02_3, snd_04_0, snd_04_1, snd_0B_0, snd_0B_1, snd_0B_2, snd_0B_3, snd_0B_4, snd_0B_5, unused_stream_04, unused_stream_06 |
 | `patch_2E` | A242 | 1 | 0 | unused_stream_09 |
 | `patch_2F` | A26C | 1 | 0 | snd_04_3 |
 | `patch_30` | A296 | 3 | 7 | unused_stream_10 |
 | `patch_31` | A2C0 | 3 | 3 | - |
-| `patch_32` | A2EA | 1 | 4 | snd_02_0, snd_02_1, snd_04_2, snd_0E_0, snd_0E_3, |
+| `patch_32` | A2EA | 1 | 4 | snd_02_0, snd_02_1, snd_04_2, snd_0E_0, snd_0E_3, unused_stream_09 |
 | `patch_33` | A314 | 5 | 4 | snd_01_3 |
 | `patch_34` | A33E | 5 | 3 | snd_0D_0, snd_0D_1, snd_0D_2 |
 | `patch_35` | A368 | 4 | 5 | snd_06_2 |
-| `patch_36` | A392 | 4 | 7 | snd_04_5, unused_stream_05, unused_stream_06, |
+| `patch_36` | A392 | 4 | 7 | snd_04_5, unused_stream_05, unused_stream_06, unused_stream_07 |
 | `patch_37` | A3BC | 4 | 7 | - |
-| `patch_38` | A3E6 | 3 | 3 | snd_01_2, snd_01_3, snd_02_5, snd_0B_6, snd_0B_7, |
+| `patch_38` | A3E6 | 3 | 3 | snd_01_2, snd_01_3, snd_02_5, snd_0B_6, snd_0B_7, snd_0E_2, snd_0E_3, snd_0E_4 |
 | `patch_39` | A410 | 1 | 3 | unused_stream_09 |
 | `patch_3A` | A43A | 1 | 3 | unused_stream_09 |
 | `patch_3B` | A464 | 1 | 0 | unused_stream_11 |
@@ -271,11 +271,11 @@ There are two banks: 26 records at 6B80-6FC3 (`patches_1.asm`, `patch_00`-`patch
 | `patch_43` | A5B4 | 4 | 0 | snd_05_0 |
 | `patch_44` | A5DE | 4 | 0 | snd_05_1 |
 | `patch_45` | A608 | 0 | 0 | unused_stream_05, unused_stream_07, unused_stream_12 |
-| `patch_46` | A632 | 0 | 0 | snd_01_0, snd_01_2, snd_02_4, snd_04_2, snd_08_0, |
+| `patch_46` | A632 | 0 | 0 | snd_01_0, snd_01_2, snd_02_4, snd_04_2, snd_08_0, snd_09_4, snd_0A_5, snd_0B_0, snd_0B_1, snd_0B_5, snd_0B_7, snd_0E_3 |
 | `patch_47` | A65C | 0 | 4 | snd_02_6 |
-| `patch_48` | A686 | 4 | 6 | snd_08_0, snd_08_1, snd_08_2, snd_0A_0, snd_0A_2, |
+| `patch_48` | A686 | 4 | 6 | snd_08_0, snd_08_1, snd_08_2, snd_0A_0, snd_0A_2, snd_0A_3, snd_0D_2, snd_0D_3 |
 | `patch_49` | A6B0 | 4 | 0 | - |
-| `patch_4A` | A6DA | 2 | 7 | snd_01_0, snd_01_1, snd_01_2, snd_03_0, snd_03_1, |
+| `patch_4A` | A6DA | 2 | 7 | snd_01_0, snd_01_1, snd_01_2, snd_03_0, snd_03_1, unused_stream_03, unused_stream_04, unused_stream_05, unused_stream_06, unused_stream_07 |
 | `patch_4B` | A704 | 0 | 5 | - |
 | `patch_4C` | A72E | 5 | 7 | snd_03_4 |
 | `patch_4D` | A758 | 7 | 0 | unused_stream_10 |
@@ -290,17 +290,17 @@ There are two banks: 26 records at 6B80-6FC3 (`patches_1.asm`, `patch_00`-`patch
 | `patch_56` | A8D2 | 4 | 5 | - |
 | `patch_57` | A8FC | 3 | 6 | - |
 | `patch_58` | A926 | 1 | 7 | snd_05_5 |
-| `patch_59` | A950 | 4 | 3 | snd_01_1, snd_09_4, snd_0B_0, snd_0B_1, snd_0B_6, |
+| `patch_59` | A950 | 4 | 3 | snd_01_1, snd_09_4, snd_0B_0, snd_0B_1, snd_0B_6, snd_0B_7, snd_0E_1, unused_stream_05, unused_stream_06 |
 | `patch_5A` | A97A | 4 | 0 | snd_02_5, snd_04_4, snd_0B_6, snd_0B_7 |
 | `patch_5B` | A9A4 | 4 | 7 | snd_01_4, snd_0E_4 |
 | `patch_5C` | A9CE | 5 | 7 | - |
 | `patch_5D` | A9F8 | 2 | 7 | snd_08_0, snd_08_1, snd_08_2, snd_08_3, snd_08_5 |
-| `patch_5E` | AA22 | 5 | 7 | snd_08_2, snd_08_3, snd_08_4, snd_08_6, snd_0B_4, |
-| `patch_5F` | AA4C | 5 | 7 | snd_0A_2, snd_0A_3, snd_0B_0, snd_0B_1, snd_0B_2, |
+| `patch_5E` | AA22 | 5 | 7 | snd_08_2, snd_08_3, snd_08_4, snd_08_6, snd_0B_4, snd_0C_3, snd_0D_4, snd_0D_5 |
+| `patch_5F` | AA4C | 5 | 7 | snd_0A_2, snd_0A_3, snd_0B_0, snd_0B_1, snd_0B_2, snd_0B_3, snd_0B_7, snd_0C_0, snd_0C_1, snd_0C_2, snd_0C_4, snd_0C_5, snd_0D_0, snd_0D_1 |
 | `patch_60` | AA76 | 2 | 6 | snd_0B_0, snd_0B_1 |
-| `patch_61` | AAA0 | 5 | 7 | snd_08_7, snd_0A_4, snd_0A_5, snd_0C_4, snd_0C_5, |
+| `patch_61` | AAA0 | 5 | 7 | snd_08_7, snd_0A_4, snd_0A_5, snd_0C_4, snd_0C_5, snd_0D_7 |
 | `patch_62` | AACA | 5 | 3 | - |
-| `patch_63` | AAF4 | 5 | 5 | unused_stream_03, unused_stream_04, unused_stream_06, |
+| `patch_63` | AAF4 | 5 | 5 | unused_stream_03, unused_stream_04, unused_stream_06, unused_stream_07 |
 | `patch_64` | AB1E | 5 | 3 | unused_stream_03, unused_stream_04 |
 
 ## 6. The sounds
@@ -385,7 +385,7 @@ Run of 2026-11-05 (MAME 0.289, the reference set, 374 s): 22,577 frames, 32 wind
 ## 10. Not verified, open
 
 - The other voice kind (3.8) and its ops never run; their effects are read from the code only. What chip they were written for is not in this program.
-- `sync`, `sync_group`, `portamento`, `fade_mode`, `tempo_add`, `respond`, `release`, `ym_ct`, the skip ops and `jump_table_inc` are used by no stream and were never dispatched; their descriptions are from the code.
+- `sync`, `sync_group`, `portamento`, `fade_mode`, `tempo_add`, `respond`, `release`, `ym_ct`, the `hang_op` ops and `jump_table_inc` are used by no stream and were never dispatched; their descriptions are from the code.
 - `transpose_add` (85) is used by reached streams but was not dispatched in the runs (600-frame windows, and the game run's 7,200 frames, do not reach those statements).
 - That the modulator-mask order of the level loop (3.4) and the unloaded M1 curve byte are oversights of the original is not knowable; they are what the code does, and the sound MAME plays follows it.
 - Musical readings (what a sound is in the game) are not made here: the labels are numbers, and leg M4e names the commands.

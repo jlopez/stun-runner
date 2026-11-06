@@ -165,8 +165,11 @@ _l4848
 ; offset (48DD-48F0), and the patch's register-20 byte (ram_0518) into the shadow (4900-490B).
 ; A length byte 00 returns from a call (op 8D: the return address off the node list, 4919-493E)
 ; or frees the track (free_track); else set_note_length.
-; Also the op_handlers entry of ops 90-94, 98, 9A, 9C: entered by RTS from run_op, it skips the op
-; and its operand and reads on as a nested call of itself (the data never uses them).
+; Also the op_handlers entry of ops 90-94, 98, 9A, 9C (macro hang_op): entered by RTS from
+; run_op, it adds 2 to ram_0266 only; stream_ptr is reloaded only after run_op returns (4864-486C)
+; and at 4781-4789 and 4934, so 485B reads the same op byte again and 485F dispatches it again,
+; two more stack bytes each time: a loop that never returns, and the sound CPU would hang in its
+; IRQ (zp_11 turns nested IRQs away, 41E6-41EC). No stream uses these ops.
 ; from 47AB, 493E
 read_item
     lda ram_0266,x
@@ -1418,19 +1421,19 @@ op_handlers
     .word op_call-1                     ; $8D call
     .word op_loop-1                     ; $8E loop
     .word op_loop_end-1                 ; $8F loop_end
-    .word read_item-1                   ; $90 skip
-    .word read_item-1                   ; $91 skip
-    .word read_item-1                   ; $92 skip
-    .word read_item-1                   ; $93 skip
-    .word read_item-1                   ; $94 skip
+    .word read_item-1                   ; $90 hang_op
+    .word read_item-1                   ; $91 hang_op
+    .word read_item-1                   ; $92 hang_op
+    .word read_item-1                   ; $93 hang_op
+    .word read_item-1                   ; $94 hang_op
     .word op_95-1                       ; $95 oki
     .word op_respond-1                  ; $96 respond
     .word op_release-1                  ; $97 release
-    .word read_item-1                   ; $98 skip
+    .word read_item-1                   ; $98 hang_op
     .word op_jump-1                     ; $99 jump
-    .word read_item-1                   ; $9A skip
+    .word read_item-1                   ; $9A hang_op
     .word op_ctl_clear-1                ; $9B ctl_clear
-    .word read_item-1                   ; $9C skip
+    .word read_item-1                   ; $9C hang_op
     .word op_patch-1                    ; $9D patch
     .word op_lfo-1                      ; $9E lfo
     .word op_noise-1                    ; $9F noise
@@ -2060,7 +2063,9 @@ op_var_load
     jsr read_register
     jmp store_var
 
-; op B9 (var_cmp_reg): the result = var - register A
+; op B9 (var_cmp_reg): the result = var - register A, with the carry read_register leaves
+; (no sec): minus 1 more for register 00 (54C2-54C8), 03 on a YM2151 track unless the velocity
+; is 0 (54BE) and 05 when the random byte's old bit 7 is clear (random's asl, 5506)
 ; MAME: not dispatched in make musictrace
 op_var_cmp_reg
     jsr read_register
