@@ -24,15 +24,16 @@ board. Four instruction sets, no graphics ROMs. Details with MAME references in
 | [`docs/07-objects.md`](docs/07-objects.md) | the object ROMs: how the ADSP reads them, the object format, the 413 objects, `data/objects` as their source |
 | [`docs/08-display-list.md`](docs/08-display-list.md) | the SOM display list, the frame protocol, the GSP command set and its rasteriser |
 | [`docs/09-sound-program.md`](docs/09-sound-program.md) | the JSA II 6502 sound program as source (`asm/jsa`): partition, trace, system code |
-| [`docs/10-adpcm.md`](docs/10-adpcm.md) | the OKI M6295 samples: phrase table, one verbatim WAV per sample, `tools/adpcm` |
+| [`docs/10-adpcm.md`](docs/10-adpcm.md) | the OKI M6295 samples: phrase table, the 52 committed PCM WAVs (`data/oki`) as the image's source, `tools/adpcm` |
 | [`docs/11-sound-protocol.md`](docs/11-sound-protocol.md) | the 68010-6502 sound protocol and the command set (`data/sound/commands.json`) |
 | [`docs/12-sound-music.md`](docs/12-sound-music.md) | the sequencer, its ops, streams and YM2151 patches as structured source |
 
 Status (2026-11-05): milestones 0-4 are done (`CLAUDE.md` section 4, `docs/03-plan.md`). The
-object ROMs and the 6502 sound program are built from source and data, the OKI samples through
-one WAV each; the 68k program (with the GSP and ADSP programs inside it), the sample bytes and
-the NVRAM images are still blobs (69.6% of the set's bytes). Next: M5, the 68k source by region waves. The listening check of M4
-(`make listen`) is Jesus's and pending.
+object ROMs, the 6502 sound program and the OKI samples (from 52 committed PCM WAVs under
+`data/oki`) are built from source and data; the 68k program (with the GSP and ADSP programs
+inside it) and the NVRAM images are still blobs (52.3% of the set's bytes, 790,528). Next: M5,
+the 68k source by region waves. The listening check of M4 is done: Jesus ran `make listen` on
+2026-11-05 and heard the sound.
 
 ## ROMs
 
@@ -92,7 +93,7 @@ make soundcheck     # the reference and the rebuilt set give the same YM2151 and
 make -j3 okitrace   # which OKI phrase each command plays; rewrites data/oki/samples.json's evidence
 make -j5 sndproto   # both ends of the 68010-6502 latch, checked by tools/test_sound_commands.py
 make musictrace     # every sound command in its own window: statements read, key-ons
-make oki-pcm        # the samples as 16-bit PCM under build/oki/pcm/ (for listening)
+make samples        # no MAME: re-decode the merged OKI image into data/oki (the 52 PCM WAVs)
 make listen         # Jesus's listening check: MAME on the rebuilt set, in a window, with sound
 ```
 

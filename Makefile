@@ -30,7 +30,7 @@ ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
 .PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate ida-sync \
 	dasm oracle pcwatch objects objtrace objlevels pictures view somdump fieldext depthkeys vskip \
-	okitrace oki-pcm sndtrace soundcheck listen sndproto musictrace FORCE
+	okitrace samples sndtrace soundcheck listen sndproto musictrace FORCE
 .SECONDEXPANSION:
 
 # The split always runs (cheap): make 3.81 on macOS compares whole-second mtimes, so a stamp file
@@ -83,44 +83,26 @@ $(BUILD)/obj/%0.asm $(BUILD)/obj/%1.asm $(BUILD)/obj/%2.asm: $(OBJECT_DATA) $(OB
 
 .SECONDARY: $(OBJECT_ASM)
 
-# The OKI image's source (docs/10-adpcm.md): asm/oki/samples.asm holds the phrase table and
-# includes build/oki/samples.asm, which tools/adpcm asm writes from data/oki/samples.json and one
-# WAV per phrase in OKI_WAV_DIR: it recovers each sample's bytes from its WAV into
-# build/oki/bin/NN.bin and incbins them. The WAVs come from the merged image (tools/adpcm split
-# into build/oki/wav, the default OKI_WAV_DIR), so the image is byte-identical only if every
-# sample survived WAV and back. `make OKI_WAV_DIR=dir` builds from edited WAVs (the manifest's
-# names; a sample of another length needs its start/end, and every later phrase's, moved in the
-# manifest). The split cuts the merged image by the image's own phrase table, never the
-# manifest's, so an edited manifest does not stop it. Sample bytes, WAVs and decoded audio stay
-# under build/.
+# The OKI image's source (docs/10-adpcm.md): data/oki, the manifest samples.json and one 16-bit
+# PCM WAV per phrase (NN-name.wav, the M6295 decoder's output), turned by tools/adpcm asm into
+# build/oki/samples.asm, which asm/oki/samples.asm includes after the phrase table: every WAV
+# encoded back to ADPCM, the samples laid out in phrase order from their lengths (no address is
+# written by hand), the bytes as dc.b. From the committed data alone: the OKI tree never reads
+# build/stunrun-oki.bin. The step runs on every make (a fraction of a second; make 3.81 on
+# macOS compares whole-second mtimes, so a WAV edited in the same second as the last build must
+# still count); it rewrites the include only when it changes.
 OKI_MANIFEST := data/oki/samples.json
 OKI_TOOLS := tools/adpcm/__init__.py tools/adpcm/__main__.py $(ROMSET_TOOLS)
-OKI_WAV_DIR ?= $(BUILD)/oki/wav
-OKI_SPLIT := $(BUILD)/oki/split.done
 OKI_ASM := $(BUILD)/oki/samples.asm
 
-$(OKI_SPLIT): $(BUILD)/$(SET)-oki.bin $(OKI_MANIFEST) $(OKI_TOOLS)
-	$(PYTHON) tools/adpcm split --image $< --manifest $(OKI_MANIFEST) --out $(BUILD)/oki/wav
-	@touch $@
+$(OKI_ASM): $(OKI_MANIFEST) $(wildcard data/oki/*.wav) $(OKI_TOOLS) FORCE
+	$(PYTHON) tools/adpcm asm --data data/oki --out $(BUILD)/oki
 
-# The WAVs -> bytes step and the OKI tree's assembly run on every `make` (cheap, as the split):
-# an edited WAV saved in the same second as the last build, a removed WAV or another OKI_WAV_DIR
-# must never leave a stale image (make 3.81 on macOS compares whole-second mtimes). So does
-# `split --missing` on build/oki/wav: the stamp above does not see its WAVs, so a WAV deleted
-# there, or a phrase renamed in the same second as the last split, is written again from the
-# image (the other WAVs there, edited or not, are kept).
-OKI_REFILL = $(PYTHON) tools/adpcm split --missing --image $(BUILD)/$(SET)-oki.bin \
-	--manifest $(OKI_MANIFEST) --out $(BUILD)/oki/wav
-
-$(OKI_ASM): $(OKI_SPLIT) $(OKI_MANIFEST) $(OKI_TOOLS) FORCE
-	@$(OKI_REFILL)
-	$(PYTHON) tools/adpcm asm --manifest $(OKI_MANIFEST) --wav $(OKI_WAV_DIR) --out $(BUILD)/oki
-
-.SECONDARY: $(OKI_SPLIT) $(OKI_ASM)
+.SECONDARY: $(OKI_ASM)
 
 # image -> the files its tree includes: its blob (the merged image) and any others; the object
 # tree includes only the generated page sources, never build/stunrun-obj.bin, the OKI tree
-# the generated include and the sample bytes recovered from the WAVs, and the 6502 tree is all
+# only the include generated from data/oki, never build/stunrun-oki.bin, and the 6502 tree is all
 # source (docs/09-sound-program.md): its own files, data/ included, and nothing from build/
 EXTRA_stunrun-68k   := $(BUILD)/stunrun-68k.bin $(PROGRAMS)
 EXTRA_stunrun-obj   := $(OBJECT_ASM)
@@ -228,6 +210,12 @@ pcwatch:
 # decoder; `make test` fails while the committed data and the image disagree.
 objects: $(BUILD)/$(SET)-obj.bin $(OBJECT_TOOLS)
 	$(PYTHON) tools/objects decode --image $< --out data/objects
+
+# Re-decode the OKI image into data/oki (docs/10-adpcm.md): one PCM WAV per phrase of the image's
+# own table, named from the manifest (any other WAV there is removed); run after changing the
+# decoder or a name. `make test` fails while the committed WAVs and the image disagree.
+samples: $(BUILD)/$(SET)-oki.bin $(OKI_TOOLS)
+	$(PYTHON) tools/adpcm samples --image $< --manifest $(OKI_MANIFEST) --out data/oki
 
 # Every object-ROM access of the ADSP (docs/07-objects.md section 7): tools/mame/objtrace.lua over
 # attract mode and over a started game, into build/mame/objtrace-{attract,play}.txt; then
@@ -451,14 +439,6 @@ $(SNDPROTO_RUNS:%=$(BUILD)/mame/sndproto-%.txt): $(BUILD)/mame/sndproto-%.txt: t
 
 sndproto: $(SNDPROTO_RUNS:%=$(BUILD)/mame/sndproto-%.txt)
 	$(PYTHON) -m pytest -q tools/test_sound_commands.py
-
-# Every phrase the manifest names decoded to 16-bit PCM by MAME's M6295 decoder (tools/adpcm pcm;
-# a renamed phrase's old file is removed), at the rate
-# MAME plays them, into build/oki/pcm/NN-name.wav: for listening (Jesus's naming pass). Never
-# committed.
-oki-pcm: $(OKI_SPLIT)
-	@$(OKI_REFILL)
-	$(PYTHON) tools/adpcm pcm --manifest $(OKI_MANIFEST) --wav $(OKI_WAV_DIR) --out $(BUILD)/oki/pcm
 
 # The JSA II sound program in MAME (docs/09-sound-program.md). tools/mame/sndtrace.lua records
 # what the 6502 executes and reads, the command bytes of the 68010 and the 6502's responses, and

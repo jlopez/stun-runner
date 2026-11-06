@@ -1,4 +1,4 @@
-"""The OKI M6295 ADPCM image of the JSA II board: phrase table, samples, WAV (docs/10-adpcm.md).
+"""The OKI M6295 ADPCM image of the JSA II board: phrase table, samples, PCM WAV (docs/10-adpcm.md).
 
 The image (`stunrun-oki`, 256 KB, the four 1fh/1ef/1de/1cd files one after the other; the M6295
 address is the image offset, JSA II does not bank it) starts with the chip's phrase table:
@@ -7,14 +7,14 @@ and a 3-byte big-endian end, each masked to 18 bits, and plays start..end inclus
 (`m_count = 2 * (stop - start + 1)` nibbles). Bytes 6-7 of an entry are not read by the chip.
 In stunrun the table has entries 0-52 (0x000-0x1A7, entry 0 all zero, the 6502 never asks for
 phrase 0 or for a phrase above 52); the 52 samples follow it back to back in phrase order and
-the rest of the image is zero. data/oki/samples.json (the manifest) records that layout and the
-names; this module checks an image against it, splits it, and builds it back.
+the rest of the image is zero.
 
-Each sample is kept as a WAV that carries its ADPCM bytes verbatim (format tag 0x0017, Dialogic
-OKI ADPCM: 4 bits per sample, high nibble first, as the M6295 reads them), so WAV -> bytes is a
-copy and the round trip is exact by construction. `decode` is okiadpcm.cpp's oki_adpcm_state
-(the M6295 decoder in MAME) step for step; `encode` is a deterministic greedy encoder used only
-to measure whether PCM could stand in for the bytes (it is never part of the build).
+The source of the image is data/oki: the manifest samples.json (numbers, names, descriptions,
+play evidence; no addresses) and one PCM WAV per phrase, NN-name.wav, 16-bit mono at the M6295's
+rate, the decoder's output (`decode`, MAME's okiadpcm.cpp step for step) scaled as MAME's stream
+outputs it (x16). The build encodes every WAV back to ADPCM (`encode`, specified below and in
+docs/10 section 6) and lays the samples out in phrase order from their lengths, so no address is
+written by hand: `layout` derives every start and end.
 
 No function here prints a sample byte: messages carry phrase numbers, addresses and lengths.
 """
@@ -40,10 +40,15 @@ PIN7 = "low"
 IMAGE_SIZE = 0x40000
 ENTRY = 8  # bytes per phrase-table entry
 ADDRESS_MASK = 0x3FFFF  # okim6295_device::write masks start and stop to 18 bits
+MIN_SAMPLE = 2  # bytes: a 1-byte sample has start == stop, which the chip never plays
 MAX_PHRASES = 0x80  # a phrase number is 7 bits
 
-FORMAT = "stunrun-oki 1"
-WAVE_FORMAT_DIALOGIC_OKI_ADPCM = 0x0017
+FORMAT = "stunrun-oki 2"
+# 16-bit PCM = the 12-bit decoder output x 16: okim6295.cpp adds `clock(nibble) * m_volume` to
+# its stream with max 2048 (add_int, sound.h: sample / max), so at 0 dB (s_volume_table[0] = 1)
+# a signal s is s / 2048 full scale, which a 16-bit recording writes as s * 32768 / 2048.
+SCALE = 16
+SIGNAL_MIN, SIGNAL_MAX = -2048, 2047
 
 
 class FormatError(Exception):
@@ -55,7 +60,30 @@ def rate(pin7: str = PIN7) -> float:
     return CLOCK / DIVISORS[pin7]
 
 
+def wav_rate(pin7: str = PIN7) -> int:
+    """The WAV header's sample rate: the M6295 rate rounded to whole Hz (7231 at pin 7 low)."""
+    return round(rate(pin7))
+
+
 # --- the manifest ------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Entry:
+    """A phrase as the manifest names it."""
+
+    number: int
+    name: str
+
+    @property
+    def stem(self) -> str:
+        return f"{self.number:02d}-{self.name}"
+
+
+@dataclass(frozen=True)
+class Manifest:
+    entries: int  # table entries, entry 0 included
+    phrases: list[Entry]
 
 
 @dataclass(frozen=True)
@@ -95,15 +123,6 @@ def is_label(name: str) -> bool:
     ) and name.isascii()
 
 
-def parse_address(value: object, what: str) -> int:
-    if not isinstance(value, str):
-        raise FormatError(f"{what}: an address is a hex string, not {value!r}")
-    try:
-        return int(value, 16)
-    except ValueError:
-        raise FormatError(f"{what}: {value!r} is not a hex address") from None
-
-
 # The OKI tree's own labels (asm/oki/samples.asm and the include tools/adpcm asm writes): a
 # sample name is a label alias next to them, so it may not be one of them.
 RESERVED_LABEL = re.compile(r"phrase_\d+(_last)?|oki_\w*")
@@ -115,9 +134,9 @@ def reserved_label(name: str) -> bool:
     return RESERVED_LABEL.fullmatch(name) is not None
 
 
-def read_manifest(path: Path) -> Layout:
-    """The layout data/oki/samples.json records, checked: phrases 1..n back to back from the end
-    of the table, unique label names, inside the image."""
+def read_manifest(path: Path) -> Manifest:
+    """The phrases data/oki/samples.json names, checked: numbered 1..n in order, unique label
+    names that are not the tree's own, a table of n + 1 entries."""
     try:
         doc = json.loads(path.read_text())
     except (OSError, ValueError) as e:
@@ -129,7 +148,6 @@ def read_manifest(path: Path) -> Layout:
         raise FormatError(f"{path}: table_entries must be 1..{MAX_PHRASES}")
     phrases = []
     names: set[str] = set()
-    expect = entries * ENTRY
     for i, p in enumerate(doc.get("phrases", []), 1):
         where = f"{path}: phrase {i}"
         if not isinstance(p, dict) or p.get("number") != i:
@@ -142,29 +160,52 @@ def read_manifest(path: Path) -> Layout:
                 f"{where}: name {name!r} is one of the OKI tree's own labels "
                 "(phrase_NN, phrase_NN_last, oki_*)"
             )
+        for key in ("start", "end", "length", "seconds"):
+            if key in p:
+                raise FormatError(
+                    f"{where}: {key!r} is derived from the WAV lengths, not written in the manifest"
+                )
         names.add(name)
-        start = parse_address(p.get("start"), where)
-        end = parse_address(p.get("end"), where)
-        if start != expect:
-            raise FormatError(f"{where}: starts at {start:05X}, the previous one ends at {expect:05X}")
-        if end < start or end >= IMAGE_SIZE:
-            raise FormatError(f"{where}: end {end:05X} outside {start:05X}-{IMAGE_SIZE - 1:05X}")
-        if p.get("length") != end - start + 1:
-            raise FormatError(f"{where}: length is not end - start + 1")
-        phrases.append(Phrase(i, name, start, end))
-        expect = end + 1
+        phrases.append(Entry(i, name))
     if len(phrases) != entries - 1:
         raise FormatError(f"{path}: {len(phrases)} phrases for {entries} table entries")
-    return Layout(entries, phrases)
+    return Manifest(entries, phrases)
+
+
+def layout(manifest: Manifest, lengths: dict[int, int]) -> Layout:
+    """Every phrase's start and end from the sample lengths in bytes: phrase 1 right after the
+    table, each next one where the previous one ends. Fails on a sample under MIN_SAMPLE bytes
+    (it would never play) and when the samples do not fit."""
+    phrases = []
+    start = manifest.entries * ENTRY
+    for e in manifest.phrases:
+        n = lengths[e.number]
+        if n < 1:
+            raise FormatError(f"phrase {e.number}: an empty sample")
+        if n < MIN_SAMPLE:
+            # okim6295_device::write starts a voice only when start < stop (okim6295.cpp:266)
+            raise FormatError(
+                f"phrase {e.number}: a sample of {n} byte would never play (the M6295 starts "
+                "a voice only when its start lies before its end); a WAV needs at least 3 samples"
+            )
+        phrases.append(Phrase(e.number, e.name, start, start + n - 1))
+        start += n
+    if start > IMAGE_SIZE:
+        raise FormatError(
+            f"the samples end at {start - 1:05X}: {start - IMAGE_SIZE} bytes more than the "
+            f"{IMAGE_SIZE // 1024} KB image holds (the last address is {IMAGE_SIZE - 1:05X}); "
+            "shorten a WAV by twice that many samples"
+        )
+    return Layout(manifest.entries, phrases)
 
 
 # --- the phrase table --------------------------------------------------------------------------
 
 
-def encode_table(layout: Layout) -> bytes:
+def encode_table(lay: Layout) -> bytes:
     """The table as the image holds it: entry 0 and bytes 6-7 of every entry zero."""
     out = bytearray(ENTRY)
-    for p in layout.phrases:
+    for p in lay.phrases:
         out += p.start.to_bytes(3, "big") + p.end.to_bytes(3, "big") + b"\0\0"
     return bytes(out)
 
@@ -179,22 +220,43 @@ def decode_table(image: bytes, entries: int) -> list[tuple[int, int]]:
     return out
 
 
-def check_image(image: bytes, layout: Layout) -> None:
-    """Fail unless the image is exactly the manifest's table, samples and zero tail."""
+def table_layout(image: bytes) -> tuple[int, list[tuple[int, int]]]:
+    """The image's own table: the number of entries phrase 1's start implies (it starts right
+    after the table) and every (start, end), each phrase starting where the previous one ends."""
     if len(image) != IMAGE_SIZE:
         raise FormatError(f"image is {len(image)} bytes, not {IMAGE_SIZE}")
-    table = encode_table(layout)
-    for n in range(layout.entries):
+    start1 = int.from_bytes(image[ENTRY : ENTRY + 3], "big")
+    if start1 % ENTRY or not 2 * ENTRY <= start1 <= MAX_PHRASES * ENTRY:
+        raise FormatError(f"phrase 1 starts at {start1:05X}: no table length explains it")
+    entries = start1 // ENTRY
+    if any(image[:ENTRY]):
+        raise FormatError("phrase table entry 0 is not zero")
+    spans = decode_table(image, entries)
+    expect = start1
+    for n, (s, e) in enumerate(spans, 1):
+        if s != expect or e < s:
+            raise FormatError(f"phrase {n} ({s:05X}-{e:05X}) does not follow at {expect:05X}")
+        expect = e + 1
+    return entries, spans
+
+
+def check_image(image: bytes, lay: Layout) -> None:
+    """Fail unless the image is exactly the layout's table, samples and zero tail."""
+    if len(image) != IMAGE_SIZE:
+        raise FormatError(f"image is {len(image)} bytes, not {IMAGE_SIZE}")
+    table = encode_table(lay)
+    for n in range(lay.entries):
         if image[n * ENTRY : n * ENTRY + ENTRY] != table[n * ENTRY : n * ENTRY + ENTRY]:
-            got = decode_table(image, layout.entries)[n - 1] if n else None
-            want = (layout.phrases[n - 1].start, layout.phrases[n - 1].end) if n else None
+            got = decode_table(image, lay.entries)[n - 1] if n else None
+            want = (lay.phrases[n - 1].start, lay.phrases[n - 1].end) if n else None
             detail = (
-                f"{got[0]:05X}-{got[1]:05X} in the image, {want[0]:05X}-{want[1]:05X} in the manifest"
+                f"{got[0]:05X}-{got[1]:05X} in the image, {want[0]:05X}-{want[1]:05X} from the "
+                "WAVs"
                 if got and want
-                else "not the zero entry and padding the manifest describes"
+                else "not the zero entry and padding the layout describes"
             )
             raise FormatError(f"phrase table entry {n}: {detail}")
-    tail = layout.tail
+    tail = lay.tail
     nonzero = [a for a in range(tail, IMAGE_SIZE) if image[a]]
     if nonzero:
         raise FormatError(
@@ -202,19 +264,19 @@ def check_image(image: bytes, layout: Layout) -> None:
         )
 
 
-def split(image: bytes, layout: Layout) -> dict[int, bytes]:
+def split(image: bytes, lay: Layout) -> dict[int, bytes]:
     """Phrase number -> its sample bytes, after check_image."""
-    check_image(image, layout)
-    return {p.number: image[p.start : p.end + 1] for p in layout.phrases}
+    check_image(image, lay)
+    return {p.number: image[p.start : p.end + 1] for p in lay.phrases}
 
 
-def build(layout: Layout, samples: dict[int, bytes]) -> bytes:
-    """The image from the manifest and the sample bytes (the inverse of split)."""
-    out = bytearray(encode_table(layout))
-    for p in layout.phrases:
+def build(lay: Layout, samples: dict[int, bytes]) -> bytes:
+    """The image from the layout and the sample bytes (the inverse of split)."""
+    out = bytearray(encode_table(lay))
+    for p in lay.phrases:
         data = samples[p.number]
         if len(data) != p.length:
-            raise FormatError(f"phrase {p.number}: {len(data)} bytes, the manifest says {p.length}")
+            raise FormatError(f"phrase {p.number}: {len(data)} bytes, the layout says {p.length}")
         out += data
     if len(out) > IMAGE_SIZE:
         raise FormatError(f"the samples end at {len(out):05X}, past the image")
@@ -222,6 +284,11 @@ def build(layout: Layout, samples: dict[int, bytes]) -> bytes:
 
 
 # --- WAV ---------------------------------------------------------------------------------------
+
+WAVE_FORMAT_PCM = 0x0001
+WAVE_FORMAT_EXTENSIBLE = 0xFFFE
+# KSDATAFORMAT_SUBTYPE_PCM: the extensible header's sub-format GUID for integer PCM
+SUBTYPE_PCM = bytes.fromhex("0100000000001000800000aa00389b71")
 
 
 def chunk(tag: bytes, body: bytes) -> bytes:
@@ -233,17 +300,12 @@ def riff(chunks: list[bytes]) -> bytes:
     return b"RIFF" + struct.pack("<I", len(body)) + body
 
 
-def adpcm_wav(data: bytes, name: str = "", pin7: str = PIN7) -> bytes:
-    """A WAV whose data chunk is `data` verbatim: Dialogic OKI ADPCM (format tag 0x0017), mono,
-    4 bits per sample, high nibble first; the fact chunk gives the number of samples (two per
-    byte); the name, if any, goes into LIST/INFO/INAM."""
-    hz = round(rate(pin7))
-    fmt = struct.pack("<HHIIHHH", WAVE_FORMAT_DIALOGIC_OKI_ADPCM, 1, hz, (hz + 1) // 2, 1, 4, 0)
-    chunks = [chunk(b"fmt ", fmt), chunk(b"fact", struct.pack("<I", 2 * len(data)))]
-    if name:
-        chunks.append(chunk(b"LIST", b"INFO" + chunk(b"INAM", name.encode("ascii") + b"\0")))
-    chunks.append(chunk(b"data", data))
-    return riff(chunks)
+def pcm_wav(values: list[int], pin7: str = PIN7) -> bytes:
+    """16-bit PCM mono at the M6295 rate, a canonical 44-byte header (fmt, data) and nothing
+    else: the file `tools/adpcm samples` writes and data/oki commits."""
+    hz = wav_rate(pin7)
+    fmt = struct.pack("<HHIIHH", WAVE_FORMAT_PCM, 1, hz, 2 * hz, 2, 16)
+    return riff([chunk(b"fmt ", fmt), chunk(b"data", struct.pack(f"<{len(values)}h", *values))])
 
 
 def chunks(blob: bytes) -> list[tuple[bytes, bytes]]:
@@ -267,10 +329,12 @@ def chunks(blob: bytes) -> list[tuple[bytes, bytes]]:
     return out
 
 
-def unwav(blob: bytes) -> bytes:
-    """The ADPCM bytes of a WAV made by adpcm_wav (or any WAV in the same format): the data
-    chunk, verbatim. Rejects any other format, channel count or sample size, a missing or
-    doubled fmt/data chunk, and a fact chunk that disagrees with the data."""
+def read_wav(blob: bytes, pin7: str = PIN7) -> list[int]:
+    """The 16-bit samples of a mono 16-bit PCM WAV at the M6295 rate (format tag 1, or the
+    extensible header with the PCM sub-format, as editors write it); chunks other than fmt and
+    data are skipped. Any 16-bit value is accepted: one the decoder cannot produce is an edit,
+    which `encode` quantises. Rejects another format, channel count, sample size or rate, a
+    missing or doubled fmt/data chunk, an odd data size and an empty sample."""
     found: dict[bytes, list[bytes]] = {}
     for tag, body in chunks(blob):
         found.setdefault(tag, []).append(body)
@@ -280,42 +344,27 @@ def unwav(blob: bytes) -> bytes:
     fmt = found[b"fmt "][0]
     if len(fmt) < 16:
         raise FormatError("fmt chunk shorter than 16 bytes")
-    tag, channels, _, _, align, bits = struct.unpack_from("<HHIIHH", fmt)
-    if tag != WAVE_FORMAT_DIALOGIC_OKI_ADPCM:
-        raise FormatError(f"format tag 0x{tag:04X}, not 0x0017 (Dialogic OKI ADPCM)")
-    if channels != 1 or bits != 4 or align != 1:
-        raise FormatError(f"{channels} channels, {bits} bits, block align {align}: not 1, 4, 1")
+    tag, channels, hz, _, align, bits = struct.unpack_from("<HHIIHH", fmt)
+    if tag == WAVE_FORMAT_EXTENSIBLE:
+        if len(fmt) < 40 or fmt[24:40] != SUBTYPE_PCM:
+            raise FormatError("an extensible WAV whose sub-format is not integer PCM")
+    elif tag != WAVE_FORMAT_PCM:
+        raise FormatError(f"format tag 0x{tag:04X}, not 0x0001 (PCM)")
+    if channels != 1 or bits != 16 or align != 2:
+        raise FormatError(
+            f"{channels} channels, {bits} bits, block align {align}: not mono 16-bit PCM"
+        )
+    if hz != wav_rate(pin7):
+        raise FormatError(
+            f"{hz} Hz, not {wav_rate(pin7)} Hz (the M6295's rate): resample it to "
+            f"{wav_rate(pin7)} Hz, the chip plays every sample at that rate"
+        )
     data = found[b"data"][0]
-    for fact in found.get(b"fact", []):
-        if len(fact) < 4 or struct.unpack_from("<I", fact)[0] != 2 * len(data):
-            raise FormatError("fact chunk does not give two samples per data byte")
-    return data
-
-
-def pcm_wav(samples: list[int], pin7: str = PIN7) -> bytes:
-    """16-bit PCM mono: each 12-bit decoder output shifted left by 4 (MAME's stream divides the
-    output by 2048, the same scale)."""
-    hz = round(rate(pin7))
-    fmt = struct.pack("<HHIIHH", 1, 1, hz, 2 * hz, 2, 16)
-    data = struct.pack(f"<{len(samples)}h", *(s * 16 for s in samples))
-    return riff([chunk(b"fmt ", fmt), chunk(b"data", data)])
-
-
-def read_pcm_wav(blob: bytes) -> list[int]:
-    """The 12-bit samples of a pcm_wav file (each 16-bit sample shifted right by 4, which must
-    be exact)."""
-    found = dict(chunks(blob))
-    fmt = found.get(b"fmt ")
-    data = found.get(b"data")
-    if fmt is None or data is None or len(fmt) < 16:
-        raise FormatError("no fmt or data chunk")
-    tag, channels, _, _, _, bits = struct.unpack_from("<HHIIHH", fmt)
-    if (tag, channels, bits) != (1, 1, 16) or len(data) & 1:
-        raise FormatError("not 16-bit mono PCM")
-    values = struct.unpack(f"<{len(data) // 2}h", data)
-    if any(v & 15 for v in values):
-        raise FormatError("a sample is not a 12-bit value shifted left by 4")
-    return [v >> 4 for v in values]
+    if len(data) & 1:
+        raise FormatError(f"a data chunk of {len(data)} bytes: not whole 16-bit samples")
+    if not data:
+        raise FormatError("no samples")
+    return list(struct.unpack(f"<{len(data) // 2}h", data))
 
 
 # --- the M6295's decoder (okiadpcm.cpp, oki_adpcm_state) ---------------------------------------
@@ -343,6 +392,13 @@ def diff_lookup() -> list[int]:
 
 
 DIFF = diff_lookup()
+# per step index: (difference, next step index) for nibbles 0-15, and difference -> nibble (the
+# 16 differences of a row are distinct: see `encode`)
+ROWS = [
+    [(DIFF[i * 16 + n], min(48, max(0, i + INDEX_SHIFT[n & 7]))) for n in range(16)]
+    for i in range(49)
+]
+INVERSE = [{d: n for n, (d, _) in enumerate(row)} for row in ROWS]
 
 
 def nibbles(data: bytes) -> list[int]:
@@ -355,34 +411,117 @@ def nibbles(data: bytes) -> list[int]:
 
 def step(signal: int, index: int, nibble: int) -> tuple[int, int]:
     """oki_adpcm_state::clock: the new (signal, step index)."""
-    signal = min(2047, max(-2048, signal + DIFF[index * 16 + nibble]))
-    index = min(48, max(0, index + INDEX_SHIFT[nibble & 7]))
-    return signal, index
+    d, index = ROWS[index][nibble]
+    return min(SIGNAL_MAX, max(SIGNAL_MIN, signal + d)), index
 
 
-def decode(data: bytes) -> list[int]:
-    """The 12-bit outputs (-2048..2047) the M6295 produces for a sample, one per nibble, from
-    the reset state (signal 0, step 0, as a voice starts: voice.m_adpcm.reset())."""
-    signal, index = 0, 0
+def decode_nibbles(nibs: list[int], start: tuple[int, int] = (0, 0)) -> list[int]:
+    """The decoder's outputs for a nibble sequence from a state (signal, step index)."""
+    signal, index = start
     out: list[int] = []
-    for n in nibbles(data):
+    for n in nibs:
         signal, index = step(signal, index, n)
         out.append(signal)
     return out
 
 
-def encode(samples: list[int]) -> bytes:
-    """A deterministic greedy encoder: at each sample the nibble whose decoded output is nearest
-    (the lowest nibble on a tie). For PCM that decode() produced, the nibble the ROM holds
-    reaches each sample exactly, so the encoder picks it unless a lower nibble reaches the same
-    output, which only the clamp to -2048..2047 allows; `tools/adpcm encoder-check` measures it.
-    Experiments only: the build never encodes PCM."""
-    signal, index = 0, 0
+def decode(data: bytes) -> list[int]:
+    """The 12-bit outputs (-2048..2047) the M6295 produces for a sample, one per nibble, from
+    the reset state (signal 0, step 0, as a voice starts: voice.m_adpcm.reset())."""
+    return decode_nibbles(nibbles(data))
+
+
+def pcm(data: bytes) -> list[int]:
+    """The 16-bit PCM of a sample: decode x SCALE, what a WAV in data/oki holds."""
+    return [SCALE * s for s in decode(data)]
+
+
+# --- the encoder -------------------------------------------------------------------------------
+
+Node = tuple[int, "Node"] | None  # a nibble history, newest first: (nibble, the history before)
+
+
+def encode_nibbles(targets: list[int], start: tuple[int, int] = (0, 0)) -> list[int]:
+    """The encoder's nibble for each 16-bit target, from a decoder state (signal, step
+    index): the rule `encode` states, one nibble per value."""
+    cands: list[tuple[int, int, Node]] = [(start[0], start[1], None)]
+    for v in targets:
+        if len(cands) == 1 and v % SCALE == 0:
+            # the common case: one candidate and a value on the decoder's grid that one nibble
+            # reaches exactly without clamping, so it is the only error-0 successor
+            signal, index, node = cands[0]
+            n = INVERSE[index].get(v // SCALE - signal)
+            if n is not None and SIGNAL_MIN < v // SCALE < SIGNAL_MAX:
+                cands = [(v // SCALE, ROWS[index][n][1], (n, node))]
+                continue
+        best = -1
+        found: dict[tuple[int, int], Node] = {}
+        for signal, index, node in cands:
+            for n, (d, nxt) in enumerate(ROWS[index]):
+                s = min(SIGNAL_MAX, max(SIGNAL_MIN, signal + d))
+                err = abs(SCALE * s - v)
+                if best < 0 or err < best:
+                    best, found = err, {}
+                if err == best and (s, nxt) not in found:
+                    found[(s, nxt)] = (n, node)
+        cands = [(s, i, node) for (s, i), node in found.items()]
     out: list[int] = []
-    for target in samples:
-        best = min(range(16), key=lambda n: (abs(step(signal, index, n)[0] - target), n))
-        signal, index = step(signal, index, best)
-        out.append(best)
-    if len(out) & 1:
-        out.append(0)
+    node = cands[0][2]
+    while node is not None:
+        out.append(node[0])
+        node = node[1]
+    out.reverse()
+    return out
+
+
+def encode(values: list[int]) -> bytes:
+    """ADPCM bytes for 16-bit PCM values, by the rule docs/10 section 6 states and proves:
+
+    The decoder state is (signal, step index), (0, 0) at the start. The encoder keeps a set of
+    candidate states, each with one nibble history that reaches it; at first only (0, 0). For
+    each value v in turn, every candidate and every nibble 0-15 gives a successor state, with
+    the error |SCALE * signal - v|. The new candidates are the successors whose error is the
+    smallest one this value allows (over all candidates and nibbles), one per distinct state,
+    each with the lexicographically smallest history that reaches it (candidates are kept in
+    history order and nibbles tried from 0 up, so the first successor found for a state is
+    that one). After the last value the first candidate's history is the result. An odd number
+    of values gets the last value once more, so the last byte has two nibbles.
+
+    Properties (docs/10 section 6): for any PCM the decoder produced, `pcm(encode(v)) == v`;
+    the bytes are the original ones unless some output is -2048 or 2047 (only a clamped output
+    can be reached by two nibbles from one state), and then they are the lexicographically
+    smallest bytes that decode to v. For any other PCM (an edit) each value is followed as
+    closely as the rule allows, one value at a time (not a global optimum); `round_trip` gives
+    the error. At most 98 candidates (two signals at the smallest distance x 49 step indices).
+    """
+    if not values:
+        raise FormatError("no samples")
+    out = encode_nibbles(list(values) + ([values[-1]] if len(values) & 1 else []))
     return bytes(out[i] << 4 | out[i + 1] for i in range(0, len(out), 2))
+
+
+@dataclass(frozen=True)
+class RoundTrip:
+    """What decoding the encoder's bytes gives back, compared with the PCM it was given."""
+
+    samples: int  # the PCM's length
+    differ: int  # samples whose decoded value is not the PCM's
+    max_error: int  # the largest |decoded - PCM|, in 16-bit units
+    rms_error: float
+    padded: bool  # an odd length: the last byte's second nibble repeats the last value
+
+    @property
+    def exact(self) -> bool:
+        return self.differ == 0 and not self.padded
+
+
+def round_trip(values: list[int], data: bytes) -> RoundTrip:
+    back = pcm(data)
+    errors = [abs(a - b) for a, b in zip(back, values, strict=False)]
+    return RoundTrip(
+        len(values),
+        sum(e != 0 for e in errors),
+        max(errors, default=0),
+        math.sqrt(sum(e * e for e in errors) / len(errors)) if errors else 0.0,
+        len(back) != len(values),
+    )
