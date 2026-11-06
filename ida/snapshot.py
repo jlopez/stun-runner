@@ -18,7 +18,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-COMMENT_KINDS = ("regular", "repeatable", "function", "function_repeatable")
+# "anterior": the lines IDA shows above an address (its extra comments), one text joined by
+# line breaks.
+COMMENT_KINDS = ("regular", "repeatable", "function", "function_repeatable", "anterior")
 DATA_TYPES = {"byte": 1, "word": 2, "dword": 4}
 
 # What IDA's own analysis writes as if it were a user annotation (has_user_name is true for the
@@ -31,6 +33,8 @@ IDA_GENERATED_COMMENTS = [
     re.compile(r"jumptable [0-9A-F]+ (default case|cases? [0-9,-]+)(, cases? [0-9,-]+)?"),
     # mc68k: the exception each vector-table target serves, one per line
     re.compile(r"(initial_sp|[a-z0-9_]+_entry)(\n(initial_sp|[a-z0-9_]+_entry))*"),
+    # the binary loader: the anterior lines at the first address (the image's local path)
+    re.compile(r"; File Name +: .*\n; Format +: .*(\n; Base Address: .*)?"),
 ]
 
 
@@ -57,6 +61,7 @@ class Segment:
 class Name:
     ea: int
     name: str
+    local: bool = False  # an IDA local name (SN_LOCAL), valid inside the function at ea
 
 
 @dataclass(frozen=True, order=True)
@@ -72,6 +77,9 @@ class DataItem:
     type: str  # one of DATA_TYPES
     count: int = 1
     offset: bool = False  # the value is an address (an IDA offset)
+    # An offset whose value is its target plus `delta` (IDA's refinfo tdelta): -1 for the 6502's
+    # RTS-dispatch words, `.word handler-1`, whose target is the handler. 0 for a plain offset.
+    delta: int = 0
 
 
 @dataclass
@@ -83,6 +91,9 @@ class Snapshot:
     functions: list[int] = field(default_factory=list)
     comments: list[Comment] = field(default_factory=list)
     data: list[DataItem] = field(default_factory=list)
+    # Instruction ranges [start, end): only for a database whose classification the repository
+    # owns (`classified` in `export`), where every instruction head is recorded.
+    code: list[tuple[int, int]] = field(default_factory=list)
 
     def normalized(self) -> Snapshot:
         """Sorted, duplicate-free copy: the canonical order of the committed file."""
@@ -94,7 +105,19 @@ class Snapshot:
             sorted(set(self.functions)),
             sorted(set(self.comments), key=lambda c: (c.ea, COMMENT_KINDS.index(c.kind))),
             sorted(set(self.data)),
+            merge_ranges(self.code),
         )
+
+
+def merge_ranges(ranges: Iterable[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Sorted ranges with the touching and overlapping ones joined."""
+    out: list[tuple[int, int]] = []
+    for start, end in sorted(ranges):
+        if out and start <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], end))
+        else:
+            out.append((start, end))
+    return out
 
 
 class Database(Protocol):
@@ -102,19 +125,23 @@ class Database(Protocol):
 
     def segments(self) -> list[Segment]: ...
     def add_segment(self, segment: Segment) -> None: ...
-    def names(self) -> list[Name]: ...
-    def set_name(self, ea: int, name: str) -> None: ...
+    def names(self) -> list[Name]: ...  # global and local
+    def set_name(self, ea: int, name: str, local: bool = False) -> None: ...
     def function_starts(self) -> list[int]: ...
     def add_function(self, ea: int) -> None: ...
     def comments(self, eas: Iterable[int]) -> list[Comment]: ...
     def set_comment(self, comment: Comment) -> None: ...
     def data_item(self, ea: int) -> DataItem | None: ...
     def create_data(self, item: DataItem) -> None: ...
+    def data_items(self, start: int, end: int) -> list[DataItem]: ...
+    def code_ranges(self, start: int, end: int) -> list[tuple[int, int]]: ...
+    def create_code(self, start: int, end: int) -> None: ...
 
 
 def apply(snapshot: Snapshot, db: Database) -> None:
-    """Segments, then data items, then functions, then names (so that a function keeps its
-    name), then comments (a function comment needs the function).
+    """Segments, then data items, then code, then functions, then names (so that a function
+    keeps its name; local names after the global ones, inside their functions), then comments (a
+    function comment needs the function).
 
     Functions are created from the highest address down: a function made first would otherwise
     absorb the code of a later start that its flow falls or branches into (on this ROM the 68010
@@ -123,29 +150,39 @@ def apply(snapshot: Snapshot, db: Database) -> None:
         db.add_segment(segment)
     for item in snapshot.data:
         db.create_data(item)
+    for start, end in snapshot.code:
+        db.create_code(start, end)
     for ea in sorted(snapshot.functions, reverse=True):
         db.add_function(ea)
-    for name in snapshot.names:
-        db.set_name(name.ea, name.name)
+    for name in sorted(snapshot.names, key=lambda n: n.local):
+        db.set_name(name.ea, name.name, name.local)
     for comment in snapshot.comments:
         db.set_comment(comment)
 
 
-def export(db: Database, database: str, processor: str) -> Snapshot:
+def export(
+    db: Database, database: str, processor: str, classified: Iterable[tuple[int, int]] = ()
+) -> Snapshot:
     """The snapshot of `db`. Comments are looked up at function starts and named addresses and
     at every head the database reports (the IDA side adds its heads in `comments`); data items
-    only at named addresses. Names and comments IDA's analysis generates are left out."""
+    at named addresses, and every data item and instruction range inside the `classified`
+    ranges (the 6502 image, whose source owns the classification). Names and comments IDA's
+    analysis generates are left out."""
     names = [n for n in db.names() if not ida_generated_name(n.name)]
     functions = db.function_starts()
     named = sorted({n.ea for n in names})
     data = [item for ea in named if (item := db.data_item(ea)) is not None]
+    code: list[tuple[int, int]] = []
+    for start, end in classified:
+        data += db.data_items(start, end)
+        code += db.code_ranges(start, end)
     comments = [
         c
         for c in db.comments(sorted(set(named) | set(functions)))
         if not ida_generated_comment(c.text)
     ]
     return Snapshot(
-        database, processor, db.segments(), names, functions, comments, data
+        database, processor, db.segments(), names, functions, comments, data, code
     ).normalized()
 
 
@@ -155,6 +192,13 @@ def _hex(ea: int) -> str:
 
 def _ea(text: str) -> int:
     return int(text, 16)
+
+
+def _name(n: Name) -> dict[str, Any]:
+    entry: dict[str, Any] = {"ea": _hex(n.ea), "name": n.name}
+    if n.local:
+        entry["local"] = True
+    return entry
 
 
 def to_dict(snapshot: Snapshot) -> dict[str, Any]:
@@ -172,17 +216,25 @@ def to_dict(snapshot: Snapshot) -> dict[str, Any]:
         if seg.comment:
             entry["comment"] = seg.comment
         segments.append(entry)
-    return {
+    out: dict[str, Any] = {
         "database": s.database,
         "processor": s.processor,
         "segments": segments,
-        "names": [{"ea": _hex(n.ea), "name": n.name} for n in s.names],
+        "names": [_name(n) for n in s.names],
         "functions": [_hex(ea) for ea in s.functions],
         "comments": [{"ea": _hex(c.ea), "kind": c.kind, "text": c.text} for c in s.comments],
-        "data": [
-            {"ea": _hex(d.ea), "type": d.type, "count": d.count, "offset": d.offset} for d in s.data
-        ],
+        "data": [_data(d) for d in s.data],
     }
+    if s.code:  # absent from a snapshot without classified ranges (the 68k's)
+        out["code"] = [[_hex(a), _hex(b)] for a, b in s.code]
+    return out
+
+
+def _data(d: DataItem) -> dict[str, Any]:
+    out: dict[str, Any] = {"ea": _hex(d.ea), "type": d.type, "count": d.count, "offset": d.offset}
+    if d.delta:  # only on an offset to a target other than its value (none in the 68k's)
+        out["delta"] = d.delta
+    return out
 
 
 def from_dict(d: dict[str, Any]) -> Snapshot:
@@ -204,10 +256,14 @@ def from_dict(d: dict[str, Any]) -> Snapshot:
             )
             for s in d["segments"]
         ],
-        [Name(_ea(n["ea"]), n["name"]) for n in d["names"]],
+        [Name(_ea(n["ea"]), n["name"], n.get("local", False)) for n in d["names"]],
         [_ea(ea) for ea in d["functions"]],
         [Comment(_ea(c["ea"]), c["kind"], c["text"]) for c in d["comments"]],
-        [DataItem(_ea(x["ea"]), x["type"], x["count"], x["offset"]) for x in d["data"]],
+        [
+            DataItem(_ea(x["ea"]), x["type"], x["count"], x["offset"], x.get("delta", 0))
+            for x in d["data"]
+        ],
+        [(_ea(a), _ea(b)) for a, b in d.get("code", [])],
     ).normalized()
 
 

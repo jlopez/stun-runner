@@ -35,7 +35,8 @@ def export_one(key: str, data: Path, out: Path, listing: Path) -> None:
         from ida.snapshot import dumps, export
 
         out.mkdir(parents=True, exist_ok=True)
-        snapshot = export(IdaDatabase(), name, ida_ida.inf_get_procname())
+        spec = DATABASES[key]
+        snapshot = export(IdaDatabase(), name, ida_ida.inf_get_procname(), spec.classified)
         (out / f"{name}.json").write_text(dumps(snapshot))
         functions = collect_all_functions()
         with open(out / f"{name}.functions.jsonl", "w") as f:

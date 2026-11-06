@@ -2,14 +2,14 @@
 
 **Date**: 2026-11-05 (milestone 4, leg M4e, issue #15). How the 68010 talks to the JSA II board's
 6502: the latch pair at 600000, the reset at 604000, the level 4 interrupt, both programs' code
-for it, the command set 00-6C with the 68010's own name for each command, and the MAME runs that
-show it. Addresses: 68010 addresses as six hex digits, 6502 addresses as four. **CODE** means
+for it, the command set 00-6C with the 68010's own name for each command but 03 (`cmd_03_imm`),
+and the MAME runs that show it. Addresses: 68010 addresses as six hex digits, 6502 addresses as four. **CODE** means
 read off the image (`build/stunrun-68k.bin` with `unidasm -arch m68010`; the 6502 program in its
 source `asm/jsa/`, leg M4a, docs/09), **MAME** a run of the committed script
 `tools/mame/sndproto.lua` (`make sndproto`, MAME 0.289, section 8), **SRC** MAME's source
-(`~/.local/src/mame`, tag mame0289, file:line). 6502 label names are M4a's (`h_nmi`,
-`dispatch_command`, `cmd_class` ...); they will change in later legs, the addresses will not.
-68010 names are the ones this leg puts into `ida/code_map.py`.
+(`~/.local/src/mame`, tag mame0289, file:line). 6502 label names are the source's (M4a, M4c
+and M4d named them: docs/09 sections 4 and 10, docs/12); the sequencer's terms (sound, track,
+list, priority) are docs/12's. 68010 names are the ones this leg puts into `ida/code_map.py`.
 
 The machine form of section 6 is `data/sound/commands.json`: one entry per command value, with
 its name, the 6502's tables, the 68010 call sites and the MAME counts. The 6502 source legs and
@@ -245,22 +245,22 @@ Classes, types and parameters are the 6502's tables at 6093, 6100 and 616D (`cmd
 |---|---|---|
 | 00 | `cmdtype_00_min_priority` 438A | `min_priority` = 4 x param, a floor on the track priority (docs/09 section 10.2): F0 for 01, 0 for 02. While `min_priority` is not 0 the OKI start returns at once (5BFE-5C01), and a YM2151 key-on needs the track's priority byte `sounding_prio` >= `min_priority` (4EE3-4EF0): with F0 only the priority-3F sound (command 32, byte FD) keys on |
 | 01 | `cmdtype_01_set_var` 43AD | `seq_vars` + (`global_set_index`+param AND 1F) = `global_set_value`+param; a stream op reads `seq_vars,y` (54EE) |
-| 03 | `cmdtype_03_immediate` 43CA | `imm_handlers` entry param: entry 0 is `init_sound` (4238), the initialisation reset also runs (OKI reset, response queue emptied, voice tables cleared, key-off on the eight YM2151 channels, MIX set) |
-| 05 | `cmdtype_05_stop_sound` 43EE | if command param is of type 08, every voice playing its stream gets `trk_sound` = FF (stopped) |
-| 08 | `cmdtype_08_start_sound` 4569 | starts stream param on its voices (`sound_first_entry` first entry, `entry_next` next; group `entry_priority`, YM2151 channel `entry_channel`, byte stream `entry_stream`) |
+| 03 | `cmdtype_03_immediate` 43CA | `imm_handlers` entry param: entry 0 is `init_sound` (4238), the initialisation reset also runs (OKI reset, response queue emptied, every track freed and the lists emptied, key-off on the eight YM2151 channels, MIX set) |
+| 05 | `cmdtype_05_stop_sound` 43EE | if command param is of type 08, every track playing its sound gets `trk_sound` = FF (stopped) |
+| 08 | `cmdtype_08_start_sound` 4569 | starts sound param, one track per entry (`sound_first_entry` first entry, `entry_next` next; priority `entry_priority`, YM2151 channel `entry_channel`, byte stream `entry_stream`; docs/12 section 1) |
 | 09 | `queue_response` 44D0 | param into `resp_queue` |
-| 0A | `cmdtype_0A_release_sound` 445F | if command param is of type 08, every voice playing its stream is released (`trk_slide_rate_hi` = D0, `trk_slide_time_hi` = 2, `trk_sound` = FE) |
-| 0B | `cmdtype_0B_release_priority` 4496 | every voice whose group (`trk_priority` / 4) is param is released as by type 0A |
+| 0A | `cmdtype_0A_release_sound` 445F | if command param is of type 08, every track playing its sound is released (`trk_slide_rate_hi` = D0, `trk_slide_time_hi` = 2, `trk_sound` = FE) |
+| 0B | `cmdtype_0B_release_priority` 4496 | every track whose priority (`trk_priority` / 4) is param is released as by type 0A |
 | 13 | `cmdtype_13_oki_play` 5BFE | OKI phrase `effect_phrase`+param on the channel and attenuation of `effect_voice`+param, unless `min_priority` is not 0 (docs/10) |
 | 14 | `cmdtype_14_oki_stop` 5C6F | stops the OKI channel whose current phrase is param |
 | FF | `imm_handlers` 61DA | an immediate command (class 00-03), inside `h_nmi` |
 
 The names fit what the 6502 does with them, which is a check on both: SOFF/SON raise and clear the
 priority floor (`min_priority` F0 starts no OKI sample and keys on only priority 3F), STAT the status, SMAX sends the command count 6D, ECHO queues 55; the K names (KSCRAP
-2E, KDIVE 36) are type 05 and stop exactly the stream of SCRAP (2D) and DIVE (35); the F names
-of type 0A (FSUBFAN 13, FSTBEG 15, FHISCOR 19, FHELCPT 27, FVRCFT 29) release the stream of
-SUBFAN, STBEG, HISCOR, HELCPT and HVRCFT; FTUBMUS (0B) releases group 27, the voices of TUBMUS
-(0A), and FMAPMUS (0E) group 29, those of MAPMUS, WAIT and CHMAP; KBRAKE (66) stops phrase 48,
+2E, KDIVE 36) are type 05 and stop exactly the sound of SCRAP (2D) and DIVE (35); the F names
+of type 0A (FSUBFAN 13, FSTBEG 15, FHISCOR 19, FHELCPT 27, FVRCFT 29) release the sound of
+SUBFAN, STBEG, HISCOR, HELCPT and HVRCFT; FTUBMUS (0B) releases priority 27, the tracks of TUBMUS
+(0A), and FMAPMUS (0E) priority 29, those of MAPMUS, WAIT and CHMAP; KBRAKE (66) stops phrase 48,
 which BRAKE (65) plays **CODE**.
 
 Columns: the 68010's name (section 5), the 6502's class, type and parameter, what the 6502 does
@@ -276,58 +276,58 @@ except the audio test's 04395C.
 | 01 | SOFF | FF | 00 | 3C | priority floor: min_priority = F0 (no OKI start, only priority 3F keys on) | 5 / 1 | 024E42, 0253A4, 02837E |
 | 02 | SON | FF | 00 | 00 | no floor: min_priority = 0 | 0 / 1 | 027178, 02837E |
 | 03 | (not listed) | 00 | FF | 00 | sends coin_state, read_inputs's four 2-bit coin counters (raw RDIO bits 0-3 under the self-test) | 0 / 0 | none |
-| 04 | YTST | FF | 08 | 00 | starts stream 00 | 0 / 0 | none; written by 008E84 |
+| 04 | YTST | FF | 08 | 00 | starts sound 00 | 0 / 0 | none; written by 008E84 |
 | 05 | ADTEST | FF | 13 | 00 | plays OKI phrase 1 | 0 / 0 | none; written by 008EB0 |
 | 06 | SMAX | 01 | FF | 00 | sends 6D, the number of command values the tables cover | 0 / 0 | none (audio test only) |
 | 07 | STAT | 02 | FF | 00 | sends board_status, the status byte, then sets its bits 0 and 2 | 0 / 0 | none; written by 008DDA, 008F94, 0300B8 |
 | 08 | SCUM | 03 | FF | 00 | sends AA, takes the next byte written and sends it back | 0 / 0 | none (audio test only) |
 | 09 | ECHO | FF | 09 | 55 | queues the response 55 | 0 / 0 | none (audio test only) |
-| 0A | TUBMUS | FF | 08 | 01 | starts stream 01 | 3 / 8 | 032278 |
-| 0B | FTUBMUS | FF | 0B | 27 | releases every voice of group 27 (streams of commands 0A) | 2 / 6 | 024E4E, 0253B0, 0268A8, 028B94 and 2 more |
-| 0C | MAPMUS | FF | 08 | 02 | starts stream 02 | 0 / 4 | 024A7C, 029C0E, 02AF58 |
-| 0D | WAIT | FF | 08 | 03 | starts stream 03 | 0 / 0 | 029C0E |
-| 0E | FMAPMUS | FF | 0B | 29 | releases every voice of group 29 (streams of commands 0C, 0D, 17) | 0 / 4 | 02769C, 027A0A, 02ABEC |
-| 0F | SUBSTA2 | FF | 08 | 04 | starts stream 04 | 0 / 1 | 028F8A |
-| 10 | WARPMUS | FF | 08 | 05 | starts stream 05 | 0 / 0 | none (audio test only) |
-| 11 | ASMUS | FF | 08 | 06 | starts stream 06 | 0 / 1 | 028F8A |
-| 12 | SUBFAN | FF | 08 | 07 | starts stream 07 | 0 / 1 | 028F8A |
-| 13 | FSUBFAN | FF | 0A | 12 | releases the voices of stream 07 (command 12) | 0 / 4 | 027782, 027994 |
-| 14 | STBEG | FF | 08 | 08 | starts stream 08 | 0 / 1 | 024FF2 |
-| 15 | FSTBEG | FF | 0A | 14 | releases the voices of stream 08 (command 14) | 0 / 1 | 02763E, 02B6C0, 038F3A |
-| 16 | INPASS | FF | 08 | 09 | starts stream 09 | 0 / 1 | 031FAE, 03262E, 03A2D2 |
-| 17 | CHMAP | FF | 08 | 0A | starts stream 0A | 0 / 0 | 024A72, 029BF8 |
-| 18 | HISCOR | FF | 08 | 0B | starts stream 0B | 0 / 0 | 024D5C, 02509A, 0250D6, 02516E and 3 more |
-| 19 | FHISCOR | FF | 0A | 18 | releases the voices of stream 0B (command 18) | 0 / 0 | 024D74, 024DE8, 03EE82, 03EEAE and 1 more |
-| 1A | VICTORY | FF | 08 | 0C | starts stream 0C | 0 / 0 | 02732A, 02749C |
-| 1B | ATRCTMUS | FF | 08 | 0D | starts stream 0D | 0 / 0 | 0245F4, 02466A |
-| 1C | TUBEG | FF | 08 | 0E | starts stream 0E | 3 / 5 | 024B98, 028498 |
-| 1D | ENG | FF | 08 | 0F | starts stream 0F | 3 / 5 | 024B92, 027BFC, 028492 |
+| 0A | TUBMUS | FF | 08 | 01 | starts sound 01 | 3 / 8 | 032278 |
+| 0B | FTUBMUS | FF | 0B | 27 | releases every track of priority 27 (the sound of command 0A) | 2 / 6 | 024E4E, 0253B0, 0268A8, 028B94 and 2 more |
+| 0C | MAPMUS | FF | 08 | 02 | starts sound 02 | 0 / 4 | 024A7C, 029C0E, 02AF58 |
+| 0D | WAIT | FF | 08 | 03 | starts sound 03 | 0 / 0 | 029C0E |
+| 0E | FMAPMUS | FF | 0B | 29 | releases every track of priority 29 (the sounds of commands 0C, 0D, 17) | 0 / 4 | 02769C, 027A0A, 02ABEC |
+| 0F | SUBSTA2 | FF | 08 | 04 | starts sound 04 | 0 / 1 | 028F8A |
+| 10 | WARPMUS | FF | 08 | 05 | starts sound 05 | 0 / 0 | none (audio test only) |
+| 11 | ASMUS | FF | 08 | 06 | starts sound 06 | 0 / 1 | 028F8A |
+| 12 | SUBFAN | FF | 08 | 07 | starts sound 07 | 0 / 1 | 028F8A |
+| 13 | FSUBFAN | FF | 0A | 12 | releases the tracks of sound 07 (command 12) | 0 / 4 | 027782, 027994 |
+| 14 | STBEG | FF | 08 | 08 | starts sound 08 | 0 / 1 | 024FF2 |
+| 15 | FSTBEG | FF | 0A | 14 | releases the tracks of sound 08 (command 14) | 0 / 1 | 02763E, 02B6C0, 038F3A |
+| 16 | INPASS | FF | 08 | 09 | starts sound 09 | 0 / 1 | 031FAE, 03262E, 03A2D2 |
+| 17 | CHMAP | FF | 08 | 0A | starts sound 0A | 0 / 0 | 024A72, 029BF8 |
+| 18 | HISCOR | FF | 08 | 0B | starts sound 0B | 0 / 0 | 024D5C, 02509A, 0250D6, 02516E and 3 more |
+| 19 | FHISCOR | FF | 0A | 18 | releases the tracks of sound 0B (command 18) | 0 / 0 | 024D74, 024DE8, 03EE82, 03EEAE and 1 more |
+| 1A | VICTORY | FF | 08 | 0C | starts sound 0C | 0 / 0 | 02732A, 02749C |
+| 1B | ATRCTMUS | FF | 08 | 0D | starts sound 0D | 0 / 0 | 0245F4, 02466A |
+| 1C | TUBEG | FF | 08 | 0E | starts sound 0E | 3 / 5 | 024B98, 028498 |
+| 1D | ENG | FF | 08 | 0F | starts sound 0F | 3 / 5 | 024B92, 027BFC, 028492 |
 | 1E | SAME | FF | 01 | 00 | seq_vars = 00 | 62 / 124 | 02822A, 028244, 028C54, 03ADD0 and 1 more |
 | 1F | ACL | FF | 01 | 01 | seq_vars = 01 | 44 / 120 | 02822A, 03ADD0 |
 | 20 | DCL | FF | 01 | 02 | seq_vars = 02 | 45 / 71 | 03ADD0 |
 | 21 | SENG | FF | 01 | 03 | seq_vars = 03 | 2 / 6 | 024E54, 0253B6, 0268B2, 028B8A and 2 more |
 | 22 | FACL | FF | 01 | 04 | seq_vars = 04 | 29 / 87 | 028244, 028332, 03ADD0 |
 | 23 | FDCL | FF | 01 | 05 | seq_vars = 05 | 25 / 33 | 03ADD0 |
-| 24 | CD | FF | 08 | 10 | starts stream 10 | 0 / 21 | 02912A, 03E7FA, 03EAF4, 03EEDE and 1 more |
-| 25 | WARN | FF | 08 | 11 | starts stream 11 | 0 / 24 | 0280C0 |
-| 26 | HELCPT | FF | 08 | 12 | starts stream 12 | 3 / 0 | 033B82 |
-| 27 | FHELCPT | FF | 0A | 26 | releases the voices of stream 12 (command 26) | 2 / 0 | 0268BC, 03568A |
-| 28 | HVRCFT | FF | 08 | 13 | starts stream 13 | 0 / 0 | 033A8E |
-| 29 | FVRCFT | FF | 0A | 28 | releases the voices of stream 13 (command 28) | 0 / 0 | 0268C6, 03568A |
-| 2A | WINGS | FF | 08 | 14 | starts stream 14 | 0 / 0 | 025B02 |
-| 2B | RSHIELD | FF | 08 | 15 | starts stream 15 | 0 / 0 | 025B02 |
-| 2C | FSHIELD | FF | 08 | 16 | starts stream 16 | 0 / 0 | 025B02 |
-| 2D | SCRAP | FF | 08 | 17 | starts stream 17 | 2 / 8 | 033174 |
-| 2E | KSCRAP | FF | 05 | 2D | stops the voices of stream 17 (command 2D) | 2 / 10 | 033174, 03A1C2 |
-| 2F | SHOCK | FF | 08 | 18 | starts stream 18 | 0 / 0 | 03B01C |
-| 30 | PVSKID | FF | 08 | 19 | starts stream 19 | 2 / 0 | 0382E0 |
-| 31 | PAD | FF | 08 | 1A | starts stream 1A | 3 / 8 | 03A144, 03A210 |
-| 32 | COIN | FF | 08 | 1B | starts stream 1B | 0 / 1 | 024522 |
-| 33 | LTTR | FF | 08 | 1C | starts stream 1C | 0 / 0 | 03E728, 03EA22, 03EDEE, 040086 and 2 more |
-| 34 | LETIC | FF | 08 | 1D | starts stream 1D | 0 / 0 | 03E5AE, 040184, 040300 |
-| 35 | DIVE | FF | 08 | 1E | starts stream 1E | 0 / 0 | 0374BE |
-| 36 | KDIVE | FF | 05 | 35 | stops the voices of stream 1E (command 35) | 0 / 0 | 036E86 |
-| 37 | EXP3 | FF | 08 | 1F | starts stream 1F | 0 / 0 | none (audio test only) |
+| 24 | CD | FF | 08 | 10 | starts sound 10 | 0 / 21 | 02912A, 03E7FA, 03EAF4, 03EEDE and 1 more |
+| 25 | WARN | FF | 08 | 11 | starts sound 11 | 0 / 24 | 0280C0 |
+| 26 | HELCPT | FF | 08 | 12 | starts sound 12 | 3 / 0 | 033B82 |
+| 27 | FHELCPT | FF | 0A | 26 | releases the tracks of sound 12 (command 26) | 2 / 0 | 0268BC, 03568A |
+| 28 | HVRCFT | FF | 08 | 13 | starts sound 13 | 0 / 0 | 033A8E |
+| 29 | FVRCFT | FF | 0A | 28 | releases the tracks of sound 13 (command 28) | 0 / 0 | 0268C6, 03568A |
+| 2A | WINGS | FF | 08 | 14 | starts sound 14 | 0 / 0 | 025B02 |
+| 2B | RSHIELD | FF | 08 | 15 | starts sound 15 | 0 / 0 | 025B02 |
+| 2C | FSHIELD | FF | 08 | 16 | starts sound 16 | 0 / 0 | 025B02 |
+| 2D | SCRAP | FF | 08 | 17 | starts sound 17 | 2 / 8 | 033174 |
+| 2E | KSCRAP | FF | 05 | 2D | stops the tracks of sound 17 (command 2D) | 2 / 10 | 033174, 03A1C2 |
+| 2F | SHOCK | FF | 08 | 18 | starts sound 18 | 0 / 0 | 03B01C |
+| 30 | PVSKID | FF | 08 | 19 | starts sound 19 | 2 / 0 | 0382E0 |
+| 31 | PAD | FF | 08 | 1A | starts sound 1A | 3 / 8 | 03A144, 03A210 |
+| 32 | COIN | FF | 08 | 1B | starts sound 1B | 0 / 1 | 024522 |
+| 33 | LTTR | FF | 08 | 1C | starts sound 1C | 0 / 0 | 03E728, 03EA22, 03EDEE, 040086 and 2 more |
+| 34 | LETIC | FF | 08 | 1D | starts sound 1D | 0 / 0 | 03E5AE, 040184, 040300 |
+| 35 | DIVE | FF | 08 | 1E | starts sound 1E | 0 / 0 | 0374BE |
+| 36 | KDIVE | FF | 05 | 35 | stops the tracks of sound 1E (command 35) | 0 / 0 | 036E86 |
+| 37 | EXP3 | FF | 08 | 1F | starts sound 1F | 0 / 0 | none (audio test only) |
 | 38 | WELCOME | FF | 13 | 01 | plays OKI phrase 1 | 0 / 1 | 027236, 0275C2 |
 | 39 | LUCK | FF | 13 | 02 | plays OKI phrase 2 | 0 / 4 | 024BD2 |
 | 3A | CONGRATS | FF | 13 | 03 | plays OKI phrase 3 | 0 / 0 | none (audio test only) |
@@ -382,7 +382,7 @@ except the audio test's 04395C.
 | 6B | SWPIKUP | FF | 13 | 33 | plays OKI phrase 52 | 0 / 0 | 03A3A2 |
 | 6C | STAR | FF | 13 | 34 | plays OKI phrase 43 | 0 / 51 | 02B248, 03A30C |
 
-Over 00-6C: 53 commands of type 13 (OKI phrases), 32 of type 08 (streams), 6 of type 01, 5 of
+Over 00-6C: 53 commands of type 13 (OKI phrases), 32 of type 08 (sounds), 6 of type 01, 5 of
 type 0A, 2 each of types 00, 05 and 0B, 1 each of types 03, 09 and 14, and the 4 immediate
 commands. 13 commands have no call site in the game (00, 03, 04, 05, 06, 07, 08, 09, and 10
 WARPMUS, 37 EXP3, 3A CONGRATS, 5D APAD, 66 KBRAKE): the game program can play them only from its
@@ -494,7 +494,7 @@ address) of the table below, FF once per reset.
 4. **Latency of three flushes**: `flush_sound_queue` sends a command at the third flush after it
    was queued, one flush per main loop pass (section 2.1).
 5. **Thirteen commands the game never sends**: besides the test and immediate commands, the
-   streams WARPMUS (10) and EXP3 (37), the OKI phrases CONGRATS (3A) and APAD (5D), and KBRAKE
+   sounds WARPMUS (10) and EXP3 (37), the OKI phrases CONGRATS (3A) and APAD (5D), and KBRAKE
    (66), which would stop BRAKE (section 6).
 6. **The end-of-demo command 01** comes from the main loop's state switch (024E3E, 0253A0: 01, 0B, 21).
 7. docs/01 section 6's /RDIO row was wrong (bits 4-2 "+5V"): MAME's `jsa_ii_ioports` has bits 4-3
@@ -507,8 +507,43 @@ address) of the table below, FF once per reset.
   levels 1-22).
 - The game events behind most call sites: this leg names the sound path, not the game logic (M5).
   The routine around each site is in `data/sound/commands.json`.
-- Stream op 96's responses: no stream sent one in the runs; which streams contain it is the data
-  leg's.
-- What the streams do with `seq_vars` (type 01, the SAME/ACL/DCL/SENG/FACL/FDCL commands): the
-  sequencer reads it at 54EE; its role is the sequencer legs'.
 - Real-hardware timing of the reset handshake (MAME answers FF within a frame).
+
+## 11. Settled by the other M4 legs, and the entry points for M5
+
+Two questions of section 10 as M4e wrote it are answered by the sequencer leg (docs/12):
+
+- **Stream op 96's responses**: no stream sent one in the runs, and none can: no stream of the
+  data uses op 96 (`respond`, docs/12 section 4, the walk of every reached and unreached stream).
+- **What the streams do with `seq_vars`** (type 01, the SAME/ACL/DCL/SENG/FACL/FDCL commands): they
+  set global 0 to 0-5, and the four streams of sound 0F (ENG, 1D) branch on it (`var_load
+  R_GLOBAL+0`, `var_and 7`, `jump_table`, docs/12 section 3.7); `snd_0F_0` clears it when the
+  sound starts (`var_and 0`, `var_store R_GLOBAL+0`), and no other stream uses global 0
+  (`asm/jsa/data/streams_1.asm`). So the six commands choose the branch sound 0F's streams take
+  while it plays; which game states send which is M5's.
+
+What M5 (the 68k source) starts from on the sound path:
+
+- **The names.** The 68010's sound routines and RAM are named in `ida/code_map.py` (section 2;
+  `h_level4_sound`, a vector target, in `ida/memory_map.py`:
+  `queue_sound_command` 0301CA, `flush_sound_queue` 03013C, `send_sound_byte` 023EDA,
+  `send_sound_byte_once` 023EDE, `send_sound_with_reply` 023E96, `h_level4_sound` 023F24,
+  `get_sound_response` 023F72, `reset_sound` 0300F8, `reset_sound_board` 023FA2,
+  `sound_watchdog` 03001E, `audio_test` 043718, `audio_test_list` 05C63C, `game_options` FF94EE,
+  `sound_queue` FFDB64 and its counters) and carried by the 68k snapshot `data/ida/stunrun-68k.json`.
+- **The command values.** `data/sound/commands.json` is the name of every value 00-6C (`snd_` and
+  the audio test's name, `cmd_03_imm` for 03), so that the 68k source can write `#snd_tubmus`,
+  not `#$0A` (equates generated from the file), and the 133 call sites with the routine around
+  each (and `site_notes` for the 17 computed or alternative values) say where they go.
+  `tools/test_sound_commands.py` checks the file against the 6502's tables and the 68k image.
+- **The 6502 side** is source (`asm/jsa`, docs/09, docs/12); its IDA database follows it through
+  `make ida-sync` (docs/05 section 6). A 6502 name M5 cites is a label of that tree.
+- **Questions for M5** (from the code, not answered by the sound legs): the game events behind
+  the call sites (section 10); the range of the level word FF9578 at 029078; whether the 36 OKI
+  phrases that only the injected commands started (docs/10 section 9) and the 46 commands with
+  call sites that no 10,800-frame run reached (section 6) are reachable in play; why the queue
+  sends at the third flush (section 2.1); what drives A80000 bit 15 (section 4).
+- **Questions for M7** (the hardware, not the code): the real board's pin 7 polarity (docs/10
+  section 2), whether the JSA II coin inputs are wired on a STUN Runner cabinet (docs/09
+  section 1), the reset handshake's timing, and what the samples and sounds are (the listening
+  pass, Jesus's: `make listen`, `make oki-pcm`).

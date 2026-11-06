@@ -129,7 +129,7 @@ So the pipeline is: the 68010 fills ADSP data RAM with the frame's scene (and wr
 | 3000-3FFF | banked ROM: 4 pages of 4 KB from the first 16 KB of `136070-2123.10c` (`configure_entries(0, 4, base, 0x1000)`) |
 | 4000-FFFF | ROM, file offset 0x4000-0xFFFF |
 
-The 6502 gets a periodic IRQ at 3.579545 MHz / 4 / 16 / 16 / 14 ≈ 249.7 Hz and the YM2151's IRQ. The 256 KB of ADPCM is not banked on JSA II (`atari_jsa_ii_device` has no OKI bank; the 6295 sees 256 KB directly). Ports: `jsa:JSAII` has the coin inputs; stunrun routes coins through the main board instead ("stunrun has its own coins").
+Every port 2800-2A06 decodes with mirror mask 01F9 (bits 0 and 3-8 are don't-cares; `atarijsa2_map` gives each its `.mirror(0x01f9)`); rev 6 reads the read ports only at their +8 mirrors (2808-280E) and writes the write ports at their base addresses (docs/05 section 4, the `_M` names of `asm/jsa/hardware.asm`). The 6502 gets a periodic IRQ at 3.579545 MHz / 4 / 16 / 16 / 14 ≈ 249.7 Hz and the YM2151's IRQ. The 256 KB of ADPCM is not banked on JSA II (`atari_jsa_ii_device` has no OKI bank; the 6295 sees 256 KB directly). Ports: `jsa:JSAII` has the coin inputs (bits 2-0, `IPT_COIN3`-`IPT_COIN1`). `harddriv.cpp` has a "stunrun has its own coins" override of that port, but in MAME 0.289 it is a commented-out todo (harddriv.cpp:1165-1169), so a coin key sets these bits as well as the main board's coin input; the 6502 counts them and pulses the coin counters (docs/09 section 10.6). How a real STUN Runner cabinet wires them is not established.
 
 ## 7. Inputs and outputs the code will reference
 

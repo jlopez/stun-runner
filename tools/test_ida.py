@@ -55,6 +55,8 @@ class FakeDatabase:
     def __init__(self) -> None:
         self.segs: dict[int, Segment] = {}
         self.name_map: dict[int, str] = {}
+        self.local_map: dict[int, str] = {}
+        self.code: set[int] = set()  # instruction heads, one byte each here
         self.funcs: list[int] = []
         self.cmts: dict[tuple[int, str], str] = {}
         self.items: dict[int, DataItem] = {}
@@ -68,11 +70,12 @@ class FakeDatabase:
         self.segs[segment.start] = segment
 
     def names(self) -> list[Name]:
-        return [Name(ea, n) for ea, n in self.name_map.items()]
+        out = [Name(ea, n) for ea, n in self.name_map.items()]
+        return out + [Name(ea, n, True) for ea, n in self.local_map.items()]
 
-    def set_name(self, ea: int, name: str) -> None:
-        self.calls.append("name")
-        self.name_map[ea] = name
+    def set_name(self, ea: int, name: str, local: bool = False) -> None:
+        self.calls.append("local" if local else "name")
+        (self.local_map if local else self.name_map)[ea] = name
 
     def function_starts(self) -> list[int]:
         return list(self.funcs)
@@ -96,6 +99,16 @@ class FakeDatabase:
     def create_data(self, item: DataItem) -> None:
         self.calls.append("data")
         self.items[item.ea] = item
+
+    def data_items(self, start: int, end: int) -> list[DataItem]:
+        return [item for ea, item in sorted(self.items.items()) if start <= ea < end]
+
+    def code_ranges(self, start: int, end: int) -> list[tuple[int, int]]:
+        return [(ea, ea + 1) for ea in sorted(self.code) if start <= ea < end]
+
+    def create_code(self, start: int, end: int) -> None:
+        self.calls.append("code")
+        self.code |= set(range(start, end))
 
 
 def sample() -> Snapshot:
@@ -133,9 +146,36 @@ def test_apply_order() -> None:
     db = FakeDatabase()
     apply(sample(), db)
     kinds = [c.split()[0] for c in db.calls]
-    assert kinds == sorted(kinds, key=["segment", "data", "function", "name", "comment"].index)
+    order = ["segment", "data", "code", "function", "name", "local", "comment"]
+    assert kinds == sorted(kinds, key=order.index)
     # functions from the highest address down (a function made first absorbs later starts)
     assert [c for c in db.calls if c.startswith("function")] == ["function 300", "function 200"]
+
+
+def test_classified_ranges_export_every_item_and_the_code() -> None:
+    """A database whose classification the source owns (the 6502's): every data item and the
+    instruction ranges inside the classified ranges, local names marked, nothing else changed."""
+    snap = replace(
+        sample(),
+        names=[*sample().names, Name(0x210, "_loop", True)],
+        data=[*sample().data, DataItem(0x800, "byte", 3), DataItem(0x900, "word", 2, True)],
+        code=[(0x200, 0x204), (0x204, 0x208), (0x300, 0x302)],
+        comments=[*sample().comments, Comment(0x300, "anterior", "line 1\nline 2")],
+    )
+    db = FakeDatabase()
+    apply(snap, db)
+    assert "local" in db.calls and db.local_map == {0x210: "_loop"}
+    exported = export(db, "sample", "68010", [(0x0, 0x1000)])
+    assert exported == snap.normalized()
+    assert exported.code == [(0x200, 0x208), (0x300, 0x302)]  # touching ranges joined
+    # without classified ranges, only the data at named addresses, and no code key at all
+    plain = export(db, "sample", "68010")
+    assert plain.code == [] and {d.ea for d in plain.data} == {0x0}
+    assert '"code"' not in dumps(plain)
+    text = dumps(exported)
+    assert '    {"ea": "0x000210", "name": "_loop", "local": true},' in text.splitlines()
+    assert '    ["0x000200", "0x000208"],' in text.splitlines()
+    assert loads(text) == exported
 
 
 def test_dumps_is_stable_and_loads_back() -> None:
@@ -309,7 +349,7 @@ def test_jsa_read_port_mirrors_are_labelled() -> None:
         assert names[used] == names[base] + "_M"
         assert (used ^ base) & ~JSA_READ_MIRROR_MASK == 0
     comments = {ea: text for ea, _, text in IO_JSA}
-    assert "mirror of 2802" in comments[0x280A] and "/RDP" in comments[0x280A]
+    assert "mirror of CMD_FROM_68K, 2802" in comments[0x280A] and "/RDP" in comments[0x280A]
     # the write ports and the YM2151 are not mirrored here
     assert 0x2A08 not in names and 0x2002 not in names
 
@@ -378,14 +418,17 @@ def test_create_export_reproduces_the_committed_snapshots(tmp_path: Path) -> Non
 def test_an_annotation_survives_create_and_export(tmp_path: Path) -> None:
     """What a GUI session would add (a function name, comments) goes through the snapshot."""
     committed = loads((SNAPSHOTS / "stunrun-jsa.json").read_text())
-    func = next(ea for ea in committed.functions if ea not in {n.ea for n in committed.names})
+    named = {n.ea for n in committed.names}
+    ram = next(ea for ea in range(0x100, 0x2000) if ea not in named)
+    func = committed.functions[-1]
     edited = replace(
         committed,
-        names=[*committed.names, Name(func, "test_annotation")],
+        names=[*committed.names, Name(ram, "test_annotation")],
         comments=[
-            *committed.comments,
-            Comment(func, "regular", "a test comment"),
+            *[c for c in committed.comments if (c.ea, c.kind) != (func, "function")],
+            Comment(ram, "repeatable", "a test comment"),
             Comment(func, "function", "a function comment"),
+            Comment(func, "anterior", "an anterior line\nand another"),
         ],
     ).normalized()
     snapshots = tmp_path / "snapshots"

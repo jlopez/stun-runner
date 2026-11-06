@@ -9,24 +9,26 @@
 ; YM2151 (atarijsa.cpp: 2000-2001, no mirror). Write: 2000 the register, 2001 its value. Read:
 ; the status at 2001 (offset 1), bit 7 busy, bit 1 timer B, bit 0 timer A; a read of 2000 returns
 ; FF in MAME 0.289 (ymfm ym2151::read). The program reads only 2001 (41C5, 502E).
-YM2151_REG      = $2000
-YM2151_DATA     = $2001
+YM2151_REG      = $2000                 ; write: the register the next write to 2001 sets
+YM2151_DATA     = $2001                 ; write: the register's value; read: the status
 
 ; Read ports
+
 OKI_READ        = $2800                 ; /RDV: OKI M6295 status, bits 3-0 channel 4-1 playing
 CMD_FROM_68K    = $2802                 ; /RDP: the 68010's command byte; reading clears the NMI
-RDIO            = $2804                 ; /RDIO, below
+RDIO            = $2804                 ; /RDIO: 7 self-test, 6 NMI low, 5 response full, 2-0 coins
 IRQ_ACK         = $2806                 ; /IRQACK: a read or a write acknowledges the timed IRQ
-OKI_READ_M      = OKI_READ + 8          ; mirror of OKI_READ (mask 01F9)
-CMD_FROM_68K_M  = CMD_FROM_68K + 8      ; mirror of CMD_FROM_68K (mask 01F9)
-RDIO_M          = RDIO + 8              ; mirror of RDIO (mask 01F9)
-IRQ_ACK_M       = IRQ_ACK + 8           ; mirror of IRQ_ACK (mask 01F9)
+OKI_READ_M      = OKI_READ + 8          ; mirror of OKI_READ, 2800 (mask 01F9): /RDV
+CMD_FROM_68K_M  = CMD_FROM_68K + 8      ; mirror of CMD_FROM_68K, 2802 (mask 01F9): /RDP
+RDIO_M          = RDIO + 8              ; mirror of RDIO, 2804 (mask 01F9): /RDIO
+IRQ_ACK_M       = IRQ_ACK + 8           ; mirror of IRQ_ACK, 2806 (mask 01F9): /IRQACK
 
 ; Write ports
+
 OKI_WRITE       = $2A00                 ; /WRV: an OKI M6295 command byte
 RESP_TO_68K     = $2A02                 ; /WRP: the response the 68010 reads at 600000
-WRIO            = $2A04                 ; /WRIO, below
-MIX             = $2A06                 ; /MIX, below
+WRIO            = $2A04                 ; /WRIO: 7-6 page, 5-4 coin counters, 3-2 M6295, 0 YM2151
+MIX             = $2A06                 ; /MIX: 5 LPF, 3-1 YM2151 volume, 0 M6295 full volume
 
 BANK_WINDOW     = $3000                 ; one of the four 4 KB pages of file 0000-3FFF
 

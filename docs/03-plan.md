@@ -44,13 +44,15 @@ Hardware map from MAME, toolchain proposal, this plan, `CLAUDE.md`, ROM location
 
 **Check**: `make check` green with the 6502 ROM entirely from source (coverage: no blob in `10c`); samples round-trip byte-identical; a MAME run with the rebuilt file plays the attract-mode music (listening is Jesus's check; the byte check is the machine's).
 
+**Done 2026-11-05** (legs M4a-M4f, docs/09-docs/12), measured: `make check` 25 files, 0 differences; `136070-2123.10c` is assembled from `asm/jsa` alone (`make coverage`: `stunrun-jsa` instr 7,351, data 20,376, fill 37,809, blob 0), and CI assembles it to MAME's CRC-32 and SHA-1 without the ROMs (`tools/test_jsa.py`); the 52 OKI samples go through one verbatim WAV each in every build and come back byte-identical (docs/10); the 6502's 59 stream ops are documented from their handlers, and its data is structured source, every address a label: the 119 streams the 125 entries of the sound table start, 13 streams no pointer reaches and 101 YM2151 patch records (docs/12); the protocol is documented from both programs and MAME, with the 68010's own name for 108 of the 109 command values (03, which the audio test omits, is `cmd_03_imm`) in `data/sound/commands.json` (docs/11); the 6502 IDA database follows the source through `make ida-sync` (1,018 names, 147 functions, 1,702 comments; docs/05 section 6); `make soundcheck`: the reference and the rebuilt set give equal YM2151 and OKI write streams over 3000 frames of attract mode with its sound on (62,115 YM2151 writes, 261 key-ons, 405 OKI commands). The set's blob share is 69.6% (1,051,392 of 1,511,424 bytes). **The listening check is Jesus's and pending** (card A5: `make listen`, MAME on the rebuilt set with sound; docs/09 section 6 says when attract mode plays).
+
 ## M5. 68k source: waves by region
 
 The Spindizzy wave pattern: wave 0 fixes the partition and the shared files (main include, hardware equates for docs/01's map, Makefile, tools, the IDA annotation snapshot); each later leg owns one region file and converts it from `incbin` to source, with IDA names carried in and corrected where the code disproves them. Regions are defined by M2's partition; a leg's acceptance is byte-identical reassembly of its region plus every address in the region accounted for by an instruction, a data statement, a named table or a `ds` fill, with no raw `dc.w` runs left unexplained except documented residue.
 
 Sub-milestones in dependency order: 5a boot, vectors, interrupt handlers, the loaders (already named in M2); 5b the main loop and game state; 5c input, ADC, NVRAM, DUART; 5d the ADSP interface (scene building) and the GSP interface (text, HUD, palette); 5e attract mode, high scores, test mode; 5f the tunnel/course data and tables (data regions as structured source or extracted files, like Spindizzy's `world.asm`).
 
-**Check**: per leg `make check`, `make coverage` (the leg's region reports 0 blob bytes), `make labels`; at the end the 68k image is 100% source and data files.
+**Check**: per leg `make check`, `make coverage` (the leg's region reports 0 blob bytes), `make labels`; at the end the 68k image is 100% source and data files. (`make labels` is to be written in M5, for the 68k; for the 6502 the same check is `tools/test_ida_sync.py`, which fails in CI when the committed snapshot's names are not the source's, docs/05 section 6.)
 
 ## M6. GSP and ADSP programs as source
 
@@ -62,7 +64,7 @@ Sub-milestones in dependency order: 5a boot, vectors, interrupt handlers, the lo
 ## M7. Full source, assets external, variants
 
 - Every asset class outside the binary: meshes (M3), samples (M4), fonts and HUD bitmaps (M6), palettes, course data (M5f), text strings.
-- IDA sync: names and comments from the source into both databases; the exports committed.
+- IDA sync: names and comments from the source into both databases; the exports committed. (The 6502's is done, M4f: `make ida-sync`, docs/05 section 6; the 68k's follows M5.)
 - Variants: the ten other sets as alternative builds of the same tree where the diff is small (conditional assembly or per-set data files), each verified against its MAME hashes by `tools/check-roms --set <name>`; where a set diverges too far, record it as out of scope with the measured diff.
 - README and `CLAUDE.md` final; a `docs/NN-findings.md` with what the original code does that documentation never said (the Spindizzy "findings" section is the model).
 

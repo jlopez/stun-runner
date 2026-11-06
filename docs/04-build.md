@@ -126,10 +126,30 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   (docs/10-adpcm.md section 4).
 - `tools/test_jsa.py` (CI, no ROMs; docs/09 section 8): `asm/jsa/jsa.asm` assembles with 64tass
   to MAME's size, CRC-32 and SHA-1 of `136070-2123.10c`; a changed operand changes the hash, a
-  moved region fails its guard, the IDA names are in the source, and the committed
-  `artifacts/sndtrace-summary.json` agrees with the source. The synthetic `make all` of
+  moved region fails its guard, the IDA snapshot's global names are in the source, and the
+  committed `artifacts/sndtrace-summary.json` agrees with the source. The synthetic `make all` of
   `tools/test_build.py` carries the image the 6502 source assembles to and checks that an
   operand edited in the copy reaches 10c.
+- `tools/test_ida_sync.py` (CI, no ROMs, no IDA; docs/05 section 6): what `make ida-sync` reads
+  from the source (names, locals, functions, comments, the classification), on a synthetic tree
+  and on `asm/jsa` assembled with 64tass; the committed 6502 snapshot has exactly the source's
+  names (a rename without a sync fails), its functions and its classification; the 6502 setup's
+  I/O names are `hardware.asm`'s. `tools/test_ida.py` holds the snapshot helpers' tests (CI) and
+  the create -> export round trip of both databases (idalib only).
+- `make ida-sync` (needs idalib; never in CI): the dry run of the 6502 source into
+  `data/stunrun-jsa.i64`, per category; `make ida-sync WRITE=1` writes it (docs/05 section 6).
+- `tools/test_sound_commands.py` (CI, no ROMs; docs/11): `data/sound/commands.json` against the
+  6502's command tables in the assembled source, its OKI commands against
+  `data/oki/samples.json`, its 68010 routines against `ida/code_map.py` and the 68k IDA
+  snapshot; with the build images (made from the reference set), against the 6502 and 68k images
+  (the audio test's list, every `queue_sound_command` call, the direct sends) and, with the local
+  `make sndproto` traces, against MAME.
+- `make sndproto` (needs MAME and the ROMs; never in CI; `-j5` runs its five runs at once):
+  `tools/mame/sndproto.lua` taps both ends of the latch pair (the 68010's command writes,
+  response reads and sound resets, its command queue, the 6502's command reads, responses and
+  dispatch) in attract mode, a game, attract mode with the immediate commands injected, and the
+  boot program's SA SELF TEST and PLAY SOUNDS menus, each from its own empty private state,
+  into `build/mame/sndproto-<run>.txt` (docs/11 section 8).
 - `make sndtrace` (needs MAME and the ROMs; never in CI; `-j3` runs its three MAME runs side by
   side): `tools/mame/sndtrace.lua` records what the 6502 executes and reads, the 68010's command
   bytes and the 6502's responses, the YM2151 and OKI writes, in attract mode with the factory
@@ -260,6 +280,14 @@ After M4a (`make coverage`, 2026-11-05, on top of M4b) the 6502 image has no blo
 
 `blob: 69.6% of 1511424 bytes come from incbin/.binary` (1,051,392 blob bytes, 65,536 fewer);
 the per-file table is docs/09 section 2.
+
+At the end of M4 (`make coverage`, 2026-11-05, after M4c-M4f, which changed labels, comments,
+equates and the data files' statement form but no byte): the same totals, `stunrun-jsa` instr
+7,351, data 20,376, blob 0, fill 37,809; the set 1,051,392 blob bytes, 69.56% in the JSON line.
+M4d split `data/music.asm` (17,762 bytes) into `data/streams_1.asm` 1,434, `patches_1.asm`
+1,092, `unused_streams.asm` 2,591, `streams_2.asm` 9,495 and `patches_2.asm` 3,150 (docs/12
+section 9); `data/sounds.asm` 1,026 and `lookup.asm` 256 are files of M4a's tree, their bytes
+unchanged.
 
 ## 6. Tools and versions
 

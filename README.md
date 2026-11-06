@@ -22,6 +22,17 @@ board. Four instruction sets, no graphics ROMs. Details with MAME references in
 | [`docs/05-ida.md`](docs/05-ida.md) | the IDA databases: made by `make ida`, never committed; annotation snapshots in `data/ida/` |
 | [`docs/06-code-map.md`](docs/06-code-map.md) | the code map: boot and game programs, the GSP and ADSP programs and their loaders, the MAME proof, the partition of the 768 KB |
 | [`docs/07-objects.md`](docs/07-objects.md) | the object ROMs: how the ADSP reads them, the object format, the 413 objects, `data/objects` as their source |
+| [`docs/08-display-list.md`](docs/08-display-list.md) | the SOM display list, the frame protocol, the GSP command set and its rasteriser |
+| [`docs/09-sound-program.md`](docs/09-sound-program.md) | the JSA II 6502 sound program as source (`asm/jsa`): partition, trace, system code |
+| [`docs/10-adpcm.md`](docs/10-adpcm.md) | the OKI M6295 samples: phrase table, one verbatim WAV per sample, `tools/adpcm` |
+| [`docs/11-sound-protocol.md`](docs/11-sound-protocol.md) | the 68010-6502 sound protocol and the command set (`data/sound/commands.json`) |
+| [`docs/12-sound-music.md`](docs/12-sound-music.md) | the sequencer, its ops, streams and YM2151 patches as structured source |
+
+Status (2026-11-05): milestones 0-4 are done (`CLAUDE.md` section 4, `docs/03-plan.md`). The
+object ROMs and the 6502 sound program are built from source and data, the OKI samples through
+one WAV each; the 68k program (with the GSP and ADSP programs inside it), the sample bytes and
+the NVRAM images are still blobs (69.6% of the set's bytes). Next: M5, the 68k source by region waves. The listening check of M4
+(`make listen`) is Jesus's and pending.
 
 ## ROMs
 
@@ -58,6 +69,8 @@ uv sync --group ida
 make ida            # data/stunrun-68k.i64, data/stunrun-jsa.i64 (gitignored: they contain the ROM bytes)
 make ida-export     # data/ida/*.json + *.functions.jsonl (commit these), build/ida/*.asm
 make ida-annotate   # re-apply ida/memory_map.py + ida/code_map.py over the databases, then ida-export
+make ida-sync       # dry run: what the 6502 source (asm/jsa) would change in data/stunrun-jsa.i64
+make ida-sync WRITE=1   # write it, then make ida-export (docs/05 section 6)
 ```
 
 The GSP and ADSP programs (needs MAME's `unidasm` on PATH, and `mame` for the oracle;
@@ -69,6 +82,18 @@ make oracle         # MAME runs the set and dumps GSP VRAM, ADSP program/data RA
 make test           # now also compares the extracted programs with those dumps (skips without them)
 make pcwatch        # MAME -debug: highest and lowest 68k PC over 3,600 frames (code in RAM?)
 make objtrace       # every object-ROM read of the ADSP in attract mode and a game (docs/07 section 7)
+```
+
+The sound board (needs `mame`; every run headless from its own empty state except `make listen`; docs/09-docs/12):
+
+```bash
+make -j3 sndtrace   # what the 6502 executes and reads in three runs, checked against asm/jsa
+make soundcheck     # the reference and the rebuilt set give the same YM2151 and OKI streams
+make -j3 okitrace   # which OKI phrase each command plays; rewrites data/oki/samples.json's evidence
+make -j5 sndproto   # both ends of the 68010-6502 latch, checked by tools/test_sound_commands.py
+make musictrace     # every sound command in its own window: statements read, key-ons
+make oki-pcm        # the samples as 16-bit PCM under build/oki/pcm/ (for listening)
+make listen         # Jesus's listening check: MAME on the rebuilt set, in a window, with sound
 ```
 
 Without the reference set, `make check` prints `reference set absent, skipped` (this is what CI

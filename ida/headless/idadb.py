@@ -10,10 +10,14 @@ from collections.abc import Iterable
 
 import ida_bytes
 import ida_funcs
+import ida_idaapi
+import ida_lines
 import ida_loader
+import ida_nalt
 import ida_name
 import ida_offset
 import ida_segment
+import ida_ua
 import idautils
 
 from ida.snapshot import Comment, DataItem, Name, Segment
@@ -24,6 +28,7 @@ _CREATE = {
     "word": ida_bytes.create_word,
     "dword": ida_bytes.create_dword,
 }
+_REF_TYPE = {"byte": ida_nalt.REF_OFF8, "word": ida_nalt.REF_OFF16, "dword": ida_nalt.REF_OFF32}
 
 
 def warn(message: str) -> None:
@@ -83,15 +88,31 @@ class IdaDatabase:
 
     # names
     def names(self) -> list[Name]:
-        return [
+        """The user names of the name list (the global ones) and the local names of every
+        function (IDA keeps those out of the name list)."""
+        out = [
             Name(ea, name)
             for ea, name in idautils.Names()
             if ida_bytes.has_user_name(ida_bytes.get_flags(ea))
         ]
+        for start in idautils.Functions():
+            func = ida_funcs.get_func(start)
+            for chunk_start, chunk_end in idautils.Chunks(func.start_ea):
+                for ea in idautils.Heads(chunk_start, chunk_end):
+                    if local_name(ea):
+                        out.append(Name(ea, local_name(ea), True))
+        return out
 
-    def set_name(self, ea: int, name: str) -> None:
-        if not ida_name.set_name(ea, name, ida_name.SN_NOWARN):
-            warn(f"cannot name {ea:06X} {name}")
+    def set_name(self, ea: int, name: str, local: bool = False) -> None:
+        if not local:
+            if not ida_name.set_name(ea, name, ida_name.SN_NOWARN):
+                warn(f"cannot name {ea:06X} {name}")
+            return
+        # A global (or dummy) name first goes: IDA 9.1 does not turn it into a local name.
+        ida_name.set_name(ea, "", ida_name.SN_NOWARN)
+        ida_name.set_name(ea, name, ida_name.SN_NOWARN | ida_name.SN_LOCAL)
+        if local_name(ea) != name:
+            warn(f"cannot name {ea:06X} {name} (local)")
 
     # functions
     def function_starts(self) -> list[int]:
@@ -101,6 +122,8 @@ class IdaDatabase:
         func = ida_funcs.get_func(ea)
         if func is not None and func.start_ea == ea:
             return
+        if func is not None:
+            make_room_for_function(ea)
         if not ida_funcs.add_func(ea):
             warn(f"cannot create a function at {ea:06X}")
 
@@ -113,6 +136,11 @@ class IdaDatabase:
                 if ida_bytes.has_cmt(ida_bytes.get_flags(ea)):
                     candidates.add(ea)
         out = []
+        for i in range(ida_segment.get_segm_qty()):
+            seg = ida_segment.getnseg(i)
+            for ea in idautils.Heads(seg.start_ea, seg.end_ea):
+                if ida_bytes.has_extra_cmts(ida_bytes.get_flags(ea)):
+                    candidates.add(ea)
         for ea in sorted(candidates):
             for kind, repeatable in (("regular", False), ("repeatable", True)):
                 text = ida_bytes.get_cmt(ea, repeatable)
@@ -124,9 +152,15 @@ class IdaDatabase:
                     text = ida_funcs.get_func_cmt(func, repeatable)
                     if text:
                         out.append(Comment(ea, kind, text))
+            anterior = extra_comment_lines(ea, ida_lines.E_PREV)
+            if anterior:
+                out.append(Comment(ea, "anterior", "\n".join(anterior)))
         return out
 
     def set_comment(self, comment: Comment) -> None:
+        if comment.kind == "anterior":
+            set_extra_comment_lines(comment.ea, ida_lines.E_PREV, comment.text.split("\n"))
+            return
         if comment.kind in ("regular", "repeatable"):
             ida_bytes.set_cmt(comment.ea, comment.text, comment.kind == "repeatable")
             return
@@ -149,7 +183,8 @@ class IdaDatabase:
             if test(flags):
                 width = {"byte": 1, "word": 2, "dword": 4}[kind]
                 count = ida_bytes.get_item_size(ea) // width
-                return DataItem(ea, kind, count, bool(ida_bytes.is_off0(flags)))
+                offset = bool(ida_bytes.is_off0(flags))
+                return DataItem(ea, kind, count, offset, offset_delta(ea) if offset else 0)
         return None
 
     def create_data(self, item: DataItem) -> None:
@@ -158,5 +193,91 @@ class IdaDatabase:
         if not _CREATE[item.type](item.ea, width * item.count):
             warn(f"cannot create {item}")
             return
-        if item.offset:
+        if item.offset and item.delta:
+            ri = ida_nalt.refinfo_t()
+            ri.init(_REF_TYPE[item.type])
+            ri.base, ri.target, ri.tdelta = 0, ida_idaapi.BADADDR, item.delta
+            if not ida_offset.op_offset_ex(item.ea, 0, ri):
+                warn(f"cannot make {item} an offset")
+        elif item.offset:
             ida_offset.op_plain_offset(item.ea, 0, 0)
+
+    def data_items(self, start: int, end: int) -> list[DataItem]:
+        out = []
+        for ea in idautils.Heads(start, end):
+            item = self.data_item(ea)
+            if item is not None:
+                out.append(item)
+        return out
+
+    def code_ranges(self, start: int, end: int) -> list[tuple[int, int]]:
+        out: list[tuple[int, int]] = []
+        for ea in idautils.Heads(start, end):
+            if not ida_bytes.is_code(ida_bytes.get_flags(ea)):
+                continue
+            item_end = ida_bytes.get_item_end(ea)
+            if out and out[-1][1] == ea:
+                out[-1] = (out[-1][0], item_end)
+            else:
+                out.append((ea, item_end))
+        return out
+
+    def create_code(self, start: int, end: int) -> None:
+        ea = start
+        while ea < end:
+            flags = ida_bytes.get_flags(ea)
+            if not (ida_bytes.is_code(flags) and ida_bytes.is_head(flags)):
+                # at most one 6502 instruction's length, never past the range
+                ida_bytes.del_items(ea, ida_bytes.DELIT_SIMPLE, min(3, end - ea))
+                if not ida_ua.create_insn(ea):
+                    warn(f"cannot create an instruction at {ea:06X}")
+                    return
+            ea = ida_bytes.get_item_end(ea)
+
+
+def offset_delta(ea: int) -> int:
+    """The tdelta of the offset at `ea`: its value minus its target (IDA computes the target as
+    base + value - tdelta)."""
+    ri = ida_nalt.refinfo_t()
+    if not ida_nalt.get_refinfo(ri, ea, 0):
+        return 0
+    return int(ri.tdelta)
+
+
+def local_name(ea: int) -> str:
+    """The local name at `ea`, or ''. IDA keeps local names out of the name list, and the plain
+    name of the address is '' or, on the last instruction of a function that returns, still the
+    dummy `locret_` (IDA 9.1: the user-name flag stays clear there), never the local name."""
+    if ida_name.is_in_nlist(ea):
+        return ""
+    name = ida_name.get_ea_name(ea, ida_name.GN_LOCAL)
+    return name if name and name != ida_name.get_ea_name(ea) else ""
+
+
+def make_room_for_function(ea: int) -> None:
+    """End the function whose main body or tail holds `ea` there, so that a function can start
+    at `ea` (a source routine that IDA's flow analysis ran into from the routine before)."""
+    func = ida_funcs.get_func(ea)
+    if func is None or func.start_ea == ea:
+        return
+    tail = ida_funcs.get_fchunk(ea)
+    if tail is not None and tail.start_ea != func.start_ea:
+        ida_funcs.remove_func_tail(func, tail.start_ea)
+        return
+    ida_funcs.set_func_end(func.start_ea, ea)
+
+
+def extra_comment_lines(ea: int, base: int) -> list[str]:
+    out = []
+    for i in range(1000):
+        line = ida_lines.get_extra_cmt(ea, base + i)
+        if line is None:
+            break
+        out.append(line)
+    return out
+
+
+def set_extra_comment_lines(ea: int, base: int, lines: list[str]) -> None:
+    ida_lines.delete_extra_cmts(ea, base)
+    for i, line in enumerate(lines):
+        ida_lines.update_extra_cmt(ea, base + i, line)

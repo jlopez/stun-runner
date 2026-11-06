@@ -1,29 +1,147 @@
-{"start_ea": 16384, "end_ea": 16780, "name": "reset", "size": 396, "chunks": [], "xrefsTo": [], "xrefsFrom": ["sub_418C", "sub_41A9", "sub_41BD", "sub_4238", "sub_4371", "sub_5504"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 16780, "end_ea": 16809, "name": "sub_418C", "size": 29, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 16809, "end_ea": 16829, "name": "sub_41A9", "size": 20, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 16829, "end_ea": 16833, "name": "sub_41BD", "size": 4, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 16833, "end_ea": 16937, "name": "h_irq", "size": 104, "chunks": [], "xrefsTo": [], "xrefsFrom": ["reset", "sub_4229", "sub_59C0", "sub_5BC6", "sub_5CE8"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 16937, "end_ea": 16952, "name": "sub_4229", "size": 100, "chunks": [[20054, 20089], [20494, 20518], [20547, 20573]], "xrefsTo": ["h_irq"], "xrefsFrom": ["sub_4759", "sub_4E79"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 16952, "end_ea": 17112, "name": "sub_4238", "size": 160, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": ["sub_42D8", "sub_5026", "sub_585E", "sub_5BAC"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 17112, "end_ea": 17161, "name": "sub_42D8", "size": 49, "chunks": [], "xrefsTo": ["sub_4238"], "xrefsFrom": ["sub_431A"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 17178, "end_ea": 17212, "name": "sub_431A", "size": 34, "chunks": [], "xrefsTo": ["sub_42D8", "sub_433C", "sub_4759"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 17212, "end_ea": 17265, "name": "sub_433C", "size": 53, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": ["sub_431A"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 17265, "end_ea": 17290, "name": "sub_4371", "size": 25, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 18265, "end_ea": 19649, "name": "sub_4759", "size": 1384, "chunks": [], "xrefsTo": ["sub_4229", "sub_4759", "sub_4E79"], "xrefsFrom": ["sub_431A", "sub_433C", "sub_4CC1", "sub_4D6C", "sub_505D", "sub_5585"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 19649, "end_ea": 19820, "name": "sub_4CC1", "size": 171, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": ["sub_51C7"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 19820, "end_ea": 20054, "name": "sub_4D6C", "size": 234, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 20089, "end_ea": 20494, "name": "sub_4E79", "size": 405, "chunks": [], "xrefsTo": ["sub_4229"], "xrefsFrom": ["sub_4759", "sub_5026"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 20518, "end_ea": 20547, "name": "sub_5026", "size": 29, "chunks": [], "xrefsTo": ["sub_4238", "sub_4E79", "sub_559A", "sub_59C0", "sub_5B63"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 20573, "end_ea": 20603, "name": "sub_505D", "size": 30, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 20935, "end_ea": 20985, "name": "sub_51C7", "size": 173, "chunks": [[22344, 22467]], "xrefsTo": ["sub_4CC1"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 21764, "end_ea": 21774, "name": "sub_5504", "size": 10, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 21893, "end_ea": 21914, "name": "sub_5585", "size": 21, "chunks": [], "xrefsTo": ["sub_4759"], "xrefsFrom": ["sub_559A"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 21914, "end_ea": 22075, "name": "sub_559A", "size": 161, "chunks": [], "xrefsTo": ["sub_59C0"], "xrefsFrom": ["sub_5026"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 22499, "end_ea": 22622, "name": "h_nmi", "size": 123, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 22622, "end_ea": 22633, "name": "sub_585E", "size": 11, "chunks": [], "xrefsTo": ["sub_4238"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 22976, "end_ea": 23395, "name": "sub_59C0", "size": 419, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": ["sub_5026", "sub_559A", "sub_5B63"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 23395, "end_ea": 23408, "name": "sub_5B63", "size": 13, "chunks": [], "xrefsTo": ["sub_59C0"], "xrefsFrom": ["sub_5026"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 23468, "end_ea": 23494, "name": "sub_5BAC", "size": 26, "chunks": [], "xrefsTo": ["sub_4238"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 23494, "end_ea": 23546, "name": "sub_5BC6", "size": 52, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": ["sub_5C87"], "leaf": false, "exploreLeaf": false}
-{"start_ea": 23687, "end_ea": 23736, "name": "sub_5C87", "size": 49, "chunks": [], "xrefsTo": ["sub_5BC6"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
-{"start_ea": 23784, "end_ea": 23981, "name": "sub_5CE8", "size": 197, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 16384, "end_ea": 16426, "name": "reset", "size": 42, "chunks": [], "xrefsTo": [], "xrefsFrom": ["ack_timed_irq", "init_board", "self_test"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 16426, "end_ea": 16659, "name": "self_test", "size": 233, "chunks": [], "xrefsTo": ["reset"], "xrefsFrom": ["ack_timed_irq", "checksum_pages", "init_board", "self_test_bad_page", "self_test_fatal"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 16659, "end_ea": 16705, "name": "init_board", "size": 46, "chunks": [], "xrefsTo": ["reset", "self_test"], "xrefsFrom": ["warm_start"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 16705, "end_ea": 16713, "name": "warm_start", "size": 8, "chunks": [], "xrefsTo": ["h_irq", "init_board"], "xrefsFrom": ["init_sound", "main_loop"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 16713, "end_ea": 16780, "name": "main_loop", "size": 67, "chunks": [], "xrefsTo": ["main_loop", "warm_start"], "xrefsFrom": ["dispatch_command", "random"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 16780, "end_ea": 16801, "name": "self_test_bad_page", "size": 21, "chunks": [], "xrefsTo": ["self_test"], "xrefsFrom": ["self_test_fatal"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 16801, "end_ea": 16809, "name": "self_test_fatal", "size": 8, "chunks": [], "xrefsTo": ["self_test", "self_test_bad_page"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 16809, "end_ea": 16829, "name": "checksum_pages", "size": 20, "chunks": [], "xrefsTo": ["self_test"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 16829, "end_ea": 16833, "name": "ack_timed_irq", "size": 4, "chunks": [], "xrefsTo": ["reset", "self_test"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 16833, "end_ea": 16937, "name": "h_irq", "size": 104, "chunks": [], "xrefsTo": [], "xrefsFrom": ["oki_tick", "read_inputs", "tick_sequencer", "warm_start", "ymtimer_irq"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 16937, "end_ea": 16952, "name": "tick_sequencer", "size": 15, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": ["tick_group"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 16952, "end_ea": 17112, "name": "init_sound", "size": 160, "chunks": [], "xrefsTo": ["warm_start"], "xrefsFrom": ["init_frame_pool", "oki_reset", "ym_wait", "ymtimer_reset"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 17112, "end_ea": 17161, "name": "init_frame_pool", "size": 49, "chunks": [], "xrefsTo": ["init_sound"], "xrefsFrom": ["frame_address"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 17161, "end_ea": 17178, "name": "alloc_frame", "size": 17, "chunks": [], "xrefsTo": ["op_call", "op_loop"], "xrefsFrom": ["frame_address"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 17178, "end_ea": 17212, "name": "frame_address", "size": 34, "chunks": [], "xrefsTo": ["alloc_frame", "free_track_frames", "init_frame_pool", "op_loop_end", "read_item"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17212, "end_ea": 17265, "name": "free_track_frames", "size": 53, "chunks": [], "xrefsTo": ["cmdtype_08_start_sound", "free_track"], "xrefsFrom": ["frame_address"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 17265, "end_ea": 17290, "name": "dispatch_command", "size": 25, "chunks": [], "xrefsTo": ["main_loop"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17290, "end_ea": 17295, "name": "cmdtype_00_min_priority", "size": 5, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17295, "end_ea": 17325, "name": "cmdtype_11_ym_ct", "size": 30, "chunks": [], "xrefsTo": [], "xrefsFrom": ["ym_wait"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 17325, "end_ea": 17338, "name": "cmdtype_01_set_var", "size": 13, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17338, "end_ea": 17354, "name": "cmdtype_02_add_var", "size": 16, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17354, "end_ea": 17365, "name": "cmdtype_03_immediate", "size": 11, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17365, "end_ea": 17390, "name": "cmdtype_04_stop_priority", "size": 25, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17390, "end_ea": 17424, "name": "cmdtype_05_stop_sound", "size": 34, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17424, "end_ea": 17461, "name": "cmdtype_06_stop_list", "size": 37, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17461, "end_ea": 17503, "name": "cmdtype_07_stop_side", "size": 42, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17503, "end_ea": 17558, "name": "cmdtype_0A_release_sound", "size": 55, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17558, "end_ea": 17604, "name": "cmdtype_0B_release_priority", "size": 46, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17604, "end_ea": 17616, "name": "cmdtype_10_ymtimer", "size": 12, "chunks": [], "xrefsTo": [], "xrefsFrom": ["ymtimer_start"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 17616, "end_ea": 17644, "name": "queue_response", "size": 28, "chunks": [], "xrefsTo": ["op_respond"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17644, "end_ea": 17715, "name": "cmdtype_0D_run_op", "size": 71, "chunks": [], "xrefsTo": [], "xrefsFrom": ["chain_run_op"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 17715, "end_ea": 17731, "name": "imm_03_send_status", "size": 16, "chunks": [], "xrefsTo": [], "xrefsFrom": ["imm_return", "send_response"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 17731, "end_ea": 17736, "name": "imm_02_send_count", "size": 5, "chunks": [], "xrefsTo": [], "xrefsFrom": ["imm_return", "send_response"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 17736, "end_ea": 17747, "name": "imm_return", "size": 11, "chunks": [], "xrefsTo": ["imm_02_send_count", "imm_03_send_status", "imm_04_loopback"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17747, "end_ea": 17769, "name": "send_response", "size": 22, "chunks": [], "xrefsTo": ["imm_01_send_inputs", "imm_02_send_count", "imm_03_send_status", "imm_04_loopback", "receive_bytes"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 17769, "end_ea": 18084, "name": "cmdtype_08_start_sound", "size": 315, "chunks": [], "xrefsTo": [], "xrefsFrom": ["cmdtype_none", "free_track_frames", "init_track"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 18084, "end_ea": 18085, "name": "cmdtype_none", "size": 1, "chunks": [], "xrefsTo": ["cmdtype_08_start_sound"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 18085, "end_ea": 18217, "name": "init_track", "size": 132, "chunks": [], "xrefsTo": ["cmdtype_08_start_sound"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 18217, "end_ea": 18223, "name": "cmdtype_0E_set_mix", "size": 6, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 18265, "end_ea": 18507, "name": "run_track", "size": 242, "chunks": [], "xrefsTo": ["next_track", "tick_other_group", "tick_ym_channel"], "xrefsFrom": ["fade_step", "free_track", "next_track", "other_voice_off", "other_voice_update", "prepare_key_on", "read_item"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 18507, "end_ea": 18753, "name": "read_item", "size": 246, "chunks": [], "xrefsTo": ["read_item", "run_track"], "xrefsFrom": ["frame_address", "free_track", "next_track", "run_op", "set_note_length"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 18753, "end_ea": 18815, "name": "free_track", "size": 62, "chunks": [], "xrefsTo": ["read_item", "run_track", "set_note_length"], "xrefsFrom": ["free_track_frames", "load_patch", "next_track", "other_voice_off"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 18815, "end_ea": 19176, "name": "set_note_length", "size": 361, "chunks": [], "xrefsTo": ["read_item"], "xrefsFrom": ["fade_step", "free_track", "next_track", "other_voice_update", "prepare_key_on"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 19176, "end_ea": 19604, "name": "other_voice_update", "size": 428, "chunks": [], "xrefsTo": ["run_track", "set_note_length"], "xrefsFrom": ["other_voice_level", "other_voice_off"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 19604, "end_ea": 19606, "name": "other_voice_off", "size": 2, "chunks": [], "xrefsTo": ["free_track", "other_voice_update", "run_track"], "xrefsFrom": ["other_voice_level"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 19606, "end_ea": 19633, "name": "other_voice_level", "size": 27, "chunks": [], "xrefsTo": ["other_voice_off", "other_voice_update"], "xrefsFrom": ["next_track"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 19633, "end_ea": 19649, "name": "next_track", "size": 16, "chunks": [], "xrefsTo": ["free_track", "other_voice_level", "read_item", "run_track", "set_note_length"], "xrefsFrom": ["run_track"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 19649, "end_ea": 19820, "name": "fade_step", "size": 171, "chunks": [], "xrefsTo": ["run_track", "set_note_length"], "xrefsFrom": ["add_volume"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 19820, "end_ea": 20054, "name": "prepare_key_on", "size": 234, "chunks": [], "xrefsTo": ["run_track", "set_note_length"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20054, "end_ea": 20089, "name": "tick_other_group", "size": 35, "chunks": [], "xrefsTo": ["tick_group"], "xrefsFrom": ["run_track"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20089, "end_ea": 20494, "name": "tick_ym_channel", "size": 405, "chunks": [], "xrefsTo": ["tick_ym_group"], "xrefsFrom": ["run_track", "ym_wait"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20494, "end_ea": 20518, "name": "tick_ym_group", "size": 24, "chunks": [], "xrefsTo": ["tick_group"], "xrefsFrom": ["tick_ym_channel"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20518, "end_ea": 20547, "name": "ym_wait", "size": 29, "chunks": [], "xrefsTo": ["cmdtype_11_ym_ct", "init_sound", "tick_ym_channel", "write_patch_regs", "ym_write_record", "ymtimer_irq", "ymtimer_start", "ymtimer_write"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20547, "end_ea": 20573, "name": "tick_group", "size": 26, "chunks": [], "xrefsTo": ["tick_sequencer"], "xrefsFrom": ["tick_other_group", "tick_ym_group"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20573, "end_ea": 20603, "name": "run_op", "size": 30, "chunks": [], "xrefsTo": ["read_item"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20603, "end_ea": 20621, "name": "next_operand", "size": 18, "chunks": [], "xrefsTo": ["branch_not_taken", "branch_taken", "op_call", "op_fade", "op_jump", "op_jump_table", "op_jump_table_inc", "op_level_env", "op_lfo", "op_noise", "op_patch", "op_pitch_env", "op_tempo", "op_tempo_add"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20621, "end_ea": 20643, "name": "chain_run_op", "size": 22, "chunks": [], "xrefsTo": ["cmdtype_0D_run_op"], "xrefsFrom": ["call_op_handler"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20643, "end_ea": 20655, "name": "call_op_handler", "size": 12, "chunks": [], "xrefsTo": ["chain_run_op"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20773, "end_ea": 20866, "name": "op_sync", "size": 93, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20866, "end_ea": 20875, "name": "op_sync_group", "size": 9, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20875, "end_ea": 20886, "name": "op_level_env", "size": 11, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20886, "end_ea": 20897, "name": "op_pitch_env", "size": 11, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20897, "end_ea": 20909, "name": "op_tempo_add", "size": 12, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand", "tempo_add_hi"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20909, "end_ea": 20917, "name": "tempo_add_hi", "size": 8, "chunks": [], "xrefsTo": ["op_tempo_add", "op_var_add_to"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20917, "end_ea": 20923, "name": "op_tempo", "size": 6, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand", "set_tempo_hi"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20923, "end_ea": 20928, "name": "set_tempo_hi", "size": 5, "chunks": [], "xrefsTo": ["op_tempo", "op_var_store"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20928, "end_ea": 20935, "name": "op_volume_add", "size": 7, "chunks": [], "xrefsTo": ["op_var_add_to"], "xrefsFrom": ["add_volume", "op_refuse"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20935, "end_ea": 20961, "name": "add_volume", "size": 26, "chunks": [], "xrefsTo": ["fade_step", "op_volume_add"], "xrefsFrom": ["op_carrier_tl_sub", "op_volume", "store_volume"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20961, "end_ea": 20978, "name": "op_volume", "size": 17, "chunks": [], "xrefsTo": ["add_volume", "op_var_store"], "xrefsFrom": ["op_refuse", "store_volume", "volume_ym"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20978, "end_ea": 20983, "name": "store_volume", "size": 5, "chunks": [], "xrefsTo": ["add_volume", "op_volume"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20983, "end_ea": 20985, "name": "op_refuse", "size": 2, "chunks": [], "xrefsTo": ["op_volume", "op_volume_add"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20985, "end_ea": 20989, "name": "op_transpose_add", "size": 4, "chunks": [], "xrefsTo": ["op_var_add_to"], "xrefsFrom": ["op_transpose"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 20989, "end_ea": 20994, "name": "op_transpose", "size": 5, "chunks": [], "xrefsTo": ["op_transpose_add", "op_var_store"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20994, "end_ea": 20998, "name": "op_ctl_bits", "size": 4, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 20998, "end_ea": 21018, "name": "op_ctl_set", "size": 20, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 21018, "end_ea": 21041, "name": "op_ctl_clear", "size": 23, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 21041, "end_ea": 21045, "name": "op_portamento", "size": 4, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 21045, "end_ea": 21091, "name": "op_call", "size": 46, "chunks": [], "xrefsTo": [], "xrefsFrom": ["alloc_frame", "next_operand"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21091, "end_ea": 21134, "name": "op_loop", "size": 43, "chunks": [], "xrefsTo": [], "xrefsFrom": ["alloc_frame"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21134, "end_ea": 21184, "name": "op_loop_end", "size": 50, "chunks": [], "xrefsTo": [], "xrefsFrom": ["frame_address"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21184, "end_ea": 21229, "name": "op_fade", "size": 45, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21229, "end_ea": 21233, "name": "op_var_add", "size": 4, "chunks": [], "xrefsTo": [], "xrefsFrom": ["store_var"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21233, "end_ea": 21241, "name": "store_var", "size": 8, "chunks": [], "xrefsTo": ["op_jump_table_inc", "op_var_add", "op_var_and", "op_var_load", "op_var_or", "op_var_shl", "op_var_shr", "op_var_sub", "op_var_xor"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 21241, "end_ea": 21251, "name": "op_var_sub", "size": 10, "chunks": [], "xrefsTo": [], "xrefsFrom": ["store_var"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21251, "end_ea": 21257, "name": "op_var_and", "size": 6, "chunks": [], "xrefsTo": [], "xrefsFrom": ["store_var"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21257, "end_ea": 21263, "name": "op_var_or", "size": 6, "chunks": [], "xrefsTo": [], "xrefsFrom": ["store_var"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21263, "end_ea": 21269, "name": "op_var_xor", "size": 6, "chunks": [], "xrefsTo": [], "xrefsFrom": ["store_var"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21269, "end_ea": 21314, "name": "op_var_shr", "size": 45, "chunks": [], "xrefsTo": [], "xrefsFrom": ["store_var"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21314, "end_ea": 21359, "name": "op_var_shl", "size": 45, "chunks": [], "xrefsTo": [], "xrefsFrom": ["store_var"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21359, "end_ea": 21398, "name": "op_jump_table", "size": 39, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21398, "end_ea": 21444, "name": "op_jump_table_inc", "size": 46, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand", "store_var"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21444, "end_ea": 21521, "name": "op_var_store", "size": 77, "chunks": [], "xrefsTo": [], "xrefsFrom": ["op_fine_tune", "op_transpose", "op_velocity", "op_volume", "set_tempo_hi"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21521, "end_ea": 21579, "name": "op_var_add_to", "size": 58, "chunks": [], "xrefsTo": [], "xrefsFrom": ["op_bend", "op_transpose_add", "op_velocity_add", "op_volume_add", "tempo_add_hi"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21579, "end_ea": 21585, "name": "op_var_load", "size": 6, "chunks": [], "xrefsTo": [], "xrefsFrom": ["read_register", "store_var"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21585, "end_ea": 21588, "name": "op_var_cmp_reg", "size": 3, "chunks": [], "xrefsTo": [], "xrefsFrom": ["op_var_cmp", "read_register"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21588, "end_ea": 21600, "name": "op_var_cmp", "size": 12, "chunks": [], "xrefsTo": ["op_var_cmp_reg"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 21600, "end_ea": 21607, "name": "op_branch_zero", "size": 7, "chunks": [], "xrefsTo": [], "xrefsFrom": ["branch_not_taken", "branch_taken", "op_branch_nonzero", "read_register"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21607, "end_ea": 21614, "name": "op_branch_nonzero", "size": 7, "chunks": [], "xrefsTo": ["op_branch_zero"], "xrefsFrom": ["branch_not_taken", "branch_taken", "op_branch_plus", "read_register"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21614, "end_ea": 21621, "name": "op_branch_plus", "size": 7, "chunks": [], "xrefsTo": ["op_branch_nonzero"], "xrefsFrom": ["branch_not_taken", "branch_taken", "op_branch_minus", "read_register"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21621, "end_ea": 21626, "name": "op_branch_minus", "size": 5, "chunks": [], "xrefsTo": ["op_branch_plus"], "xrefsFrom": ["branch_not_taken", "branch_taken", "read_register"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21626, "end_ea": 21634, "name": "branch_not_taken", "size": 8, "chunks": [], "xrefsTo": ["op_branch_minus", "op_branch_nonzero", "op_branch_plus", "op_branch_zero"], "xrefsFrom": ["next_operand"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21634, "end_ea": 21652, "name": "branch_taken", "size": 18, "chunks": [], "xrefsTo": ["op_branch_minus", "op_branch_nonzero", "op_branch_plus", "op_branch_zero"], "xrefsFrom": ["next_operand"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21652, "end_ea": 21764, "name": "read_register", "size": 112, "chunks": [], "xrefsTo": ["op_branch_minus", "op_branch_nonzero", "op_branch_plus", "op_branch_zero", "op_var_cmp_reg", "op_var_load"], "xrefsFrom": ["random"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21764, "end_ea": 21774, "name": "random", "size": 10, "chunks": [], "xrefsTo": ["main_loop", "read_register"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 21774, "end_ea": 21779, "name": "op_respond", "size": 5, "chunks": [], "xrefsTo": [], "xrefsFrom": ["queue_response"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21779, "end_ea": 21807, "name": "op_release", "size": 28, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 21807, "end_ea": 21822, "name": "op_jump", "size": 15, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21822, "end_ea": 21893, "name": "op_patch", "size": 71, "chunks": [], "xrefsTo": [], "xrefsFrom": ["load_patch", "next_operand"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21893, "end_ea": 21914, "name": "load_patch", "size": 21, "chunks": [], "xrefsTo": ["free_track", "op_patch"], "xrefsFrom": ["patch_done", "write_patch"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21914, "end_ea": 21916, "name": "load_patch_regs", "size": 2, "chunks": [], "xrefsTo": ["ymtimer_irq"], "xrefsFrom": ["write_patch"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21916, "end_ea": 21940, "name": "write_patch", "size": 24, "chunks": [], "xrefsTo": ["load_patch", "load_patch_regs"], "xrefsFrom": ["write_patch_regs"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21940, "end_ea": 21942, "name": "write_patch_regs_at", "size": 2, "chunks": [], "xrefsTo": ["ymtimer_start"], "xrefsFrom": ["write_patch_regs"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 21942, "end_ea": 22072, "name": "write_patch_regs", "size": 130, "chunks": [], "xrefsTo": ["write_patch", "write_patch_regs_at"], "xrefsFrom": ["patch_done", "ym_wait"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22072, "end_ea": 22075, "name": "patch_done", "size": 3, "chunks": [], "xrefsTo": ["load_patch", "write_patch_regs"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 22075, "end_ea": 22143, "name": "op_lfo", "size": 68, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand", "ym_write_record"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22143, "end_ea": 22177, "name": "op_noise", "size": 34, "chunks": [], "xrefsTo": [], "xrefsFrom": ["next_operand", "ym_write_record"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22177, "end_ea": 22205, "name": "ym_write_record", "size": 28, "chunks": [], "xrefsTo": ["op_lfo", "op_noise"], "xrefsFrom": ["ym_wait"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22205, "end_ea": 22242, "name": "op_pan", "size": 37, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 22242, "end_ea": 22270, "name": "op_velocity_add", "size": 28, "chunks": [], "xrefsTo": ["op_var_add_to"], "xrefsFrom": ["op_done", "op_velocity", "store_velocity"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22270, "end_ea": 22282, "name": "op_velocity", "size": 12, "chunks": [], "xrefsTo": ["op_var_store", "op_velocity_add"], "xrefsFrom": ["op_done", "store_velocity"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22282, "end_ea": 22285, "name": "store_velocity", "size": 3, "chunks": [], "xrefsTo": ["op_velocity", "op_velocity_add"], "xrefsFrom": ["op_done"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22285, "end_ea": 22287, "name": "op_done", "size": 2, "chunks": [], "xrefsTo": ["op_bend", "op_fine_tune", "op_velocity", "op_velocity_add", "store_velocity"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 22287, "end_ea": 22326, "name": "op_bend", "size": 39, "chunks": [], "xrefsTo": ["op_var_add_to"], "xrefsFrom": ["op_done"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22326, "end_ea": 22340, "name": "op_fine_tune", "size": 14, "chunks": [], "xrefsTo": ["op_var_store"], "xrefsFrom": ["op_done"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22340, "end_ea": 22344, "name": "op_fade_mode", "size": 4, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 22344, "end_ea": 22408, "name": "op_carrier_tl_sub", "size": 64, "chunks": [], "xrefsTo": ["add_volume", "volume_ym"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 22408, "end_ea": 22467, "name": "volume_ym", "size": 59, "chunks": [], "xrefsTo": ["op_volume"], "xrefsFrom": ["op_carrier_tl_sub"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22499, "end_ea": 22601, "name": "h_nmi", "size": 102, "chunks": [], "xrefsTo": [], "xrefsFrom": ["nmi_immediate", "nmi_return", "nmi_return_x"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22601, "end_ea": 22603, "name": "nmi_return_x", "size": 2, "chunks": [], "xrefsTo": ["h_nmi", "imm_01_send_inputs", "nmi_immediate"], "xrefsFrom": ["nmi_return"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22603, "end_ea": 22607, "name": "nmi_return", "size": 4, "chunks": [], "xrefsTo": ["h_nmi", "nmi_return_x"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 22607, "end_ea": 22622, "name": "nmi_immediate", "size": 15, "chunks": [], "xrefsTo": ["h_nmi"], "xrefsFrom": ["nmi_return_x"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22622, "end_ea": 22633, "name": "ymtimer_reset", "size": 11, "chunks": [], "xrefsTo": ["init_sound"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 22633, "end_ea": 22976, "name": "ymtimer_start", "size": 343, "chunks": [], "xrefsTo": ["cmdtype_10_ymtimer"], "xrefsFrom": ["cmp_list_priority", "write_patch_regs_at", "ym_wait"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 22976, "end_ea": 23395, "name": "ymtimer_irq", "size": 419, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": ["load_patch_regs", "ym_wait", "ymtimer_write"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 23395, "end_ea": 23408, "name": "ymtimer_write", "size": 13, "chunks": [], "xrefsTo": ["ymtimer_irq"], "xrefsFrom": ["ym_wait"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 23408, "end_ea": 23426, "name": "cmp_list_priority", "size": 18, "chunks": [], "xrefsTo": ["cmp_list_priority", "ymtimer_start"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 23468, "end_ea": 23494, "name": "oki_reset", "size": 26, "chunks": [], "xrefsTo": ["init_sound"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 23494, "end_ea": 23546, "name": "oki_tick", "size": 52, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": ["oki_duck_ym"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 23546, "end_ea": 23550, "name": "op_95", "size": 4, "chunks": [], "xrefsTo": [], "xrefsFrom": ["cmdtype_13_oki_play"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 23550, "end_ea": 23651, "name": "cmdtype_13_oki_play", "size": 101, "chunks": [], "xrefsTo": ["op_95"], "xrefsFrom": ["oki_duck_ym"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 23663, "end_ea": 23687, "name": "cmdtype_14_oki_stop", "size": 24, "chunks": [], "xrefsTo": [], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 23687, "end_ea": 23736, "name": "oki_duck_ym", "size": 49, "chunks": [], "xrefsTo": ["cmdtype_13_oki_play", "oki_tick"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 23736, "end_ea": 23749, "name": "imm_04_loopback", "size": 13, "chunks": [], "xrefsTo": [], "xrefsFrom": ["imm_return", "receive_bytes", "send_response"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 23749, "end_ea": 23784, "name": "receive_bytes", "size": 35, "chunks": [], "xrefsTo": ["imm_04_loopback"], "xrefsFrom": ["send_response"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 23784, "end_ea": 23817, "name": "read_inputs", "size": 33, "chunks": [], "xrefsTo": ["h_irq"], "xrefsFrom": ["count_coins"], "leaf": false, "exploreLeaf": true}
+{"start_ea": 23825, "end_ea": 23981, "name": "count_coins", "size": 156, "chunks": [], "xrefsTo": ["read_inputs"], "xrefsFrom": [], "leaf": true, "exploreLeaf": true}
+{"start_ea": 23981, "end_ea": 23989, "name": "imm_01_send_inputs", "size": 8, "chunks": [], "xrefsTo": [], "xrefsFrom": ["nmi_return_x", "send_response"], "leaf": false, "exploreLeaf": true}

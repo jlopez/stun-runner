@@ -113,19 +113,19 @@ def test_type_fields() -> None:
         t = c["type"]
         assert ("phrase" in c) == (t == "13"), c["value"]
         assert ("stops_phrase" in c) == (t == "14"), c["value"]
-        assert ("stream" in c) == (t == "08"), c["value"]
+        assert ("sound" in c) == (t == "08"), c["value"]
         assert ("target" in c) == (t in ("05", "0A")), c["value"]
-        assert ("group" in c) == (t == "0B"), c["value"]
+        assert ("priority" in c) == (t == "0B"), c["value"]
         if t == "08":
-            assert c["stream"] == c["param"]
+            assert c["sound"] == c["param"]
         if t in ("05", "0A"):
-            # the command whose stream is stopped or released starts a stream (type 08)
+            # the command whose sound is stopped or released starts a sound (type 08)
             assert by_value[c["target"]]["type"] == "08", c["value"]
             assert c["target"] == c["param"]
         if t == "0B":
-            # cmdtype_0B_release_priority (4496-44C2) releases the voices whose group
+            # cmdtype_0B_release_priority (4496-44C2) releases the tracks whose priority
             # (trk_priority, y >> 2) is A
-            assert HEX2.match(c["group"]) and c["group"] == c["param"], c["value"]
+            assert HEX2.match(c["priority"]) and c["priority"] == c["param"], c["value"]
 
 
 def test_site_notes_name_listed_sites() -> None:
