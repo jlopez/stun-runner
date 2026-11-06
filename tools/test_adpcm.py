@@ -81,7 +81,7 @@ def synthetic_layout(seed: int, count: int = 9, entries: int | None = None) -> L
     rng = random.Random(seed)
     entries = entries or count + 1
     manifest = Manifest(entries, [entry(n) for n in range(1, count + 1)])
-    return layout(manifest, {n: rng.randrange(1, 0x6000) for n in range(1, count + 1)})
+    return layout(manifest, {n: rng.randrange(2, 0x6000) for n in range(1, count + 1)})
 
 
 def entry(n: int) -> Entry:
@@ -183,16 +183,19 @@ def test_truncated_chunk_rejected() -> None:
 
 def test_layout_from_lengths() -> None:
     manifest = Manifest(4, [Entry(1, "a"), Entry(2, "b"), Entry(3, "c")])
-    lay = layout(manifest, {1: 5, 2: 1, 3: 0x100})
-    assert [(p.start, p.end) for p in lay.phrases] == [(0x20, 0x24), (0x25, 0x25), (0x26, 0x125)]
-    assert lay.tail == 0x126
+    lay = layout(manifest, {1: 5, 2: 2, 3: 0x100})
+    assert [(p.start, p.end) for p in lay.phrases] == [(0x20, 0x24), (0x25, 0x26), (0x27, 0x126)]
+    assert lay.tail == 0x127
     # exactly full is allowed, one byte more is not, with how much too much
-    full = layout(manifest, {1: 5, 2: 1, 3: IMAGE_SIZE - 0x26})
+    full = layout(manifest, {1: 5, 2: 2, 3: IMAGE_SIZE - 0x27})
     assert full.tail == IMAGE_SIZE
     with pytest.raises(FormatError, match="1 bytes more than the 256 KB image holds"):
-        layout(manifest, {1: 5, 2: 1, 3: IMAGE_SIZE - 0x25})
+        layout(manifest, {1: 5, 2: 2, 3: IMAGE_SIZE - 0x26})
     with pytest.raises(FormatError, match="an empty sample"):
-        layout(manifest, {1: 5, 2: 0, 3: 1})
+        layout(manifest, {1: 5, 2: 0, 3: 2})
+    # a 1-byte sample (a WAV of 1 or 2 values) has start == end: okim6295.cpp:265 never plays it
+    with pytest.raises(FormatError, match="phrase 2: a sample of 1 byte would never play"):
+        layout(manifest, {1: 5, 2: 1, 3: 2})
 
 
 def test_table_encoder_and_decoder_on_a_synthetic_image() -> None:
@@ -278,6 +281,7 @@ def test_manifest_reader(tmp_path: Path) -> None:
         ("p4__name", "oki_tail", "the OKI tree's own labels"),
         ("p2__start", "001A8", "derived from the WAV lengths"),
         ("p2__length", 4, "derived from the WAV lengths"),
+        ("p4__seconds", 1.77, "derived from the WAV lengths"),
     ]
     for key, value, message in cases:
         write_manifest(path, 4, **{key: value})

@@ -277,13 +277,15 @@ Decision (Jesus, 2026-11-05, card A7, option 2): one format, a playable one, com
   size and an empty sample. A value the decoder cannot produce (off its grid of multiples of 16,
   or beyond -32768..32752) is an edit, not an error.
 - **The layout is derived.** The manifest holds no address (`read_manifest` refuses `start`,
-  `end` and `length`). `tools/adpcm asm` encodes every WAV and lays the samples out in phrase
-  order: phrase 1 at the end of the table (001A8 with 53 entries), each next one where the
+  `end`, `length` and M4b's `seconds`). `tools/adpcm asm` encodes every WAV and lays the
+  samples out in phrase order: phrase 1 at the end of the table (001A8 with 53 entries), each next one where the
   previous one ends, the rest of the 256 KB zero. A WAV of another length moves every later
   sample; a set of samples that no longer fits fails with the number of bytes too many (`the
   samples end at 40000: 1 bytes more than the 256 KB image holds ...`). A WAV of an odd number
   of samples gets its last value once more (the last byte needs two nibbles; `tools/adpcm`
-  says so).
+  says so). A sample needs at least 2 bytes, a WAV at least 3 values: a 1-byte sample would
+  have start equal to end in the phrase table, and the M6295 starts a voice only when start <
+  stop (`devices/sound/okim6295.cpp:265`), so it would never play; `layout` fails on it.
 - **The build** (`Makefile`, docs/04 section 1): `tools/adpcm asm --data data/oki --out
   build/oki` writes `build/oki/samples.asm`; `asm/oki/samples.asm` (committed) is the phrase table
   as `dc.b` statements computed from the include's labels `phrase_NN` (first byte) and
@@ -391,13 +393,17 @@ reach the same output only when the clamp to -2048..2047 makes them equal, and t
 
 ## 7. Names
 
-Decision (Jesus, 2026-11-05, card A8): the samples are named from his listening. `name` is a
-lower_snake label derived from his words (the speech phrases by their words, the numbers
-`number_01`-`number_22`, the effects by his description); `description` holds his words
-verbatim, question marks included (for 10-31 he wrote `"One" all the way to "Twenty-two"`, and
-each phrase's description is its number word). Where he marked a doubt with `?`, the name keeps
-his words behind the prefix `maybe_`, so the label does not state as a fact what he heard as a
-guess. `audio_test` is cross evidence, not a name: the 68010's audio-test names of the commands
+Decision (Jesus, 2026-11-05, card A8): the samples are named from his listening, the name close
+to his words, a doubt never upgraded to a fact. His words are in the table below; for 10-31 he
+wrote `"One" all the way to "Twenty-two"`.
+
+Convention taken by the implementer (leg M4g), pending Jesus (it is not part of his card A8
+answer): `name` is a lower_snake label derived from his words (the speech phrases by their
+words, the effects by his description); phrases 10-31 are `number_01`-`number_22` and each
+one's `description` is its number word ("One" ... "Twenty-two"), derived from his range, not
+words he wrote per phrase; every other `description` holds his words verbatim, question marks
+included. Where he marked a doubt with `?`, the name keeps his words behind the prefix `maybe_`
+(8 labels and 8 file names), so the label does not state as a fact what he heard as a guess. `audio_test` is cross evidence, not a name: the 68010's audio-test names of the commands
 that play the phrase (`data/sound/commands.json`, docs/11). The file names
 (`data/oki/NN-name.wav`), the labels of the include and this table follow `name`; the build uses
 the name as a label alias, so it may not be one of the OKI tree's own labels (`phrase_NN`,
@@ -464,10 +470,11 @@ checks that `maybe_` is exactly where the description ends in `?` and that `audi
 progress page, not a rename):
 
 - 36 `hmm_tsk` "hmm... tsk": the 68k calls it KISS (a kiss sound would fit "tsk").
-- 38 `shockwave` "shockwave sound": PRGUN, the command the 68k sends at 036DFC; the shockwave is
-  the player's weapon (phrase 8, "Press FIRE button to fire shockwaves"), so the two agree in role.
-- 39 `maybe_missile_launch` "missile launch?": GUN1, a gun, not a missile; the most frequent
-  phrase in a played game (312 starts in the game run).
+- 38 `shockwave` "shockwave sound": PRGUN (the 68k's name; role unknown), command 5E, queued at
+  036DFC. In the game run, with button 1 pressed every 20 frames from frame 1020
+  (`tools/mame/okitrace.lua`), 5E never played, while 67 (GUN1, phrase 39) played 312 times.
+- 39 `maybe_missile_launch` "missile launch?": GUN1 (the 68k's name; possibly a gun); the most
+  frequent phrase in a played game (312 starts in the game run).
 - 41 `maybe_mild_explosion` "another sfx, sounds like a mild explosion?": APAD; no call site in
   the 68k program queues command 5D (docs/11), only the audio test plays it.
 - 42 `maybe_turret_attached` "sound when turret is attached?": IRISOP (iris open).

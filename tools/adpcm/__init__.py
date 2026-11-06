@@ -40,6 +40,7 @@ PIN7 = "low"
 IMAGE_SIZE = 0x40000
 ENTRY = 8  # bytes per phrase-table entry
 ADDRESS_MASK = 0x3FFFF  # okim6295_device::write masks start and stop to 18 bits
+MIN_SAMPLE = 2  # bytes: a 1-byte sample has start == stop, which the chip never plays
 MAX_PHRASES = 0x80  # a phrase number is 7 bits
 
 FORMAT = "stunrun-oki 2"
@@ -159,7 +160,7 @@ def read_manifest(path: Path) -> Manifest:
                 f"{where}: name {name!r} is one of the OKI tree's own labels "
                 "(phrase_NN, phrase_NN_last, oki_*)"
             )
-        for key in ("start", "end", "length"):
+        for key in ("start", "end", "length", "seconds"):
             if key in p:
                 raise FormatError(
                     f"{where}: {key!r} is derived from the WAV lengths, not written in the manifest"
@@ -173,13 +174,20 @@ def read_manifest(path: Path) -> Manifest:
 
 def layout(manifest: Manifest, lengths: dict[int, int]) -> Layout:
     """Every phrase's start and end from the sample lengths in bytes: phrase 1 right after the
-    table, each next one where the previous one ends. Fails when the samples do not fit."""
+    table, each next one where the previous one ends. Fails on a sample under MIN_SAMPLE bytes
+    (it would never play) and when the samples do not fit."""
     phrases = []
     start = manifest.entries * ENTRY
     for e in manifest.phrases:
         n = lengths[e.number]
         if n < 1:
             raise FormatError(f"phrase {e.number}: an empty sample")
+        if n < MIN_SAMPLE:
+            # okim6295_device::write starts a voice only when start < stop (okim6295.cpp:265)
+            raise FormatError(
+                f"phrase {e.number}: a sample of {n} byte would never play (the M6295 starts "
+                "a voice only when its start lies before its end); a WAV needs at least 3 samples"
+            )
         phrases.append(Phrase(e.number, e.name, start, start + n - 1))
         start += n
     if start > IMAGE_SIZE:
