@@ -1,16 +1,17 @@
 ; S.T.U.N. Runner (rev 6), JSA II OKI M6295 ADPCM image: 256 KB, not banked on JSA II
 ; (docs/01-hardware.md section 6, docs/10-adpcm.md).
 ;
-; Milestone 4: the phrase table is source; the samples are the bytes recovered from one WAV per
-; phrase (tools/adpcm asm writes ../../build/oki/samples.asm from data/oki/samples.json and the
-; WAVs in OKI_WAV_DIR, default build/oki/wav, which tools/adpcm split makes from the merged
-; image). The WAVs carry the ADPCM bytes verbatim, so the four files are byte-identical only if
-; every sample survived WAV and back. The sample bytes stay under build/ (CLAUDE.md section 2).
+; Milestone 4: the phrase table is source and the samples are generated from data/oki, one
+; 16-bit PCM WAV per phrase (tools/adpcm asm writes ../../build/oki/samples.asm: each WAV encoded
+; back to ADPCM, the samples laid out in phrase order from their lengths, the bytes as dc.b). The
+; four files are byte-identical only if the encoder gives every sample's bytes back from its PCM
+; (docs/10-adpcm.md section 6); nothing here reads the reference set.
 ;
 ; ROM files: 136070-2124.1fh 00000-0FFFF, -2125.1ef 10000-1FFFF, -2126.1de 20000-2FFFF,
-; -2127.1cd 30000-3FFFF. Phrase 11 straddles 1fh/1ef, phrase 32 1ef/1de, phrase 40 1de/1cd; the
-; include cuts each of those incbins at the boundary and labels the file (oki_1ef, oki_1de,
-; oki_1cd). Assembled with vasmm68k_mot as a plain byte image (docs/04-build.md).
+; -2127.1cd 30000-3FFFF. In the reference layout phrase 11 straddles 1fh/1ef, phrase 32 1ef/1de,
+; phrase 40 1de/1cd; the include labels each file where it starts (oki_1ef, oki_1de, oki_1cd,
+; with an assert), inside a sample or in the zero tail. Assembled with vasmm68k_mot as a plain
+; byte image (docs/04-build.md).
 
 	org	0
 
