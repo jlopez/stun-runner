@@ -10,8 +10,10 @@ from collections.abc import Iterable
 
 import ida_bytes
 import ida_funcs
+import ida_idaapi
 import ida_lines
 import ida_loader
+import ida_nalt
 import ida_name
 import ida_offset
 import ida_segment
@@ -26,6 +28,7 @@ _CREATE = {
     "word": ida_bytes.create_word,
     "dword": ida_bytes.create_dword,
 }
+_REF_TYPE = {"byte": ida_nalt.REF_OFF8, "word": ida_nalt.REF_OFF16, "dword": ida_nalt.REF_OFF32}
 
 
 def warn(message: str) -> None:
@@ -180,7 +183,8 @@ class IdaDatabase:
             if test(flags):
                 width = {"byte": 1, "word": 2, "dword": 4}[kind]
                 count = ida_bytes.get_item_size(ea) // width
-                return DataItem(ea, kind, count, bool(ida_bytes.is_off0(flags)))
+                offset = bool(ida_bytes.is_off0(flags))
+                return DataItem(ea, kind, count, offset, offset_delta(ea) if offset else 0)
         return None
 
     def create_data(self, item: DataItem) -> None:
@@ -189,7 +193,13 @@ class IdaDatabase:
         if not _CREATE[item.type](item.ea, width * item.count):
             warn(f"cannot create {item}")
             return
-        if item.offset:
+        if item.offset and item.delta:
+            ri = ida_nalt.refinfo_t()
+            ri.init(_REF_TYPE[item.type])
+            ri.base, ri.target, ri.tdelta = 0, ida_idaapi.BADADDR, item.delta
+            if not ida_offset.op_offset_ex(item.ea, 0, ri):
+                warn(f"cannot make {item} an offset")
+        elif item.offset:
             ida_offset.op_plain_offset(item.ea, 0, 0)
 
     def data_items(self, start: int, end: int) -> list[DataItem]:
@@ -223,6 +233,15 @@ class IdaDatabase:
                     warn(f"cannot create an instruction at {ea:06X}")
                     return
             ea = ida_bytes.get_item_end(ea)
+
+
+def offset_delta(ea: int) -> int:
+    """The tdelta of the offset at `ea`: its value minus its target (IDA computes the target as
+    base + value - tdelta)."""
+    ri = ida_nalt.refinfo_t()
+    if not ida_nalt.get_refinfo(ri, ea, 0):
+        return 0
+    return int(ri.tdelta)
 
 
 def local_name(ea: int) -> str:

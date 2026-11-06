@@ -252,7 +252,8 @@ class Sync:
 def describe_item(item: DataItem | None) -> str:
     if item is None:
         return "(no data item)"
-    return f"{item.type} x{item.count}{' offset' if item.offset else ''}"
+    offset = f" offset{item.delta:+d}" if item.delta else " offset"
+    return f"{item.type} x{item.count}{offset if item.offset else ''}"
 
 
 def describe(cur: str, new: str) -> str:

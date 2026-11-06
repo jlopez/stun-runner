@@ -77,6 +77,9 @@ class DataItem:
     type: str  # one of DATA_TYPES
     count: int = 1
     offset: bool = False  # the value is an address (an IDA offset)
+    # An offset whose value is its target plus `delta` (IDA's refinfo tdelta): -1 for the 6502's
+    # RTS-dispatch words, `.word handler-1`, whose target is the handler. 0 for a plain offset.
+    delta: int = 0
 
 
 @dataclass
@@ -220,12 +223,17 @@ def to_dict(snapshot: Snapshot) -> dict[str, Any]:
         "names": [_name(n) for n in s.names],
         "functions": [_hex(ea) for ea in s.functions],
         "comments": [{"ea": _hex(c.ea), "kind": c.kind, "text": c.text} for c in s.comments],
-        "data": [
-            {"ea": _hex(d.ea), "type": d.type, "count": d.count, "offset": d.offset} for d in s.data
-        ],
+        "data": [_data(d) for d in s.data],
     }
     if s.code:  # absent from a snapshot without classified ranges (the 68k's)
         out["code"] = [[_hex(a), _hex(b)] for a, b in s.code]
+    return out
+
+
+def _data(d: DataItem) -> dict[str, Any]:
+    out: dict[str, Any] = {"ea": _hex(d.ea), "type": d.type, "count": d.count, "offset": d.offset}
+    if d.delta:  # only on an offset to a target other than its value (none in the 68k's)
+        out["delta"] = d.delta
     return out
 
 
@@ -251,7 +259,10 @@ def from_dict(d: dict[str, Any]) -> Snapshot:
         [Name(_ea(n["ea"]), n["name"], n.get("local", False)) for n in d["names"]],
         [_ea(ea) for ea in d["functions"]],
         [Comment(_ea(c["ea"]), c["kind"], c["text"]) for c in d["comments"]],
-        [DataItem(_ea(x["ea"]), x["type"], x["count"], x["offset"]) for x in d["data"]],
+        [
+            DataItem(_ea(x["ea"]), x["type"], x["count"], x["offset"], x.get("delta", 0))
+            for x in d["data"]
+        ],
         [(_ea(a), _ea(b)) for a, b in d.get("code", [])],
     ).normalized()
 

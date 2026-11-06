@@ -20,7 +20,14 @@ returns a `Source`, the annotations the source carries at their IDA addresses.
   file renamed, split or added keeps its functions.
 - **Code and data.** Every instruction is code; every data statement (.byte, .word, .text, .fill,
   and the ones a macro call expands to) is one data item of its size: bytes, or words where the
-  statement is .word, offsets where every operand of a .word names a label of the image.
+  statement is .word. A .word is an offset when every operand is a label of the image, or every
+  operand the same `label-n`/`label+n`: the offset's target is then the label and its `delta`
+  (IDA's tdelta) the -n or +n, so an RTS-dispatch entry `.word handler-1` points at the handler,
+  not at the byte before it. Any other operand (a number, an equate, another expression) makes
+  the statement plain words.
+- **Equates.** Only ram.asm and hardware.asm (`CONST_FILES`) hold the RAM and I/O names; an
+  equate elsewhere whose value lies in 0000-2FFF fails the load, because its name would silently
+  drop out of the database (data/macros.asm, `SKIP_FILES`, holds the macros' constants).
 - **Comments.** A column-0 comment block directly above a global label (its `; ---` rules
   dropped) is the label's header: the function comment of a routine, the repeatable comment of
   any other label. The comments on a line, its continuation lines (comment-only lines at the
@@ -70,7 +77,7 @@ SYMBOL = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\$[0-9A-Fa-f]+|\d+)\s*$")
 LISTED = re.compile(r"^([.>])([0-9a-f]{4})$")
 HEX = re.compile(r"^[0-9a-f]{2}( [0-9a-f]{2})*$")
 DATA_KIND = re.compile(r"^\.(byte|char|word|addr|text|fill)\b\s*(.*)$")
-IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+LABEL_DELTA = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*(?:([+-])\s*(\$[0-9A-Fa-f]+|\d+))?$")
 
 
 def ida_ea(offset: int) -> int:
@@ -237,12 +244,25 @@ def operand_list(text: str) -> list[str]:
     return [x.strip() for x in text.split(",") if x.strip()]
 
 
+def label_delta(op: str, image_labels: set[str]) -> int | None:
+    """`delta` of an operand `label`, `label+n` or `label-n` (n in decimal or $hex) whose label
+    is a label of the image; None for any other operand."""
+    m = LABEL_DELTA.match(op)
+    if m is None or m.group(1) not in image_labels:
+        return None
+    if m.group(2) is None:
+        return 0
+    n = int(m.group(3)[1:], 16) if m.group(3).startswith("$") else int(m.group(3))
+    return n if m.group(2) == "+" else -n
+
+
 def data_item(st: Statement, image_labels: set[str]) -> DataItem:
     ea = ida_ea(st.offset)
     if st.kind in ("word", "addr") and st.size % 2 == 0:
-        ops = operand_list(st.operands)
-        offset = bool(ops) and all(any(i in image_labels for i in IDENT.findall(op)) for op in ops)
-        return DataItem(ea, "word", st.size // 2, offset)
+        deltas = {label_delta(op, image_labels) for op in operand_list(st.operands)}
+        if len(deltas) == 1 and None not in deltas:
+            return DataItem(ea, "word", st.size // 2, True, deltas.pop() or 0)
+        return DataItem(ea, "word", st.size // 2, False)
     return DataItem(ea, "byte", st.size, False)
 
 
@@ -499,6 +519,15 @@ def build(
                 continue
 
             body = code.strip()
+            equate = EQUATE.match(code) if not text[0].isspace() else None
+            if equate and "*" not in equate.group(2):
+                v = syms.get(equate.group(1))
+                if v is not None and 0 <= v < CONST_FILES["hardware.asm"][1]:
+                    raise ValueError(
+                        f"{where}: the equate {equate.group(1)} = ${v:04X} (RAM or I/O) is outside"
+                        f" {' and '.join(CONST_FILES)}, so IDA would lose its name: move it there"
+                        " or add its file to CONST_FILES (ida/jsa_source.py)"
+                    )
             if not text[0].isspace() or NO_BYTES.match(body) or ORG.match(body):
                 if above or comment:
                     src.loose.append(f"{where} (directive) {(above or [comment or ''])[0][:60]}")

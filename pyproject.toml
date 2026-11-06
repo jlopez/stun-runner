@@ -83,7 +83,8 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = [
     "idapro", "idautils", "ida_auto", "ida_bytes", "ida_fpro", "ida_funcs", "ida_ida",
-    "ida_lines", "ida_loader", "ida_name", "ida_offset", "ida_segment", "ida_ua",
+    "ida_idaapi", "ida_lines", "ida_loader", "ida_name", "ida_nalt", "ida_offset", "ida_segment",
+    "ida_ua",
 ]
 ignore_missing_imports = true
 

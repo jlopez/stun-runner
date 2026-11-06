@@ -11,6 +11,7 @@ and `make ida && make ida-sync` (docs/05 section 6).
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -109,9 +110,20 @@ def test_listing_statements() -> None:
     ]
     assert sts[3].operands == "reset, $4001"
     assert js.data_item(sts[3], {"reset"}) == DataItem(0x4006, "word", 2, False)  # mixed
-    assert js.data_item(js.Statement(0x10, "word", "reset, reset+2", 4), {"reset"}) == DataItem(
-        0x23000 - 0x10000 + 0x10, "word", 2, True
+    labels = {"reset", "sub"}
+    bank = 0x23000 - 0x10000 + 0x10
+    assert js.data_item(js.Statement(0x10, "word", "reset, sub", 4), labels) == DataItem(
+        bank, "word", 2, True
     )
+    # an RTS-dispatch entry: the offset's target is the label, its delta the -1
+    assert js.data_item(js.Statement(0x10, "word", "sub-1", 2), labels) == DataItem(
+        bank, "word", 1, True, -1
+    )
+    assert js.data_item(js.Statement(0x10, "word", "sub - $2, reset-2", 4), labels) == DataItem(
+        bank, "word", 2, True, -2
+    )
+    for plain in ("reset, reset+2", "reset*2", "reset>>8", "ptr", "PORT+1", "$1234"):
+        assert js.data_item(js.Statement(0x10, "word", plain, 2), labels).offset is False, plain
     assert js.data_item(sts[4], set()) == DataItem(0x400A, "byte", 12, False)
 
 
@@ -205,6 +217,7 @@ table
     .word sub, reset                    ; offsets
     .word $1234
     #pair $05, sub                      ; a macro call
+    .word reset-1                       ; an RTS-dispatch entry
 """,
 }
 
@@ -266,6 +279,7 @@ def test_synthetic_comments(synthetic: js.Source) -> None:
     assert c[(0x400E, "regular")] == "three"
     assert c[(0x4011, "regular")] == "offsets"
     assert c[(0x4017, "regular")] == "a macro call"
+    assert c[(0x401A, "regular")] == "an RTS-dispatch entry"
     assert c[(0x13000, "regular")] == "the four bank pages"
     assert c[(0x10, "repeatable")] == "2 bytes: a pointer"
     assert c[(0x12, "repeatable")] == "how many\nand a second line"
@@ -296,6 +310,7 @@ def test_synthetic_classification(synthetic: js.Source) -> None:
         DataItem(0x4015, "word", 1, False),
         DataItem(0x4017, "byte", 1),  # the macro's .byte
         DataItem(0x4018, "word", 1, True),  # and its .word
+        DataItem(0x401A, "word", 1, True, -1),  # reset-1: an offset to reset, delta -1
     ]
 
 
@@ -364,19 +379,64 @@ def test_committed_snapshot_is_json() -> None:
     assert json.loads(SNAPSHOT.read_text())["database"] == "stunrun-jsa"
 
 
+def rename_in_tree(tree: Path, old: str, new: str) -> None:
+    """`old` renamed to `new`, as a whole word, in every file of the tree."""
+    pattern = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(old)}(?![A-Za-z0-9_])")
+    for path in tree.rglob("*.asm"):
+        text = path.read_text()
+        if pattern.search(text):
+            path.write_text(pattern.sub(new, text))
+
+
 @needs_tass
-def test_a_rename_without_a_sync_is_caught(tmp_path: Path) -> None:
-    """A planted rename (a global and a local) in a copy of asm/jsa: its names no longer equal
-    the committed snapshot's, which is what test_committed_snapshot_has_the_source_names sees."""
+def test_a_rename_without_a_sync_is_caught(source: js.Source, tmp_path: Path) -> None:
+    """A planted rename (a routine's global and a local) in a copy of asm/jsa: its names no
+    longer equal the committed snapshot's, which is what
+    test_committed_snapshot_has_the_source_names sees. The two labels are picked from the
+    source, not named here, so that a later leg's own rename (with its sync) does not break this
+    test."""
+    globals_ = source.global_names()
+    locals_ = list(source.local_names().values())
+    victim_global = globals_[source.functions[0]]
+    victim_local = next(n for n in locals_ if locals_.count(n) == 1)  # one local of that name
     tree = tmp_path / "jsa"
     shutil.copytree(js.TREE, tree)
-    system = tree / "system.asm"
-    text = system.read_text()
-    assert "\nself_test\n" in text and "_clear_zero_page" in text
-    text = text.replace("self_test", "power_up_test").replace("_clear_zero_page", "_wipe_zp")
-    system.write_text(text)
+    rename_in_tree(tree, victim_global, f"{victim_global}_planted")
+    rename_in_tree(tree, victim_local, f"{victim_local}_planted")
     renamed = js.load(tree)
+    assert {n.name for n in set(source.names) - set(renamed.names)} == {victim_global, victim_local}
+    assert {n.name for n in set(renamed.names) - set(source.names)} == {
+        f"{victim_global}_planted",
+        f"{victim_local}_planted",
+    }
+    # the committed snapshot holds the source's names (test above): the copy no longer matches it
     snap = loads(SNAPSHOT.read_text())
-    missing = {n.name for n in set(snap.names) - set(renamed.names)}
-    assert missing == {"_clear_zero_page"} | {n.name for n in snap.names if "self_test" in n.name}
-    assert "self_test" in missing
+    assert set(snap.names) != set(renamed.names)
+
+
+@needs_tass
+def test_an_equate_outside_the_constants_files_fails(tmp_path: Path) -> None:
+    """A RAM equate moved from ram.asm into a file of its own (the image unchanged) would drop
+    its name out of the database without a word: the load fails instead and names the file."""
+    (tmp_path / "work").mkdir()
+    (tmp_path / "moved").mkdir()
+    syms = js.assembled_symbols(js.TREE, tmp_path / "work")
+    tree = tmp_path / "jsa"
+    shutil.copytree(js.TREE, tree)
+    ram = (tree / "ram.asm").read_text().splitlines(keepends=True)
+    no, line = next(
+        (i, x)
+        for i, x in enumerate(ram)
+        if (m := js.EQUATE.match(js.split_comment(x)[0])) and m.group(1) in syms
+        and syms[m.group(1)] < 0x2000 and "*" not in m.group(2)
+    )
+    name = js.EQUATE.match(js.split_comment(line)[0]).group(1)  # type: ignore[union-attr]
+    (tree / "ram.asm").write_text("".join(ram[:no] + ram[no + 1 :]))
+    (tree / "ram_moved.asm").write_text(line)
+    main = (tree / "jsa.asm").read_text()
+    assert '    .include "ram.asm"\n' in main
+    main = main.replace('    .include "ram.asm"\n', '    .include "ram.asm"\n    .include "ram_moved.asm"\n')
+    (tree / "jsa.asm").write_text(main)
+    assert js.assembled_symbols(tree, tmp_path / "moved")[name] == syms[name]
+    with pytest.raises(ValueError, match=rf"ram_moved\.asm:1: the equate {name} "):
+        js.load(tree)
