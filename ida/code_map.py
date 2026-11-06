@@ -379,6 +379,241 @@ CODE_MAP_68K = [
         "Writes its long argument to HSTDATA (C0000C) low word first (02FE68), then high word "
         "(02FE6E); each write stores 16 bits at HSTADR and adds 10h (INCW).",
     ),
+    # --- the sound path (M4e, docs/11-sound-protocol.md): the 68010 side of the JSA II latch ---
+    Entry(
+        0x008D94,
+        "boot_sa_audio_test",
+        "Boot program, SOUND BOARD TESTS > SA SELF TEST (menu table 008D60: 008D6C exit, this, "
+        "008EF2 play sounds). SR = 2F00 (008DB4), reads 604000 (sound reset, 008DB8), waits 180 "
+        "vertical syncs (0013EC), reads the response (008DCC): not FF, message 90 (audio "
+        "timeout error). Else writes 07 at 600000 (008DDA), two syncs, reads the status byte "
+        "into FF8090 (008DFA), boot_show_sound_status, boot_play_test_sounds, waits for a button "
+        "(008F40). MAME (make sndproto, selftest): reset, FF, 07, status 00, AUDIO TEST OK.",
+    ),
+    Entry(
+        0x008E2C,
+        "boot_show_sound_status",
+        "The status byte (FF8090) against the table at 008ED0 (a count, 8, then {bit, message} "
+        "words 80/88 down to 01/8F): prints the message of each bit set (002326, message "
+        "pointers at 010136): 80-20 6502 program PROM, 10 first RAM (0000), 08 second RAM "
+        "(0800), 04 IRQs not present, 02 YM2151 timed out, 01 main loop not running; message "
+        "91 (audio test OK) when none is. The 6502 sets these bits in zp_02 (docs/11).",
+    ),
+    Entry(
+        0x008E84,
+        "boot_play_test_sounds",
+        "Writes 04 at 600000 (008E84), waits 640 syncs, 00 (008E9A), 32 syncs, 05 (008EB0), 128 "
+        "syncs, 00 (008EC6): the game's audio test names them YTST, STOP, ADTEST, STOP. Called "
+        "from 008E08 and 008FE8.",
+    ),
+    Entry(
+        0x008F68,
+        "boot_sa_ii_test",
+        "As boot_sa_audio_test with messages 105-108 (SA II test in progress, OK, error, timeout "
+        "error): reset (008F72), 180 syncs, FF expected (008F86), 07 (008F94), status 0 is OK "
+        "(008FB4); then boot_play_test_sounds. Called from 00533C (the power-up self-test).",
+    ),
+    Entry(
+        0x023E96,
+        "send_sound_with_reply",
+        "send_sound_with_reply(command, buffer, count): SR = 2400 (level 4 masked); if A80000 "
+        "bit 15 is set and no reply is pending (sound_reply_ptr 0), writes the command at "
+        "600000 (023EC0) and points the next count responses at buffer (h_level4_sound stores "
+        "them there); returns 1, else 0. No caller found (no absolute or relative reference).",
+    ),
+    Entry(
+        0x023EDA,
+        "send_sound_byte",
+        "send_sound_byte(command): SR = 2400, A80000 bit 15 set: writes the byte at 600000 "
+        "(023EF6) and returns 1; clear: restores SR and tries again, 256 times in all, then "
+        "returns 0 (the byte is dropped). HYP: bit 15 says the sound latch is free; MAME has it "
+        "always 1 (IPT_UNUSED, active low). Called from 030170 (flush_sound_queue) and the audio "
+        "test (04392C, 04393E, 04395C).",
+    ),
+    Entry(
+        0x023EDE,
+        "send_sound_byte_once",
+        "As send_sound_byte with one try (enters with D0 = 1). Called from 0300B8 "
+        "(sound_watchdog, which has no caller).",
+        "label",
+    ),
+    Entry(
+        0x023F0C,
+        None,
+        "A second way into h_level4_sound with no reference (no vector, no call): if the "
+        "interrupted level (the stacked SR) is 4 or more, drops the 8-byte exception frame "
+        "before going on at 023F28.",
+        "label",
+    ),
+    Entry(
+        0x023F72,
+        "get_sound_response",
+        "The next byte of the response ring (sound_resp_ring, out index sound_resp_out), or -1 "
+        "when it is empty. Called only from 03002C (sound_watchdog, which has no caller): the "
+        "game reads no response.",
+    ),
+    Entry(
+        0x023FA2,
+        "reset_sound_board",
+        "Reads 604000 (023FA8: hd68k_sound_reset_r resets the 6502), reads 600000 (023FAE: "
+        "clears a response and the level 4 interrupt, atariscom.cpp main_response_r), clears "
+        "sound_reply_ptr. The 6502 answers FF after its reset (413C-413E). Called from 0300FC.",
+    ),
+    Entry(
+        0x02837E,
+        None,
+        "Attract mode's sound: game_options (FF94EE) bit 11, SOUNDS IN ATTRACT (028364-028372), "
+        "set: command 02 (sound on), clear: 01 (off), queued through A2 = queue_sound_command. "
+        "The factory option word is 0: attract mode is silent (MAME, docs/11).",
+        "label",
+    ),
+    Entry(
+        0x03001E,
+        "sound_watchdog",
+        "No caller found (no absolute or relative reference, MAME never runs it: its counters "
+        "FFDB5C-FFDB63 are written only by reset_sound and the RAM clears). Takes a response "
+        "(get_sound_response): FF ends the wait after a reset (sound_wait_ready); with a status "
+        "request out (sound_wait_status), status AND 7 = 0 is good; any other byte resets the "
+        "board. With nothing pending, every 240 calls sends 07 (0300B8, send_sound_byte_once) "
+        "and gives 30 calls for the answer; a timeout of either wait, or 180 failed sends, calls "
+        "reset_sound.",
+    ),
+    Entry(
+        0x0300F8,
+        "reset_sound",
+        "reset_sound_board, then sound_wait_ready = B4 (180 calls of sound_watchdog for the FF), "
+        "sound_wait_status and sound_check_tries 0, the command queue empty with sound_queue_fill "
+        "0 and sound_queue_send 1. Called from 0243B2, 029B42, 02BA16, 02BB4A, 02BD5E, 02C144, "
+        "030070 and 043728; MAME: 02C144 at frame 367, 0243B2 at 410, 02BA16 at each attract "
+        "cycle (3964, 8668), 02BB4A when a game starts, 029B42 during play.",
+    ),
+    Entry(
+        0x03013C,
+        "flush_sound_queue",
+        "Sends every byte of the buffer sound_queue_send through send_sound_byte (030170), "
+        "three empty loop turns after each, empties it, then advances sound_queue_send and "
+        "sound_queue_fill (0, 1, 2, 0...): a command waits two flushes. Called once per pass of "
+        "the main loop (024500).",
+    ),
+    Entry(
+        0x0301CA,
+        "queue_sound_command",
+        "queue_sound_command(command): appends the byte to buffer sound_queue_fill of "
+        "sound_queue (three buffers of 32 at FFDB64, counts at sound_queue_count) unless it holds "
+        "32 already (the byte is dropped). 133 calls: 96 jsr and 37 jsr (A2) in the four "
+        "routines that load A2 with it (02430E, 02819C, 028350, 029B82); data/sound/commands.json "
+        "lists them per command.",
+    ),
+    Entry(
+        0x0433A4,
+        "get_game_options",
+        "Option word 0D (020B4E). game_reset's main initialisation stores it in game_options "
+        "(0243B8-0243BE); the game options menu (0432A4) edits it with the table at 020ED0 "
+        "(or 021024, without bit 12) and stores it back (020BB4).",
+    ),
+    Entry(
+        0x042CE4,
+        None,
+        "One item of an option menu: the item's first byte gives its field in the option word, "
+        "shift = low nibble, 2 << (high - low) choices (042CF8-042D2C). SOUNDS IN ATTRACT "
+        "(020F51: BB) is bit 11, OFF = 0, ON = 1.",
+        "label",
+    ),
+    Entry(
+        0x043718,
+        "audio_test",
+        "The game's audio test (AUDIO TEST, 05C3DA; entered from game_entry_2, the boot "
+        "program's PLAY SOUNDS): reset_sound (043728), the list audio_test_list on screen; the "
+        "stick moves the cursor (sending 34, 04392C), button 1 sends 00 (04393E), button 2 the "
+        "entry's command (04394E-04395C). MAME (make sndproto, soundtest): all 108 entries.",
+    ),
+    Entry(
+        0x05C63C,
+        "audio_test_list",
+        "108 entries of 22 bytes, a word (the command) and its name, sorted by name, to a word "
+        "FFFF at 05CF84: the 68010's names for 00-6C but 03 (data/sound/commands.json).",
+        "data",
+    ),
+    Entry(
+        0xFF9470,
+        "sound_resp_out",
+        "Byte: out index of sound_resp_ring (get_sound_response).",
+        "data",
+    ),
+    Entry(0xFF9471, "sound_resp_in", "Byte: in index of sound_resp_ring (h_level4_sound).", "data"),
+    Entry(
+        0xFF9472,
+        "sound_reply_count",
+        "Byte: responses still to go to sound_reply_ptr (send_sound_with_reply).",
+        "data",
+    ),
+    Entry(
+        0xFF9474,
+        "sound_reply_ptr",
+        "Long: where h_level4_sound stores the next response; 0: into sound_resp_ring.",
+        "data",
+    ),
+    Entry(
+        0xFF9478,
+        "sound_resp_ring",
+        "16 bytes: the responses h_level4_sound reads, a ring that overwrites when full.",
+        "data",
+    ),
+    Entry(
+        0xFF94EE,
+        "game_options",
+        "Word: option word 0D (get_game_options, 0243BE). Bit 11 SOUNDS IN ATTRACT (028364), "
+        "bit 12 CONTINUE IS ONE COIN LESS; the item bytes of the table at 020ED0 give the others.",
+        "data",
+    ),
+    Entry(
+        0xFFDB5C,
+        "sound_wait_ready",
+        "Word: calls of sound_watchdog left to see the FF after a reset (reset_sound sets B4).",
+        "data",
+    ),
+    Entry(
+        0xFFDB5E,
+        "sound_wait_status",
+        "Word: calls of sound_watchdog left for the answer to its 07.",
+        "data",
+    ),
+    Entry(
+        0xFFDB60,
+        "sound_check_timer",
+        "Word: calls of sound_watchdog until its next 07 (F0 after one is sent).",
+        "data",
+    ),
+    Entry(
+        0xFFDB62,
+        "sound_check_tries",
+        "Word: failed sends of the 07; above B4, sound_watchdog resets the board.",
+        "data",
+    ),
+    Entry(
+        0xFFDB64,
+        "sound_queue",
+        "3 x 32 bytes: the command buffers of queue_sound_command and flush_sound_queue.",
+        "data",
+    ),
+    Entry(
+        0xFFDBC4,
+        "sound_queue_count",
+        "3 bytes: the number of commands in each buffer of sound_queue.",
+        "data",
+    ),
+    Entry(
+        0xFFDBC8,
+        "sound_queue_fill",
+        "Byte: the buffer queue_sound_command appends to (0-2).",
+        "data",
+    ),
+    Entry(
+        0xFFDBCA,
+        "sound_queue_send",
+        "Byte: the buffer flush_sound_queue sends next (0-2).",
+        "data",
+    ),
     Entry(
         0x048F9C,
         "object_descriptors",
@@ -398,7 +633,8 @@ HANDLER_COMMENTS = {
     0x0007F0: "Saves and restores registers only: does not clear the ADSP interrupt (818060).",
     0x0007FA: "Sets FF80E6 = FFFF and clears the MSP's INTOUT (C04008 &= FF7F).",
     0x000812: "Saves and restores registers only.",
-    0x00081C: "Reads the JSA response byte (600000) into D0.",
+    0x00081C: "Reads the JSA response byte (600000) into D0 (clears the level 4 interrupt); the "
+    "boot program's sound tests poll 600000 with interrupts masked instead (008DCC, 008DFA).",
     0x00082C: "Counts FF9042, reads the 8-bit ADC (B00001) into FF8007 + channel, starts the "
     "12-bit ADC, calls boot_read_wheel, and acknowledges with clr.w 60C000 (IRQ5_ACK).",
     # game table (020000)
@@ -412,7 +648,11 @@ HANDLER_COMMENTS = {
     0x02143C: "Sets FFDB48 = FFFF, clears HSTCTL INTOUT (C00008 &= FF7F: acknowledges the GSP; "
     "the GSP sets it after each command buffer, FFF41910), stores the ticks since FFDB36 in "
     "FF9BAA.",
-    0x023F24: "Appends the JSA response byte (600000) to the buffer at FF9470.",
+    0x023F24: "Reads the JSA response byte (600000, 023F66; the read clears the interrupt, "
+    "atariscom.cpp main_response_r) into sound_reply_ptr when a reply is pending (counting "
+    "sound_reply_count down), else into sound_resp_ring at sound_resp_in (16 entries, no full "
+    "check). Nothing in the game reads the ring (get_sound_response has one caller, the "
+    "unreferenced sound_watchdog).",
     0x0222DA: "Counts the ticks in FF8014, calls 02FFF0, acknowledges with clr.w 60C000 "
     "(IRQ5_ACK).",
     0x0239FE: "Services the DUART channels (FFFF0012, FFFF0002 status bits) through 023A54, "
