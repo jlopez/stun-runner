@@ -233,8 +233,25 @@ def test_synthetic_names_and_functions(synthetic: js.Source) -> None:
     }
     assert s.local_names() == {loop: "_loop"}
     assert s.scope[loop] == "reset"
-    assert s.functions == [reset, sub]  # code labels of a ROUTINE_FILES file; table is data
+    assert s.functions == [reset, sub]  # code labels of a file with code; table is data
     assert s.left_out == []
+
+
+@needs_tass
+def test_functions_follow_a_renamed_code_file(
+    synthetic: js.Source, tmp_path: Path
+) -> None:
+    """The code files are derived from the listing: a code file under a new name keeps its
+    functions (a fixed file list would silently drop them)."""
+    tree = {k: v for k, v in TREE.items() if k != "system.asm"}
+    tree["routines_renamed.asm"] = TREE["system.asm"]
+    tree["jsa.asm"] = TREE["jsa.asm"].replace('"system.asm"', '"routines_renamed.asm"')
+    for rel, text in tree.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(text)
+    renamed = js.load(tmp_path)
+    assert renamed.functions == synthetic.functions == [0x4000, 0x400B]
+    assert renamed.global_names() == synthetic.global_names()
 
 
 @needs_tass

@@ -127,7 +127,9 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
 - `tools/test_jsa.py` (CI, no ROMs; docs/09 section 8): `asm/jsa/jsa.asm` assembles with 64tass
   to MAME's size, CRC-32 and SHA-1 of `136070-2123.10c`; a changed operand changes the hash, a
   moved region fails its guard, the IDA snapshot's global names are in the source, and the
-  committed `artifacts/sndtrace-summary.json` agrees with the source.
+  committed `artifacts/sndtrace-summary.json` agrees with the source. The synthetic `make all` of
+  `tools/test_build.py` carries the image the 6502 source assembles to and checks that an
+  operand edited in the copy reaches 10c.
 - `tools/test_ida_sync.py` (CI, no ROMs, no IDA; docs/05 section 6): what `make ida-sync` reads
   from the source (names, locals, functions, comments, the classification), on a synthetic tree
   and on `asm/jsa` assembled with 64tass; the committed 6502 snapshot has exactly the source's
@@ -147,9 +149,7 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   response reads and sound resets, its command queue, the 6502's command reads, responses and
   dispatch) in attract mode, a game, attract mode with the immediate commands injected, and the
   boot program's SA SELF TEST and PLAY SOUNDS menus, each from its own empty private state,
-  into `build/mame/sndproto-<run>.txt` (docs/11 section 8). The synthetic `make all` of
-  `tools/test_build.py` carries the image the 6502 source assembles to and checks that an
-  operand edited in the copy reaches 10c.
+  into `build/mame/sndproto-<run>.txt` (docs/11 section 8).
 - `make sndtrace` (needs MAME and the ROMs; never in CI; `-j3` runs its three MAME runs side by
   side): `tools/mame/sndtrace.lua` records what the 6502 executes and reads, the 68010's command
   bytes and the 6502's responses, the YM2151 and OKI writes, in attract mode with the factory
@@ -284,9 +284,10 @@ the per-file table is docs/09 section 2.
 At the end of M4 (`make coverage`, 2026-11-05, after M4c-M4f, which changed labels, comments,
 equates and the data files' statement form but no byte): the same totals, `stunrun-jsa` instr
 7,351, data 20,376, blob 0, fill 37,809; the set 1,051,392 blob bytes, 69.56% in the JSON line.
-M4d split the data rows into `data/sounds.asm` 1,026, `streams_1.asm` 1,434, `patches_1.asm`
-1,092, `unused_streams.asm` 2,591, `streams_2.asm` 9,495, `patches_2.asm` 3,150 and
-`lookup.asm` 256 (docs/12 section 9).
+M4d split `data/music.asm` (17,762 bytes) into `data/streams_1.asm` 1,434, `patches_1.asm`
+1,092, `unused_streams.asm` 2,591, `streams_2.asm` 9,495 and `patches_2.asm` 3,150 (docs/12
+section 9); `data/sounds.asm` 1,026 and `lookup.asm` 256 are files of M4a's tree, their bytes
+unchanged.
 
 ## 6. Tools and versions
 

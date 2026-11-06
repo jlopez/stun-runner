@@ -84,7 +84,7 @@ make pcwatch        # MAME -debug: highest and lowest 68k PC over 3,600 frames (
 make objtrace       # every object-ROM read of the ADSP in attract mode and a game (docs/07 section 7)
 ```
 
-The sound board (needs `mame`; every run headless from its own empty state; docs/09-docs/12):
+The sound board (needs `mame`; every run headless from its own empty state except `make listen`; docs/09-docs/12):
 
 ```bash
 make -j3 sndtrace   # what the 6502 executes and reads in three runs, checked against asm/jsa

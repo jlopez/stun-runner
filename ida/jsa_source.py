@@ -14,8 +14,10 @@ returns a `Source`, the annotations the source carries at their IDA addresses.
 - **Names.** A global label is the IDA name at its address, a `_local` an IDA local name (with
   its underscore) in the function that holds it. IDA has one name per address: a second label
   there is reported, not carried.
-- **Functions.** Every global label of the code files whose first statement is an instruction
-  starts a function (`ROUTINE_FILES`): each 64tass local scope is then one IDA function.
+- **Functions.** Every global label of a code file (a file that assembles to at least one
+  instruction, `code_files`) whose first statement is an instruction starts a function: each
+  64tass local scope is then one IDA function. The code files are derived, never listed, so a
+  file renamed, split or added keeps its functions.
 - **Code and data.** Every instruction is code; every data statement (.byte, .word, .text, .fill,
   and the ones a macro call expands to) is one data item of its size: bytes, or words where the
   statement is .word, offsets where every operand of a .word names a label of the image.
@@ -51,15 +53,6 @@ TASS_FLAGS = ("-q", "-C", "-b")
 
 CONST_FILES = {"ram.asm": (0x0000, 0x2000), "hardware.asm": (0x2000, 0x3000)}  # IDA RAM, IO
 SKIP_FILES = ("data/macros.asm",)  # macro definitions and their constants: no IDA counterpart
-ROUTINE_FILES = (
-    "system.asm",
-    "commands.asm",
-    "sequencer.asm",
-    "nmi.asm",
-    "ymtimer.asm",
-    "oki.asm",
-    "io.asm",
-)
 BANK_SIZE = 0x1000
 BANKS = 4
 MAX_COMMENT = 1023  # IDA 9.1 keeps 1024 characters of a comment, one less for safety
@@ -413,6 +406,12 @@ def summary(text: str) -> str:
     return out + tail
 
 
+def code_files(addresses: dict[tuple[str, int], int], code_offsets: set[int]) -> set[str]:
+    """The files of the tree with an instruction: a line of the file starts at the offset of an
+    instruction of the listing. Their global labels over code start functions."""
+    return {rel for (rel, _no), offset in addresses.items() if offset in code_offsets}
+
+
 def build(
     files: dict[str, str],
     order: list[str],
@@ -431,6 +430,7 @@ def build(
     repeatable: dict[int, list[str]] = defaultdict(list)
     routine_candidates: set[int] = set()
     code_offsets = {s.offset for s in statements if s.kind == "code"}
+    routine_files = code_files(addresses, code_offsets)
     image_labels: set[str] = set()
 
     for rel in order:
@@ -489,7 +489,7 @@ def build(
                         header.setdefault(ea, []).extend(clean_block(above))
                     else:
                         regular[ea].extend(clean_block(above))
-                    if rel in ROUTINE_FILES and offset in code_offsets:
+                    if rel in routine_files and offset in code_offsets:
                         routine_candidates.add(ea)
                 if comment is not None:
                     regular[ea].append(comment)

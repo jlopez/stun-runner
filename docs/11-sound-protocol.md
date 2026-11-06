@@ -2,8 +2,8 @@
 
 **Date**: 2026-11-05 (milestone 4, leg M4e, issue #15). How the 68010 talks to the JSA II board's
 6502: the latch pair at 600000, the reset at 604000, the level 4 interrupt, both programs' code
-for it, the command set 00-6C with the 68010's own name for each command, and the MAME runs that
-show it. Addresses: 68010 addresses as six hex digits, 6502 addresses as four. **CODE** means
+for it, the command set 00-6C with the 68010's own name for each command but 03 (`cmd_03_imm`),
+and the MAME runs that show it. Addresses: 68010 addresses as six hex digits, 6502 addresses as four. **CODE** means
 read off the image (`build/stunrun-68k.bin` with `unidasm -arch m68010`; the 6502 program in its
 source `asm/jsa/`, leg M4a, docs/09), **MAME** a run of the committed script
 `tools/mame/sndproto.lua` (`make sndproto`, MAME 0.289, section 8), **SRC** MAME's source
@@ -245,7 +245,7 @@ Classes, types and parameters are the 6502's tables at 6093, 6100 and 616D (`cmd
 |---|---|---|
 | 00 | `cmdtype_00_min_priority` 438A | `min_priority` = 4 x param, a floor on the track priority (docs/09 section 10.2): F0 for 01, 0 for 02. While `min_priority` is not 0 the OKI start returns at once (5BFE-5C01), and a YM2151 key-on needs the track's priority byte `sounding_prio` >= `min_priority` (4EE3-4EF0): with F0 only the priority-3F sound (command 32, byte FD) keys on |
 | 01 | `cmdtype_01_set_var` 43AD | `seq_vars` + (`global_set_index`+param AND 1F) = `global_set_value`+param; a stream op reads `seq_vars,y` (54EE) |
-| 03 | `cmdtype_03_immediate` 43CA | `imm_handlers` entry param: entry 0 is `init_sound` (4238), the initialisation reset also runs (OKI reset, response queue emptied, voice tables cleared, key-off on the eight YM2151 channels, MIX set) |
+| 03 | `cmdtype_03_immediate` 43CA | `imm_handlers` entry param: entry 0 is `init_sound` (4238), the initialisation reset also runs (OKI reset, response queue emptied, every track freed and the lists emptied, key-off on the eight YM2151 channels, MIX set) |
 | 05 | `cmdtype_05_stop_sound` 43EE | if command param is of type 08, every track playing its sound gets `trk_sound` = FF (stopped) |
 | 08 | `cmdtype_08_start_sound` 4569 | starts sound param, one track per entry (`sound_first_entry` first entry, `entry_next` next; priority `entry_priority`, YM2151 channel `entry_channel`, byte stream `entry_stream`; docs/12 section 1) |
 | 09 | `queue_response` 44D0 | param into `resp_queue` |
