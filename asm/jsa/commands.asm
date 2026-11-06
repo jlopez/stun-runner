@@ -42,11 +42,11 @@ _l4255
     bpl _l4255
     ldx #$01
 _l4269
-    lda tbl_57DB,x
+    lda group_chip_lo,x
     sta zp_08
-    lda tbl_57DD,x
+    lda group_chip_hi,x
     sta zp_09
-    lda tbl_57DF,x
+    lda group_kind,x
     cmp #$03
     beq _l42B9
     jsr ym_wait
@@ -340,7 +340,7 @@ cmdtype_06
     lda zp_1C
     and #$0F
     clc
-    adc tbl_57E1,y
+    adc group_first_chain,y
     tay
     php
     sei
@@ -513,7 +513,7 @@ _l450C
     sta ram_08AC
     pla
     tax
-    jmp loc_508D
+    jmp chain_run_op
 _l4531
     pla
 _l4532

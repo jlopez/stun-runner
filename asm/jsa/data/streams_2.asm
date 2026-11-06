@@ -399,7 +399,7 @@ snd_06_3
     #note $19, LEN_8
     #rest LEN_8
     #note $19, LEN_8
-    #fade $08, $E2
+    #fade 1, $E2
     #note $19, LEN_8
     #note $19, LEN_8
     #note $19, LEN_8
@@ -457,7 +457,7 @@ snd_06_4
     #note $19, LEN_8
     #rest LEN_8
     #note $19, LEN_8
-    #fade $08, $E2
+    #fade 1, $E2
     #note $19, LEN_8
     #note $19, LEN_8
     #note $19, LEN_8
@@ -514,7 +514,7 @@ snd_06_5
     #note $19, LEN_8
     #rest LEN_8
     #note $19, LEN_8
-    #fade $08, $E2
+    #fade 1, $E2
     #note $19, LEN_8
     #note $19, LEN_8
     #note $19, LEN_8
@@ -577,7 +577,7 @@ snd_04_0
     #note $44, LEN_8
     #rest LEN_8
     #note $46, LEN_2
-    #fade $08, $DC
+    #fade 1, $DC
     #note $46, LEN_2
     #ret
 
@@ -616,7 +616,7 @@ snd_04_1
     #bend $08
     #loop_end
     #note $44, LEN_4|TIE
-    #fade $08, $DC
+    #fade 1, $DC
     #note $44, LEN_2|DOT
     #fine_tune $00
     #transpose $00
@@ -648,7 +648,7 @@ snd_04_2
     #rest LEN_32
     #note $19, LEN_16|DOT
     #rest LEN_32
-    #fade $08, $EC
+    #fade 1, $EC
     #note $22, LEN_8|ACCENT_1|TIE
     #note $22, LEN_1
     #ret
@@ -679,7 +679,7 @@ snd_04_3
     #rest LEN_32
     #note $19, LEN_16|DOT
     #rest LEN_32
-    #fade $08, $EC
+    #fade 1, $EC
     #note $22, LEN_8|ACCENT_1|TIE
     #note $22, LEN_2
     #ret
@@ -743,12 +743,12 @@ snd_08_0
     #rest LEN_4
     #patch patch_46
     #volume $09
-    #fade $08, $F2
+    #fade 1, $F2
     #note $31, LEN_1
     #patch patch_5D
     #velocity $5F
     #volume $02
-    #fade $08, $24
+    #fade 1, $24
     #note $42, LEN_1|TIE
     #note $42, LEN_2
     #tempo $2666
@@ -779,7 +779,7 @@ snd_08_0
     #note $44, LEN_8|GATE_HALF
     #note $44, LEN_8|GATE_HALF
     #volume $07
-    #fade $08, $0A
+    #fade 1, $0A
     #note $40, LEN_16|ACCENT_1|DOT
     #rest LEN_32
     #note $40, LEN_8|GATE_HALF
@@ -843,7 +843,7 @@ snd_08_1
     #velocity $4B
     #volume $01
     #rest LEN_1
-    #fade $08, $30
+    #fade 1, $30
     #note $3D, LEN_4|TIE
     #note $3D, LEN_1|TIE
     #note $3D, LEN_2
@@ -875,7 +875,7 @@ snd_08_1
     #note $3D, LEN_8|GATE_HALF
     #note $3D, LEN_8|GATE_HALF
     #volume $07
-    #fade $08, $0A
+    #fade 1, $0A
     #note $3B, LEN_16|ACCENT_1|DOT
     #rest LEN_32
     #note $3B, LEN_8|GATE_HALF
@@ -914,11 +914,11 @@ snd_08_2
     #volume $01
     #rest LEN_4
     #rest LEN_2
-    #fade $08, $30
+    #fade 1, $30
     #note $38, LEN_2|TIE
     #note $38, LEN_2
     #volume $03
-    #fade $08, $28
+    #fade 1, $28
     #note $47, LEN_2|TIE
     #note $47, LEN_2
     #tempo $2666
@@ -949,7 +949,7 @@ snd_08_2
     #note $36, LEN_8|GATE_HALF
     #note $36, LEN_8|GATE_HALF
     #volume $09
-    #fade $08, $0A
+    #fade 1, $0A
     #note $36, LEN_16|ACCENT_1|DOT
     #rest LEN_32
     #note $36, LEN_8|GATE_HALF
@@ -988,7 +988,7 @@ snd_08_3
     #velocity $4B
     #rest LEN_4
     #rest LEN_4
-    #fade $08, $18
+    #fade 1, $18
     #note $31, LEN_2|DOT|TIE
     #note $31, LEN_1|TIE
     #note $31, LEN_2
@@ -1080,7 +1080,7 @@ snd_08_4
     #velocity $4B
     #rest LEN_4
     #volume $01
-    #fade $08, $24
+    #fade 1, $24
     #note $2C, LEN_1|TIE
     #note $2C, LEN_1|TIE
     #note $2C, LEN_2
@@ -1162,7 +1162,7 @@ snd_08_5
     #velocity $4B
     #volume $02
     #rest LEN_4
-    #fade $08, $23
+    #fade 1, $23
     #note $44, LEN_2|DOT|TIE
     #note $44, LEN_2
     #tempo $2666
@@ -1417,7 +1417,7 @@ snd_09_4_t1
     #rest LEN_64
     #note $2F, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2F, LEN_1
     #ret
 snd_09_4_t2
@@ -1430,7 +1430,7 @@ snd_09_4_t2
     #rest LEN_64
     #note $2A, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2A, LEN_1
     #ret
 snd_09_4_t3
@@ -1442,7 +1442,7 @@ snd_09_4_t3
     #rest LEN_64
     #note $31, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $31, LEN_1
     #ret
 snd_09_4_t4
@@ -1455,7 +1455,7 @@ snd_09_4_t4
     #rest LEN_64
     #note $20, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $20, LEN_1
     #ret
 snd_09_4_t5
@@ -1468,7 +1468,7 @@ snd_09_4_t5
     #rest LEN_64
     #note $2F, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2F, LEN_1
     #ret
 snd_09_4_t6
@@ -1481,7 +1481,7 @@ snd_09_4_t6
     #rest LEN_64
     #note $2A, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2A, LEN_1
     #ret
 snd_09_4_t7
@@ -1493,7 +1493,7 @@ snd_09_4_t7
     #rest LEN_64
     #note $31, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $31, LEN_1
     #ret
 snd_09_4_t8
@@ -1506,7 +1506,7 @@ snd_09_4_t8
     #rest LEN_64
     #note $20, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $20, LEN_1
     #ret
 snd_09_4_t9
@@ -1519,7 +1519,7 @@ snd_09_4_t9
     #rest LEN_64
     #note $2F, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2F, LEN_1
     #ret
 snd_09_4_t10
@@ -1532,7 +1532,7 @@ snd_09_4_t10
     #rest LEN_64
     #note $2A, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2A, LEN_1
     #ret
 snd_09_4_t11
@@ -1544,7 +1544,7 @@ snd_09_4_t11
     #rest LEN_64
     #note $31, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $31, LEN_1
     #ret
 snd_09_4_t12
@@ -1557,7 +1557,7 @@ snd_09_4_t12
     #rest LEN_64
     #note $20, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $20, LEN_1
     #ret
 snd_09_4_t13
@@ -1570,7 +1570,7 @@ snd_09_4_t13
     #rest LEN_64
     #note $2F, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2F, LEN_1
     #ret
 snd_09_4_t14
@@ -1583,7 +1583,7 @@ snd_09_4_t14
     #rest LEN_64
     #note $2A, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2A, LEN_1
     #ret
 snd_09_4_t15
@@ -1595,7 +1595,7 @@ snd_09_4_t15
     #rest LEN_64
     #note $31, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $31, LEN_1
     #ret
 snd_09_4_t16
@@ -1608,7 +1608,7 @@ snd_09_4_t16
     #rest LEN_64
     #note $20, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $EC
+    #fade 1, $EC
     #note $20, LEN_1
     #ret
     #ret                                ; not reached: the stream never gets here
@@ -1629,15 +1629,15 @@ snd_0A_0
     #note $46, LEN_2|ACCENT_1|DOT
     #rest LEN_8|DOT
     #note $3F, LEN_16
-    #fade $08, $E8
+    #fade 1, $E8
     #note $48, LEN_1|ACCENT_1
     #patch patch_52
     #volume $01
-    #fade $08, $14
+    #fade 1, $14
     #note $54, LEN_1|TIE
     #note $54, LEN_1|TIE
     #note $54, LEN_1|TIE
-    #fade $08, $E8
+    #fade 1, $E8
     #note $54, LEN_1
     #ret
 
@@ -1659,16 +1659,16 @@ snd_0A_1
     #note $46, LEN_2|ACCENT_1|DOT
     #rest LEN_8|DOT
     #note $3F, LEN_16
-    #fade $08, $E8
+    #fade 1, $E8
     #note $48, LEN_1|ACCENT_1
     #transpose $00
     #patch patch_52
     #volume $01
-    #fade $08, $14
+    #fade 1, $14
     #note $54, LEN_1|TIE
     #note $54, LEN_1|TIE
     #note $54, LEN_1|TIE
-    #fade $08, $E8
+    #fade 1, $E8
     #note $54, LEN_1
     #ret
 
@@ -1716,7 +1716,7 @@ snd_0A_2
     #note $3F, LEN_16|GATE_HALF
     #note $3F, LEN_16|GATE_HALF
     #loop_end
-    #fade $08, $EC
+    #fade 1, $EC
     #note $3F, LEN_1
     #ret
 
@@ -1764,7 +1764,7 @@ snd_0A_3
     #note $38, LEN_16|GATE_HALF
     #note $38, LEN_16|GATE_HALF
     #loop_end
-    #fade $08, $EC
+    #fade 1, $EC
     #note $38, LEN_1
     #ret
 
@@ -1785,7 +1785,7 @@ snd_0A_4
     #note $1B, LEN_2|ACCENT_1|DOT
     #rest LEN_8|DOT
     #note $27, LEN_16
-    #fade $08, $E8
+    #fade 1, $E8
     #note $14, LEN_1|ACCENT_1
     #ret
 
@@ -1814,7 +1814,7 @@ snd_0A_5
     #volume $09
     #note $33, LEN_16|GATE_HALF
     #note $33, LEN_16|GATE_HALF
-    #fade $10, $F4
+    #fade 2, $F4
     #note $33, LEN_1|TIE
     #note $33, LEN_2|DOT|TIE
     #note $33, LEN_8
@@ -1822,7 +1822,7 @@ snd_0A_5
     #note $2C, LEN_16|GATE_HALF
     #note $2C, LEN_16|GATE_HALF
     #note $2C, LEN_1
-    #fade $08, $E8
+    #fade 1, $E8
     #note $2C, LEN_1
     #ret
 
@@ -1905,7 +1905,7 @@ snd_0A_7
     #note $14, LEN_1|TIE
     #note $14, LEN_1|TIE
     #note $14, LEN_1|TIE
-    #fade $08, $EC
+    #fade 1, $EC
     #note $14, LEN_1
     #ret
 
@@ -1920,7 +1920,7 @@ snd_0B_0
     #note $49, LEN_4
     #rest LEN_8
     #note $4B, LEN_4|TIE
-    #fade $10, $F6
+    #fade 2, $F6
     #note $4B, LEN_1
     #note $4B, LEN_1
     #rest LEN_2
@@ -1932,7 +1932,7 @@ snd_0B_0
     #note $2E, LEN_128|TIE
     #bend $14
     #loop_end
-    #fade $08, $E8
+    #fade 1, $E8
     #note $2E, LEN_2|DOT
     #rest LEN_8
     #fine_tune $00
@@ -1959,10 +1959,10 @@ snd_0B_0
     #patch patch_59
     #velocity $64
     #volume $01
-    #fade $08, $18
+    #fade 1, $18
     #note $25, LEN_8|TIE
     #note $25, LEN_1|TIE
-    #fade $08, $E8
+    #fade 1, $E8
     #note $25, LEN_1
 snd_0B_0_t1
     #patch patch_2D
@@ -1981,7 +1981,7 @@ snd_0B_0_t1
     #note $38, LEN_8|DOT
     #rest LEN_16
     #note $41, LEN_8|TIE
-    #fade $08, $E6
+    #fade 1, $E6
     #note $41, LEN_1
     #volume $09
     #note $33, LEN_16|DOT
@@ -1993,7 +1993,7 @@ snd_0B_0_t1
     #note $38, LEN_8|DOT
     #rest LEN_16
     #note $43, LEN_8|TIE
-    #fade $08, $E6
+    #fade 1, $E6
     #note $43, LEN_1
     #patch patch_5F
     #velocity $32
@@ -2010,11 +2010,11 @@ snd_0B_0_t1
     #note $46, LEN_2|ACCENT_1
     #note $3D, LEN_2|ACCENT_1
     #note $3F, LEN_2|ACCENT_1
-    #fade $08, $EC
+    #fade 1, $EC
     #note $3F, LEN_1
     #patch patch_40
     #volume $01
-    #fade $08, $15
+    #fade 1, $15
     #note $43, LEN_1|TIE
     #note $43, LEN_1
     #volume $05
@@ -2071,7 +2071,7 @@ snd_0B_1
     #bend $08
     #loop_end
     #note $49, LEN_8|TIE
-    #fade $10, $F6
+    #fade 2, $F6
     #note $49, LEN_1
     #note $49, LEN_1
     #fine_tune $00
@@ -2085,7 +2085,7 @@ snd_0B_1
     #note $2E, LEN_128|TIE
     #bend $14
     #loop_end
-    #fade $08, $E8
+    #fade 1, $E8
     #note $2E, LEN_2|DOT
     #rest LEN_8
     #fine_tune $00
@@ -2094,9 +2094,9 @@ snd_0B_1
     #loop $02
     #volume $01
     #velocity $5F
-    #fade $08, $1E
+    #fade 1, $1E
     #note $22, LEN_1|TIE
-    #fade $08, $E2
+    #fade 1, $E2
     #note $22, LEN_1
     #loop_end
     #volume $07
@@ -2116,7 +2116,7 @@ snd_0B_1_t1
     #note $33, LEN_16|DOT
     #rest LEN_32
     #note $3A, LEN_8|TIE
-    #fade $08, $E6
+    #fade 1, $E6
     #note $3A, LEN_1
     #volume $09
     #rest LEN_4|DOT
@@ -2127,7 +2127,7 @@ snd_0B_1_t1
     #note $33, LEN_16|DOT
     #rest LEN_32
     #note $3C, LEN_8|TIE
-    #fade $08, $E6
+    #fade 1, $E6
     #note $3C, LEN_1
     #patch patch_5F
     #velocity $32
@@ -2190,7 +2190,7 @@ snd_0B_2
     #velocity $0A
     #volume $01
     #rest LEN_32
-    #fade $08, $1A
+    #fade 1, $1A
     #loop $07
     #note $44, LEN_8
     #note $44, LEN_16
@@ -2350,7 +2350,7 @@ snd_0B_3
     #velocity $0A
     #volume $01
     #rest LEN_64|DOT
-    #fade $08, $1A
+    #fade 1, $1A
     #loop $07
     #note $3F, LEN_8
     #note $3F, LEN_16
@@ -2512,7 +2512,7 @@ snd_0B_4
     #velocity $0A
     #volume $01
     #rest LEN_64
-    #fade $08, $1A
+    #fade 1, $1A
     #loop $07
     #note $3A, LEN_8
     #note $3A, LEN_16
@@ -2662,7 +2662,7 @@ snd_0B_5
     #tempo $2666
     #patch patch_46
     #volume $09
-    #fade $08, $F1
+    #fade 1, $F1
     #note $33, LEN_2|DOT
     #patch patch_23
     #volume $0A
@@ -2671,7 +2671,7 @@ snd_0B_5
     #transpose $F4
     #velocity $0A
     #volume $01
-    #fade $08, $1A
+    #fade 1, $1A
     #loop $07
     #note $33, LEN_8
     #note $33, LEN_16
@@ -2835,7 +2835,7 @@ snd_0B_6
     #patch patch_59
     #velocity $64
     #volume $09
-    #fade $08, $EC
+    #fade 1, $EC
     #note $1B, LEN_4|TIE
     #note $1B, LEN_1
     #patch patch_38
@@ -2940,7 +2940,7 @@ snd_0B_7
     #volume $0A
     #velocity $1E
     #rest LEN_2|DOT
-    #fade $1D, $F8
+    #fade 3, $F8, 5
     #note $27, LEN_4|ACCENT_1
     #note $27, LEN_1|TIE
     #note $27, LEN_1
@@ -2986,12 +2986,12 @@ snd_0B_7_t1
     #note $24, LEN_8
     #patch patch_46
     #volume $09
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2C, LEN_8|TIE
     #note $2C, LEN_2|DOT
     #rest LEN_8
     #volume $09
-    #fade $1B, $FA
+    #fade 3, $FA, 3
     #note $2E, LEN_8|TIE
     #note $2E, LEN_1|TIE
     #note $2E, LEN_1|TIE
@@ -2999,7 +2999,7 @@ snd_0B_7_t1
     #rest LEN_8
     #volume $0A
     #call snd_0B_7_sub3
-    #fade $10, $F6
+    #fade 2, $F6
     #note $33, LEN_1|TIE
     #note $33, LEN_1
     #rest LEN_1
@@ -3015,7 +3015,7 @@ snd_0B_7_t1
     #note $38, LEN_8
     #note $33, LEN_8
     #note $3A, LEN_8|TIE
-    #fade $08, $EC
+    #fade 1, $EC
     #note $3A, LEN_1|TIE
     #note $3A, LEN_1
     #rest LEN_1
@@ -3040,7 +3040,7 @@ snd_0B_7_t1
     #rest LEN_8
     #note $33, LEN_16|DOT
     #rest LEN_32
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2E, LEN_1|TIE
     #note $2E, LEN_2|DOT
     #rest LEN_8
@@ -3137,7 +3137,7 @@ snd_02_0
     #note $38, LEN_4
     #note $3A, LEN_4
     #note $38, LEN_4
-    #fade $08, $E2
+    #fade 1, $E2
     #note $35, LEN_1
     #ret
 
@@ -3202,7 +3202,7 @@ snd_02_1
     #fine_tune $00
     #transpose $0C
     #note $38, LEN_4
-    #fade $08, $E2
+    #fade 1, $E2
     #note $30, LEN_1
     #ret
 
@@ -3296,11 +3296,11 @@ snd_02_4
     #rest LEN_64
     #note $29, LEN_32|DOT
     #rest LEN_64
-    #fade $08, $E1
+    #fade 1, $E1
     #note $29, LEN_1
     #rest LEN_1
     #volume $09
-    #fade $08, $E1
+    #fade 1, $E1
     #note $29, LEN_1
     #rest LEN_2
     #volume $09
@@ -3420,7 +3420,7 @@ snd_0C_0
     #patch patch_1E
     #velocity $64
     #volume $09
-    #fade $10, $F1
+    #fade 2, $F1
     #note $4D, LEN_1|TIE
     #note $4D, LEN_1
     #patch patch_27
@@ -3429,7 +3429,7 @@ snd_0C_0
     #note $2C, LEN_1
     #patch patch_5F
     #volume $05
-    #fade $08, $08
+    #fade 1, $08
     #note $3D, LEN_8
     #note $3D, LEN_24|GATE_HALF
     #note $3D, LEN_24|GATE_HALF
@@ -3456,7 +3456,7 @@ snd_0C_1
     #patch patch_1E
     #velocity $4B
     #volume $09
-    #fade $10, $F1
+    #fade 2, $F1
     #note $49, LEN_1|TIE
     #note $49, LEN_1
     #rest LEN_2
@@ -3467,7 +3467,7 @@ snd_0C_1
     #note $31, LEN_2|DOT
     #patch patch_5F
     #volume $05
-    #fade $08, $08
+    #fade 1, $08
     #note $38, LEN_8
     #note $38, LEN_24|GATE_HALF
     #note $38, LEN_24|GATE_HALF
@@ -3494,7 +3494,7 @@ snd_0C_2
     #patch patch_5F
     #velocity $4B
     #volume $09
-    #fade $10, $F1
+    #fade 2, $F1
     #note $44, LEN_1|TIE
     #note $44, LEN_1
     #rest LEN_1
@@ -3503,7 +3503,7 @@ snd_0C_2
     #note $30, LEN_1
     #patch patch_5F
     #volume $05
-    #fade $08, $08
+    #fade 1, $08
     #note $35, LEN_8
     #note $35, LEN_24|GATE_HALF
     #note $35, LEN_24|GATE_HALF
@@ -3530,7 +3530,7 @@ snd_0C_3
     #patch patch_5E
     #velocity $4B
     #volume $09
-    #fade $10, $F1
+    #fade 2, $F1
     #note $31, LEN_1|TIE
     #note $31, LEN_2|DOT
     #volume $09
@@ -3554,7 +3554,7 @@ snd_0C_3
     #note $31, LEN_16
     #note $3D, LEN_2|DOT
     #volume $05
-    #fade $08, $08
+    #fade 1, $08
     #note $31, LEN_8
     #note $31, LEN_24|GATE_HALF
     #note $31, LEN_24|GATE_HALF
@@ -3581,7 +3581,7 @@ snd_0C_4
     #patch patch_5F
     #velocity $4B
     #volume $09
-    #fade $10, $F1
+    #fade 2, $F1
     #note $35, LEN_1|TIE
     #note $35, LEN_1
     #volume $09
@@ -3649,7 +3649,7 @@ snd_0C_5
     #patch patch_5F
     #velocity $32
     #volume $09
-    #fade $08, $08
+    #fade 1, $08
     #note $44, LEN_16|TIE
     #note $3D, LEN_16|TIE
     #note $3C, LEN_16|TIE
@@ -3815,7 +3815,7 @@ snd_0D_1
     #volume $02
     #rest LEN_1
     #rest LEN_2
-    #fade $08, $14
+    #fade 1, $14
     #bend $0A
     #note $39, LEN_2|TIE
     #note $39, LEN_2|DOT|TIE
@@ -3847,7 +3847,7 @@ snd_0D_2
     #volume $02
     #rest LEN_1
     #rest LEN_2
-    #fade $08, $14
+    #fade 1, $14
     #note $39, LEN_2|TIE
     #note $39, LEN_2|DOT|TIE
     #note $39, LEN_8
@@ -3880,7 +3880,7 @@ snd_0D_3
     #patch patch_54
     #volume $03
     #rest LEN_1
-    #fade $08, $14
+    #fade 1, $14
     #bend $0A
     #note $31, LEN_1|TIE
     #note $31, LEN_2|DOT|TIE
@@ -3899,7 +3899,7 @@ snd_0D_4
     #patch patch_54
     #volume $03
     #rest LEN_1
-    #fade $08, $14
+    #fade 1, $14
     #note $31, LEN_1|TIE
     #note $31, LEN_2|DOT|TIE
     #note $31, LEN_8
@@ -3923,7 +3923,7 @@ snd_0D_5
     #patch patch_53
     #velocity $78
     #volume $05
-    #fade $08, $14
+    #fade 1, $14
     #note $19, LEN_1|TIE
     #note $19, LEN_1|TIE
     #note $19, LEN_2|DOT|TIE
@@ -3958,7 +3958,7 @@ snd_0D_6
     #patch patch_53
     #velocity $78
     #volume $05
-    #fade $08, $14
+    #fade 1, $14
     #note $0D, LEN_1|TIE
     #note $0D, LEN_1|TIE
     #note $0D, LEN_2|DOT|TIE
@@ -3968,7 +3968,7 @@ snd_0D_6
     #velocity $0A
     #tempo $24DD
     #volume $07
-    #fade $08, $07
+    #fade 1, $07
     #transpose $0C
     #note $19, LEN_16|ACCENT_1
     #rest LEN_16
@@ -3996,7 +3996,7 @@ snd_0D_7
     #patch patch_40
     #velocity $32
     #volume $05
-    #fade $08, $14
+    #fade 1, $14
     #bend $0A
     #note $0D, LEN_1|TIE
     #note $0D, LEN_1|TIE
@@ -4008,7 +4008,7 @@ snd_0D_7
     #velocity $0A
     #tempo $24DD
     #volume $09
-    #fade $08, $07
+    #fade 1, $07
     #transpose $0C
     #note $19, LEN_16|ACCENT_1
     #rest LEN_16
@@ -4061,7 +4061,7 @@ snd_0E_0
     #note $3B, LEN_16
     #transpose $0C
     #fine_tune $0A
-    #fade $08, $F0
+    #fade 1, $F0
     #note $3F, LEN_8
     #rest LEN_16
     #note $3D, LEN_16
@@ -4117,7 +4117,7 @@ snd_0E_1
     #rest LEN_8
     #loop_end
     #loop_end
-    #fade $08, $F0
+    #fade 1, $F0
     #loop $04
     #note $1E, LEN_8
     #rest LEN_8
@@ -4205,7 +4205,7 @@ snd_0E_3
     #patch patch_50
     #volume $09
     #velocity $7F
-    #fade $08, $0F
+    #fade 1, $0F
     #rest LEN_2
     #note $2E, LEN_8
     #note $2E, LEN_8
@@ -4230,7 +4230,7 @@ snd_0E_3
     #note $31, LEN_16
     #patch patch_46
     #volume $0A
-    #fade $10, $F6
+    #fade 2, $F6
     #note $2C, LEN_1
     #note $2C, LEN_1
     #patch patch_32
@@ -4423,7 +4423,7 @@ snd_01_0
     #note $3F, LEN_1
     #fine_tune $00
     #fine_tune $0A
-    #fade $08, $F1
+    #fade 1, $F1
     #note $3F, LEN_8|DOT
     #rest LEN_16
     #note $3F, LEN_8|DOT
@@ -4438,7 +4438,7 @@ snd_01_0
     #note $3D, LEN_32|TIE
     #volume_add $03
     #loop_end
-    #fade $10, $F4
+    #fade 2, $F4
     #note $3D, LEN_2|DOT
     #note $3D, LEN_1
     #patch patch_3D
@@ -4500,7 +4500,7 @@ snd_01_1
     #note $3D, LEN_16|TIE
     #volume_add $03
     #loop_end
-    #fade $10, $F4
+    #fade 2, $F4
     #note $3D, LEN_1|TIE
     #note $3D, LEN_1
     #patch patch_3D
@@ -4576,10 +4576,10 @@ snd_01_2
     #volume $09
     #note $2C, LEN_16
     #note $2C, LEN_16
-    #fade $08, $EC
+    #fade 1, $EC
     #note $2C, LEN_1|ACCENT_2
     #volume $09
-    #fade $08, $F1
+    #fade 1, $F1
     #note $2C, LEN_1
     #patch patch_38
     #volume $03
@@ -4612,13 +4612,13 @@ snd_01_2
     #note $31, LEN_16
     #patch patch_46
     #volume $09
-    #fade $14, $F6
+    #fade 2, $F6, 4
     #note $2C, LEN_1
     #note $2C, LEN_1
     #patch patch_4A
     #velocity $00
     #volume $02
-    #fade $08, $1C
+    #fade 1, $1C
     #rest LEN_4
     #note $33, LEN_4
     #note $31, LEN_8

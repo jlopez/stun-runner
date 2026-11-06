@@ -58,7 +58,7 @@ _l5888
     sta zp_19
     lda #>dat_5B82
     sta zp_1A
-    jsr sub_55B4
+    jsr write_patch_regs_at
     clc
     lda #$20
     adc #$06
@@ -81,7 +81,7 @@ _l5888
     sta zp_19
     lda #>dat_5B82
     sta zp_1A
-    jsr sub_55B4
+    jsr write_patch_regs_at
     clc
     lda #$20
     adc #$07
@@ -241,7 +241,7 @@ _l5A12
 _l5A1C
     lda #$06
     sta zp_0D
-    jsr sub_559A
+    jsr load_patch_regs
 _l5A23
     ldx ram_0885
     beq _l5A3A
@@ -255,7 +255,7 @@ _l5A29
 _l5A33
     lda #$07
     sta zp_0D
-    jsr sub_559A
+    jsr load_patch_regs
 _l5A3A
     pla
     sta zp_0D

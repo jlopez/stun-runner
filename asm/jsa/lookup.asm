@@ -1,6 +1,6 @@
 ; lookup.asm: AB48-AC47, the 256-byte table read at 4F69.
 ;
-; Read at 4F69 with Y = ram_0895 OR ram_08A2,y (4F62-4F68), so 256 bytes. The byte after it,
+; Read at 4F69 with Y = key_note OR key_scaling,y (4F62-4F68), so 256 bytes. The byte after it,
 ; AC48, is checksum_adjust (jsa.asm).
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
@@ -10,7 +10,7 @@
     .cerror * != $AB48, "lookup.asm must start at $AB48"
 
 ; read at 4F69
-tbl_AB48
+key_level_curve
     .byte $00, $02, $04, $06, $07, $09, $0B, $0D, $0F, $11, $12, $14, $16, $18, $1A, $1C
     .byte $1D, $1F, $21, $23, $25, $27, $29, $2A, $2C, $2E, $30, $32, $34, $35, $37, $39
     .byte $3B, $3D, $3F, $40, $42, $44, $46, $48, $4A, $4B, $4D, $4F, $51, $53, $55, $57

@@ -498,7 +498,7 @@ snd_16_0
     #note $31, LEN_16|TIE
     #volume_add $FF
     #loop_end
-    #fade $08, $FB
+    #fade 1, $FB
     #note $31, LEN_1
     #ret
 
@@ -617,7 +617,7 @@ snd_1C_0_t1
     #note $49, LEN_128|TIE
     #bend $10
     #loop_end
-    #fade $08, $EC
+    #fade 1, $EC
     #note $49, LEN_1
     #fine_tune $00
     #transpose $00
@@ -627,7 +627,7 @@ snd_1C_0_t2
     #note $50, LEN_128|TIE
     #bend $10
     #loop_end
-    #fade $08, $EC
+    #fade 1, $EC
     #note $50, LEN_1
     #fine_tune $00
     #transpose $00
@@ -637,7 +637,7 @@ snd_1C_0_t3
     #note $4E, LEN_128|TIE
     #bend $10
     #loop_end
-    #fade $08, $EC
+    #fade 1, $EC
     #note $4E, LEN_1
     #fine_tune $00
     #transpose $00
@@ -647,7 +647,7 @@ snd_1C_0_t4
     #note $44, LEN_128|TIE
     #bend $10
     #loop_end
-    #fade $08, $EC
+    #fade 1, $EC
     #note $44, LEN_1
     #fine_tune $00
     #transpose $00

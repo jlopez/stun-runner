@@ -200,8 +200,11 @@ velocity_add .macro delta               ; A3
     .byte $A3, \delta
 .endm
 
-fade .macro time, rate                  ; A4: carriers' TL + rate per step, time in steps
-    .byte $A4, \time, \rate             ;   (fade_step 4CC1)
+; A4: for steps x LEN_1 of time the carriers' TL loses rate + frac / 8 (signed) per LEN_1, in
+; 32 fade steps per LEN_1 (52C3-52EA, fade_step 4CC1; with fade_mode 0)
+fade .macro steps, rate, frac=0
+    .cerror \steps < 0 || \steps > $1F || \frac < 0 || \frac > 7, "fade: steps 0-1F, frac 0-7"
+    .byte $A4, (\steps << 3) | \frac, \rate
 .endm
 
 ym_ct .macro bits                       ; A5: register 1B bits 7-6 (CT1, CT2)
@@ -216,8 +219,8 @@ bend .macro delta                       ; A7: pitch fraction + delta x 4 (signed
     .byte $A7, \delta                   ;   the transpose (5711-5733)
 .endm
 
-fade_shape .macro value                 ; A8: ram_0608 (fade_step 4CCF; other voices: the
-    .byte $A8, \value                   ;   pitch envelope's repeat count)
+fade_mode .macro value                  ; A8: nonzero: fade steps only at note starts, by the
+    .byte $A8, \value                   ;   note's length nibble (ram_0608, 47F5, 4CCF)
 .endm
 
 var_add .macro value                    ; A9: var + value

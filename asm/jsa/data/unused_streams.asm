@@ -533,16 +533,16 @@ unused_stream_05
     #patch patch_59
     #volume $01
     #velocity $50
-    #fade $10, $0C
+    #fade 2, $0C
     #note $20, LEN_1|TIE
     #note $20, LEN_1|TIE
-    #fade $10, $F1
+    #fade 2, $F1
     #note $20, LEN_1|TIE
     #note $20, LEN_1
     #velocity $00
     #patch patch_45
     #volume $0A
-    #fade $10, $F6
+    #fade 2, $F6
     #note $33, LEN_1|TIE
     #note $33, LEN_1
     #rest LEN_1
@@ -873,7 +873,7 @@ unused_stream_07
     #tempo $2000
     #patch patch_45
     #volume $09
-    #fade $10, $F6
+    #fade 2, $F6
     #note $2C, LEN_1|TIE
     #note $2C, LEN_1
     #rest LEN_1
@@ -900,7 +900,7 @@ unused_stream_07
     #note $2E, LEN_16
     #patch patch_45
     #volume $09
-    #fade $10, $F6
+    #fade 2, $F6
     #note $2C, LEN_1|TIE
     #note $2C, LEN_1
     #patch patch_25
@@ -935,7 +935,7 @@ unused_stream_07
     #transpose $00
     #patch patch_45
     #volume $09
-    #fade $10, $F6
+    #fade 2, $F6
     #note $33, LEN_1|TIE
     #note $33, LEN_1
     #patch patch_63
@@ -1031,7 +1031,7 @@ unused_stream_07
     #loop_end
     #patch patch_45
     #volume $09
-    #fade $10, $F6
+    #fade 2, $F6
     #note $2C, LEN_1|TIE
     #note $2C, LEN_1
     #patch patch_25

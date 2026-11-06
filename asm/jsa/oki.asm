@@ -6,8 +6,8 @@
 ; tbl_5C6B are those bits for channels 1-4. sub_5BAC resets it (WRIO bit 2 low, then high: called by
 ; imm_00); sub_5BC6 (every eighth timed IRQ) counts down each playing channel and stops it when its
 ; count runs out; cmdtype_13 (the commands of type 13, and stream op 95 with cmd_param) starts
-; phrase effect_phrase,y on the channel effect_voice,y names; cmdtype_14 (command 66) stops the channel whose
-; current entry (zp_52,x) has phrase A in effect_phrase; sub_5C87 sets the YM2151 volume in MIX from the
+; phrase tbl_6532,y on the channel tbl_6567,y names; cmdtype_14 (command 66) stops the channel whose
+; current entry (zp_52,x) has phrase A in tbl_6532; sub_5C87 sets the YM2151 volume in MIX from the
 ; zp_5E values of the playing channels.
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-

@@ -204,7 +204,7 @@ loc_4141
 ; output buffer full, is clear) and one queued command run, each per pass. h_nmi fills cmd_queue
 ; (48 entries), queue_response fills resp_queue (16).
 main_loop
-    jsr sub_5504
+    jsr random
     lda zp_02
     and #$FE
     sta zp_02
@@ -366,9 +366,9 @@ sub_4229
     lsr a
     bcc _l4233
     ldx #$00
-    jmp loc_5043
+    jmp tick_group
 _l4233
     ldx #$01
-    jmp loc_5043
+    jmp tick_group
 
     .cerror * != $4238, "system.asm must end at $4237"
