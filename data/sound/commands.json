@@ -49,7 +49,7 @@
     "0301CA": "queue_sound_command",
     "03013C": "flush_sound_queue",
     "023EDA": "send_sound_byte",
-    "023EDE": "try_sound_byte",
+    "023EDE": "send_sound_byte_once",
     "043718": "audio_test",
     "008D94": "boot_sa_audio_test",
     "008E84": "boot_play_test_sounds",

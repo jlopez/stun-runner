@@ -24,6 +24,8 @@ from typing import Any
 import pytest
 from test_jsa import assemble, tass
 
+from ida.code_map import CODE_MAP_68K
+
 REPO = Path(__file__).resolve().parent.parent
 COMMANDS = REPO / "data/sound/commands.json"
 SAMPLES = REPO / "data/oki/samples.json"
@@ -31,6 +33,7 @@ IMAGE_68K = REPO / "build/stunrun-68k.bin"
 IMAGE_JSA = REPO / "build/stunrun-jsa.bin"
 TRACES = REPO / "build/mame"
 FUNCTIONS = REPO / "data/ida/stunrun-68k.functions.jsonl"
+SNAPSHOT = REPO / "data/ida/stunrun-68k.json"
 
 RUNS = ("attract", "game", "selftest", "soundtest", "inject")
 QUEUE = 0x0301CA  # queue_sound_command
@@ -149,6 +152,29 @@ def ida_owners(address: int) -> list[int]:
     return owners
 
 
+def ida_extents_of(address: int) -> list[list[tuple[int, int]]]:
+    """The extents (the function's own and its chunks) of each committed IDA function holding the
+    address."""
+    found = []
+    for line in FUNCTIONS.read_text().splitlines():
+        f = json.loads(line)
+        extents = [(f["start_ea"], f["end_ea"]), *(tuple(c) for c in f["chunks"])]
+        if any(lo <= address < hi for lo, hi in extents):
+            found.append(extents)
+    return found
+
+
+def test_routine_names_are_the_code_map_names() -> None:
+    """Each name of `routines` is the name ida/code_map.py and the committed IDA snapshot give its
+    address (a parenthesised remark after the name is not part of it)."""
+    code_map = {e.ea: e.name for e in CODE_MAP_68K if e.name}
+    snapshot = {int(n["ea"], 16): n["name"] for n in json.loads(SNAPSHOT.read_text())["names"]}
+    for address, text in load()["routines"].items():
+        name = text.split(" (")[0]
+        assert code_map.get(h(address)) == name, (address, text)
+        assert snapshot.get(h(address)) == name, (address, text)
+
+
 def test_routines_are_ida_functions() -> None:
     """The routine given with each call site and direct send is the IDA function around it, or,
     where the IDA export has no function there, a `link A6` the image test below checks."""
@@ -241,8 +267,9 @@ def _w(image: bytes, a: int) -> int:
 
 
 def test_every_queue_call_is_listed(m68k: bytes) -> None:
-    """Each `jsr queue_sound_command` (4EB9 0003 01CA) and each `jsr (A2)` of the four routines
-    that load A2 with it is a listed call site; a site without a note is preceded by `pea N.w`
+    """Each `jsr queue_sound_command` (4EB9 0003 01CA) of the image and each `jsr (A2)` (4E92)
+    after the load in the IDA function of the four routines that load A2 with it (247C 0003 01CA)
+    is a listed call site, and no other site is; a site without a note is preceded by `pea N.w`
     and queues N; a note's `pea N at A` holds N."""
     doc = load()
     per_site: dict[str, set[int]] = {}
@@ -259,9 +286,17 @@ def test_every_queue_call_is_listed(m68k: bytes) -> None:
         if _w(m68k, a) == 0x247C and struct.unpack_from(">I", m68k, a + 2)[0] == QUEUE
     ]
     assert [f"{a:06X}" for a in loads] == ["02430E", "02819C", "028350", "029B82"]
-    indirect = {s for s in per_site if _w(m68k, h(s)) == 0x4E92}
-    for s in indirect:
-        assert any(0 < h(s) - a < 0x1200 for a in loads), s
+    # the `jsr (A2)` (4E92) of each loading routine: every one in the extents (and chunks) of the
+    # IDA function that holds the load, after the load, found in the image, not in the listing
+    indirect = set()
+    for load_at in loads:
+        (owner,) = ida_extents_of(load_at)
+        for lo, hi in owner:
+            for a in range(max(lo, load_at + 6), hi, 2):
+                if _w(m68k, a) == 0x4E92:
+                    indirect.add(f"{a:06X}")
+    assert len(indirect) == 37
+    assert not found & indirect
     assert found | indirect == set(per_site)
     for s, values in per_site.items():
         a = h(s)
@@ -314,7 +349,9 @@ def note_values(note: str, m68k: bytes) -> set[int]:
         lo, hi = int(m[1]), int(m[2])
         assert 0x44 + lo == h(m[3]), note
         return {0x44 + level for level in range(lo, hi + 1)}
-    if m := re.match(r"([0-9A-F]{2}) or ([0-9A-F]{2}) \(moveq at ([0-9A-F]{6}) / ([0-9A-F]{6})\)", note):
+    if m := re.match(
+        r"([0-9A-F]{2}) or ([0-9A-F]{2}) \(moveq at ([0-9A-F]{6}) / ([0-9A-F]{6})\)", note
+    ):
         assert _moveq(m68k, h(m[3]), 0) == h(m[1]) and _moveq(m68k, h(m[4]), 0) == h(m[2]), note
         return {h(m[1]), h(m[2])}
     if m := re.match(r"D2 = ([0-9A-F/]+) by .*\(([0-9A-F]{6})-([0-9A-F]{6})\)", note):
@@ -323,8 +360,7 @@ def note_values(note: str, m68k: bytes) -> set[int]:
         results = {
             image_value
             for a in range(lo, hi + 2, 2)
-            if (image_value := _moveq(m68k, a, 2)) is not None
-            and (m68k[a + 2] == 0x60 or a == hi)
+            if (image_value := _moveq(m68k, a, 2)) is not None and (m68k[a + 2] == 0x60 or a == hi)
         }
         values = {h(v) for v in m[1].split("/")}
         assert results == values, note

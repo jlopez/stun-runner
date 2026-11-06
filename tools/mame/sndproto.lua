@@ -36,7 +36,8 @@
 --
 -- PROTO_PLAY=1: a coin at frame 900, start at 960, the trigger every 20 frames from 1020 (as
 -- okitrace.lua). PROTO_MENU=selftest or soundtest holds the self-test switch (IN0 bit 5,
--- "Service Mode") from the start, so the boot program runs its test menus, and drives them with
+-- "Service Mode") from the start (the game program still starts first and queues 1E; the 68010
+-- restarts through boot_reset at frame 445), so the boot program runs its test menus, and drives them with
 -- the buttons (MENU_STEPS below; button 1 moves the cursor up, button 2 down, start selects): the
 -- boot program's "SA SELF TEST" (008D94: reset, FF, command 07 and its status byte, then 04, 00,
 -- 05, 00), or "PLAY SOUNDS", the game's audio test (043718), where every entry of its list is

@@ -61,8 +61,12 @@ program at 00023C/000242, the game in `reset_sound_board` at 023FA8/023FAE **COD
 - **Queue** (`queue_sound_command`, 0301CA, `queue_sound_command(n)`): appends the byte to one of
   three 32-byte buffers (`sound_queue`, FFDB64-FFDBC3; counts `sound_queue_count`, FFDBC4-FFDBC6;
   the buffer filled is `sound_queue_fill`, FFDBC8). A full buffer drops the byte (0301E6-0301EC)
-  **CODE**. All sound commands of the game go through it: 133 calls, 96 `jsr $301CA.l` and 37
+  **CODE**. Every command of game play goes through it: 133 calls, 96 `jsr $301CA.l` and 37
   `jsr (A2)` in the four routines that load A2 with it (02430E, 02819C, 028350, 029B82), section 6.
+  Two parts of the game program send without the queue: the audio test calls `send_sound_byte`
+  (023EDA) directly at 04392C, 04393E and 04395C (section 5), and `sound_watchdog` (03001E, which
+  nothing calls) calls `send_sound_byte_once` (023EDE) at 0300B8 **CODE**; `data/sound/commands.json`
+  lists them as `direct_sends`.
 - **Flush** (`flush_sound_queue`, 03013C): called once per pass of the main loop (024500, inside
   the game's main loop 024306). Sends every byte of the buffer `sound_queue_send` (FFDBCA) through
   `send_sound_byte` (030170), three empty loop turns after each (03017A-030182), empties it, then
@@ -221,7 +225,7 @@ The game program's audio test (`audio_test`, 043718; title AUDIO TEST at 05C3DA,
 `reload_gsp` at 04373A) lists `audio_test_list` (05C63C): 108 entries of 22 bytes, a word (the
 command value) and a name of up to 20 characters, sorted by name, ended by a word FFFF at 05CF84.
 The cursor (index D4) selects an entry; button 2 sends its word (`move.w (a4,d0.w),d1` at
-04394E, `send_sound_byte` at 04395C), button 1 sends 00 (04393E), and each move of the stick
+043954, after the index D4 times 16h at 04394E-043950, `send_sound_byte` at 04395C), button 1 sends 00 (04393E), and each move of the stick
 sends 34 (04392C) **CODE**. The 108 words are 00-6C less 03, each once, so the list names every
 command the game can send by its own name **CODE**.
 
@@ -460,8 +464,14 @@ it, every byte written taken by `h_nmi`, and the responses of section 3.2.
 - 51 of the 133 call sites queued a command; every (command, site) pair seen is one
   `data/sound/commands.json` lists, including the computed ones (sections 2.1 and 6).
 - The menu runs press button 1, button 2 and start at fixed frames (`tools/mame/sndproto.lua`,
-  found with snapshots kept in `build/`); the self-test switch is held from the start, so the
-  boot program runs its test menu instead of the game.
+  found with snapshots kept in `build/`); the self-test switch is held from the start. The game
+  program still starts first: `reset_sound` is called from 02C144 (frame 367) and 0243B2
+  (frame 410), and command 1E is queued at 03ADD0 (frame 420), which is the one command the run
+  table counts as queued. The 68010 then runs `boot_reset` again (00023C, frame 445) and the boot
+  program runs its test menu; start bypasses the power-up self-test and the re-entry resets the
+  board at 000FC2 (frame 543) **MAME** (the `reset` and `queue` lines of
+  `build/mame/sndproto-selftest.txt` and `-soundtest.txt`). Why the machine restarts at 445 is
+  not established here.
 
 ## 9. Findings
 
