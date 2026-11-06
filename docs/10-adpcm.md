@@ -1,19 +1,20 @@
-# The OKI M6295 samples: phrase table, WAVs, tools/adpcm
+# The OKI M6295 samples: phrase table, PCM WAVs, tools/adpcm
 
-**Date**: 2026-11-05 (milestone 4, leg M4b). What the 256 KB of ADPCM on the JSA II board hold,
-how the 6502 plays them, and how the repository rebuilds the four files `136070-2124.1fh`,
-`-2125.1ef`, `-2126.1de` and `-2127.1cd` through one WAV per sample. Addresses: OKI addresses
-(= offsets in `build/stunrun-oki.bin`) as five hex digits, 6502 addresses as four. **CODE**
-means read off the 6502 program (`build/stunrun-jsa.bin`, disassembled with
-`unidasm -arch m6502`) at the addresses given, **MAME** means a run of the committed script
-`tools/mame/okitrace.lua` (`make okitrace`, MAME 0.289) shows it, **SRC** means MAME's source
-(`~/.local/src/mame`, tag mame0289) says it. The 6502 program as source is leg M4a (docs/09);
-this document cites the 6502 only where it decides which phrase plays.
+**Date**: 2026-11-05 (milestone 4, legs M4b and M4g). What the 256 KB of ADPCM on the JSA II
+board hold, how the 6502 plays them, and how the repository rebuilds the four files
+`136070-2124.1fh`, `-2125.1ef`, `-2126.1de` and `-2127.1cd` from one committed PCM WAV per
+sample. Addresses: OKI addresses (= offsets in `build/stunrun-oki.bin`) as five hex digits, 6502
+addresses as four. **CODE** means read off the 6502 program (`build/stunrun-jsa.bin`,
+disassembled with `unidasm -arch m6502`) at the addresses given, **MAME** means a run of the
+committed script `tools/mame/okitrace.lua` (`make okitrace`, MAME 0.289) shows it, **SRC** means
+MAME's source (`~/.local/src/mame`, tag mame0289) says it. The 6502 program as source is leg M4a
+(docs/09); this document cites the 6502 only where it decides which phrase plays.
 
-The sample bytes, the WAVs and anything decoded from them are ROM content: they live under
-`build/` only and are never committed (CLAUDE.md section 2). The repository holds the manifest
-`data/oki/samples.json` (numbers, names, addresses, lengths, play evidence), the tools and the
-phrase table as source.
+Decision (Jesus, 2026-11-05, card A7, option 2): the editable form of a sample is a plain PCM
+WAV, the only format, and the 52 WAVs are committed under `data/oki`. Like the meshes of
+`data/objects`, they are assets in their editable form and the build re-embeds them (CLAUDE.md
+section 2). The ROM files, hex dumps of them and MAME recordings still never enter the
+repository. The M4b container that carried the ADPCM bytes verbatim (format tag 0x0017) is gone.
 
 ## 1. Summary
 
@@ -34,13 +35,20 @@ phrase table as source.
   00, 01 and 05 (**MAME**). The code never sets bit 3: the one write that could (5903) is in a
   routine no sound command reaches (section 2, **CODE**). Only the real board's pin 7 polarity is
   unverified.
-- `tools/adpcm` keeps each sample as a WAV whose data chunk is the sample's ADPCM bytes
-  verbatim (format tag 0x0017, Dialogic OKI ADPCM, 4 bits, high nibble first), so WAV -> bytes
-  is a copy. `make` goes image -> WAVs -> bytes -> vasm, and `make check` is byte-identical
-  only if every sample survived the round trip. `tools/adpcm decode` gives 16-bit PCM through a
-  decoder equal to MAME's on every sample (MAME's own `okiadpcm.cpp`, compiled, is the oracle).
-- Finding: a deterministic greedy encoder gives back all 52 samples byte for byte from the PCM
-  they decode to (section 6). The build does not depend on it; the editable form is card A7.
+- The source of the image is `data/oki`: the manifest `samples.json` (numbers, names, Jesus's
+  descriptions, play evidence; no addresses) and `NN-name.wav` per phrase, 16-bit mono PCM at
+  7231 Hz, the M6295 decoder's output exactly (MAME's `okiadpcm.cpp`, compiled, is the oracle)
+  at MAME's output scale. `make` encodes every WAV back to ADPCM and lays the samples out from
+  their lengths; `make check` is byte-identical because the encoder gives all 52 samples' bytes
+  back from their PCM (section 6). The OKI image needs nothing from the reference set; a CI test
+  checks the four chips' CRC-32 and SHA-1 from the committed WAVs alone.
+- The encoder is exact on decoder output by construction except where an output sits at a clamp
+  (-2048 or 2047), the only place two nibbles reach one output; there it takes the
+  lexicographically smallest bytes. The 52 samples have one such output (phrase 50), and the
+  ROM agrees with the rule there (section 6). An edited WAV encodes to the nearest ADPCM by the
+  same rule and does not come back exactly: `tools/adpcm` reports the error.
+- The samples are named from Jesus's listening (card A8, section 7), with the 68010's own
+  audio-test names alongside as cross evidence.
 
 ## 2. The M6295 as MAME emulates it (SRC)
 
@@ -96,11 +104,11 @@ Citations are `file:line` under `~/.local/src/mame/src/`.
 
 ## 3. The image
 
-`tools/adpcm info` checks the image against the manifest and prints the table. The phrase table
-is entries 0-52; the samples tile 001A8-3FCA7 with no gap and no overlap, each starting where
-the previous one ends (every length is a multiple of 0x80); 3FCA8-3FFFF is zero. Three samples
-cross a ROM file boundary, and the generated include cuts their incbin there so that each file
-starts at a labelled statement with an assert:
+`tools/adpcm info` prints the layout the WAVs give and checks the merged image against it. The
+phrase table is entries 0-52; the samples tile 001A8-3FCA7 with no gap and no overlap, each
+starting where the previous one ends (every length is a multiple of 0x80); 3FCA8-3FFFF is zero.
+Three samples cross a ROM file boundary, and the generated include labels each file where it
+starts, with an assert, in the middle of the sample's `dc.b` statements:
 
 | Boundary | File that starts | Sample across it |
 |---|---|---|
@@ -108,63 +116,64 @@ starts at a labelled statement with an assert:
 | 20000 | `136070-2126.1de` | phrase 32 (1E528-207A7) |
 | 30000 | `136070-2127.1cd` | phrase 40 (2BBA8-30227) |
 
-The phrases (from `data/oki/samples.json`; seconds at 7231.40 Hz; commands per section 4;
-starts = how many times each MAME run saw the 6502 start the phrase):
+The reference layout (the build derives it from the WAV lengths, section 5; names per section 7;
+seconds at 7231.40 Hz; commands per section 4; starts = how many times each MAME run saw the
+6502 start the phrase):
 
 | Phrase | Name | Start | End | Bytes | Seconds | Commands | Starts attract / game / inject |
 |---|---|---|---|---|---|---|---|
-| 1 | `sample_01` | 001A8 | 01AA7 | 6,400 | 1.770 | 05, 38 | 0 / 1 / 2 |
-| 2 | `sample_02` | 01AA8 | 028A7 | 3,584 | 0.991 | 39 | 0 / 3 / 1 |
-| 3 | `sample_03` | 028A8 | 03C27 | 4,992 | 1.381 | 3A | 0 / 0 / 1 |
-| 4 | `sample_04` | 03C28 | 055A7 | 6,528 | 1.805 | 3B | 0 / 0 / 1 |
-| 5 | `sample_05` | 055A8 | 06A27 | 5,248 | 1.451 | 3C | 0 / 1 / 1 |
-| 6 | `sample_06` | 06A28 | 08F27 | 9,472 | 2.620 | 3D | 0 / 0 / 1 |
-| 7 | `sample_07` | 08F28 | 0B227 | 8,960 | 2.478 | 3E | 0 / 0 / 1 |
-| 8 | `sample_08` | 0B228 | 0DB27 | 10,496 | 2.903 | 3F | 0 / 1 / 1 |
-| 9 | `sample_09` | 0DB28 | 0F327 | 6,144 | 1.699 | 44 | 0 / 3 / 1 |
-| 10 | `sample_10` | 0F328 | 0FCA7 | 2,432 | 0.673 | 45 | 0 / 1 / 1 |
-| 11 | `sample_11` | 0FCA8 | 10627 | 2,432 | 0.673 | 46 | 0 / 1 / 1 |
-| 12 | `sample_12` | 10628 | 10FA7 | 2,432 | 0.673 | 47 | 0 / 1 / 1 |
-| 13 | `sample_13` | 10FA8 | 11A27 | 2,688 | 0.743 | 48 | 0 / 0 / 1 |
-| 14 | `sample_14` | 11A28 | 122A7 | 2,176 | 0.602 | 49 | 0 / 0 / 1 |
-| 15 | `sample_15` | 122A8 | 12AA7 | 2,048 | 0.566 | 4A | 0 / 0 / 1 |
-| 16 | `sample_16` | 12AA8 | 134A7 | 2,560 | 0.708 | 4B | 0 / 0 / 1 |
-| 17 | `sample_17` | 134A8 | 13BA7 | 1,792 | 0.496 | 4C | 0 / 0 / 1 |
-| 18 | `sample_18` | 13BA8 | 14627 | 2,688 | 0.743 | 4D | 0 / 0 / 1 |
-| 19 | `sample_19` | 14628 | 14FA7 | 2,432 | 0.673 | 4E | 0 / 0 / 1 |
-| 20 | `sample_20` | 14FA8 | 15A27 | 2,688 | 0.743 | 4F | 0 / 0 / 1 |
-| 21 | `sample_21` | 15A28 | 16327 | 2,304 | 0.637 | 50 | 0 / 0 / 1 |
-| 22 | `sample_22` | 16328 | 16F27 | 3,072 | 0.850 | 51 | 0 / 0 / 1 |
-| 23 | `sample_23` | 16F28 | 17A27 | 2,816 | 0.779 | 52 | 0 / 0 / 1 |
-| 24 | `sample_24` | 17A28 | 18527 | 2,816 | 0.779 | 53 | 0 / 0 / 1 |
-| 25 | `sample_25` | 18528 | 191A7 | 3,200 | 0.885 | 54 | 0 / 0 / 1 |
-| 26 | `sample_26` | 191A8 | 19E27 | 3,200 | 0.885 | 55 | 0 / 0 / 1 |
-| 27 | `sample_27` | 19E28 | 1AAA7 | 3,200 | 0.885 | 56 | 0 / 0 / 1 |
-| 28 | `sample_28` | 1AAA8 | 1BA27 | 3,968 | 1.097 | 57 | 0 / 0 / 1 |
-| 29 | `sample_29` | 1BA28 | 1C4A7 | 2,688 | 0.743 | 58 | 0 / 0 / 1 |
-| 30 | `sample_30` | 1C4A8 | 1D4A7 | 4,096 | 1.133 | 59 | 0 / 0 / 1 |
-| 31 | `sample_31` | 1D4A8 | 1E527 | 4,224 | 1.168 | 5A | 0 / 0 / 1 |
-| 32 | `sample_32` | 1E528 | 207A7 | 8,832 | 2.443 | 40 | 0 / 0 / 1 |
-| 33 | `sample_33` | 207A8 | 22BA7 | 9,216 | 2.549 | 42 | 0 / 0 / 1 |
-| 34 | `sample_34` | 22BA8 | 24AA7 | 7,936 | 2.195 | 41 | 0 / 0 / 1 |
-| 35 | `sample_35` | 24AA8 | 26FA7 | 9,472 | 2.620 | 43 | 0 / 0 / 1 |
-| 36 | `sample_36` | 26FA8 | 27EA7 | 3,840 | 1.062 | 5B | 0 / 0 / 1 |
-| 37 | `sample_37` | 27EA8 | 29027 | 4,480 | 1.239 | 5C | 0 / 0 / 1 |
-| 38 | `sample_38` | 29028 | 29AA7 | 2,688 | 0.743 | 5E | 0 / 0 / 29 |
-| 39 | `sample_39` | 29AA8 | 2BBA7 | 8,448 | 2.336 | 67 | 0 / 312 / 287 |
-| 40 | `sample_40` | 2BBA8 | 30227 | 18,048 | 4.992 | 61 | 0 / 27 / 40 |
-| 41 | `sample_41` | 30228 | 32AA7 | 10,368 | 2.867 | 5D | 0 / 0 / 1 |
-| 42 | `sample_42` | 32AA8 | 356A7 | 11,264 | 3.115 | 68 | 0 / 8 / 16 |
-| 43 | `sample_43` | 356A8 | 36527 | 3,712 | 1.027 | 6C | 0 / 51 / 1 |
-| 44 | `sample_44` | 36528 | 37BA7 | 5,760 | 1.593 | 62 | 0 / 25 / 1 |
-| 45 | `sample_45` | 37BA8 | 38FA7 | 5,120 | 1.416 | 64 | 0 / 0 / 1 |
-| 46 | `sample_46` | 38FA8 | 39A27 | 2,688 | 0.743 | 60 | 0 / 0 / 5 |
-| 47 | `sample_47` | 39A28 | 3A3A7 | 2,432 | 0.673 | 63 | 0 / 4 / 1 |
-| 48 | `sample_48` | 3A3A8 | 3BA27 | 5,760 | 1.593 | 65 | 0 / 0 / 5 |
-| 49 | `sample_49` | 3BA28 | 3BC27 | 512 | 0.142 | 6A | 0 / 20 / 18 |
-| 50 | `sample_50` | 3BC28 | 3D227 | 5,632 | 1.558 | 69 | 0 / 0 / 17 |
-| 51 | `sample_51` | 3D228 | 3E327 | 4,352 | 1.204 | 5F | 0 / 21 / 1 |
-| 52 | `sample_52` | 3E328 | 3FCA7 | 6,528 | 1.805 | 6B | 0 / 0 / 1 |
+| 1 | `welcome_stun_runner` | 001A8 | 01AA7 | 6,400 | 1.770 | 05, 38 | 0 / 1 / 2 |
+| 2 | `good_luck` | 01AA8 | 028A7 | 3,584 | 0.991 | 39 | 0 / 3 / 1 |
+| 3 | `congratulations` | 028A8 | 03C27 | 4,992 | 1.381 | 3A | 0 / 0 / 1 |
+| 4 | `better_luck_next_time` | 03C28 | 055A7 | 6,528 | 1.805 | 3B | 0 / 0 / 1 |
+| 5 | `stay_off_the_rails` | 055A8 | 06A27 | 5,248 | 1.451 | 3C | 0 / 1 / 1 |
+| 6 | `vehicle_slows_on_open_areas` | 06A28 | 08F27 | 9,472 | 2.620 | 3D | 0 / 0 / 1 |
+| 7 | `outside_wall_is_faster_in_turns` | 08F28 | 0B227 | 8,960 | 2.478 | 3E | 0 / 0 / 1 |
+| 8 | `press_fire_button_to_fire_shockwaves` | 0B228 | 0DB27 | 10,496 | 2.903 | 3F | 0 / 1 / 1 |
+| 9 | `you_have_completed_level` | 0DB28 | 0F327 | 6,144 | 1.699 | 44 | 0 / 3 / 1 |
+| 10 | `number_01` | 0F328 | 0FCA7 | 2,432 | 0.673 | 45 | 0 / 1 / 1 |
+| 11 | `number_02` | 0FCA8 | 10627 | 2,432 | 0.673 | 46 | 0 / 1 / 1 |
+| 12 | `number_03` | 10628 | 10FA7 | 2,432 | 0.673 | 47 | 0 / 1 / 1 |
+| 13 | `number_04` | 10FA8 | 11A27 | 2,688 | 0.743 | 48 | 0 / 0 / 1 |
+| 14 | `number_05` | 11A28 | 122A7 | 2,176 | 0.602 | 49 | 0 / 0 / 1 |
+| 15 | `number_06` | 122A8 | 12AA7 | 2,048 | 0.566 | 4A | 0 / 0 / 1 |
+| 16 | `number_07` | 12AA8 | 134A7 | 2,560 | 0.708 | 4B | 0 / 0 / 1 |
+| 17 | `number_08` | 134A8 | 13BA7 | 1,792 | 0.496 | 4C | 0 / 0 / 1 |
+| 18 | `number_09` | 13BA8 | 14627 | 2,688 | 0.743 | 4D | 0 / 0 / 1 |
+| 19 | `number_10` | 14628 | 14FA7 | 2,432 | 0.673 | 4E | 0 / 0 / 1 |
+| 20 | `number_11` | 14FA8 | 15A27 | 2,688 | 0.743 | 4F | 0 / 0 / 1 |
+| 21 | `number_12` | 15A28 | 16327 | 2,304 | 0.637 | 50 | 0 / 0 / 1 |
+| 22 | `number_13` | 16328 | 16F27 | 3,072 | 0.850 | 51 | 0 / 0 / 1 |
+| 23 | `number_14` | 16F28 | 17A27 | 2,816 | 0.779 | 52 | 0 / 0 / 1 |
+| 24 | `number_15` | 17A28 | 18527 | 2,816 | 0.779 | 53 | 0 / 0 / 1 |
+| 25 | `number_16` | 18528 | 191A7 | 3,200 | 0.885 | 54 | 0 / 0 / 1 |
+| 26 | `number_17` | 191A8 | 19E27 | 3,200 | 0.885 | 55 | 0 / 0 / 1 |
+| 27 | `number_18` | 19E28 | 1AAA7 | 3,200 | 0.885 | 56 | 0 / 0 / 1 |
+| 28 | `number_19` | 1AAA8 | 1BA27 | 3,968 | 1.097 | 57 | 0 / 0 / 1 |
+| 29 | `number_20` | 1BA28 | 1C4A7 | 2,688 | 0.743 | 58 | 0 / 0 / 1 |
+| 30 | `number_21` | 1C4A8 | 1D4A7 | 4,096 | 1.133 | 59 | 0 / 0 / 1 |
+| 31 | `number_22` | 1D4A8 | 1E527 | 4,224 | 1.168 | 5A | 0 / 0 / 1 |
+| 32 | `welcome_to_the_ultimate_challenge` | 1E528 | 207A7 | 8,832 | 2.443 | 40 | 0 / 0 / 1 |
+| 33 | `welcome_to_the_kill_challenge` | 207A8 | 22BA7 | 9,216 | 2.549 | 42 | 0 / 0 / 1 |
+| 34 | `welcome_to_the_marker_challenge` | 22BA8 | 24AA7 | 7,936 | 2.195 | 41 | 0 / 0 / 1 |
+| 35 | `welcome_to_the_boost_challenge` | 24AA8 | 26FA7 | 9,472 | 2.620 | 43 | 0 / 0 / 1 |
+| 36 | `hmm_tsk` | 26FA8 | 27EA7 | 3,840 | 1.062 | 5B | 0 / 0 / 1 |
+| 37 | `yeehoo` | 27EA8 | 29027 | 4,480 | 1.239 | 5C | 0 / 0 / 1 |
+| 38 | `shockwave` | 29028 | 29AA7 | 2,688 | 0.743 | 5E | 0 / 0 / 29 |
+| 39 | `maybe_missile_launch` | 29AA8 | 2BBA7 | 8,448 | 2.336 | 67 | 0 / 312 / 287 |
+| 40 | `explosion` | 2BBA8 | 30227 | 18,048 | 4.992 | 61 | 0 / 27 / 40 |
+| 41 | `maybe_mild_explosion` | 30228 | 32AA7 | 10,368 | 2.867 | 5D | 0 / 0 / 1 |
+| 42 | `maybe_turret_attached` | 32AA8 | 356A7 | 11,264 | 3.115 | 68 | 0 / 8 / 16 |
+| 43 | `maybe_gong` | 356A8 | 36527 | 3,712 | 1.027 | 6C | 0 / 51 / 1 |
+| 44 | `metallic_bounce` | 36528 | 37BA7 | 5,760 | 1.593 | 62 | 0 / 25 / 1 |
+| 45 | `whirring` | 37BA8 | 38FA7 | 5,120 | 1.416 | 64 | 0 / 0 / 1 |
+| 46 | `maybe_attachment` | 38FA8 | 39A27 | 2,688 | 0.743 | 60 | 0 / 0 / 5 |
+| 47 | `maybe_shockwave_hit` | 39A28 | 3A3A7 | 2,432 | 0.673 | 63 | 0 / 4 / 1 |
+| 48 | `screeching_tires` | 3A3A8 | 3BA27 | 5,760 | 1.593 | 65 | 0 / 0 / 5 |
+| 49 | `maybe_rejection` | 3BA28 | 3BC27 | 512 | 0.142 | 6A | 0 / 20 / 18 |
+| 50 | `crow_caw` | 3BC28 | 3D227 | 5,632 | 1.558 | 69 | 0 / 0 / 17 |
+| 51 | `bell_ding` | 3D228 | 3E327 | 4,352 | 1.204 | 5F | 0 / 21 / 1 |
+| 52 | `maybe_higher_bell_ding` | 3E328 | 3FCA7 | 6,528 | 1.805 | 6B | 0 / 0 / 1 |
 
 ## 4. Which phrases the 6502 plays (CODE, MAME)
 
@@ -243,75 +252,74 @@ except one at 5C82 (command 66, the stop handler, on voice mask 4: phrase 48's v
 The attribution check: `tools/adpcm survey` fails if any run saw a phrase started by a command
 the 6502's tables do not map to it; none did.
 
-## 5. The WAV container and the round trip
+## 5. The PCM WAVs and the build
 
-Decision (coordinator, 2026-11-05, card A7's default): the lossless form of a sample is a WAV
-that carries its ADPCM bytes verbatim.
+Decision (Jesus, 2026-11-05, card A7, option 2): one format, a playable one, committed.
 
-- **Format.** RIFF WAVE, `fmt ` with format tag **0x0017** (`WAVE_FORMAT_DIALOGIC_OKI_ADPCM`),
-  1 channel, 7231 samples per second (the MAME rate rounded), 3616 bytes per second, block align
-  1, 4 bits per sample, cbSize 0; a `fact` chunk with the sample count (two per byte); a
-  `LIST`/`INFO`/`INAM` chunk with the name; the `data` chunk is the sample's bytes, unchanged,
-  high nibble first (the order the M6295 reads), padded to an even size as RIFF requires.
-- **Why 0x0017 and not 0x0010.** 0x0010 is `WAVE_FORMAT_OKI_ADPCM`, whose registered header
-  (`OKIADPCMWAVEFORMAT`) carries an extra `wPole` field this file would have to invent; 0x0017
-  names the Dialogic OKI ADPCM coding, which is the M6295's (section 2). ffmpeg 9.0.2 reads both
-  tags as `adpcm_ima_oki` (ffprobe on a synthetic file: "adpcm_ima_oki ([23][0][0][0] / 0x0017),
-  7231 Hz, 1 channels"), so audio tools built on ffmpeg play the files; ffmpeg's decoder rounds
-  the difference as ((2 * delta + 1) * step) >> 3, not MAME's sum of truncated quarters, so its
-  output differs from the M6295's on about a quarter of the outputs (0.22-0.23 on six files of
-  4000 random bytes, never ROM data), by a few units of 4096 (per-file maxima 3 to 5 there, up
-  to 8 in a model of both formulas over 40 random files): the per-nibble difference is at most
-  2 but accumulates through the predictor, so it has no fixed bound. For the exact sound use
-  `tools/adpcm decode`.
-- **Lossless by construction.** `wav` writes the bytes into the data chunk; `unwav` returns the
-  data chunk. No arithmetic touches them. `unwav` rejects anything else: not RIFF WAVE, a format
-  tag other than 0x0017, not mono, not 4 bits, block align not 1, no or several `fmt `/`data`
-  chunks, a chunk running past the RIFF body, a `fact` count that is not twice the data
-  length; it skips chunks it does not know (an editor may add some).
-- **The build** (`Makefile`, docs/04 section 1): `tools/adpcm split` cuts
-  `build/stunrun-oki.bin` by the image's own phrase table (names from the manifest) into
-  `build/oki/wav/NN-name.wav` and removes any other WAV there (a renamed phrase's old file);
-  `tools/adpcm info` and `make check` compare the image with the manifest; `tools/adpcm asm` reads `$(OKI_WAV_DIR)/NN-name.wav` for every
-  phrase (default `build/oki/wav`), recovers the bytes into `build/oki/bin/NN.bin` (failing on
-  a missing WAV, a malformed one, or a length other than the manifest's) and writes
-  `build/oki/samples.asm`; `asm/oki/samples.asm` (committed) is the phrase table as `dc.b`
-  statements computed from the include's labels `phrase_NN` (first byte) and `phrase_NN_last`
-  (last byte), entry 0 explicit, and includes the generated file: one labelled `incbin` per
-  sample with an assert at its start, cut at each file boundary inside a sample, every file
-  labelled (`oki_1ef`, `oki_1de`, `oki_1cd` with their asserts, before the incbin when a file
-  starts at a sample's first byte; `asm` fails if a file would start in the zero tail), the
-  tail as `dcb.b`. The WAV step and the OKI assembly run on
-  every `make` (make 3.81 compares whole-second mtimes; an edit in the same second must count),
-  and so does `tools/adpcm split --missing` on `build/oki/wav`: the split's stamp
-  (`build/oki/split.done`) does not see the WAVs, so a WAV deleted there, or a phrase renamed in
-  the same second as the last split, is written again from the image while the other WAVs,
-  edited or not, are kept.
-- **Editing.** `make OKI_WAV_DIR=dir` builds from a directory of edited WAVs (the same file
-  names; copy `build/oki/wav` there first). A sample of another length needs the manifest's
-  start/end changed, for that phrase and every later one (the asserts and `tools/adpcm asm`
-  say so), and its WAVs in a directory of your own: the split still cuts the reference image by
-  its own table into `build/oki/wav`, which then no longer matches the manifest. The tail
-  absorbs the difference, within the 256 KB. `tools/test_build.py` builds such a relayout
-  through `make`.
-- **Proof.** `make check`: 25 files, 0 differences, with the OKI image built through the 52
-  WAVs. `tools/test_build.py` (CI, synthetic set: the manifest's table over random sample
-  bytes) changes one data byte of phrase 2's WAV and `bytecheck` reports exactly
-  `136070-2124.1fh: 1 differing bytes, first at file offset $01AB8 = OKI $01AB8`, then builds
-  the same edit from another `OKI_WAV_DIR`, fails the build when a WAV is missing from that
-  directory, and rebuilds a WAV deleted from `build/oki/wav` (with another one there edited and
-  kept) and a rename made behind the split's stamp.
-  `tools/test_adpcm.py` round-trips random samples of 1 to 17,497 bytes, rejects a dozen
-  malformed WAVs and, with the reference set, all 52 real samples through WAV and back and the
-  image through split and build.
+- **Format.** `data/oki/NN-name.wav`, NN the phrase number, name the manifest's: RIFF WAVE, a
+  16-byte `fmt ` (format tag 1, PCM, mono, 7231 samples per second, the MAME rate rounded,
+  14,462 bytes per second, block align 2, 16 bits) and the `data` chunk, nothing else (a
+  44-byte header). Two samples per ADPCM byte: sample k is the decoder's output after nibble k,
+  high nibble first, from the reset state (section 2), times 16. The factor is MAME's output
+  scale: `okim_voice::generate_adpcm` adds `clock(nibble) * m_volume` to its stream with a
+  maximum of 2048 (`stream.add_int(..., 2048)`, `okim6295.cpp:352`; `add_int` divides by the
+  maximum, `emu/sound.h:253`), so at 0 dB (`s_volume_table[0]` = 0x20 / 0x20) an output s is
+  s / 2048 of full scale, which a 16-bit recording writes as s * 16. **SRC.** The attenuation
+  the 6502 chooses per play (section 4) is not applied: a WAV is the sample at full volume.
+- **Size.** 52 files, 1,045,744 bytes in all (2,288 of headers, 1,043,456 of samples: 521,728
+  16-bit samples, twice the 260,864 ADPCM bytes); the largest is phrase 40, 72,236 bytes. Each
+  is well under a few hundred KB, so they are plain git files, not LFS (the repository sends only
+  larger non-ROM binaries through LFS). `.gitattributes` marks `*.wav` binary.
+- **Reading.** `read_wav` accepts what an editor writes: format tag 1 or the extensible header
+  with the PCM sub-format, other chunks (LIST, cue and so on) skipped, and any 16-bit value.
+  It rejects another format, stereo, another sample size, another rate (resample to 7231 Hz: the
+  chip plays every sample at that rate), a missing or doubled `fmt `/`data` chunk, an odd data
+  size and an empty sample. A value the decoder cannot produce (off its grid of multiples of 16,
+  or beyond -32768..32752) is an edit, not an error.
+- **The layout is derived.** The manifest holds no address (`read_manifest` refuses `start`,
+  `end` and `length`). `tools/adpcm asm` encodes every WAV and lays the samples out in phrase
+  order: phrase 1 at the end of the table (001A8 with 53 entries), each next one where the
+  previous one ends, the rest of the 256 KB zero. A WAV of another length moves every later
+  sample; a set of samples that no longer fits fails with the number of bytes too many (`the
+  samples end at 40000: 1 bytes more than the 256 KB image holds ...`). A WAV of an odd number
+  of samples gets its last value once more (the last byte needs two nibbles; `tools/adpcm`
+  says so).
+- **The build** (`Makefile`, docs/04 section 1): `tools/adpcm asm --data data/oki --out
+  build/oki` writes `build/oki/samples.asm`; `asm/oki/samples.asm` (committed) is the phrase table
+  as `dc.b` statements computed from the include's labels `phrase_NN` (first byte) and
+  `phrase_NN_last` (last byte), entry 0 explicit, and includes it. The include has per sample
+  `phrase_NN:`, the manifest name as a label alias, an assert at its start and the bytes as
+  `dc.b`, 16 per line; at every ROM file boundary, inside a sample or in the zero tail, the
+  file's label (`oki_1ef`, `oki_1de`, `oki_1cd`) and an assert; the tail as `dcb.b`; the tree's
+  last statement asserts the image ends at 40000. The step runs on every `make` (0.2 s for the
+  52 samples; make 3.81 compares whole-second mtimes, and a WAV saved in the same second as the
+  last build must count) and rewrites the include only when it changes. It fails on a missing
+  WAV, a WAV in `data/oki` no phrase names (a rename is the manifest's name and the file's name
+  together), or a WAV it cannot read. Nothing in the OKI tree reads `build/stunrun-oki.bin`.
+- **Coverage.** The samples are bytes generated from committed data, so they count as `data`
+  under `build/oki/samples.asm` (the M3a rule): `stunrun-oki` is 261,288 bytes of data (424 of
+  table, 260,864 of samples), 856 of fill and **0 of blob**; the set's blob goes from 1,051,392
+  bytes (69.6%) to 790,528 (52.3%).
+- **`make samples`** (`tools/adpcm samples`) re-decodes the merged image into `data/oki`, one
+  WAV per phrase of the image's own table, named from the manifest, and removes any other WAV
+  there: run it after changing the decoder or a name, as `make objects` for the meshes.
+- **Proof.** `make check`: 25 files, 0 differences, with `build/stunrun-oki.bin` deleted before
+  the OKI tree assembles. `tools/test_adpcm.py` (CI) encodes the committed WAVs and checks the
+  four chips' size, CRC-32 and SHA-1 against `tools/romsets/stunrun.json`; checks that
+  `git ls-files` holds no audio but the 52 WAVs, each in the canonical form above, one per
+  manifest phrase; and, with the reference set, that every committed WAV is byte for byte what
+  `make samples` would write from the image (so `make test` fails while the two disagree).
+  `tools/test_build.py` (CI, synthetic set carrying the image the committed WAVs encode to)
+  changes one sample of phrase 2's WAV through `make` and `bytecheck` reports a difference in
+  `136070-2124.1fh` only, first at that sample's byte; makes phrase 1 256 samples longer and
+  checks every later sample moved by 128 bytes; renames a phrase with its WAV (same bytes) and
+  without it (the build fails). On the real set the same one-sample edit (phrase 2, sample
+  1000, moved by 4000) gave `136070-2124.1fh: 7 differing bytes, first at file offset $01C9C
+  = OKI $01C9C` (= 01AA8 + 1000 / 2) and nothing else.
 
 ## 6. Decoding and the encoder
 
-`tools/adpcm decode IN.wav OUT.wav` writes 16-bit mono PCM at 7231 Hz: the 12-bit decoder
-output shifted left by 4 (MAME's stream divides by 2048: the same scale), at full volume (the
-attenuation is a play-time choice of the 6502, section 4). `make oki-pcm` (`tools/adpcm pcm`)
-decodes the WAV of every phrase the manifest names from `OKI_WAV_DIR` into `build/oki/pcm/` for
-listening, and removes any other WAV there, so a rename leaves no copy under the old name.
+`tools/adpcm decode IN.bin OUT.wav` turns one sample's raw ADPCM bytes into its PCM WAV.
 
 **The decoder is MAME's.** Two independent checks, both in `tools/test_adpcm.py`:
 
@@ -326,26 +334,156 @@ listening, and removes any other WAV there, so a rename leaves no copy under the
    (CI). Not checked: a `-wavwrite` recording of MAME, which would mix the YM2151 and the
    volumes in and could not be compared sample for sample.
 
-**Finding: the encoder.** `tools/adpcm encode` is a deterministic greedy encoder (per sample the
-nibble whose output is nearest, the lowest on a tie). `tools/adpcm encoder-check` decodes every
-sample and encodes the PCM again: **52 of 52 samples come back byte for byte**. The PCM the
-decoder gives is therefore an equivalent lossless form for these 52 samples as they are. This
-is a measured property of this data, not of the coding: two nibbles can give the same output
-when the signal clamps at -2048 or 2047, and the greedy choice could then differ from the ROM
-(none of the 52 samples hits that case). An edited PCM is quantised again, so its bytes are
-whatever the encoder chooses. The build never encodes; card A7 asks Jesus which form he wants
-to edit.
+**The encoder** (`encode` in `tools/adpcm/__init__.py`, the build's). The decoder's state is
+(signal, step index), (0, 0) when a voice starts. The encoder keeps a set of candidate states,
+each with one nibble history that reaches it; at first only (0, 0). For each 16-bit value v in
+turn, every candidate and every nibble 0-15 gives a successor state with the error
+|16 * signal - v|. The new candidates are the successors whose error is the smallest one this
+value allows (over all candidates and nibbles), one per distinct state, each with the
+lexicographically smallest history that reaches it. After the last value the result is the first
+candidate's history (the smallest). An odd number of values gets the last value once more.
+Candidates are kept in history order and nibbles tried from 0 up, so "the first successor found
+for a state" is the smallest history; the set never holds more than 98 states (the two signals
+at the smallest distance, times 49 step indices), and on decoder output it is one state at
+almost every step, which a table lookup handles (0.2 s for the 52 samples).
+
+**Lemma.** From any state the 16 nibbles give 16 distinct sums signal + diff: within a sign the
+differences step/8, step/8 + step/4, ... are strictly increasing (step >= 16, so step/4 >= 4 and
+step > step/2 + step/4), and the two signs never meet (|diff| >= step/8 >= 2). So two nibbles
+reach the same output only when the clamp to -2048..2047 makes them equal, and that output is
+-2048 or 2047. `test_lemma_distinct_differences` checks every row and 20,000 random states.
+
+**Properties.**
+
+1. *PCM exact.* For any v the decoder produced from some bytes x, `pcm(encode(v)) == v`. Proof:
+   the state x's decoder is in after k values is always a candidate (it reaches error 0, the
+   smallest possible, so it is kept), and every candidate reaches every value with error 0, so
+   the history returned decodes to v.
+2. *Bytes exact unless a clamp.* If no output of x is -2048 or 2047, `encode(v) == x`: by the
+   lemma each output has exactly one nibble from the state before it, so x is the only nibble
+   sequence that decodes to v. Otherwise several sequences may decode to v, and the encoder
+   returns the lexicographically smallest of them (every one is in the candidate set at every
+   step, and the first candidate is the smallest).
+   `test_encoder_picks_the_lexicographically_smallest` checks this against brute force over
+   every three-nibble sequence from seven states at and near the clamps;
+   `test_encoder_inverts_the_decoder` checks properties 1 and 2 on random and clamp-heavy
+   samples.
+3. *On this data.* `tools/adpcm encoder-check`: **52 of 52 samples come back byte for byte from
+   their PCM**. One output in the 52 samples sits at a clamp: phrase 50, output 661, 2047, at
+   step index 48, which four nibbles reach, all leaving the same state (signal 2047, step 48: the
+   step index clamps too), so no PCM can tell them apart; the ROM holds the smallest of the four,
+   the encoder's choice. That single tie is why the rule for ties matters: with another one the
+   image would differ there and nowhere else. `make check` is the proof that decode and encode
+   are exact inverses on these 52 samples.
+4. *Edits.* For PCM the decoder did not produce, each value is followed as closely as the rule
+   allows, one value at a time: the result is a valid ADPCM sample, not a global optimum, and
+   decoding it gives a PCM other than the edit. `tools/adpcm check [WAV ...]` prints, per WAV,
+   `exact` or how many samples decode to another value and the largest and rms error (16-bit
+   units); `make` (`tools/adpcm asm`) prints the same line for every WAV that is not exact
+   (`phrase 2 (02-good_luck.wav): edited, the build plays the encoder's nearest ADPCM: ...`).
+   ADPCM has no leak, so an offset the encoder cannot catch up with at once persists: the
+   one-sample edit of section 5 changed 7 bytes but left 6,167 of the 7,168 samples a little
+   off (rms 41.7, largest 3,296, the edited sample). Re-encoding what an edit decodes to is
+   exact (property 1). `tools/adpcm encode IN.wav OUT.bin` encodes one WAV to raw bytes with the
+   same report.
 
 ## 7. Names
 
-Every phrase is `sample_NN` in the manifest: nothing here identifies what a sample sounds like,
-and a name claims a role only with evidence. The listening pass is Jesus's (or a later leg's):
-`make oki-pcm`, then rename in `data/oki/samples.json` (a unique label; the build uses it as a
-label alias and in the WAV file names). A name may not be one of the OKI tree's own labels,
-`phrase_NN`, `phrase_NN_last` or any `oki_` label; the manifest reader refuses those. The commands in the manifest say which sound command
-plays each sample; the 68010's names for those commands are in `data/sound/commands.json`
-(docs/11 section 5), which `tools/test_sound_commands.py` checks against the manifest's
-`commands`.
+Decision (Jesus, 2026-11-05, card A8): the samples are named from his listening. `name` is a
+lower_snake label derived from his words (the speech phrases by their words, the numbers
+`number_01`-`number_22`, the effects by his description); `description` holds his words
+verbatim, question marks included (for 10-31 he wrote `"One" all the way to "Twenty-two"`, and
+each phrase's description is its number word). Where he marked a doubt with `?`, the name keeps
+his words behind the prefix `maybe_`, so the label does not state as a fact what he heard as a
+guess. `audio_test` is cross evidence, not a name: the 68010's audio-test names of the commands
+that play the phrase (`data/sound/commands.json`, docs/11). The file names
+(`data/oki/NN-name.wav`), the labels of the include and this table follow `name`; the build uses
+the name as a label alias, so it may not be one of the OKI tree's own labels (`phrase_NN`,
+`phrase_NN_last` or any `oki_` label; the manifest reader refuses those). `tools/test_adpcm.py`
+checks that `maybe_` is exactly where the description ends in `?` and that `audio_test` matches
+`data/sound/commands.json`.
+
+| Phrase | Name | Jesus's words | 68k audio test |
+|---|---|---|---|
+| 1 | `welcome_stun_runner` | Welcome S.T.U.N. Runner | ADTEST, WELCOME |
+| 2 | `good_luck` | Good luck! | LUCK |
+| 3 | `congratulations` | Congratulations | CONGRATS |
+| 4 | `better_luck_next_time` | Better luck next time | BETTER |
+| 5 | `stay_off_the_rails` | Stay off the rails! | RAILS |
+| 6 | `vehicle_slows_on_open_areas` | Vehicle slows on open areas | VSLOWS |
+| 7 | `outside_wall_is_faster_in_turns` | The outside wall is faster in turns | OWALL |
+| 8 | `press_fire_button_to_fire_shockwaves` | Press FIRE button to fire shockwaves | SWAVE |
+| 9 | `you_have_completed_level` | You have completed level... | CLEVEL |
+| 10 | `number_01` | One | ONE |
+| 11 | `number_02` | Two | TWO |
+| 12 | `number_03` | Three | THREE |
+| 13 | `number_04` | Four | FOUR |
+| 14 | `number_05` | Five | FIVE |
+| 15 | `number_06` | Six | SIX |
+| 16 | `number_07` | Seven | SEVEN |
+| 17 | `number_08` | Eight | EIGHT |
+| 18 | `number_09` | Nine | NINE |
+| 19 | `number_10` | Ten | TEN |
+| 20 | `number_11` | Eleven | ELEVEN |
+| 21 | `number_12` | Twelve | TWELVE |
+| 22 | `number_13` | Thirteen | THIRT |
+| 23 | `number_14` | Fourteen | FOURT |
+| 24 | `number_15` | Fifteen | FIFT |
+| 25 | `number_16` | Sixteen | SIXT |
+| 26 | `number_17` | Seventeen | SEVENT |
+| 27 | `number_18` | Eighteen | EIGHTT |
+| 28 | `number_19` | Nineteen | NINET |
+| 29 | `number_20` | Twenty | TWENTY |
+| 30 | `number_21` | Twenty-one | TWENTY1 |
+| 31 | `number_22` | Twenty-two | TWENTY2 |
+| 32 | `welcome_to_the_ultimate_challenge` | Welcome to the Ultimate Challenge! | ULTIMATE |
+| 33 | `welcome_to_the_kill_challenge` | Welcome to the Kill Challenge! | KILLC |
+| 34 | `welcome_to_the_marker_challenge` | Welcome to the Marker Challenge! | MARKERC |
+| 35 | `welcome_to_the_boost_challenge` | Welcome to the Boost Challenge! | BOOSTC |
+| 36 | `hmm_tsk` | hmm... tsk | KISS |
+| 37 | `yeehoo` | yeehoo! | YAHOO |
+| 38 | `shockwave` | shockwave sound | PRGUN |
+| 39 | `maybe_missile_launch` | missile launch? | GUN1 |
+| 40 | `explosion` | explosion | EXP2 |
+| 41 | `maybe_mild_explosion` | another sfx, sounds like a mild explosion? | APAD |
+| 42 | `maybe_turret_attached` | sound when turret is attached? | IRISOP |
+| 43 | `maybe_gong` | kind of gong sound? | STAR |
+| 44 | `metallic_bounce` | metallic bounce sound | TRKHIT |
+| 45 | `whirring` | another whirring sound | ARMS |
+| 46 | `maybe_attachment` | attachment sound? | RMPHIT |
+| 47 | `maybe_shockwave_hit` | shockwave hit? | SHIELD |
+| 48 | `screeching_tires` | screeching tires sound | BRAKE |
+| 49 | `maybe_rejection` | rejection sound? | TYPE |
+| 50 | `crow_caw` | crow caw | BIRD |
+| 51 | `bell_ding` | bell ding | BELL |
+| 52 | `maybe_higher_bell_ding` | higher pitched bell ding sound? | SWPIKUP |
+
+**Where the 68k names and his descriptions differ** (the names follow his words; this is for the
+progress page, not a rename):
+
+- 36 `hmm_tsk` "hmm... tsk": the 68k calls it KISS (a kiss sound would fit "tsk").
+- 38 `shockwave` "shockwave sound": PRGUN, the command the 68k sends at 036DFC; the shockwave is
+  the player's weapon (phrase 8, "Press FIRE button to fire shockwaves"), so the two agree in role.
+- 39 `maybe_missile_launch` "missile launch?": GUN1, a gun, not a missile; the most frequent
+  phrase in a played game (312 starts in the game run).
+- 41 `maybe_mild_explosion` "another sfx, sounds like a mild explosion?": APAD; no call site in
+  the 68k program queues command 5D (docs/11), only the audio test plays it.
+- 42 `maybe_turret_attached` "sound when turret is attached?": IRISOP (iris open).
+- 43 `maybe_gong` "kind of gong sound?": STAR.
+- 44 `metallic_bounce` "metallic bounce sound": TRKHIT (track hit); the two agree.
+- 45 `whirring` "another whirring sound": ARMS.
+- 46 `maybe_attachment` "attachment sound?": RMPHIT (ramp hit).
+- 47 `maybe_shockwave_hit` "shockwave hit?": SHIELD.
+- 48 `screeching_tires` "screeching tires sound": BRAKE; the two agree.
+- 49 `maybe_rejection` "rejection sound?": TYPE (a typing sound; the 68k queues it at 02792A and
+  032B06).
+- 52 `maybe_higher_bell_ding` "higher pitched bell ding sound?": SWPIKUP (shockwave pick-up),
+  which names the role, not the sound.
+
+The others agree: 1-35 are the words the 68k abbreviates (WELCOME, LUCK, CONGRATS, BETTER, RAILS,
+VSLOWS, OWALL, SWAVE, CLEVEL, ONE-TWENTY2, ULTIMATE, KILLC, MARKERC, BOOSTC), 37 YAHOO, 40 EXP2,
+50 BIRD, 51 BELL. Phrase 1 is also played by command 05 (ADTEST), which the boot program sends
+directly at 008EB0 (docs/11).
 
 ## 8. Commands
 
@@ -355,19 +493,19 @@ document writes `tools/adpcm <command>` for short.
 
 | Command | What |
 |---|---|
-| `make` / `make check` | builds the OKI image through the WAVs (section 5) |
-| `make OKI_WAV_DIR=dir` | the same from edited WAVs |
-| `uv run python tools/adpcm info` | the table, checked against the image |
-| `uv run python tools/adpcm split --out dir` | one verbatim ADPCM WAV per phrase |
-| `uv run python tools/adpcm wav` / `unwav` | one sample's bytes to its WAV and back |
-| `uv run python tools/adpcm decode in.wav out.wav`, `make oki-pcm` (`tools/adpcm pcm`) | 16-bit PCM for listening |
-| `uv run python tools/adpcm encode`, `uv run python tools/adpcm encoder-check` | the greedy encoder (section 6) |
-| `make -j3 okitrace` | the three MAME runs, then `tools/adpcm survey` rewrites the manifest |
+| `make` / `make check` | builds the OKI image from `data/oki` (section 5) |
+| `make samples` (`tools/adpcm samples`) | re-decodes the merged image into `data/oki` |
+| `uv run python tools/adpcm info` | the layout the WAVs give, checked against the image |
+| `uv run python tools/adpcm check [WAV ...]` | the round-trip error per WAV (section 6) |
+| `uv run python tools/adpcm decode in.bin out.wav` / `encode in.wav out.bin` | one sample's raw bytes to PCM and back |
+| `uv run python tools/adpcm encoder-check` | per phrase of the image: bytes back from PCM, outputs at a clamp |
+| `make -j3 okitrace` | the three MAME runs, then `tools/adpcm survey` rewrites the manifest's commands and starts (names, descriptions and audio_test kept) |
 
 ## 9. Not verified
 
 - The sample rate on real hardware: 7231 Hz is MAME's reading of /WRIO bit 3 (section 2).
-- What each sample sounds like (no listening here; section 7).
 - Whether the phrases that only the injected commands started are reachable in a real game
   (36 of 52 were not seen in the 10,800-frame game run). docs/11 section 6 lists the 68010's
   call sites of each command; the game events behind them are M5's.
+- The names are Jesus's hearing of MAME's playback; nothing here checks them against the game's
+  own documentation.
