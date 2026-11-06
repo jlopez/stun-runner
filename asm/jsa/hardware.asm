@@ -51,9 +51,9 @@ RDIO_COIN1      = $01                   ; 191
 ; (ymtimer.asm), is reached only through cmdtype_10_ymtimer, and no command has type 10
 ; (docs/10-adpcm.md section 2).
 WRIO_BANK       = $C0                   ; 490, 500: the page at 3000-3FFF
-WRIO_BANK_PAGE1 = $40                   ; the WRIO_BANK field for pages 1-3 (page 0 is 00)
-WRIO_BANK_PAGE2 = $80
-WRIO_BANK_PAGE3 = $C0
+WRIO_BANK_PAGE1 = $40                   ; 500: bank entry 1 (bits 7-6; page 0 is 00)
+WRIO_BANK_PAGE2 = $80                   ; 500: bank entry 2
+WRIO_BANK_PAGE3 = $C0                   ; 500: bank entry 3
 WRIO_COUNTER2   = $20                   ; 491, 503: coin counter 2
 WRIO_COUNTER1   = $10                   ; 492, 504: coin counter 1
 WRIO_OKI_PIN7   = $08                   ; 493, 509: the M6295's pin 7 (its clock divisor)

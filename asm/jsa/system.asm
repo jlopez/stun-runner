@@ -224,7 +224,8 @@ init_board
 
 ; -------------------------------------------------------------------------------------------------
 ; The sound initialisation, then main_loop (from init_board, and from h_irq 4204 after a BRK,
-; with an empty stack). Seeds rng_state with 0D.
+; with an empty stack). Seeds rng_state with 0D. Neither it nor init_sound clears irq_busy, which
+; the BRK path leaves FF: after a BRK commands still run but the timed tick does not (h_irq).
 ; -------------------------------------------------------------------------------------------------
 warm_start
     jsr init_sound                      ; the sound initialisation (also command 00)
@@ -238,8 +239,8 @@ warm_start
 ; Each pass: steps rng_state (sub_5504), clears board_status bit 0 (imm_03_send_status sets it:
 ; the next status shows whether the loop still runs), sends one queued response when the 68010
 ; has read the last one (RDIO bit 5, output buffer full, is clear), and runs one queued command
-; through dispatch_command. h_nmi fills cmd_queue (48 entries), queue_response fills resp_queue
-; (16).
+; through dispatch_command. h_nmi fills cmd_queue (a 48-byte ring, at most 47 queued: empty when
+; in = out), queue_response fills resp_queue (a 16-byte ring, at most 15 queued).
 ; -------------------------------------------------------------------------------------------------
 main_loop
     jsr sub_5504
@@ -346,7 +347,10 @@ ack_timed_irq
 ; tick_count. Else, unless it interrupted its own tick (irq_busy: it sets irq_again and returns),
 ; it counts tick_count and runs, with interrupts enabled, tick_sequencer, oki_tick and
 ; read_inputs, again as long as a nested IRQ set irq_again meanwhile. A BRK (status bit 4 on the
-; stack) restarts at warm_start with an empty stack instead.
+; stack) restarts at warm_start with an empty stack instead, but after the store of FF in irq_busy
+; (41F0) and before the only one that clears it (4223): every timed IRQ after it takes the
+; irq_busy path (41E6-41EC), so the timed tick never runs again until a reset (docs/09 section
+; 10.10; never reached in the traces).
 ; -------------------------------------------------------------------------------------------------
 h_irq
     pha

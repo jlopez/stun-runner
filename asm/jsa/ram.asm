@@ -55,7 +55,8 @@ start_entry = $13
 ; 2 bytes: cmdtype_08_start_sound's pointer into the sound tables (45A9-469D)
 start_ptr = $15
 start_tmp = $17                         ; cmdtype_08_start_sound: the entry's priority (45BA), then
-                                        ; its list's chan_list index (4619) and the list walk (4641)
+                                        ; its list head's index in trk_link (list + 1E, 4619)
+                                        ; and the list walk (4641)
 ; 2 bytes, scratch: a pointer (the self-test 4063-4082, checksum_pages, the patch pointer of
 ; ymtimer_start 5892-5898, the sequencer) or two bytes of arithmetic; no meaning across routines
 tmp_ptr = $19
@@ -135,7 +136,8 @@ stack = $0100
 
 ; --- RAM
 
-; 48 bytes: the commands h_nmi queues (5834-5846) and main_loop runs (4171-4186)
+; 48 bytes, a ring of at most 47 commands: the ones h_nmi queues (5834-5846) and main_loop runs
+; (4171-4186)
 cmd_queue = $0200
 ; the entry main_loop took last (4171-4180)
 cmd_queue_out = $0230
@@ -145,7 +147,8 @@ cmd_queue_in = $0231
 nmi_data_count = $0232
 ; FF: h_nmi queues commands; 0: it stores the byte at nmi_data_ptr; else it drops it
 nmi_mode = $0234
-; 16 bytes: the responses queue_response queues (44D0) and main_loop sends (4159-416E)
+; 16 bytes, a ring of at most 15 responses: the ones queue_response queues (44D0) and main_loop
+; sends (4159-416E)
 resp_queue = $0235
 ; the next entry main_loop sends
 resp_queue_out = $0245

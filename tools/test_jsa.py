@@ -260,28 +260,70 @@ def test_system_files_are_named() -> None:
             assert seq, f"{m.group(1)} is used by no sequencer file: it is not M4d's"
 
 
-# A mask an AND or ORA applies just before a store to a WRIO or MIX register (or its shadow) is
-# made of the hardware equates (hardware.asm), not a raw number (the M4c decision, CLAUDE.md).
-RAW_MASK = re.compile(r"^\s*(?:and|ora)\s+#\$[0-9A-Fa-f]+\s*(?:;|$)")
-HW_STORE = re.compile(r"^\s*sta\s+(?:WRIO|MIX|wrio_shadow|mix_shadow)\b")
+# A mask an AND or ORA applies to a value that A then carries to a store to a WRIO or MIX register
+# (or its shadow) is made of the hardware equates (hardware.asm), not a raw number in any base
+# (the M4c decision, CLAUDE.md).
+RAW_MASK = re.compile(r"^(?:and|ora)\s+#(?:\$[0-9A-Fa-f]+|%[01]+|[0-9]+)$")
+HW_STORE = re.compile(r"^sta\s+(?:WRIO|MIX|wrio_shadow|mix_shadow)\b")
+# What may come between the mask and the store with A still derived from the mask: the other
+# logic operations and the shifts on A, stores, compares, flag and index instructions. Anything
+# else (a load or transfer into A, arithmetic, a call, a jump, a return, a branch, a directive)
+# ends the search.
+A_CARRIES = re.compile(
+    r"^(?:(?:and|ora|eor|sta|stx|sty|ldx|ldy|cmp|cpx|cpy|bit)\s|(?:asl|lsr|rol|ror)\s+a$"
+    r"|(?:clc|sec|cli|sei|cld|sed|clv|nop|inx|iny|dex|dey|tax|tay|pha|php)$)"
+)
+CODE_LABEL = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\s*(?:;|$)")
 
 
 def raw_hardware_masks(lines: list[str]) -> list[str]:
-    """The raw immediate masks whose next instruction stores to WRIO, MIX or their shadows."""
-    code = [t for t in lines if t.split(";", 1)[0].strip()]
-    return [a for a, b in zip(code, code[1:], strict=False) if RAW_MASK.match(a) and HW_STORE.match(b)]
+    """The raw immediate AND/ORA masks whose value A carries, through what A_CARRIES allows, to a
+    store to WRIO, MIX or their shadows. A label in between does not stop the search: the masked
+    value still falls through it to the store."""
+    found = []
+    for i, line in enumerate(lines):
+        if not RAW_MASK.match(line.split(";", 1)[0].strip()):
+            continue
+        for later in lines[i + 1 :]:
+            text = later.split(";", 1)[0].strip()
+            if not text or CODE_LABEL.match(later):
+                continue
+            if HW_STORE.match(text):
+                found.append(line)
+                break
+            if not A_CARRIES.match(text):
+                break
+    return found
 
 
 def test_hardware_masks_are_equates() -> None:
     """System files: no raw AND/ORA mask feeds a WRIO or MIX store, and no line is over 100
     columns (the repository's convention)."""
     assert raw_hardware_masks(["    and #$FB", "    sta WRIO ; x"]) == ["    and #$FB"]
+    planted = [
+        # ymtimer.asm's form (5903): another ORA, then the shadow, then WRIO
+        ["    lda wrio_shadow", "    and #$3F", "    ora tbl_65DD+4,x", "    sta wrio_shadow"],
+        ["    and #%00111111", "    sta wrio_shadow"],
+        ["    and #63", "    sta WRIO"],
+        ["    ora #$08 ; x", "_join", "    sta temp", "    sta MIX"],
+    ]
+    for case in planted:
+        assert len(raw_hardware_masks(case)) == 1, case
     assert not raw_hardware_masks(["    and #$FF ^ WRIO_OKI_RUN", "    sta WRIO"])
+    assert not raw_hardware_masks(
+        ["    and #WRIO_BANK", "    ora #WRIO_BANK_PAGE1", "    sta WRIO"]
+    )
+    assert not raw_hardware_masks(["    and #$3F", "    lda wrio_shadow", "    sta WRIO"])
+    assert not raw_hardware_masks(["    and #$3F", "    jsr sub_5504", "    sta WRIO"])
+    assert not raw_hardware_masks(["    and #$3F", "    sta YM2151_DATA"])
     for name in SYSTEM_FILES:
         lines = (TREE / name).read_text().splitlines()
         assert not raw_hardware_masks(lines), f"{name}: {raw_hardware_masks(lines)}"
         long = [i + 1 for i, t in enumerate(lines) if len(t) > 100]
         assert not long, f"{name}: lines over 100 columns: {long}"
+    # This file too: make lint does not run the formatter and ruff ignores E501.
+    long = [i + 1 for i, t in enumerate(Path(__file__).read_text().splitlines()) if len(t) > 100]
+    assert not long, f"{Path(__file__).name}: lines over 100 columns: {long}"
 
 
 @needs_tass
