@@ -527,7 +527,7 @@ def build(
                     f"{ea:06X} {name}: a local at the address of {globals_at[ea][0]}"
                 )
             continue
-        if ida_ea_offset_is_code(ea, code_offsets):
+        if ea in code_offsets:  # (a ROM address is its file offset; the banks hold no code)
             src.names.append(Name(ea, locs[0][1], local=True))
         else:
             src.left_out.append(f"{ea:06X} {locs[0][1]}: a local over data (no function)")
@@ -582,10 +582,6 @@ def split_at_pages(st: Statement) -> list[Statement]:
         out.append(Statement(offset, st.kind, st.operands, stop - offset))
         offset = stop
     return out
-
-
-def ida_ea_offset_is_code(ea: int, code_offsets: set[int]) -> bool:
-    return ea in code_offsets  # the ROM's IDA address is its file offset; banks hold no code
 
 
 # --- assembling ---------------------------------------------------------------------------------

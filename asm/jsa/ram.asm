@@ -2,17 +2,18 @@
 ;
 ; Each name says what the code stores there, with the instructions that write and read it
 ; (docs/09-sound-program.md section 10.9). A variable only sequencer.asm, data/** or lookup.asm
-; use is named by the sequencer leg (M4d) and keeps its zp_XX/ram_XXXX name here until then.
+; use was named by the sequencer leg (M4d, docs/12-sound-music.md section 2).
 ;
-; The track arrays (0248-085F): the sequencer runs up to 30 tracks, each a byte stream of
-; data/music.asm; X = 00-1D indexes one track's byte in each array, the arrays 1E bytes apart
-; (init_track, 46A5, clears or presets each for a new track). cmdtype_08_start_sound (4569)
-; starts one track per entry of the sound and links it into the list of a channel (trk_link,
-; chan_list). The tick (tick_sequencer, 4229) runs two sets of lists on alternate timed IRQs:
-; engine 0, the lists of YM2151 channels 0-7 (chan_list+0-7, group_kind = 02), and engine 1,
-; six more lists (chan_list+8-D, group_kind = 03) that no sound of this ROM uses (entry_channel, the
-; list of each entry, holds 0-7 only). Several arrays mean one thing to engine 0 and another to
-; engine 1; the name says the engine-0 use, the comment both.
+; The track arrays (0248-085F): the sequencer runs up to 30 tracks, each a byte stream of the
+; data files (data/streams_*.asm); X = 00-1D indexes one track's byte in each array, the arrays
+; 1E bytes apart (init_track, 46A5, clears or presets each for a new track).
+; cmdtype_08_start_sound (4569) starts one track per entry of the sound and links it into the
+; list of a channel (trk_link, chan_list). The tick (tick_sequencer, 4229) runs two sets of lists
+; on alternate timed IRQs: engine 0, the lists of YM2151 channels 0-7 (chan_list+0-7, group_kind
+; = 02), and engine 1, six more lists (chan_list+8-D, group_kind = 03) that no sound of this ROM
+; uses (entry_channel, the list of each entry, holds 0-7 only). Several arrays mean one thing to
+; engine 0 and another to engine 1; the name says the engine-0 use, the comment both. The labels
+; call an engine a group (tick_group, group_kind).
 
 ; --- zero page
 

@@ -189,7 +189,7 @@ ida-annotate:
 # the code/data classification of asm/jsa. A dry run on a copy by default (the changes per
 # category); `make ida-sync WRITE=1` writes data/stunrun-jsa.i64, then `make ida-export`.
 ida-sync: $(BUILD)/$(SET)-jsa.bin
-	$(PYTHON) -m ida.headless.sync $(if $(WRITE),--write)
+	$(PYTHON) -m ida.headless.sync $(if $(filter 1,$(WRITE)),--write)
 
 # The GSP and ADSP programs as unidasm listings with the sidecars merged in (docs/06-code-map.md
 # section 6). The listings contain the program bytes: build output, never committed.

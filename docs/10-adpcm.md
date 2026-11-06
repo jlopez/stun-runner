@@ -27,8 +27,8 @@ phrase table as source.
   the stop handler (5C6F), whose parameter is a phrase number, not an effect: it stops phrase 48
   (the phrase of command 65). **CODE, MAME**. MAME saw each of the 52 phrases start by exactly
   the command the tables give, 16 of them in a played game; attract mode starts none (the 68k
-  sends command 01, which sets RAM 1E, and the play handler does nothing while 1E is nonzero).
-  **MAME**
+  sends command 01, which sets RAM 1E, `min_priority`, to F0, and the play handler does nothing
+  while 1E is nonzero). **MAME**
 - MAME plays the samples at 3.579545 MHz / 3 / 165 = 7231.4 Hz, not / 132: JSA II's /WRIO bit 3
   drives the M6295's pin 7 (**SRC**), and in the three okitrace runs /WRIO only took the values
   00, 01 and 05 (**MAME**). The code never sets bit 3: the one write that could (5903) is in a
@@ -174,9 +174,11 @@ ignored (`CPY #$6D`), the handler type is 6100+Y (21 types, jump table at 472F, 
 RTS), the handler's parameter 616D+Y. Type 13h is the OKI play handler at 5BFE, type 14h the
 OKI stop handler at 5C6F. The play handler's parameter is an **effect** number, the stop
 handler's a **phrase** number (below). Per effect, three tables
-of 53 bytes: 6532 the phrase, 6567 the voice (bits 5-4), the attenuation (bits 3-0) and a
-"do not interrupt" flag (bit 7), 659C a level the handler stores per voice (5C59) and turns into
-the YM2151 volume of /MIX (5C87-5CB4, the music ducks under the samples).
+of 53 bytes (`data/sounds.asm`): 6532 the phrase (`effect_phrase`), 6567 the voice (bits 5-4),
+the attenuation (bits 3-0) and a "do not interrupt" flag (bit 7) (`effect_voice`), 659C a level
+the handler stores per voice (5C59, `oki_duck`) and turns into the YM2151 volume of /MIX
+(5C87-5CB4, `oki_duck_ym`: the music ducks under the samples) (`effect_duck`). The handlers are
+`cmdtype_13_oki_play` (5BFE) and `cmdtype_14_oki_stop` (5C6F), `oki.asm` (docs/09 section 10.4).
 
 The play handler (5BFE-5C62): returns at once when RAM 1E is nonzero (5BFE); picks the voice X
 from 6567; if the voice is playing (status at 2808) an effect whose 6567 bit 7 is set, returns
@@ -198,17 +200,22 @@ name every phrase 1-52 and nothing else. `tools/adpcm survey` reads these tables
 (JSA_TYPES/JSA_PARAMS/JSA_EFFECT_PHRASE in tools/adpcm/__main__.py) into the manifest's
 `commands`.
 
-**RAM 1E.** Command 01 (type 0, parameter 3C) runs 438A, which stores 3C << 2 = F0 into RAM
-1E; command 02 (parameter 0) stores 0; 412B clears it at init. The OKI play handler treats any
-nonzero value as a mute: it returns without touching the OKI (5BFE-5C01). 1E is not only an OKI
-switch, though: a YM2151 path compares against it as a threshold at 4EE6. There the byte at RAM
-088E below 1E returns at 4EA6 (4EE8) before the key-code write at 4EF4-4F08 (register 28 + the
-channel in RAM 0D, from the table 5E7D); the register-08 write at 4ED3-4EDF (A = RAM 0D, the
-channel with no slot bits) comes before the compare and does not depend on it. So with 1E = F0
-some YM2151 events are suppressed too. A second compare, 44C5-44CC (a byte of the table 65E0+Y
-below 1E returns, otherwise it jumps to 5869), is in handler type 10h, which no command has
-(section 2), so it never runs. The 6502 leg named 1E `min_priority`, a floor on the track priority, not a volume (docs/09
-section 10.2: with F0 the priority-3F sound still keys on); here it is "RAM 1E" and "muted" means only that the OKI play handler returned at 5C01.
+**RAM 1E, `min_priority`.** Command 01 (type 0, parameter 3C) runs 438A
+(`cmdtype_00_min_priority`), which stores 3C << 2 = F0 into RAM 1E; command 02 (parameter 0)
+stores 0; 412B clears it at init. The OKI play handler treats any nonzero value as a mute: it
+returns without touching the OKI (5BFE-5C01). 1E is not only an OKI switch: it is a floor on the
+track priority (docs/09 sections 6 and 10.2, docs/12 section 3.4). In `tick_ym_channel` the
+heard track's priority byte `sounding_prio` (RAM 088E, the track's priority x 4 + 1) is compared
+with it at 4EE3-4EE8, and below it the routine returns (at 4EA6) before the key code (register
+28 + the channel, from `key_codes` 5E7D, 4EF4-4F08), the total levels (4F20-4FD4), the LFO reset
+(4FDE-4FF7) and the key-on (register 08 with the slot bits 78, 4FFA-5006). Registers 20 and 30
+(4EA7-4ECD) and the key-off (register 08 with no slot bits, 4ED3-4EDF) come before the compare
+and do not depend on it. So with 1E = F0 no YM2151 note keys on unless its priority is at least
+3C (priority x 4 + 1 >= F0), which only sound 1B's has: a floor, not a volume (with F0 the
+priority-3F sound still keys on, docs/09 section 10.2). A second compare, 44C5-44CC (a byte of
+the table 65E0+Y below 1E returns, otherwise it jumps to 5869), is in handler type 10h, which no
+command has (section 2), so it never runs. Below, "muted" means only that the OKI play handler
+returned at 5C01.
 
 **The MAME runs** (`make -j3 okitrace`, tools/mame/okitrace.lua, each from an empty private
 NVRAM and cfg). The script taps the 6502's writes to 2A00-2BFF (OKI, /WRP, /WRIO, /MIX) and its
@@ -336,7 +343,9 @@ and a name claims a role only with evidence. The listening pass is Jesus's (or a
 `make oki-pcm`, then rename in `data/oki/samples.json` (a unique label; the build uses it as a
 label alias and in the WAV file names). A name may not be one of the OKI tree's own labels,
 `phrase_NN`, `phrase_NN_last` or any `oki_` label; the manifest reader refuses those. The commands in the manifest say which sound command
-plays each sample; naming those commands is the 6502 leg's (docs/09).
+plays each sample; the 68010's names for those commands are in `data/sound/commands.json`
+(docs/11 section 5), which `tools/test_sound_commands.py` checks against the manifest's
+`commands`.
 
 ## 8. Commands
 
@@ -360,4 +369,5 @@ document writes `tools/adpcm <command>` for short.
 - The sample rate on real hardware: 7231 Hz is MAME's reading of /WRIO bit 3 (section 2).
 - What each sample sounds like (no listening here; section 7).
 - Whether the phrases that only the injected commands started are reachable in a real game
-  (36 of 52 were not seen in the 10,800-frame game run; the 68k side of the commands is M5).
+  (36 of 52 were not seen in the 10,800-frame game run). docs/11 section 6 lists the 68010's
+  call sites of each command; the game events behind them are M5's.

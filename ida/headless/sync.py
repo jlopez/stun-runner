@@ -129,15 +129,11 @@ class Sync:
                 db.add_function(ea)
                 if ida_funcs.get_func(ea) is None or ida_funcs.get_func(ea).start_ea != ea:
                     self.skipped.append(f"{ea:06X} {names.get(ea, '')}: add_func failed")
-        for ea in idautils.Functions():
-            if ea not in wanted and not self.write:
-                self.extra_functions.append(f"{ea:06X} {names.get(ea, '(no label)')}")
-        if self.write:
-            self.extra_functions = [
-                f"{ea:06X} {names.get(ea, '(no label)')}"
-                for ea in idautils.Functions()
-                if ea not in wanted
-            ]
+        self.extra_functions = [
+            f"{ea:06X} {names.get(ea, '(no label)')}"
+            for ea in idautils.Functions()
+            if ea not in wanted
+        ]
 
     # names ---------------------------------------------------------------------------------
 
