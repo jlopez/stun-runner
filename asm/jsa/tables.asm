@@ -74,9 +74,9 @@ nibble_scale
     .byte $00, $01, $03, $05, $07, $09, $0A, $0C, $0E, $10, $12, $13, $15, $17, $19, $1B
     .byte $00, $01, $03, $05, $07, $09, $0B, $0D, $0F, $11, $13, $15, $17, $19, $1B, $1D
 
-; 4 bytes: read at 4F2C with X = ram_08AB bits 3-2 (4F24-4F2B), which hold the note's length
-; byte bits 5-4 there (sub_4D6C 4D70-4D7E, shifted twice at 4ECE and 4EEA): subtracted from the
-; level offset (trk_level_offset) before it scales the operators' levels.
+; 4 bytes: read at 4F2C with X = key_flags bits 3-2 (4F24-4F2B), which hold the note's length
+; byte bits 5-4 there (prepare_key_on 4D70-4D7E, shifted twice at 4ECE and 4EEA): subtracted from
+; the level offset (trk_level_offset) before it scales the operators' levels.
 level_bias
     .byte $00, $00, $24, $58
 

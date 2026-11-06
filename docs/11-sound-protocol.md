@@ -173,7 +173,7 @@ of `cmd_type` at 4375, after that test, so they cannot show it.
 | `coin_state` | command 03 (imm_01_send_inputs, 5DAD): `read_inputs`'s four 2-bit coin counters (5D11-5D57: RDIO bits 0-3 debounced in `coin_debounce`,x, `coin_field_one`,x added inside the field mask `coin_field_mask`,x), or the raw RDIO bits 0-3 when RDIO bit 7, the self-test, is set (5CE8-5D08; never in MAME) | `send_response` |
 | AA, then the next byte written | command 08 (imm_04_loopback, 5CB8): a loop-back | `send_response` |
 | 55 | command 09 (type 09, `queue_response` 44D0) | `main_loop` 4159-4164 |
-| a stream's operand | stream op 96 (`op_96`, 550E, through `queue_response`) | `main_loop` |
+| a stream's operand | stream op 96 (`op_respond`, 550E, through `queue_response`) | `main_loop` |
 
 `send_response` waits for RDIO bit 5 to clear before and after its write, so the immediate
 commands hold the 6502 inside its NMI until the 68010 has read their answer. `main_loop` sends a
@@ -243,15 +243,15 @@ Classes, types and parameters are the 6502's tables at 6093, 6100 and 616D (`cmd
 
 | Type | Handler | What it does |
 |---|---|---|
-| 00 | `cmdtype_00_min_priority` 438A | `min_priority` = 4 x param, a floor on the track priority (docs/09 section 10.2): F0 for 01, 0 for 02. While `min_priority` is not 0 the OKI start returns at once (5BFE-5C01), and a YM2151 key-on needs the track's priority byte `ram_088E` >= `min_priority` (4EE3-4EF0): with F0 only the priority-3F sound (command 32, byte FD) keys on |
-| 01 | `cmdtype_01_set_var` 43AD | `seq_vars` + (`tbl_65D1`+param AND 1F) = `tbl_65D7`+param; a stream op reads `seq_vars,y` (54EE) |
+| 00 | `cmdtype_00_min_priority` 438A | `min_priority` = 4 x param, a floor on the track priority (docs/09 section 10.2): F0 for 01, 0 for 02. While `min_priority` is not 0 the OKI start returns at once (5BFE-5C01), and a YM2151 key-on needs the track's priority byte `sounding_prio` >= `min_priority` (4EE3-4EF0): with F0 only the priority-3F sound (command 32, byte FD) keys on |
+| 01 | `cmdtype_01_set_var` 43AD | `seq_vars` + (`global_set_index`+param AND 1F) = `global_set_value`+param; a stream op reads `seq_vars,y` (54EE) |
 | 03 | `cmdtype_03_immediate` 43CA | `imm_handlers` entry param: entry 0 is `init_sound` (4238), the initialisation reset also runs (OKI reset, response queue emptied, voice tables cleared, key-off on the eight YM2151 channels, MIX set) |
 | 05 | `cmdtype_05_stop_sound` 43EE | if command param is of type 08, every voice playing its stream gets `trk_sound` = FF (stopped) |
-| 08 | `cmdtype_08_start_sound` 4569 | starts stream param on its voices (`tbl_61E4` first entry, `tbl_6438` next; group `tbl_6244`, YM2151 channel `tbl_62C1`, byte stream `tbl_633E`) |
+| 08 | `cmdtype_08_start_sound` 4569 | starts stream param on its voices (`sound_first_entry` first entry, `entry_next` next; group `entry_priority`, YM2151 channel `entry_channel`, byte stream `entry_stream`) |
 | 09 | `queue_response` 44D0 | param into `resp_queue` |
 | 0A | `cmdtype_0A_release_sound` 445F | if command param is of type 08, every voice playing its stream is released (`trk_slide_rate_hi` = D0, `trk_slide_time_hi` = 2, `trk_sound` = FE) |
 | 0B | `cmdtype_0B_release_priority` 4496 | every voice whose group (`trk_priority` / 4) is param is released as by type 0A |
-| 13 | `cmdtype_13_oki_play` 5BFE | OKI phrase `tbl_6532`+param on the channel and attenuation of `tbl_6567`+param, unless `min_priority` is not 0 (docs/10) |
+| 13 | `cmdtype_13_oki_play` 5BFE | OKI phrase `effect_phrase`+param on the channel and attenuation of `effect_voice`+param, unless `min_priority` is not 0 (docs/10) |
 | 14 | `cmdtype_14_oki_stop` 5C6F | stops the OKI channel whose current phrase is param |
 | FF | `imm_handlers` 61DA | an immediate command (class 00-03), inside `h_nmi` |
 

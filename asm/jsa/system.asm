@@ -230,20 +230,20 @@ init_board
 warm_start
     jsr init_sound                      ; the sound initialisation (also command 00)
     lda #$0D
-    sta rng_state                       ; the seed of sub_5504
+    sta rng_state                       ; the seed of random
     cli
 
 ; -------------------------------------------------------------------------------------------------
 ; The main loop, forever.
 ;
-; Each pass: steps rng_state (sub_5504), clears board_status bit 0 (imm_03_send_status sets it:
+; Each pass: steps rng_state (random), clears board_status bit 0 (imm_03_send_status sets it:
 ; the next status shows whether the loop still runs), sends one queued response when the 68010
 ; has read the last one (RDIO bit 5, output buffer full, is clear), and runs one queued command
 ; through dispatch_command. h_nmi fills cmd_queue (a 48-byte ring, at most 47 queued: empty when
 ; in = out), queue_response fills resp_queue (a 16-byte ring, at most 15 queued).
 ; -------------------------------------------------------------------------------------------------
 main_loop
-    jsr sub_5504
+    jsr random
     lda board_status
     and #$FE
     sta board_status
@@ -419,16 +419,16 @@ _return
 
 ; -------------------------------------------------------------------------------------------------
 ; One sequencer tick (from h_irq 420B): engine 0, the YM2151 channels (X = 0), on odd values of
-; tick_count, engine 1 (X = 1) on even ones, through loc_5043 (sequencer.asm).
+; tick_count, engine 1 (X = 1) on even ones, through tick_group (sequencer.asm).
 ; -------------------------------------------------------------------------------------------------
 tick_sequencer
     lda tick_count
     lsr a
     bcc _engine_1
     ldx #$00
-    jmp loc_5043
+    jmp tick_group
 _engine_1
     ldx #$01
-    jmp loc_5043
+    jmp tick_group
 
     .cerror * != $4238, "system.asm must end at $4237"

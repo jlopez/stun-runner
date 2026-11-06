@@ -9,8 +9,8 @@
 ; (init_track, 46A5, clears or presets each for a new track). cmdtype_08_start_sound (4569)
 ; starts one track per entry of the sound and links it into the list of a channel (trk_link,
 ; chan_list). The tick (tick_sequencer, 4229) runs two sets of lists on alternate timed IRQs:
-; engine 0, the lists of YM2151 channels 0-7 (chan_list+0-7, tbl_57DF = 02), and engine 1,
-; six more lists (chan_list+8-D, tbl_57DF = 03) that no sound of this ROM uses (tbl_62C1, the
+; engine 0, the lists of YM2151 channels 0-7 (chan_list+0-7, group_kind = 02), and engine 1,
+; six more lists (chan_list+8-D, group_kind = 03) that no sound of this ROM uses (entry_channel, the
 ; list of each entry, holds 0-7 only). Several arrays mean one thing to engine 0 and another to
 ; engine 1; the name says the engine-0 use, the comment both.
 
@@ -30,18 +30,18 @@ start_sound = $03                       ; cmdtype_08_start_sound: the sound N be
 ; 2 bytes: where h_nmi stores a byte while nmi_mode is 0 (57FA-5805); receive_bytes points it at
 ; rx_buffer (5CC7-5CCE)
 nmi_data_ptr = $04
-zp_06 = $06
-zp_07 = $07
-; 2 bytes, written from tbl_57DB/tbl_57DD by init_sound (4269-4271) and the tick (5043-504B):
-; 2000 (the YM2151) for engine 0, 0000 for engine 1. No instruction reads it.
+stream_ptr = $06
+stream_ptr_hi = $07
+; 2 bytes, written from group_chip_lo/group_chip_hi by init_sound (4269-4271) and the tick
+; (5043-504B): 2000 (the YM2151) for engine 0, 0000 for engine 1. No instruction reads it.
 engine_chip = $08
 fm_op_index = $0C                       ; the operator loop's index: 6, 4, 2, 0 (4F22-4FD2) or a
                                         ; count 3-0 over the four operators (556C, 55C8, 57A0)
-ym_channel = $0D                        ; the YM2151 channel 0-7 the code is writing (loc_500E
+ym_channel = $0D                        ; the YM2151 channel 0-7 the code is writing (tick_ym_group
                                         ; 500E-5023 counts 7 to 0; ymtimer 5890, 58C0)
 ym_timed_out = $0E                      ; bit 7 set by ym_wait after 255 busy reads (5039): later
                                         ; waits return at once; cleared by init_sound (4284-429E)
-zp_0F = $0F
+chain_mute = $0F
 ymtimer_active = $10                    ; 1 while the timer-A sequence of ymtimer.asm runs (588C),
                                         ; 0 when it ends (59FB) or at init (5866); the tick
                                         ; leaves channels 6 and 7 silent while it is set (4E8B)
@@ -49,8 +49,8 @@ irq_busy = $11                          ; FF while h_irq runs its tick with inte
                                         ; (41EE-4223)
 irq_again = $12                         ; a timed IRQ came in during the tick: h_irq runs the tick
                                         ; once more (41E6-41EC, 4216-421E)
-; 2 bytes: cmdtype_08_start_sound's entry E, the index into the sound tables (tbl_61E4 4570-4584,
-; then tbl_6438 4694-469F)
+; 2 bytes: cmdtype_08_start_sound's entry E, the index into the sound tables (sound_first_entry
+; 4570-4584, then entry_next 4694-469F)
 start_entry = $13
 ; 2 bytes: cmdtype_08_start_sound's pointer into the sound tables (45A9-469D)
 start_ptr = $15
@@ -65,7 +65,7 @@ tmp_1B = $1B                            ; scratch: checksum_pages' page count (4
 tmp_1C = $1C                            ; scratch: a handler's parameter
                                         ; (cmdtype_04_stop_priority 43D9), the sequencer's X
                                         ; across a dispatch (5069), arithmetic
-zp_1D = $1D
+seq_tmp = $1D
 min_priority = $1E                      ; 4 x the parameter of a type-00 command (438A): a track
                                         ; whose priority byte is below it is not keyed on
                                         ; (4EE3-4EE8), a type-10 sound below it does not start
@@ -75,7 +75,7 @@ frame_free = $1F                        ; the first free 4-byte frame of frame_p
                                         ; 0): init_frame_pool, alloc_frame, free_track_frames
 ; 2 bytes: the address of a frame, set by frame_address (431A-433A)
 frame_ptr = $20
-zp_22 = $22
+track_muted = $22
 ; 32 bytes, 23-42: the variables 06-25 of the stream ops B0-B8 (53D2, 54EE); commands 1E-23
 ; (cmdtype_01_set_var) set variable 06, seq_vars+0, to 0-5
 seq_vars = $23
@@ -90,8 +90,8 @@ wrio_shadow = $45
 ; (atarijsa.cpp ym2151_port_w 328, update_all_volumes 630)
 ym_1b_shadow = $46
 rng_state = $47                         ; an 8-bit shift register, seeded 0D at reset (4146) and
-                                        ; stepped by sub_5504 (asl, eor 1D) on every main_loop pass
-zp_48 = $48
+                                        ; stepped by random (asl, eor 1D) on every main_loop pass
+group_count = $48
 ; 2 bytes: ymtimer.asm's data pointer (5906-5916, read 59CB, 5A5A)
 ymt_ptr = $49
 ymt_count = $4B                         ; ymtimer: the steps left before ymt_ptr moves 0E bytes on
@@ -114,7 +114,7 @@ oki_entry = $52
 oki_time_lo = $56
 oki_time_hi = $5A
 ; 4 bytes, channels 1-4: how much the channel lowers the YM2151's volume while it plays
-; (tbl_659C, 5C56; oki_duck_ym); cleared once the channel is idle, or in the tick that stops it
+; (effect_duck, 5C56; oki_duck_ym); cleared once the channel is idle, or in the tick that stops it
 ; on time-out (5BE9 falls into 5BEB-5BF3)
 oki_duck = $5E
 rx_count = $62                          ; receive_bytes: how many bytes to wait for (5CC5)
@@ -163,7 +163,7 @@ trk_sound = $0248                       ; the sound N (start_sound, 4672); FF: e
                                         ; up, 5063, and the stop commands); FE: released, the
                                         ; track ends when its level slide does (4802-480C,
                                         ; 4A67-4A71) or at its next op 9D (5540-554B)
-trk_ptr_lo = $0266                      ; the stream address, from tbl_633E (4632-463A)
+trk_ptr_lo = $0266                      ; the stream address, from entry_stream (4632-463A)
 trk_ptr_hi = $0284
 trk_pitch_lo = $02A2                    ; engine 0: the note (48F6), key_codes' index (4EEF-4F02);
 trk_pitch_hi = $02C0                    ; engine 1: a note_periods word (48B9-48D7)
@@ -180,10 +180,10 @@ trk_gate_hi = $0374
 trk_length_byte = $0392                 ; the note's length byte (4A5C, 4A85-4A91): bits 3-0 a
                                         ; note_lengths index, 6 dotted, 7 tied (4A05-4A07,
                                         ; 4A8B-4A95)
-trk_priority = $03EC                    ; tbl_6244 x 4 + 1 (4604; 0 = free track); a list is kept
-                                        ; in ascending priority (4641-4653) and only its last
-                                        ; track sounds; compared with min_priority through
-                                        ; ram_088E (477B-477E, 4EE3)
+trk_priority = $03EC                    ; entry_priority x 4 + 1 (4604; 0 = free track); a list
+                                        ; is kept in ascending priority (4641-4653) and only its
+                                        ; last track sounds; compared with min_priority through
+                                        ; sounding_prio (477B-477E, 4EE3)
 trk_curve_index = $040A                 ; engine 1: the level_curves index (4A24, 4C5C-4C73)
 trk_scale_ptr_lo = $0428                ; engine 0: the track's patch address + 1C (55A4-55AE),
 trk_scale_ptr_hi = $0446                ; the 7 bytes 4DA3-4DBC copies; engine 1: bits ops 8B
@@ -199,13 +199,13 @@ trk_level_offset = $04FA                ; engine 0: a signed level offset scaled
                                         ; operator's total level (4DAF, 4F24-4FCA; op A2, A3)
 trk_reg20 = $0518                       ; engine 0: the value for YM2151 register 20+ch (patch
                                         ; byte 0, 5567; 4906; op A0 sets bits 7-6, the outputs)
-ram_0536 = $0536
+trk_patch_lo = $0536
 trk_patch_hi = $0554                   ; engine 0: the patch address, high byte (555F; the low
-                                        ; byte is ram_0536); engine 1: an envelope loop count
+                                        ; byte is trk_patch_lo); engine 1: an envelope loop count
 trk_keyon_flags = $0572                 ; engine 0: the tick's flags at each event (478B into
-                                        ; ram_08AB): bit 7 resets the LFO before a key-on (5652,
+                                        ; key_flags): bit 7 resets the LFO before a key-on (5652,
                                         ; 4FDD-4FF8); engine 1: an envelope position
-ram_0590 = $0590
+trk_penv_count = $0590
 ; 3 bytes, engine 0: the time to the next level-slide step (480F-4826, preset 4CD3-4CDC);
 ; engine 1: a pitch envelope accumulator (4B96-4BAB)
 trk_slide_wait_frac = $05AE
@@ -247,24 +247,24 @@ trk_test = $0842                        ; what the conditional ops B5-B8 test: t
 ; 44 bytes: 1 + the next track of the track's list, 0 at the end (4677, 4CB1-4CBE)...
 trk_link = $0860
 ; ...followed by the 14 list heads, 1 + the first track: 0-7 the YM2151 channels, 8-D engine 1's
-; lists (tbl_57E1, 4E5A, 5013)
+; lists (group_first_chain, 4E5A, 5013)
 chan_list = $087E
-ram_088C = $088C
-ram_088D = $088D
-ram_088E = $088E
-ram_088F = $088F
-ram_0893 = $0893
-ram_0895 = $0895
-ram_0896 = $0896
-ram_0897 = $0897
-ram_0898 = $0898
-ram_0899 = $0899
-ram_089A = $089A
-ram_089E = $089E
-ram_08A2 = $08A2
-ram_08A3 = $08A3
-ram_08A4 = $08A4
-ram_08AB = $08AB
+key_tl_offset = $088C
+kind_prio = $088D
+sounding_prio = $088E
+trk_kind = $088F
+other_level = $0893
+key_note = $0895
+glide_hi = $0896
+glide_lo = $0897
+chain_prev = $0898
+cur_group_kind = $0899
+other_ctl_a = $089A
+other_ctl_b = $089E
+key_scaling = $08A2
+key_scaling_depth = $08A3
+key_velocity = key_scaling + 8          ; 08AA: the velocity (4DAF-4DB2, read at 4F32)
+key_flags = $08AB
 cmd_target_sound = $08AC                ; cmdtype_0D_run_op: the sound whose tracks run the op
                                         ; (4529, 5099)
 cmd_op_operand = $08AD                  ; cmdtype_0D_run_op: the op's operand (4518, 50AB)

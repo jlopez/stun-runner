@@ -22,7 +22,7 @@
 ;
 ; Resets the M6295 (oki_reset) and the frame pool, empties the response queue, clears every list
 ; (trk_link and chan_list) and frees every track (trk_priority 0). For engine 0 (engine 1, whose
-; tbl_57DF entry is 03, has no chip and is skipped at 4276-4278): keys off YM2151 channels 7-0
+; group_kind entry is 03, has no chip and is skipped at 4276-4278): keys off YM2151 channels 7-0
 ; (register 08, 427A-429C), clears ym_timed_out and board_status bit 1 (each wait gets a fresh
 ; time-out), resets the ymtimer state (ymtimer_reset) and writes ym_1b_shadow to register 1B. Then
 ; MIX 0F: YM2151 volume 7, M6295 full volume, low-pass filter off (mix_shadow too). Interrupts are
@@ -53,11 +53,11 @@ _clear_tracks
     bpl _clear_tracks
     ldx #$01                            ; engine 1, then engine 0
 _engine
-    lda tbl_57DB,x
+    lda group_chip_lo,x
     sta engine_chip
-    lda tbl_57DD,x
+    lda group_chip_hi,x
     sta engine_chip+1
-    lda tbl_57DF,x
+    lda group_kind,x
     cmp #$03
     beq _next_engine                    ; engine 1: no chip
     jsr ym_wait
@@ -308,28 +308,29 @@ cmdtype_11_ym_ct
 ; -------------------------------------------------------------------------------------------------
 ; Type 01: set a sequencer variable (cmdtype_handlers entry 01; commands 1E-23, parameters 0-5).
 ;
-; seq_vars + (tbl_65D1,A AND 1F) = tbl_65D7,A. In this ROM tbl_65D1 is all 0 and tbl_65D7 is 0-5,
-; so commands 1E-23 set seq_vars+0, the variable 06 of the stream ops B0-B8, to 0-5.
+; seq_vars + (global_set_index,A AND 1F) = global_set_value,A. In this ROM global_set_index is all 0
+; and global_set_value is 0-5, so commands 1E-23 set seq_vars+0, the variable 06 of the stream ops
+; B0-B8, to 0-5.
 ; -------------------------------------------------------------------------------------------------
 cmdtype_01_set_var
     tay
-    lda tbl_65D1,y
+    lda global_set_index,y
     and #$1F
     tax
-    lda tbl_65D7,y
+    lda global_set_value,y
     sta seq_vars,x
     rts
 
 ; -------------------------------------------------------------------------------------------------
 ; Type 02: add to a sequencer variable (cmdtype_handlers entry 02, no command; not executed in the
-; make sndtrace runs). As cmdtype_01_set_var, but adds tbl_65D7,A.
+; make sndtrace runs). As cmdtype_01_set_var, but adds global_set_value,A.
 ; -------------------------------------------------------------------------------------------------
 cmdtype_02_add_var
     tay
-    lda tbl_65D1,y
+    lda global_set_index,y
     and #$1F
     tax
-    lda tbl_65D7,y
+    lda global_set_value,y
     clc
     adc seq_vars,x
     sta seq_vars,x
@@ -410,8 +411,8 @@ _done
 ; Type 06: stop a list (cmdtype_handlers entry 06, no command; not executed in the make sndtrace
 ; runs).
 ;
-; A bits 7-4: the engine (tbl_57E1: its first list in trk_link, 1E or 26), bits 3-0 the list:
-; trk_sound FF for every track on that list.
+; A bits 7-4: the engine (group_first_chain: its first list in trk_link, 1E or 26), bits 3-0 the
+; list: trk_sound FF for every track on that list.
 ; -------------------------------------------------------------------------------------------------
 cmdtype_06_stop_list
     sta tmp_1C
@@ -423,7 +424,7 @@ cmdtype_06_stop_list
     lda tmp_1C
     and #$0F
     clc
-    adc tbl_57E1,y
+    adc group_first_chain,y
     tay
     php
     sei
@@ -597,7 +598,7 @@ _full
 ; indexes 08-09, 0D-11 and 16-18, the ops 88, 89, 8D-91 and 96-98, refused at 44ED-450A for a
 ; reason the code does not show: 89, 96 and 97 do not move the stream), its operand
 ; tbl_65DD+6 (cmd_op_operand), a command tbl_65DD+7 whose type must be 08 (its parameter is
-; cmd_target_sound) and a list tbl_65DD+8 (+ 1E, an index into trk_link). loc_508D runs the op
+; cmd_target_sound) and a list tbl_65DD+8 (+ 1E, an index into trk_link). chain_run_op runs the op
 ; on every track of that list playing cmd_target_sound.
 ; -------------------------------------------------------------------------------------------------
 cmdtype_0D_run_op
@@ -635,7 +636,7 @@ _allowed
     sta cmd_target_sound
     pla
     tax
-    jmp loc_508D
+    jmp chain_run_op
 _not_a_sound
     pla
 _refused
@@ -706,13 +707,13 @@ _wait_read
 ; -------------------------------------------------------------------------------------------------
 ; Type 08: start a sound (cmdtype_handlers entry 08; 32 commands, A = the sound N, 00-1F).
 ;
-; start_entry = tbl_61E4 word N (4569-4584), the sound's first entry E. When tbl_6224,N is 0 (it is
-; FF for every N in this ROM) a sound already playing is not started again (458D-459C). Then for E
-; and each next entry tbl_6438 gives until 0 (467B-46A1):
+; start_entry = sound_first_entry word N (4569-4584), the sound's first entry E. When
+; sound_restartable,N is 0 (it is FF for every N in this ROM) a sound already playing is not started
+; again (458D-459C). Then for E and each next entry entry_next gives until 0 (467B-46A1):
 ; - a free track (trk_priority 0, 459F-45A6); if none, the first track of the entry's list
-;   (tbl_62C1 + 1E in trk_link: the lowest priority there) when its priority is not above the
+;   (entry_channel + 1E in trk_link: the lowest priority there) when its priority is not above the
 ;   entry's (45A9-45E9), else the start ends there (C set);
-; - init_track; trk_priority = tbl_6244,E x 4 + 1; trk_ptr = tbl_633E word E, the stream;
+; - init_track; trk_priority = entry_priority,E x 4 + 1; trk_ptr = entry_stream word E, the stream;
 ; - linked into its list in ascending priority (4641-4679); a track of the same priority is
 ;   replaced (its frames freed, its trk_priority 0); trk_sound = N.
 ; A track taken from a list (45E4-45E9) keeps its frames, which init_track forgets: they are not
@@ -724,22 +725,22 @@ cmdtype_08_start_sound
     asl a
     tax
     bcs _high_half
-    lda tbl_61E4,x
+    lda sound_first_entry,x
     bcc _entry_lo
 _high_half
-    lda tbl_61E4+$100,x
+    lda sound_first_entry+$100,x
 _entry_lo
     sta start_entry
     bcs _high_half_hi
-    lda tbl_61E4+1,x
+    lda sound_first_entry+1,x
     bcc _entry_hi
 _high_half_hi
-    lda tbl_61E4+$101,x
+    lda sound_first_entry+$101,x
 _entry_hi
     sta start_entry+1
-    lda tbl_6224,y
+    lda sound_restartable,y
     bne _next_entry
-    lda start_sound                     ; tbl_6224 = 0: is the sound playing?
+    lda start_sound                     ; sound_restartable = 0: is the sound playing?
     ldy #$1D
 _playing
     cmp trk_sound,y
@@ -760,20 +761,20 @@ _find_free
     dey
     bpl _find_free
     ldy #$00                            ; no free track: the head of the entry's list
-    lda #<tbl_6244
+    lda #<entry_priority
     clc
     adc start_entry
     sta start_ptr
-    lda #>tbl_6244
+    lda #>entry_priority
     adc start_entry+1
     sta start_ptr+1
     lda (start_ptr),y
     sta start_tmp                       ; the entry's priority
-    lda #<tbl_62C1
+    lda #<entry_channel
     clc
     adc start_entry
     sta start_ptr
-    lda #>tbl_62C1
+    lda #>entry_channel
     adc start_entry+1
     sta start_ptr+1
     lda (start_ptr),y
@@ -804,11 +805,11 @@ _take_track
     tax
     jsr init_track
     ldy #$00
-    lda #<tbl_6244
+    lda #<entry_priority
     clc
     adc start_entry
     sta start_ptr
-    lda #>tbl_6244
+    lda #>entry_priority
     adc start_entry+1
     sta start_ptr+1
     lda (start_ptr),y
@@ -816,11 +817,11 @@ _take_track
     sec
     rol a
     sta trk_priority,x                  ; priority x 4 + 1
-    lda #<tbl_62C1
+    lda #<entry_channel
     clc
     adc start_entry
     sta start_ptr
-    lda #>tbl_62C1
+    lda #>entry_channel
     adc start_entry+1
     sta start_ptr+1
     lda (start_ptr),y
@@ -833,11 +834,11 @@ _take_track
     lda start_entry+1
     rol a
     sta start_ptr+1
-    lda #<tbl_633E
+    lda #<entry_stream
     clc
     adc start_ptr
     sta start_ptr
-    lda #>tbl_633E
+    lda #>entry_stream
     adc start_ptr+1
     sta start_ptr+1
     lda (start_ptr),y
@@ -890,11 +891,11 @@ _link_in
     lda start_entry+1
     rol a
     sta start_ptr+1
-    lda #<tbl_6438
+    lda #<entry_next
     clc
     adc start_ptr
     sta start_ptr
-    lda #>tbl_6438
+    lda #>entry_next
     adc start_ptr+1
     sta start_ptr+1
     lda (start_ptr),y

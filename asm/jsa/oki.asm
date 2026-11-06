@@ -6,11 +6,11 @@
 ; oki_busy_bits and oki_stop_bits are those bits for channels 1-4. oki_reset resets the chip
 ; (called by init_sound); oki_tick (every eighth timed IRQ) stops a channel that has played for
 ; about 8.2 s and lets the YM2151 volume back up when a channel goes idle; cmdtype_13_oki_play (the
-; commands of type 13, and stream op 95 with cmd_param) starts phrase tbl_6532,y on the channel
-; tbl_6567,y names; cmdtype_14_oki_stop (command 66) stops the channel whose current entry
-; (oki_entry,x) has phrase A in tbl_6532; oki_duck_ym lowers the YM2151 volume in MIX by the
-; oki_duck values of the playing channels. The tables tbl_6532, tbl_6567 and tbl_659C, one byte
-; per effect entry 00-34, are in data/sounds.asm (docs/10-adpcm.md section 4).
+; commands of type 13, and stream op 95 with cmd_param) starts phrase effect_phrase,y on the channel
+; effect_voice,y names; cmdtype_14_oki_stop (command 66) stops the channel whose current entry
+; (oki_entry,x) has phrase A in effect_phrase; oki_duck_ym lowers the YM2151 volume in MIX by the
+; oki_duck values of the playing channels. The tables effect_phrase, effect_voice and effect_duck,
+; one byte per effect entry 00-34, are in data/sounds.asm (docs/10-adpcm.md section 4).
 ;
 ; Generated once from a recursive descent and checked against the MAME trace (docs/09-sound-
 ; program.md section 3); named in M4c (docs/09 section 10.4).
@@ -90,11 +90,11 @@ op_95
 ; Type 13: play an OKI sample (cmdtype_handlers entry 13; commands 05 and 38-6C but 66, A = the
 ; effect entry 00-34; also op 95).
 ;
-; Nothing while min_priority is not 0 (5BFE). The channel is tbl_6567,A bits 5-4 (X = 0-3). If it
-; is playing an entry whose tbl_6567 bit 7 is set, the new start is dropped; else the channel is
-; stopped and polled until idle (5C23-5C34), oki_entry = A, oki_time = 0100, and the start is
-; written: 80 + tbl_6532,A (the phrase), then the channel bit + tbl_6567,A bits 3-0 (the
-; attenuation). oki_duck = tbl_659C,A and oki_duck_ym lowers the YM2151 volume. Returns C set
+; Nothing while min_priority is not 0 (5BFE). The channel is effect_voice,A bits 5-4 (X = 0-3). If
+; it is playing an entry whose effect_voice bit 7 is set, the new start is dropped; else the channel
+; is stopped and polled until idle (5C23-5C34), oki_entry = A, oki_time = 0100, and the start is
+; written: 80 + effect_phrase,A (the phrase), then the channel bit + effect_voice,A bits 3-0 (the
+; attenuation). oki_duck = effect_duck,A and oki_duck_ym lowers the YM2151 volume. Returns C set
 ; (for op 95); keeps X; interrupts off meanwhile.
 ; -------------------------------------------------------------------------------------------------
 cmdtype_13_oki_play
@@ -105,7 +105,7 @@ cmdtype_13_oki_play
     tay
     txa
     pha
-    lda tbl_6567,y
+    lda effect_voice,y
     and #$30
     lsr a
     lsr a
@@ -117,7 +117,7 @@ cmdtype_13_oki_play
     and OKI_READ_M
     beq _stop
     ldy oki_entry,x
-    lda tbl_6567,y
+    lda effect_voice,y
     bmi _done                           ; the entry playing may not be interrupted
 _stop
     lda oki_stop_bits,x
@@ -136,14 +136,14 @@ _delay
     sta oki_time_hi,x
     lda #$00
     sta oki_time_lo,x
-    lda tbl_6532,y
+    lda effect_phrase,y
     ora #OKI_PHRASE
     sta OKI_WRITE                       ; 80 + the phrase
-    lda tbl_6567,y
+    lda effect_voice,y
     and #$0F
     ora oki_start_bits,x
     sta OKI_WRITE                       ; the channel and the attenuation
-    lda tbl_659C,y
+    lda effect_duck,y
     sta oki_duck,x
     jsr oki_duck_ym
 _done
@@ -171,7 +171,7 @@ oki_stop_bits
 ; decimal numbering; not executed in the make sndtrace runs).
 ;
 ; A is a phrase number: the first channel from 4 down whose current entry (oki_entry,x) has
-; tbl_6532 = A is stopped; at most one. oki_duck stays until oki_tick sees the channel idle.
+; effect_phrase = A is stopped; at most one. oki_duck stays until oki_tick sees the channel idle.
 ; Interrupts off meanwhile.
 ; -------------------------------------------------------------------------------------------------
 cmdtype_14_oki_stop
@@ -180,7 +180,7 @@ cmdtype_14_oki_stop
     ldx #$03
 _channel
     ldy oki_entry,x
-    cmp tbl_6532,y
+    cmp effect_phrase,y
     beq _stop
     dex
     bpl _channel

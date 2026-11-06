@@ -1,0 +1,353 @@
+; data/macros.asm: the statements of the sequencer's data. Emits no bytes.
+;
+; One macro per stream command of the interpreter (sequencer.asm: read_item 484B-4940 for the
+; notes, run_op 505D and op_handlers for the ops 80-BA) and for the YM2151 patch records the ops
+; 9D, 9E and 9F point to. A macro's bytes are exactly what its handler reads: the op byte, the
+; operand byte the reader hands every handler in A (505D-5079), and one more byte per call of
+; next_operand (507B) the handler makes. Every address operand is a .word of a label, so the
+; data assembles anywhere (the stream pointer is 16-bit, 4781-4786 and 4864-486C).
+; docs/12-sound-music.md has the op table with the handlers' addresses and what MAME executed.
+; Included by jsa.asm before the region files.
+
+; ---------------------------------------------------------------------------------------------
+; Note lengths: the low nibble of a note's length byte indexes note_lengths (tables.asm
+; note_lengths, 16 words; 498B-49A1 add the word to the track's 24-bit time counter, bytes 1-2).
+; LEN_n is 1/n of LEN_1 ($1E00); LEN_0 adds nothing.
+
+LEN_0 = $00                             ; $0000
+LEN_1 = $01                             ; $1E00
+LEN_2 = $02                             ; $0F00
+LEN_4 = $03                             ; $0780
+LEN_8 = $04                             ; $03C0
+LEN_3 = $05                             ; $0A00
+LEN_6 = $06                             ; $0500
+LEN_12 = $07                            ; $0280
+LEN_5 = $08                             ; $0600
+LEN_16 = $09                            ; $01E0
+LEN_32 = $0A                            ; $00F0
+LEN_64 = $0B                            ; $0078
+LEN_128 = $0C                           ; $003C
+LEN_24 = $0D                            ; $0140
+LEN_48 = $0E                            ; $00A0
+LEN_10 = $0F                            ; $0300
+
+; Flags of the length byte (set_note_length 497F-4A2F; prepare_key_on 4D6C-4D82,
+; tick_ym_channel 4F24-4F2C).
+DOT = $40                               ; adds half the length again (49A2-49BC)
+TIE = $80                               ; no key-off at the end: the gate counter stays 7F
+                                        ;   (49BF-49C6); and the next note is not keyed on
+                                        ;   again (legato): key_flags bit 2 only after a
+                                        ;   length byte without TIE (trk_length_byte, 4A05-4A2C;
+                                        ;   4FD7-4FDA)
+GATE_HALF = $10                         ; bits 5-4 = 01: the key-off comes at half the length
+                                        ;   (49F4-4A02); velocity offset 0 (level_bias entry 1)
+ACCENT_1 = $20                          ; bits 5-4 = 10: velocity + 24 (level_bias entry 2)
+ACCENT_2 = $30                          ; bits 5-4 = 11: velocity + 58 (level_bias entry 3)
+
+; Registers of the variable ops (var_store B0 53C4-5410; var_load B2, var_cmp_reg B9, the
+; branches B5-B8: read_register 5494-5503), for the YM2151 tracks. Each track has one variable,
+; var (trk_acc), and the last result (trk_test). var_add_to B1 (5411-544A) takes 00-04 only:
+; 00 volume_add, 01 tempo high byte + var, 02 transpose_add, 03 velocity_add, 04 bend (the
+; fraction + var x 4); from 05 up (the globals too) it does nothing (5419-541B).
+R_VOLUME = $00                          ; write: volume (op 82); read: A = 0, but the flags come
+                                        ;   from `ldy tmp_1C` (54CA): a branch on it decides on
+                                        ;   Y, 1 from run_op, so branch_zero and branch_minus are
+                                        ;   never taken, branch_nonzero and branch_plus always
+R_TEMPO_HI = $01                        ; the tempo's high byte (trk_tempo_hi)
+R_TRANSPOSE = $02                       ; transpose (trk_transpose)
+R_VELOCITY = $03                        ; write: velocity (op A2); read: the same value back
+R_FINE = $04                            ; write: fine_tune (op A6, the value x 4); read: the
+                                        ;   pitch fraction itself (trk_key_fraction, = the value
+                                        ;   x 4)
+R_RANDOM = $05                          ; read: the next random byte (random 5504); write: none
+R_GLOBAL = $06                          ; $06+n: global variable n, n 00-1F (seq_vars+n), shared by
+                                        ;   all tracks; commands 1E-23 set global 0 to 0-5
+R_FLAG = $FF                            ; $26-$FF: read the track's last result (trk_test)
+
+; ---------------------------------------------------------------------------------------------
+; Notes (bytes 00-7F, then a length byte; read_item 487E-4919)
+
+note .macro pitch, len                  ; key a note: pitch 01-7F + transpose indexes the
+    .cerror \pitch < $01 || \pitch > $7F, "note: pitch 01-7F"      ;   key codes, key_codes
+    .cerror \len < $01 || \len > $FF, "note: length byte 01-FF (00 is ret)"
+    .byte \pitch, \len
+.endm
+
+rest .macro len                         ; pitch 00: no transpose, no key-on (4EEF-4EF2)
+    .cerror \len < $01 || \len > $FF, "rest: length byte 01-FF (00 is ret)"
+    .byte $00, \len
+.endm
+
+ret .macro                              ; length 00: return from a call, or stop the track
+    .byte $00, $00                      ;   when none is pending (4914-4940)
+.endm
+
+; ---------------------------------------------------------------------------------------------
+; Ops (bytes 80-BA; op_handlers, 50AF). A byte BB-FF stops the track (run_op 505D-5067).
+
+tempo .macro rate                       ; 80: the 16-bit amount the time counter loses per
+    .byte $80                           ;   tick (trk_tempo_lo/trk_tempo_hi)
+    .word \rate
+.endm
+
+tempo_add .macro delta                  ; 81: add to the tempo
+    .byte $81
+    .word \delta
+.endm
+
+volume .macro level                     ; 82: YM2151: the patch's TLs again, then the carriers
+    .byte $82, \level                   ;   attenuated by volume_steps[level & 0F] (5788)
+.endm
+
+volume_add .macro delta                 ; 83: YM2151: the carriers' TL minus delta (op A1)
+    .byte $83, \delta
+.endm
+
+transpose .macro steps                  ; 84: added to every pitch but 00 (4887)
+    .byte $84, \steps
+.endm
+
+transpose_add .macro delta              ; 85
+    .byte $85, \delta
+.endm
+
+pitch_env .macro table                  ; 86: other voices only: pitch envelope (4B08-4BBB)
+    .byte $86
+    .word \table
+.endm
+
+level_env .macro table                  ; 87: other voices only: level envelope (4BF4-4C4B)
+    .byte $87
+    .word \table
+.endm
+
+sync .macro unused=$00                  ; 88: wait until every track of the group arrives
+    .byte $88, \unused                  ;   (5125-517E)
+.endm
+
+sync_group .macro group                 ; 89: the group sync waits on (trk_sync_group)
+    .byte $89, \group
+.endm
+
+ctl_bits .macro bits                    ; 8A: other voices only: ORed into the level byte
+    .byte $8A, \bits                    ;   (trk_e1_ctl, 4C8E)
+.endm
+
+ctl_set .macro bits                     ; 8B: other voices only: control bits set (trk_scale_ptr_hi)
+    .byte $8B, \bits
+.endm
+
+portamento .macro rate                  ; 8C: glide from the last pitch, 2 x rate (1/256
+    .byte $8C, \rate                    ;   note) every fourth tick (trk_glide_rate, 4DBE-4E11)
+.endm
+
+call .macro target                      ; 8D: run the stream at target until its ret
+    .byte $8D
+    .word \target
+.endm
+
+loop .macro count                       ; 8E: repeat to the next loop_end count times
+    .byte $8E, \count
+.endm
+
+loop_end .macro                         ; 8F: back to the loop's start until its count runs out
+    .byte $8F, $00                      ;   (the operand byte is not read)
+.endm
+
+hang_op .macro op, unused=$00           ; 90-94, 98, 9A, 9C: handler read_item (484B), which
+    .cerror (\op < $90 || \op > $94) && \op != $98 && \op != $9A && \op != $9C, "hang_op: op"
+    .byte \op, \unused                  ;   reads the same op again and dispatches it again,
+.endm                                   ;   never returning: a stream using it hangs the CPU
+
+oki .macro command                      ; 95: start the OKI sample of command (cmd_param)
+    .byte $95, \command
+.endm
+
+respond .macro value                    ; 96: queue a response byte for the 68010
+    .byte $96, \value
+.endm
+
+release .macro unused=$00               ; 97: start the release fade, then stop the track
+    .byte $97, \unused
+.endm
+
+jump .macro target                      ; 99
+    .byte $99
+    .word \target
+.endm
+
+ctl_clear .macro bits                   ; 9B: other voices only: control bits cleared
+    .byte $9B, \bits
+.endm
+
+patch .macro record                     ; 9D: the YM2151 patch (key-off, TL 7F, registers)
+    .byte $9D
+    .word \record
+.endm
+
+lfo .macro record                       ; 9E: the record's LFO bytes into registers 18-1B
+    .byte $9E
+    .word \record
+.endm
+
+noise .macro record                     ; 9F: the record's noise byte into register 0F
+    .byte $9F
+    .word \record
+.endm
+
+pan .macro side                         ; A0: register 20 bits 7-6: 0 or 3 both, 1 bit 7,
+    .byte $A0, \side                    ;   2 bit 6
+.endm
+
+carrier_tl_sub .macro delta             ; A1: the carriers' TL minus delta
+    .byte $A1, \delta
+.endm
+
+velocity .macro level                   ; A2: the key-on level the patch scales per operator
+    .byte $A2, \level
+.endm
+
+velocity_add .macro delta               ; A3
+    .byte $A3, \delta
+.endm
+
+; A4: for steps x LEN_1 of time the carriers' TL loses rate + frac / 8 (signed) per LEN_1, in
+; 32 fade steps per LEN_1 (52C2-52EA, fade_step 4CC1; with fade_mode 0). A running fade also
+; takes a full step, and restarts its LEN_32 timer, at every note start (4A5F-4A74): the rate
+; holds only while the notes are multiples of LEN_32, shorter notes fade faster
+fade .macro steps, rate, frac=0
+    .cerror \steps < 0 || \steps > $1F || \frac < 0 || \frac > 7, "fade: steps 0-1F, frac 0-7"
+    .byte $A4, (\steps << 3) | \frac, \rate
+.endm
+
+ym_ct .macro bits                       ; A5: register 1B bits 7-6 (CT1, CT2)
+    .byte $A5, \bits
+.endm
+
+fine_tune .macro fraction               ; A6: the pitch fraction (trk_key_fraction) = fraction x 4:
+    .byte $A6, \fraction                ;   1/64 of a key step each, register 30 (4E32-4E44)
+.endm
+
+bend .macro delta                       ; A7: pitch fraction + delta x 4 (signed), carried into
+    .byte $A7, \delta                   ;   the transpose (570F-5733)
+.endm
+
+fade_mode .macro value                  ; A8: nonzero: no step timer, the fade steps only at
+    .byte $A8, \value                   ;   note starts, by the length nibble (47F5, 4CCE)
+.endm
+
+var_add .macro value                    ; A9: var + value
+    .byte $A9, \value
+.endm
+
+var_sub .macro value                    ; AA: var - value
+    .byte $AA, \value
+.endm
+
+var_and .macro value                    ; AB
+    .byte $AB, \value
+.endm
+
+var_or .macro value                     ; AC
+    .byte $AC, \value
+.endm
+
+var_xor .macro value                    ; AD
+    .byte $AD, \value
+.endm
+
+jump_table .macro                       ; AE: the stream goes to the .word number var of the
+    .byte $AE                           ;   list that follows (a .word line of labels)
+.endm
+
+jump_table_inc .macro                   ; AF: as AE, then var + 1
+    .byte $AF
+.endm
+
+var_store .macro reg                    ; B0: register reg = var
+    .byte $B0, \reg
+.endm
+
+var_add_to .macro reg                   ; B1: register reg + var
+    .byte $B1, \reg
+.endm
+
+var_load .macro reg                     ; B2: var = register reg
+    .byte $B2, \reg
+.endm
+
+var_shr .macro count                    ; B3: var >> count (1-7)
+    .byte $B3, \count
+.endm
+
+var_shl .macro count                    ; B4: var << count (1-7)
+    .byte $B4, \count
+.endm
+
+branch_zero .macro reg, target          ; B5: go to target when register reg is 0 (R_VOLUME:
+                                        ;   never, see above)
+    .byte $B5, \reg
+    .word \target
+.endm
+
+branch_nonzero .macro reg, target       ; B6: not 0 (R_VOLUME: always)
+    .byte $B6, \reg
+    .word \target
+.endm
+
+branch_plus .macro reg, target          ; B7: bit 7 clear (R_VOLUME: always)
+    .byte $B7, \reg
+    .word \target
+.endm
+
+branch_minus .macro reg, target         ; B8: bit 7 set (R_VOLUME: never)
+    .byte $B8, \reg
+    .word \target
+.endm
+
+var_cmp_reg .macro reg                  ; B9: result = var - register reg, minus 1 when
+    .byte $B9, \reg                     ;   read_register leaves C clear: R_VOLUME,
+                                        ;   R_VELOCITY on a YM2151 track unless it is 0, R_RANDOM
+                                        ;   with its old bit 7 clear (54BE-54C8, 5506)
+.endm
+
+var_cmp .macro value                    ; BA: result = var - value
+    .byte $BA, \value
+.endm
+
+stop .macro op=$FF                      ; BB-FF: the track ends (trk_sound = FF)
+    .cerror \op < $BB, "stop: BB-FF"
+    .byte \op
+.endm
+
+; ---------------------------------------------------------------------------------------------
+; YM2151 patch records, 42 bytes (2A): what patch (9D: op_patch 553E-5584, load_patch 5585-55B3 and
+; the register loop 55B6-5637), lfo (9E, 563B) and noise (9F, 567F) read through the record's
+; address.
+
+ym_voice .macro rl_fb_con, kc, kf, pms_ams      ; +00: registers 20, 28, 30, 38 (+ channel)
+    .byte \rl_fb_con, \kc, \kf, \pms_ams
+.endm
+
+; +04, +0A, +10, +16: one per operator, M1, M2, C1, C2 (registers +00, +08, +10, +18): written
+; in this order to registers 40, 80, A0, C0, E0; tl is not written by the patch load (TL is set
+; to 7F) but copied into the track's TL (5565-5582) for the key-on (4D8D)
+ym_operator .macro dt1_mul, tl, ks_ar, ams_d1r, dt2_d2r, d1l_rr
+    .byte \dt1_mul, \tl, \ks_ar, \ams_d1r, \dt2_d2r, \d1l_rr
+.endm
+
+; +1C, +1E, +20, +22: per operator (M1, M2, C1, C2) the key-on level scaling: curve ORed with
+; the key code indexes key_level_curve (lookup.asm), depth's high nibble scales it and its low
+; nibble scales the velocity (4F56-4F98). The M1 curve byte (+1C) is never copied (4DB6-4DBC
+; stop at Y = 1).
+ym_scaling .macro curve, depth
+    .byte \curve, \depth
+.endm
+
+ym_lfo .macro lfrq, pmd, amd, ct_w      ; +24: registers 18, 19, 19, 1B (bits 1-0) for op 9E
+    .byte \lfrq, \pmd, \amd, \ct_w
+.endm
+
+ym_noise .macro shadow_1b, ne_nfrq      ; +28: op 9E copies shadow_1b into the shadow slot of
+    .byte \shadow_1b, \ne_nfrq          ;   register 1B (5678), which nothing reads; +29:
+.endm                                   ;   register 0F for op 9F

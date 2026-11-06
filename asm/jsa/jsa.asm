@@ -8,6 +8,7 @@
 
     .include "hardware.asm"
     .include "ram.asm"
+    .include "data/macros.asm"
 
 * = $0000
 
@@ -39,7 +40,11 @@ bank3
     .include "io.asm"
     .include "tables.asm"
     .include "data/sounds.asm"
-    .include "data/music.asm"
+    .include "data/streams_1.asm"
+    .include "data/patches_1.asm"
+    .include "data/unused_streams.asm"
+    .include "data/streams_2.asm"
+    .include "data/patches_2.asm"
     .include "lookup.asm"
 
 ; No instruction reads this byte: the power-up self-test (4094-40EC) adds every byte of the

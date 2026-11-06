@@ -61,8 +61,9 @@ evidence; `make oki-pcm` decodes every phrase the manifest names to 16-bit PCM u
 listening (other WAVs there are removed, so a rename leaves no stale copy).
 Sample bytes, WAVs and PCM stay under `build/`.
 Since M4a the 6502 image is not an incbin of `build/stunrun-jsa.bin` either: `asm/jsa/jsa.asm`
-and the files it includes (`hardware.asm`, `ram.asm` and eleven region files,
-`data/sounds.asm` and `data/music.asm` among them) are the whole program as 64tass source, instructions, tables and fills
+and the files it includes (`hardware.asm`, `ram.asm`, `data/macros.asm` and the region files,
+`data/sounds.asm` and the stream and patch files of `data/` among them, docs/12-sound-music.md
+section 7) are the whole program as 64tass source, instructions, tables and fills
 (docs/09-sound-program.md section 4), so the tree's output depends on its own files only; the
 Makefile's prerequisites for it are `asm/jsa/*.asm` and `asm/jsa/data/*.asm`.
 `build/stunrun-jsa.bin` is still made by `tools/merge-roms`, for `make ida`.
@@ -135,6 +136,22 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
   NVRAM, in attract mode with "SOUNDS IN ATTRACT" on and in a started game, each from its own
   empty private state, into `build/mame/sndtrace-*.txt`; `tools/sndtrace.py summary` checks
   them against the source and rewrites `artifacts/sndtrace-summary.json` (docs/09 section 7).
+- `make musictrace` (needs MAME and the ROMs; never in CI): `tools/mame/musictrace.lua`
+  writes each command of `MUSIC_SOUNDS` (the commands of type 08) in turn into the reference
+  set's sound latch, one window of `MUSIC_WINDOW` frames each, the 68010's own commands
+  replaced, from an empty private state (`build/mame/state-musictrace`), and records per window the sound, its key-ons, the
+  entries started, the ops `run_op` dispatched and the stream statements read into
+  `build/mame/musictrace.txt` (the run must write its done marker `musictracedone`); then
+  `tools/jsa_music.py summary` checks every statement read against the statement starts of the
+  source (never an operand byte inside a macro) and rewrites `artifacts/musictrace-summary.json`
+  (addresses, labels and counts only; docs/12-sound-music.md section 8).
+- `tools/test_jsa_music.py` (CI, no ROMs; docs/12 section 9): on the image the committed source
+  assembles to, the op macros against the op table and the handlers, every byte of 65E6-AB47 a
+  structured statement (the data files and bounds read from `jsa.asm`'s includes and the files'
+  guards), the walk of the streams landing on statement starts, the patch records whole and
+  their "named by" lists complete, the data relocated by one byte, and the committed musictrace
+  summary against the source; the two trace tests (musictrace against the source, sndtrace's
+  data reads inside walked statements) skip without the local `build/mame` traces.
 - `make soundcheck` (needs MAME and the ROMs; never in CI): after `make check`, the reference
   set and the rebuilt one (`-rompath build/roms`, confirmed by `-verifyroms`) each run 3000
   frames of attract mode with its sound on, headless; their YM2151 and OKI write streams,

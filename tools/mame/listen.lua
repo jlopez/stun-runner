@@ -6,9 +6,9 @@
 -- (0x028362-0x02837E). Both are command type 00 (cmdtype_00_min_priority, 438A), which sets
 -- min_priority to four times the parameter: F0 for 01, 0 for 02. The 6502 starts an OKI sample only
 -- while min_priority is 0 (5BFE) and keys on a YM2151 channel only when the sounding track's
--- priority byte (ram_088E) is at least min_priority (4EE6), so 01 silences attract mode. The write
--- tap below returns every value the game writes to FF94EE with bit 11 set, so the game itself sends
--- 02 at each demo's start.
+-- priority byte (sounding_prio) is at least min_priority (4EE6), so 01 silences attract mode. The
+-- write tap below returns every value the game writes to FF94EE with bit 11 set, so the game itself
+-- sends 02 at each demo's start.
 --
 -- The sound is not continuous: whatever bit 11 is, the 68010 also sends 01 at the end of each
 -- attract demo (the main loop's state switch, 024E3E/0253A0, docs/11 section 2.1). Sound plays in

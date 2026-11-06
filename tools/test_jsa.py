@@ -314,7 +314,7 @@ def test_hardware_masks_are_equates() -> None:
         ["    and #WRIO_BANK", "    ora #WRIO_BANK_PAGE1", "    sta WRIO"]
     )
     assert not raw_hardware_masks(["    and #$3F", "    lda wrio_shadow", "    sta WRIO"])
-    assert not raw_hardware_masks(["    and #$3F", "    jsr sub_5504", "    sta WRIO"])
+    assert not raw_hardware_masks(["    and #$3F", "    jsr random", "    sta WRIO"])
     assert not raw_hardware_masks(["    and #$3F", "    sta YM2151_DATA"])
     for name in SYSTEM_FILES:
         lines = (TREE / name).read_text().splitlines()

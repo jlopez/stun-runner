@@ -42,7 +42,8 @@ ymtimer_reset
 ; (cmp_list_priority; it is entered with X = the list head, 1 + the track, where the other walk,
 ; 5A0C-5A11, first subtracts 1: it starts one track off). Else, with interrupts off:
 ; - ymt_entry = Y, ymtimer_active = 1;
-; - channels 6 and 7: ymtimer_patch through sub_55B4 (sequencer.asm), then register 20+ch from
+; - channels 6 and 7: ymtimer_patch through write_patch_regs_at (sequencer.asm), then register 20+ch
+; from
 ;   ym_shadow with bits 7-6 (the outputs) from tbl_65DD+2 bits 5-4 (channel 6) and 1-0 (channel 7);
 ; - MIX with bit 5 (low-pass filter) set, mix_shadow unchanged;
 ; - wrio_shadow bits 7-6 cleared and tbl_65DD+4 ORed in (the page at 3000; the byte is ORed whole,
@@ -83,7 +84,7 @@ _start
     sta tmp_ptr
     lda #>ymtimer_patch
     sta tmp_ptr+1
-    jsr sub_55B4                        ; the patch into channel 6
+    jsr write_patch_regs_at                        ; the patch into channel 6
     clc
     lda #YM_CONNECT
     adc #$06
@@ -106,7 +107,7 @@ _start
     sta tmp_ptr
     lda #>ymtimer_patch
     sta tmp_ptr+1
-    jsr sub_55B4                        ; the patch into channel 7
+    jsr write_patch_regs_at                        ; the patch into channel 7
     clc
     lda #YM_CONNECT
     adc #$07
@@ -218,7 +219,8 @@ _timer
 ;
 ; No sequence running: stop the timer (register 14 = 14). Else, the byte at (ymt_ptr):
 ; - 0, the end: key channels 6 and 7 off, MIX bit 5 (the filter) off, the state cleared; for each
-;   of channels 6 and 7 whose list holds a track, sub_559A reloads the patch of its last track
+;   of channels 6 and 7 whose list holds a track, load_patch_regs reloads the patch of its last
+; track
 ;   (fm_op_index, tmp_ptr, ym_channel and tmp_1C saved around it); timer A stopped.
 ; - else a step: timer A's period from the group's byte 1 (register 10, 11 = 0), reloaded; key on
 ;   channel 6 (ymt_toggle 0) or 7 (1), all four operators, after a key-off write; on phase 1 the
@@ -280,7 +282,7 @@ _last_6
 _reload_6
     lda #$06
     sta ym_channel
-    jsr sub_559A                        ; the last track's patch into channel 6
+    jsr load_patch_regs                        ; the last track's patch into channel 6
 _channel_7
     ldx chan_list+7
     beq _restore
@@ -294,7 +296,7 @@ _last_7
 _reload_7
     lda #$07
     sta ym_channel
-    jsr sub_559A                        ; the last track's patch into channel 7
+    jsr load_patch_regs                        ; the last track's patch into channel 7
 _restore
     pla
     sta ym_channel
@@ -468,9 +470,10 @@ _last
     cmp trk_priority,x
     rts
 
-; read through tmp_ptr by sub_55B4 (5892-5898, 58C2-58C8): the patch ymtimer_start loads into
-; channels 6 and 7. Its layout is the sequencer's patch layout: sub_55B4 (55B4) writes a patch to
-; the YM2151, and 5553-5584 reads byte 0 as trk_reg20 and bytes 5 + 6k as the four trk_op_tl rows
+; read through tmp_ptr by write_patch_regs_at (5892-5898, 58C2-58C8): the patch ymtimer_start loads
+; into channels 6 and 7. Its layout is the sequencer's patch layout: write_patch_regs_at (55B4)
+; writes a patch to the YM2151, and 5553-5584 reads byte 0 as trk_reg20 and bytes 5 + 6k as the four
+; trk_op_tl rows
 ymtimer_patch
     .byte $C7, $00, $00, $00, $02, $7F, $19
     .byte $9F, $DF, $0A, $0D, $7F, $19, $9F
