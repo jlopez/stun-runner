@@ -362,8 +362,10 @@ reach the same output only when the clamp to -2048..2047 makes them equal, and t
 2. *Bytes exact unless a clamp.* If no output of x is -2048 or 2047, `encode(v) == x`: by the
    lemma each output has exactly one nibble from the state before it, so x is the only nibble
    sequence that decodes to v. Otherwise several sequences may decode to v, and the encoder
-   returns the lexicographically smallest of them (every one is in the candidate set at every
-   step, and the first candidate is the smallest).
+   returns the lexicographically smallest of them: every state such a sequence passes through
+   is a candidate, with the smallest history that reaches it, and two histories into one state
+   continue alike, so the smaller one always wins; the first candidate at the end is the
+   smallest of all.
    `test_encoder_picks_the_lexicographically_smallest` checks this against brute force over
    every three-nibble sequence from seven states at and near the clamps;
    `test_encoder_inverts_the_decoder` checks properties 1 and 2 on random and clamp-heavy
