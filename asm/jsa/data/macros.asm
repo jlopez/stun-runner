@@ -1,6 +1,6 @@
 ; data/macros.asm: the statements of the sequencer's data. Emits no bytes.
 ;
-; One macro per stream command of the interpreter (sequencer.asm: read_item 484B-4880 for the
+; One macro per stream command of the interpreter (sequencer.asm: read_item 484B-4940 for the
 ; notes, run_op 505D and op_handlers for the ops 80-BA) and for the YM2151 patch records the ops
 ; 9D, 9E and 9F point to. A macro's bytes are exactly what its handler reads: the op byte, the
 ; operand byte the reader hands every handler in A (505D-5079), and one more byte per call of
@@ -31,17 +31,19 @@ LEN_24 = $0D                            ; $0140
 LEN_48 = $0E                            ; $00A0
 LEN_10 = $0F                            ; $0300
 
-; Flags of the length byte (start_note 497F-4A2F; YM2151 output 4D6C-4D82, 4F24-4F2C).
+; Flags of the length byte (set_note_length 497F-4A2F; prepare_key_on 4D6C-4D82,
+; tick_ym_channel 4F24-4F2C).
 DOT = $40                               ; adds half the length again (49A9-49BD)
 TIE = $80                               ; no key-off at the end: the gate counter is not set
                                         ;   (49C4); the next note keys on without a key-off
 GATE_HALF = $10                         ; bits 5-4 = 01: the key-off comes at half the length
-                                        ;   (49FA-4A02); level offset 0 (key_accent entry 1)
-ACCENT_1 = $20                          ; bits 5-4 = 10: key_accent entry 2 (tbl_5FDF, 24)
-ACCENT_2 = $30                          ; bits 5-4 = 11: key_accent entry 3 (tbl_5FDF, 58)
+                                        ;   (49F2-4A02); velocity offset 0 (tbl_5FDF entry 1)
+ACCENT_1 = $20                          ; bits 5-4 = 10: velocity - 24 (tbl_5FDF entry 2)
+ACCENT_2 = $30                          ; bits 5-4 = 11: velocity - 58 (tbl_5FDF entry 3)
 
 ; Registers of the variable ops (var_store B0, var_add_to B1: 53C4-5449; var_load B2,
-; var_cmp_reg B9, the branches B5-B8: read_register 5494-5503), for the YM2151 tracks.
+; var_cmp_reg B9, the branches B5-B8: read_register 5494-5503), for the YM2151 tracks. Each
+; track has one variable, var (ram_0824), and the last result (ram_0842).
 R_VOLUME = $00                          ; write: volume (op 82); read: 0 (54C8-54CC)
 R_TEMPO_HI = $01                        ; the tempo's high byte (ram_0644)
 R_TRANSPOSE = $02                       ; transpose (ram_0662)
@@ -56,8 +58,8 @@ R_FLAG = $FF                            ; $26-$FF: read the track's last result 
 ; ---------------------------------------------------------------------------------------------
 ; Notes (bytes 00-7F, then a length byte; read_item 487E-4919)
 
-note .macro pitch, len                  ; key a note: pitch 01-7F (+ transpose) indexes
-    .cerror \pitch < $01 || \pitch > $7F, "note: pitch 01-7F"      ;   key_codes (5E7D)
+note .macro pitch, len                  ; key a note: pitch 01-7F + transpose indexes the
+    .cerror \pitch < $01 || \pitch > $7F, "note: pitch 01-7F"      ;   key codes, tbl_5E7D
     .cerror \len < $01 || \len > $FF, "note: length byte 01-FF (00 is ret)"
     .byte \pitch, \len
 .endm
