@@ -18,13 +18,15 @@ classify       runs the descent (with the MAME runs given as seeds) and rewrites
                the runs of `make pccov` it refuses unless --no-mame says so (the committed file
                is classified with them: three entries have MAME as their only evidence)
 stats          bytes per kind and region, the numbers of docs/14
-gen            the one-shot generator (gen.py): vasm source for START-END
+gen            the one-shot generator (gen.py): vasm source for START-END (0 <= START <= END <=
+               the classification's end, else exit 2; check-region likewise)
 check-region   gen, then assemble the range alone in DIR with macros.asm, the equates and the
                externals, compare with the image (0 differences), run the listing descent
                check, the address lint and the shift test on it (needs the reference set)
 check-listing  the descent check and the address lint on any vasm listing and its binary: fails
                on an error of either, and on an instruction statement nothing reaches unless the
-               seeds file lists it under `unreached` with an argument
+               seeds file lists it under `unreached` with an argument; with --range both report
+               only what lies in START-END (the descent itself runs over the whole listing)
 check-unidasm  every instruction boundary of the code ranges against unidasm's
 pccov-read     drains a MAME trace pipe into the distinct PCs (make pccov)
 pccov          fails unless every executed PC starts a code instruction; writes the summary
@@ -34,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -171,6 +174,10 @@ def model(a: argparse.Namespace, forced: set[int]) -> gn.Model:
 
 
 def cmd_gen(a: argparse.Namespace) -> int:
+    bad = check_range_args(a)
+    if bad:
+        print(f"gen: {bad}", file=sys.stderr)
+        return 2
     m = model(a, {a.start})
     out = gn.generate(m, a.start, a.end, a.incbin)
     a.out.write_text(out.source)
@@ -241,18 +248,25 @@ def check_region(a: argparse.Namespace, lo: int, hi: int, m: gn.Model) -> list[s
 
 
 def listed_seeds(c: cl.Classification, image: bytes, seeds: list[tuple[int, str]],
-                 inside: Callable[[int], bool]
+                 inside: Callable[[int], bool], lay: cl.Layout | None = None
                  ) -> tuple[list[int], set[int]]:
     """For a descent check over part of the image: the seeds that lie inside (the entries with
     evidence, the reviewed seeds, the vectors and game_entries, the static targets of
-    instructions outside) and the classified instruction starts outside (a flow may end there)."""
+    instructions outside) and the classified instruction starts outside (a flow may end there).
+    A vector is a seed as classify takes it: not 0 (an unused vector) and in a code-eligible
+    range, so a range from 000000 is not seeded at the stack pointer's long."""
+    lay = lay or cl.Layout()
     extra = [x for x in c.entries if inside(x)] + [x for x, _ in seeds if inside(x)]
-    for base, _ in cl.VECTOR_TABLES:
+
+    def eligible(v: int) -> bool:
+        return v % 2 == 0 and any(lo <= v < hi for lo, hi in lay.eligible)
+
+    for base, _ in lay.vector_tables:
         for n in range(1, 64):
             v = int.from_bytes(image[base + 4 * n : base + 4 * n + 4], "big")
-            if inside(v):
+            if v and eligible(v) and inside(v):
                 extra.append(v)
-    extra += [x for x in cl.GAME_ENTRIES if inside(x)]
+    extra += [x for x in lay.entries if inside(x)]
     starts = c.code_starts(image)
     for a in starts:
         if not inside(a):
@@ -264,10 +278,33 @@ def listed_seeds(c: cl.Classification, image: bytes, seeds: list[tuple[int, str]
 
 
 def cmd_check_region(a: argparse.Namespace) -> int:
+    bad = check_range_args(a)
+    if bad:
+        print(f"check-region: {bad}", file=sys.stderr)
+        return 2
     m = model(a, {a.start})
     probs = check_region(a, a.start, a.end, m)
     print("\n".join(probs) if probs else "ok")
     return 1 if probs else 0
+
+
+ADDRESS = re.compile(r"\b([0-9A-F]{6})\b")
+
+
+def in_range(e: str, lo: int, hi: int) -> bool:
+    """A descent-check error belongs to the range of its first address (the seed, the call or the
+    statement it names); an error naming none is kept."""
+    m = ADDRESS.search(e)
+    return m is None or lo <= int(m.group(1), 16) < hi
+
+
+def check_range_args(a: argparse.Namespace) -> str | None:
+    """START and END of gen and check-region: 0 <= START <= END <= the classification's end."""
+    end = cl.load(a.classification).end
+    if not 0 <= a.start <= a.end <= end:
+        return (f"the range {a.start:X}-{a.end:X} is not within 000000-{end:06X} with START <= "
+                f"END")
+    return None
 
 
 def cmd_check_listing(a: argparse.Namespace) -> int:
@@ -283,6 +320,9 @@ def cmd_check_listing(a: argparse.Namespace) -> int:
     allowed = load_unreached(a.seeds)
     rep = ls.descent_check(lst, binary, a.origin, extra, set(allowed), set(c.noreturn), untaken,
                            outside)
+    if a.range:  # the descent runs over the whole listing; --range scopes what it reports
+        rep.unreached = [x for x in rep.unreached if lo <= x < hi]
+        rep.errors = [e for e in rep.errors if in_range(e, lo, hi)]
     lst.statements = [s for s in lst.statements if lo <= s.address < hi]
     lint = ls.address_lint(lst, opd.load(a.operands), lo, hi, frozenset(ls.macro_names(a.macros)),
                            binary, a.origin, switch_ranges(c))

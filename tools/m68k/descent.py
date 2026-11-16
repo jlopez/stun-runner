@@ -451,6 +451,11 @@ class Descent:
             cur = self._prev(cur.addr, t)
         return None
 
+    def switch_at(self, insn: Insn, before: dict[int, Insn]) -> Switch | None:
+        """The switch of the idiom whose `jmp` is insn, the instructions before it given (a linear
+        decode outside the descent: the notes of unknown ranges)."""
+        return self._switch(insn, _Txn(new=dict(before)))
+
     def _switch(self, insn: Insn, t: _Txn) -> Switch | None:
         op = insn.operands[0]
         if insn.mnemonic != "jmp" or op.mode != PCINDEX or not op.xreg.startswith("d") \

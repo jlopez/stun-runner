@@ -27,8 +27,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .decode import ABSL, ABSW, CALL, IMM, JUMP, PCDISP, PCINDEX, STOP, decode
-from .descent import P_LATE, Descent, Result, _abs
+from .decode import ABSL, ABSW, CALL, IMM, JUMP, PCDISP, PCINDEX, STOP, Insn, decode
+from .descent import P_LATE, Descent, Result, Switch, _abs
 
 END = 0x05CF86
 # where code may be (docs/06 section 4): pair R below the program table, the game's entry
@@ -328,7 +328,7 @@ def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
     index = reference_index(image, END)
     for sp in spans:
         if sp.kind == "unknown" and any(lo <= sp.start < hi for lo, hi in lay.eligible):
-            sp.note = _unknown_note(image, sp, ida_functions, index, spans)
+            sp.note = _unknown_note(image, sp, ida_functions, index, spans, lay.eligible)
     return Classification(spans, dict(r.entries), dict(r.noreturn), dict(r.rejected), r, END)
 
 
@@ -384,33 +384,73 @@ def _kind_at(spans: list[Span], a: int) -> str:
     return "?"
 
 
+def _linear(image: bytes, a0: int, end: int, eligible: list[tuple[int, int]]
+            ) -> tuple[dict[int, Insn], list[Switch], int]:
+    """A linear decode of a0-end that steps over the word table of a C switch (the idiom of
+    descent.py): the instructions, the switches, and where the decode stopped."""
+    probe = Descent(image, eligible)
+    insns: dict[int, Insn] = {}
+    switches: list[Switch] = []
+    a = a0
+    while a < end:
+        insn = decode(image, a)
+        if insn is None or a + insn.length > end:
+            break
+        insns[a] = insn
+        a += insn.length
+        if insn.mnemonic == "jmp":
+            sw = probe.switch_at(insn, insns)
+            if sw is not None and sw.table == a and sw.end <= end:
+                switches.append(sw)
+                a = sw.end
+    return insns, switches, a
+
+
 def _unknown_note(image: bytes, sp: Span, ida_functions: dict[int, str],
                   index: dict[int, list[int]] | None = None,
-                  spans: list[Span] | None = None) -> str:
-    a0 = a = sp.start + (sp.start & 1)  # an instruction starts at an even address
-    n = 0
-    last = None
-    while a < sp.end:
-        insn = decode(image, a)
-        if insn is None or a + insn.length > sp.end:
-            break
-        n += 1
-        last = insn
-        a += insn.length
+                  spans: list[Span] | None = None,
+                  eligible: list[tuple[int, int]] | None = None) -> str:
+    a0 = sp.start + (sp.start & 1)  # an instruction starts at an even address
+    insns, switches, a = _linear(image, a0, sp.end, eligible or ELIGIBLE)
+    n = len(insns)
+    last = insns[max(insns)] if insns else None
+    cases = {t for sw in switches for t in sw.targets(image)}
     ida = [f"{name} {ea:06X}" for ea, name in ida_functions.items() if sp.start <= ea < sp.end]
     parts = []
-    if a == sp.end and last is not None and last.flow in (STOP, JUMP):
-        refs = [x for x in (index or {}).get(a0, []) if not sp.start <= x < sp.end]
-        where = ", ".join(f"{x:06X} ({_kind_at(spans or [], x)})" for x in refs[:6]) + (
-            f" and {len(refs) - 6} more" if len(refs) > 6 else "")
-        parts.append(f"decodes cleanly from {a0:06X} as {n} instructions ending with "
+    tables = "".join(f", a switch table at {sw.table:06X} (jmp at {sw.jmp:06X}, cases "
+                     f"{sw.lo}-{sw.lo + sw.count - 1})" for sw in switches)
+    if a == sp.end and last is not None and last.flow in (STOP, JUMP) \
+            and last.addr + last.length == sp.end and cases <= set(insns):
+        # where a routine may start inside: the start, after each rts/rte/jmp, IDA's starts
+        starts = {a0} | {x for x in ida_functions if sp.start <= x < sp.end and x in insns}
+        starts |= {i.addr + i.length for i in insns.values()
+                   if (i.flow == STOP or i.mnemonic == "jmp") and i.addr + i.length in insns}
+
+        def refs(t: int) -> list[int]:
+            return [x for x in (index or {}).get(t, []) if not sp.start <= x < sp.end]
+
+        def where(rs: list[int]) -> str:
+            return ", ".join(f"{x:06X} ({_kind_at(spans or [], x)})" for x in rs[:6]) + (
+                f" and {len(rs) - 6} more" if len(rs) > 6 else "")
+
+        inner = [(t, refs(t)) for t in sorted(starts - {a0}) if refs(t)]
+        found = []
+        if refs(a0):
+            found.append(f"possible references: {where(refs(a0))} (a long equal to it, or a "
+                         f"branch or call to it, found by a search of the bytes)")
+        found += [f"possible references to {t:06X} inside it: {where(rs)}" for t, rs in inner]
+        searched = len(starts)
+        parts.append(f"decodes cleanly from {a0:06X} as {n} instructions{tables} ending with "
                      f"{last.mnemonic} at {last.addr:06X}; "
-                     + (f"possible references: {where} (a long equal to it, or a branch or call "
-                        f"to it, found by a search of the bytes)" if refs and index is not None else
-                        "no reference found (no long equal to it, no branch or call to it in "
-                        "the bytes searched)" if index is not None else "references not searched"))
+                     + ("; ".join(found) if found and index is not None else
+                        ("no reference found (no long equal to it, no branch or call to it in "
+                         "the bytes searched)" if searched == 1 else
+                         f"no reference found (no long equal to its start or to any of the "
+                         f"{searched - 1} routine starts inside it, no branch or call to them "
+                         f"in the bytes searched)") if index is not None else
+                        "references not searched"))
     elif n:
-        parts.append(f"decodes as {n} instructions from {a0:06X}, then "
+        parts.append(f"decodes as {n} instructions{tables} from {a0:06X}, then "
                      f"{'stops' if a >= sp.end else f'no instruction at {a:06X}'}")
     if ida:
         parts.append("IDA functions: " + ", ".join(ida[:4]) + (" ..." if len(ida) > 4 else ""))

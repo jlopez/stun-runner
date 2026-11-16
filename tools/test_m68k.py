@@ -461,6 +461,33 @@ odd_pad:
 	dc.b	0
 	nop
 	rts
+	dcb.b	32,0
+dead_b:			; nothing reaches these three: unknown, with the search in their notes
+	moveq	#0,d0
+	rts
+dead_inner:		; called from dead_a, another unknown range (as 02D9A8 calls 0224C2)
+	moveq	#1,d0
+	rts
+	dcb.b	32,0
+dead_a:
+	jsr	dead_inner
+	rts
+	dcb.b	32,0
+dead_switch:		; a switch in an unknown range (as 02E548): the note steps over its table
+	cmpi.w	#2,d0
+	bhi.s	.out
+	add.w	d0,d0
+	move.w	(.tbl,pc,d0.w),d0
+	jmp	(.tbl,pc,d0.w)
+.tbl:
+	dc.w	.c0-.tbl,.c1-.tbl,.out-.tbl
+.c0:
+	moveq	#0,d1
+	rts
+.c1:
+	moveq	#1,d1
+.out:
+	rts
 end:
 """
 
@@ -542,6 +569,19 @@ def test_descent_and_classification(tmp_path: Path) -> None:
     # an unknown range from an odd address: the decode starts at the next even one
     note = next(s.note for s in c.spans if s.start == syms["odd_pad"])
     assert f"decodes cleanly from {syms['odd_pad'] + 1:06X} as 2 instructions" in note, note
+    # a routine inside an unknown range called from another unknown range: the note names the
+    # call, though nothing refers to the range's start (02249E, 0224C2 called from 02D9A8)
+    note = next(s.note for s in c.spans if s.start == syms["dead_b"])
+    assert kind_at(syms["dead_b"]) == "unknown" and "no reference found" not in note, note
+    assert f"possible references to {syms['dead_inner']:06X} inside it: " \
+        f"{syms['dead_a'] + 2:06X} (unknown)" in note, note
+    note = next(s.note for s in c.spans if s.start == syms["dead_a"])
+    assert "decodes cleanly" in note and "no reference found" in note, note
+    # a switch in an unknown range: the decode steps over its table and decodes the cases
+    sp = next(s for s in c.spans if s.start == syms["dead_switch"])
+    assert (sp.kind, sp.end) == ("unknown", syms["end"]), (sp.kind, sp.end)
+    assert f"decodes cleanly from {sp.start:06X} as 9 instructions, a switch table at " \
+        f"{sp.start + 16:06X} (jmp at {sp.start + 12:06X}, cases 0-2)" in sp.note, sp.note
     assert kind_at(syms["buffer"]) == "data"  # referenced by the lea
     fatal_call = next(a for a, i in r.insns.items() if i.target == syms["fatal"])
     assert fatal_call in c.noreturn
@@ -814,6 +854,112 @@ def test_check_listing_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str],
     listed = [{"at": f"{unk.start + k:06X}", "argument": "the test's listed exception"}
               for k in (0, 2, 4)]
     assert run({"unreached": listed}) == 0, capsys.readouterr().out
+
+
+@needs_vasm
+def test_listed_seeds(tmp_path: Path) -> None:
+    """The seeds of a descent check over part of the image: a zero vector is no seed (a range
+    from 000000 is not seeded at the stack pointer's long), the entries of the layout are."""
+    image, m, out, wrap = generated(tmp_path)
+    c = m.cls
+    names = inv(m)
+    whole = layout(len(image))
+    extra, outside = cli.listed_seeds(c, image, [], lambda x: 0 <= x < len(image), whole)
+    assert 0 not in extra and names["sub_100"] in extra and outside == set()
+    extra, _ = cli.listed_seeds(c, image, [], lambda x: 0 <= x < len(image))  # stunrun's layout
+    assert 0 not in extra
+    lay = layout(len(image))
+    lay.entries = [names["sub_100"] + 4]
+    extra, _ = cli.listed_seeds(c, image, [], lambda x: x == names["sub_100"] + 4, lay)
+    assert extra == [names["sub_100"] + 4]
+    # the descent check of the whole program from 000000 with those seeds: no error
+    (tmp_path / "gen.asm").write_text(out.source)
+    built, lst_text = assemble(tmp_path, "main", wrap)
+    lst = ls.parse(lst_text, ls.macro_names(MACROS))
+    ls.sizes(lst, len(built))
+    extra, outside = cli.listed_seeds(c, image, [], lambda x: 0 <= x < len(image), whole)
+    rep = ls.descent_check(lst, built, 0, extra, set(), set(c.noreturn), None, outside)
+    assert rep.errors == [] and rep.unreached == [], (rep.errors, rep.unreached)
+
+
+@needs_vasm
+def test_check_listing_partial_tree(tmp_path: Path, capsys: pytest.CaptureFixture[str],
+                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    """check-listing on a tree where one range is source and the rest still incbin slices: the
+    range is reached only from code inside the blobs, and flows out of it into them; --range
+    scopes what the descent check reports to the range."""
+    image, m, _, _ = generated(tmp_path)
+    c = m.cls
+    assert c.result is not None
+    # ret2 (jsr ret2 from start, in a blob) up to walk; it flows out by bra.w no_stack (a blob)
+    syms = ls.parse(assemble(tmp_path, "program", PROGRAM.format(macros=MACROS))[1],
+                    set()).symbols
+    lo, hi = syms["ret2"], syms["walk"]
+    unk = next(x for x in c.spans if x.kind == "unknown" and "decodes cleanly" in x.note)
+    assert hi < unk.start
+    prog = tmp_path / "program.bin"
+    out = gn.generate(m, lo, hi, str(prog))
+    (tmp_path / "gen.asm").write_text(out.source)
+    (tmp_path / "equates.asm").write_text(gn.equates_text(out.equates))
+    (tmp_path / "externals.asm").write_text(gn.externals_text(out.externals))
+    tree = (f'\tinclude\t"{MACROS}"\n\tinclude\t"equates.asm"\n\tinclude\t"externals.asm"\n'
+            f'\torg\t0\n\tincbin\t"{prog}",0,{lo}\n\tinclude\t"gen.asm"\n'
+            f'\tincbin\t"{prog}",{hi},{unk.start - hi}\n\tnop\n\tnop\n\trts\n'
+            f'\tincbin\t"{prog}",{unk.start + 6}\n')
+    built, lst_text = assemble(tmp_path, "main", tree)
+    assert built == image
+    (tmp_path / "c.json").write_text(cl.dump(c))
+    starts = cl.routine_starts(c.result)
+    addrs = {o.value for i in c.result.insns.values() for o in i.operands
+             if o.mode in ("absl", "pcdisp")}
+    (tmp_path / "op.json").write_text(opd.dump(opd.build(c.result.insns, starts, addrs)))
+    (tmp_path / "seeds.json").write_text(json.dumps(
+        {"format": "stunrun-68k-seeds 1", "seeds": [], "untaken": []}))
+
+    def run(*rng: int) -> int:
+        monkeypatch.setattr("sys.argv", [
+            "tools/m68k", "check-listing", "--listing", str(tmp_path / "main.lst"),
+            "--binary", str(tmp_path / "main.bin"), "--image", str(prog),
+            "--classification", str(tmp_path / "c.json"), "--operands",
+            str(tmp_path / "op.json"), "--seeds", str(tmp_path / "seeds.json"),
+            "--macros", str(MACROS)] + (["--range", f"{rng[0]:X}", f"{rng[1]:X}"] if rng else []))
+        return cli.main()
+
+    assert run(lo, hi) == 0, capsys.readouterr().out
+    capsys.readouterr()
+    # the planted instructions outside the range fail the check of the whole tree only
+    assert run() == 1
+    assert f"{unk.start:06X}: an instruction statement nothing reaches" in capsys.readouterr().out
+    # the check needs both: the targets of the code in the blobs (jsr ret2 from start) ...
+    lst = ls.parse(lst_text, ls.macro_names(MACROS))
+    ls.sizes(lst, len(built))
+    lst.statements = [x for x in lst.statements if lo <= x.address < hi]
+    extra, outside = cli.listed_seeds(c, image, [], lambda x: lo <= x < hi)
+    blob_targets = {i.target for a, i in c.result.insns.items() if not lo <= a < hi}
+    assert lo in extra and lo in blob_targets and lo not in c.entries
+    rep = ls.descent_check(lst, built, 0, [x for x in extra if x != lo], set(),
+                           set(c.noreturn), None, outside)
+    assert lo in rep.unreached, rep.unreached
+    # ... and the instruction starts outside, where its bra.w ends
+    rep = ls.descent_check(lst, built, 0, extra, set(), set(c.noreturn), None, set())
+    assert any("outside the code ranges" in e for e in rep.errors), rep.errors
+    rep = ls.descent_check(lst, built, 0, extra, set(), set(c.noreturn), None, outside)
+    assert rep.errors == [] and rep.unreached == []
+
+
+def test_gen_rejects_bad_ranges(capsys: pytest.CaptureFixture[str],
+                                monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """gen and check-region refuse a reversed, negative or out-of-image range (exit 2) before
+    reading the image."""
+    for cmd, rng in (("gen", ["012F06", "000212"]), ("gen", ["05CF00", "05D000"]),
+                     ("gen", ["-10", "300"]), ("check-region", ["012F06", "000212"])):
+        extra = ["--out", str(tmp_path / "g.asm")] if cmd == "gen" else \
+            ["--work", str(tmp_path / "w")]
+        monkeypatch.setattr("sys.argv", ["tools/m68k", cmd, "--image",
+                                         str(tmp_path / "absent.bin"), *extra, "--", *rng])
+        assert cli.main() == 2, (cmd, rng)
+        assert "is not within 000000-05CF86" in capsys.readouterr().err
+    assert not (tmp_path / "g.asm").exists()
 
 
 def test_classify_needs_the_mame_runs(capsys: pytest.CaptureFixture[str],
