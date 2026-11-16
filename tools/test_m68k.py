@@ -29,6 +29,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from m68k import __main__ as cli
 from m68k import classify as cl
 from m68k import gen as gn
 from m68k import listing as ls
@@ -306,6 +307,8 @@ start:
 	jsr	switch2
 	jsr	via_register
 	jsr	via_table
+	jsr	ret2
+	jsr	walk
 	jsr	low.w
 	lea	(.ret,pc),a2
 	bra.w	no_stack
@@ -380,6 +383,40 @@ via_table:
 	rts
 routines:
 	dc.l	r0,r1,r2
+ret2:
+	lea	.back,a2	; the return address kept across another load, as at 00953A
+	movea.l	#0,a0
+	bra.w	no_stack
+.back:
+	moveq	#5,d0
+	rts
+walk:
+	move.w	rec_count,d7	; a record table walked as at 000EB2
+	lea	rec_table,a3
+.loop:
+	move.w	(0,a3),d1
+	movea.l	(4,a3),a0
+	jsr	(a0)
+	adda.l	#10,a3
+	dbf	d7,.loop
+	rts
+rec_count:
+	dc.w	2
+rec_table:
+	dc.w	1,2
+	dc.l	rec_a
+	dc.w	3
+	dc.w	4,5
+	dc.l	rec_b
+	dc.w	6
+	dc.w	7,8
+	dc.l	rec_a
+	dc.w	9
+rec_a:
+	rts
+rec_b:
+	moveq	#1,d0
+	rts
 r0:
 	rts
 r1:
@@ -408,11 +445,21 @@ table:
 	dcb.b	64,0
 buffer:
 	dc.w	$4E75
+	dc.l	orphan
 	even
 	dcb.b	$7000-*,$FF
 low:
 	rts
+orphan:
+	moveq	#7,d0
+	rts
 far:
+	rts
+odd_text:
+	dc.b	'ODD TEXT',0
+odd_pad:
+	dc.b	0
+	nop
 	rts
 end:
 """
@@ -473,13 +520,28 @@ def test_descent_and_classification(tmp_path: Path) -> None:
     assert ev[syms[".ret"]].startswith("return address")
     assert ev[syms["callback"]].startswith("reviewed: ")
     assert kind_at(syms["routines"]) == "pointers"
+    # the return address with another load between the lea and the bra (00953A)
+    assert ev[syms[".back"]].startswith("return address: a2 set at")
+    # the record table (000E12): three records of ten bytes, the count word before them
+    assert ev[syms["rec_b"]].startswith("entry 1 of the record table")
+    rt = next(s for s in c.spans if s.start == syms["rec_table"])
+    assert (rt.kind, rt.end) == ("data", syms["rec_a"]) and "3 records of 10 bytes" in rt.note
+    assert kind_at(syms["rec_count"]) == "data"
     # what is not code stays out of it
     assert kind_at(syms["text"]) == "text"
     # a table loaded with movea.l # decodes cleanly into the rts of `buffer`: still data
     assert kind_at(syms["table"]) == "data"
     assert kind_at(syms["table"] + 8) == "fill"
     assert kind_at(syms["callback"] + 2) == "unknown"  # decodes, but nothing reaches it
-    assert "decodes cleanly" in next(s.note for s in c.spans if s.start == syms["callback"] + 2)
+    note = next(s.note for s in c.spans if s.start == syms["callback"] + 2)
+    assert "decodes cleanly" in note and "no reference found" in note
+    # a routine whose address is only in data: its note says where, not "no reference found"
+    note = next(s.note for s in c.spans if s.start == syms["orphan"])
+    assert kind_at(syms["orphan"]) == "unknown"
+    assert f"possible references: {syms['buffer'] + 2:06X} (data)" in note, note
+    # an unknown range from an odd address: the decode starts at the next even one
+    note = next(s.note for s in c.spans if s.start == syms["odd_pad"])
+    assert f"decodes cleanly from {syms['odd_pad'] + 1:06X} as 2 instructions" in note, note
     assert kind_at(syms["buffer"]) == "data"  # referenced by the lea
     fatal_call = next(a for a, i in r.insns.items() if i.target == syms["fatal"])
     assert fatal_call in c.noreturn
@@ -524,15 +586,18 @@ def test_generator_reassembles(tmp_path: Path) -> None:
     assert not out.externals
 
 
-def checks(tmp: Path, wrap: str, source: str, m: gn.Model, lo: int, hi: int
+def checks(tmp: Path, wrap: str, source: str, m: gn.Model, lo: int, hi: int,
+           noreturn: set[int] | None = None
            ) -> tuple[ls.DescentReport, ls.LintReport, ls.ShiftReport, bytes]:
     (tmp / "gen.asm").write_text(source)
     built, lst_text = assemble(tmp, "main", wrap)
     lst = ls.parse(lst_text, ls.macro_names(MACROS))
     lst.statements = [s for s in lst.statements if lo <= s.address < hi]
     ls.sizes(lst, hi)
-    rep = ls.descent_check(lst, built, 0, list(m.cls.entries), set(), set(m.cls.noreturn))
-    lint = ls.address_lint(lst, m.decisions, lo, hi, frozenset(ls.macro_names(MACROS)))
+    rep = ls.descent_check(lst, built, 0, list(m.cls.entries), set(),
+                           set(m.cls.noreturn) if noreturn is None else noreturn)
+    lint = ls.address_lint(lst, m.decisions, lo, hi, frozenset(ls.macro_names(MACROS)), built, 0,
+                           [(s.start, s.end) for s in m.cls.spans if s.kind == "switch"])
     shifted = source.replace("\tassert\t*=$000000", "\tdcb.b\t2,0\n;", 1)
     shifted = shifted.replace(f"\tassert\t*=${hi:06X}", ";", 1)
     (tmp / "gen.asm").write_text(shifted)
@@ -592,6 +657,174 @@ def test_listing_checks_fail_on_broken_source(tmp_path: Path) -> None:
     rep, _, _, built = checks(tmp_path, wrap, "\n".join(lines) + "\n", m, 0, hi)
     assert built == image and rep.errors == []
     assert rep.unreached == [unk.start, unk.start + 2, unk.start + 4]
+
+
+@needs_vasm
+def test_listing_checks_fail_on_more_broken_source(tmp_path: Path) -> None:
+    """Each failure path of the listing checks has a case that takes it."""
+    image, m, out, wrap = generated(tmp_path)
+    src = out.source
+    hi = len(image)
+    names = inv(m)
+    # a pointer written as a number in a dc.l: the lint
+    line = next(x for x in src.splitlines() if x.startswith("\tdc.l\tsub_2"))
+    sym = line.split("\t")[2]
+    _, lint, _, built = checks(tmp_path, wrap, src.replace(line, f"\tdc.l\t${names[sym]:X}", 1),
+                               m, 0, hi)
+    assert built == image and any("dc.l" in e and "could be an address" in e for e in lint.errors)
+    # pea of a ROM address written as a number (absolute long, not the constant pea N.w)
+    line = next(x for x in src.splitlines() if x.startswith("\tpea\tstr_"))
+    sym = line.split("\t")[2]
+    _, lint, _, built = checks(tmp_path, wrap, src.replace(line, f"\tpea\t${names[sym]:X}", 1),
+                               m, 0, hi)
+    assert built == image and any("pea" in e and "written as a number" in e for e in lint.errors)
+    # a PC-relative operand written as a number: the lint, and the shift test (the displacement
+    # changes when the code moves, though no symbol is named)
+    line = next(x for x in src.splitlines() if x.startswith("\tlea\t(sub_") and ",pc)" in x)
+    sym = line.split("(")[1].split(",")[0]
+    _, lint, sh, built = checks(tmp_path, wrap, src.replace(line, line.replace(
+        sym, f"${names[sym]:X}"), 1), m, 0, hi)
+    assert built == image and any("PC-relative" in e for e in lint.errors), lint.errors
+    assert any("changed without naming a moved symbol" in e for e in sh.errors), sh.errors
+    # a switch entry written as a number: the lint
+    line = next(x for x in src.splitlines() if x.startswith("\tdc.w\tsub_") and "-" in x)
+    a, b = line.split("\t")[2].split("-")
+    _, lint, _, built = checks(tmp_path, wrap, src.replace(
+        line, f"\tdc.w\t${(names[a] - names[b]) & 0xFFFF:X}", 1), m, 0, hi)
+    assert built == image and any("switch entry" in e for e in lint.errors), lint.errors
+    # an address written as an expression of numbers: the lint reads its value from the bytes
+    line = next(x for x in src.splitlines() if x.startswith("\tjsr\tsub_") and ".w" not in x)
+    sym = line.split("\t")[2]
+    _, lint, _, built = checks(tmp_path, wrap, src.replace(
+        line, f"\tjsr\t${names[sym] - 8:X}+8", 1), m, 0, hi)
+    assert built == image and any("written as a number" in e for e in lint.errors), lint.errors
+    # a word that moves by something other than the pad: the shift test
+    line = next(x for x in src.splitlines() if x.startswith("\tdc.l\tsub_2"))
+    sym = line.split("\t")[2]
+    _, _, sh, _ = checks(tmp_path, wrap, src.replace(line, f"\tdc.l\t{sym}*2", 1), m, 0, hi)
+    assert any("not by the pad" in e for e in sh.errors), sh.errors
+    # a call followed by data that the classification does not list as never returning
+    rep, _, _, _ = checks(tmp_path, wrap, src, m, 0, hi, noreturn=set())
+    assert any("falls through into no code" in e for e in rep.errors), rep.errors
+
+
+@needs_vasm
+def test_descent_check_statement_size(tmp_path: Path) -> None:
+    """A statement holding more than the one instruction the descent decodes there."""
+    src = "two\tmacro\n\tnop\n\tnop\n\tendm\n\torg\t0\n\ttwo\n\trts\n"
+    image, lst_text = assemble(tmp_path, "size", src)
+    lst = ls.parse(lst_text, {"two"})
+    ls.sizes(lst, len(image))
+    rep = ls.descent_check(lst, image, 0, [0], set(), set())
+    assert any("statement of 4 bytes, instruction of 2" in e for e in rep.errors), rep.errors
+
+
+LINT = """
+	org	$30000
+here:
+	jsr	$30010
+	lea	$BFF00,a0
+	jsr	$C0000
+	move.w	$FF9518,d0
+	pea	$1234.w
+	pea	$30000
+	jsr	$418B0+8
+	lea	$20520+0,a1
+	movea.l	#$30220+0,a2
+	lea	($30000,pc),a1
+	move.w	($30004,pc,d0.w),d0
+	bra.w	$30000
+	lea	(here,pc),a1
+	jsr	here
+	moveq	#1,d0
+	dc.l	$30000
+	dc.l	$40+$30000
+	dc.l	here
+switch:
+	dc.w	$10
+	dc.w	here-switch
+"""
+
+
+@needs_vasm
+def test_address_lint_forms(tmp_path: Path) -> None:
+    """Every operand form that can hold a ROM address as a number, above 020000 too."""
+    image, lst_text = assemble(tmp_path, "lint", LINT)
+    lst = ls.parse(lst_text, set())
+    ls.sizes(lst, 0x30000 + len(image))
+    sw = lst.symbols["switch"]
+    rep = ls.address_lint(lst, {}, 0, 0x0C0000, frozenset(), image, 0x30000, [(sw, sw + 4)])
+    bad = {e.split(":")[0] for e in rep.errors}
+    flagged = {s.text.split(";")[0].strip() for s in lst.statements if f"{s.address:06X}" in bad}
+    want = {"jsr\t$30010", "lea\t$BFF00,a0", "pea\t$30000", "jsr\t$418B0+8", "lea\t$20520+0,a1",
+            "movea.l\t#$30220+0,a2", "lea\t($30000,pc),a1", "move.w\t($30004,pc,d0.w),d0",
+            "bra.w\t$30000", "dc.l\t$30000", "dc.l\t$40+$30000", "dc.w\t$10"}
+    assert flagged == want, flagged ^ want
+
+
+def test_validate_finds_bad_ranges() -> None:
+    def c(*spans: tuple[int, int, str]) -> cl.Classification:
+        return cl.Classification([cl.Span(a, b, k) for a, b, k in spans], {}, {}, {}, None, 0x20)
+
+    assert cl.validate(c((0, 0x10, "code"), (0x10, 0x20, "data"))) == []
+    assert any("gap" in e for e in cl.validate(c((0, 0x10, "code"), (0x12, 0x20, "data"))))
+    assert any("overlap" in e for e in cl.validate(c((0, 0x10, "code"), (0x0E, 0x20, "data"))))
+    assert any("not word-aligned" in e for e in cl.validate(c((0, 0x11, "code"),
+                                                              (0x11, 0x20, "data"))))
+    assert any("whole longs" in e for e in cl.validate(c((0, 0x06, "pointers"),
+                                                         (0x06, 0x20, "data"))))
+    assert any("end at" in e for e in cl.validate(c((0, 0x10, "code"),)))
+
+
+@needs_vasm
+def test_check_listing_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str],
+                           monkeypatch: pytest.MonkeyPatch) -> None:
+    """tools/m68k check-listing fails on an instruction statement nothing reaches, unless the
+    seeds file lists it with an argument."""
+    image, m, out, wrap = generated(tmp_path)
+    c = m.cls
+    assert c.result is not None
+    (tmp_path / "program.bin").write_bytes(image)
+    (tmp_path / "c.json").write_text(cl.dump(c))
+    starts = cl.routine_starts(c.result)
+    addrs = {o.value for i in c.result.insns.values() for o in i.operands
+             if o.mode in ("absl", "pcdisp")}
+    (tmp_path / "op.json").write_text(opd.dump(opd.build(c.result.insns, starts, addrs)))
+    unk = next(x for x in c.spans if x.kind == "unknown" and "decodes cleanly" in x.note)
+    lines = out.source.splitlines()
+    i = lines.index(f"dat_{unk.start:X}:") + 1
+    lines[i] = "\tnop\n\tnop\n\trts"
+    (tmp_path / "gen.asm").write_text("\n".join(lines) + "\n")
+    built, _ = assemble(tmp_path, "main", wrap)
+    assert built == image
+
+    def run(seeds: dict[str, object]) -> int:
+        (tmp_path / "seeds.json").write_text(json.dumps(
+            {"format": "stunrun-68k-seeds 1", "seeds": [], "untaken": [], **seeds}))
+        monkeypatch.setattr("sys.argv", [
+            "tools/m68k", "check-listing", "--listing", str(tmp_path / "main.lst"),
+            "--binary", str(tmp_path / "main.bin"), "--image", str(tmp_path / "program.bin"),
+            "--classification", str(tmp_path / "c.json"), "--operands",
+            str(tmp_path / "op.json"), "--seeds", str(tmp_path / "seeds.json"),
+            "--macros", str(MACROS)])
+        return cli.main()
+
+    assert run({}) == 1
+    assert f"{unk.start:06X}: an instruction statement nothing reaches" in capsys.readouterr().out
+    listed = [{"at": f"{unk.start + k:06X}", "argument": "the test's listed exception"}
+              for k in (0, 2, 4)]
+    assert run({"unreached": listed}) == 0, capsys.readouterr().out
+
+
+def test_classify_needs_the_mame_runs(capsys: pytest.CaptureFixture[str],
+                                      monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """`classify` without the runs of make pccov would drop the MAME entries: it refuses."""
+    monkeypatch.setattr("sys.argv", ["tools/m68k", "classify", "--image",
+                                     str(tmp_path / "absent.bin"), "--out",
+                                     str(tmp_path / "c.json")])
+    assert cli.main() == 1
+    assert "make pccov" in capsys.readouterr().out
+    assert not (tmp_path / "c.json").exists()
 
 
 @needs_vasm
@@ -659,7 +892,8 @@ def test_committed_operands_and_seeds() -> None:
         assert decision in ("address", "constant", "undecided") and 0 <= i < 2
     j = json.loads((REPO / "data/68k/seeds.json").read_text())
     assert j["format"] == "stunrun-68k-seeds 1"
-    for e in j["seeds"] + j["untaken"]:
+    assert set(j) == {"format", "comment", "seeds", "untaken", "unreached"}
+    for e in j["seeds"] + j["untaken"] + j["unreached"]:
         assert set(e) == {"at", "argument"} and len(e["argument"]) > 40
     for e in j["untaken"]:
         assert any(lo <= int(e["at"], 16) < hi for lo, hi in code)
@@ -687,6 +921,11 @@ def test_pccov_reader(tmp_path: Path) -> None:
     assert pcs == {0x216, 0x21A} and header["distinct_pcs"] == "2"
     assert pc.check(pcs, {0x216}) == [0x21A]
     assert pc.ranges(pcs, {0x216: 4, 0x21A: 4}) == [["000216", "00021E"]]
+    # the summary lists the runs by name, whatever order they are given in (make pccov's)
+    runs: dict[str, tuple[dict[str, str], set[int]]] = {
+        n: ({}, pcs) for n in ("soundtest", "attract", "postest")}
+    assert list(json.loads(pc.summary(runs, {}, {}))["runs"]) == ["attract", "postest",
+                                                                  "soundtest"]
 
 
 # --- locally, with the image -----------------------------------------------------------------
