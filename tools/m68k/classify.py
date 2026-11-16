@@ -12,7 +12,8 @@ it adds, then classifies every byte that is not code:
 4. reviewed seeds: data/68k/seeds.json, an address and the written argument for each.
 
 Then, for the bytes that are no instruction and no table: text (a run of at least six printable
-characters, mostly letters, digits and the punctuation of messages, with its terminating zero),
+characters, mostly letters, digits and the punctuation of messages, with a word and not made of
+equal byte pairs, with its terminating zero),
 fill (a run of at least 32 zero bytes that no operand references), data (from an address an
 operand references to the next boundary) and unknown (the rest; in a code range a note says when
 the bytes decode cleanly as instructions and whether IDA has a function there).
@@ -209,17 +210,33 @@ def _data_refs(r: Result, end: int) -> dict[int, list[int]]:
     return refs
 
 
-SAME_CASE = re.compile(rb"[A-Z]{4}|[a-z]{4}")
+SAME_CASE = re.compile(rb"[A-Z]{4,}|[a-z]{4,}")
+TEXT_DISTINCT = 3
+
+
+def _doubled(run: bytes) -> bool:
+    """The bytes come in equal pairs (at either alignment, one odd byte allowed at each end):
+    words such as 6464 5A5A are numbers whose two bytes are equal, not characters."""
+    for off in (0, 1):
+        s = run[off:]
+        n = len(s) // 2 * 2
+        if n >= 4 and all(s[i] == s[i + 1] for i in range(0, n, 2)):
+            return True
+    return False
 
 
 def _is_text(run: bytes) -> bool:
     """At least TEXT_MIN characters, nine in ten of them letters, digits, blanks or the
-    punctuation of messages, half of them letters, and a word of four letters of one case:
-    code is often printable too (4E71 4E75 is "NqNu")."""
+    punctuation of messages, half of them letters, at least TEXT_DISTINCT distinct characters,
+    a word of four letters of one case with two distinct letters, and the bytes not in equal
+    pairs: code is often printable too (4E71 4E75 is "NqNu"), and so are numeric tables whose
+    words have two equal bytes (022DC-022EC, one byte 16 times, is 001FBC + 50 x 16 in the
+    16-byte records sub_22EC indexes at 0022F0-0022FC)."""
     wordy = sum(1 for c in run if c in TEXT_WORDY)
     letters = sum(1 for c in run if chr(c).isalpha())
     return (len(run) >= TEXT_MIN and wordy * 10 >= 9 * len(run) and letters * 2 >= len(run)
-            and SAME_CASE.search(run) is not None)
+            and len(set(run)) >= TEXT_DISTINCT and not _doubled(run)
+            and any(len(set(w)) >= 2 for w in SAME_CASE.findall(run)))
 
 
 def _text_runs(image: bytes, lo: int, hi: int, refs: set[int]) -> list[tuple[int, int]]:

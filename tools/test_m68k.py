@@ -774,6 +774,8 @@ here:
 	jsr	$C0000
 	move.w	$FF9518,d0
 	pea	$1234.w
+	lea	$0.w,a0
+	jsr	$7000.w
 	pea	$30000
 	jsr	$418B0+8
 	lea	$20520+0,a1
@@ -809,11 +811,25 @@ def test_address_lint_forms(tmp_path: Path) -> None:
                           [(pt, pt + 12)])
     bad = {e.split(":")[0] for e in rep.errors}
     flagged = {s.text.split(";")[0].strip() for s in lst.statements if f"{s.address:06X}" in bad}
-    want = {"jsr\t$30010", "lea\t$BFF00,a0", "pea\t$30000", "jsr\t$418B0+8", "lea\t$20520+0,a1",
+    want = {"jsr\t$30010", "lea\t$BFF00,a0", "lea\t$0.w,a0", "jsr\t$7000.w", "pea\t$30000", "jsr\t$418B0+8", "lea\t$20520+0,a1",
             "movea.l\t#$30220+0,a2", "lea\t($30000,pc),a1", "move.w\t($30004,pc,d0.w),d0",
             "bra.w\t$30000", "dc.l\t$30000", "dc.l\t$40+$30000", "dc.w\t$10",
             "dc.w\t$0003,$0010", "dc.w\t0,0"}
     assert flagged == want, flagged ^ want
+
+
+def test_text_rule() -> None:
+    """Text needs words: numbers whose two bytes are equal (01266A, 012742, 0128A6, 0128C6,
+    012CC6), one byte repeated (0022DC) or two distinct bytes (04D764) are not text."""
+    for run in (b"ddZZxxnn", b"44++FF==WWNNii``zzqq", b"99++VVHHssee", b"++  AA66WWLLllaa",
+                b"--((7722AA<<KKFFZZPPnndd", b"UUUUUUUUUUUUUUUU", b"aaaaabaaaaaa",
+                b"xddZZxxnn", b"AAAA BBBB AAAA"):
+        assert not cl._is_text(run), run
+    for run in (b"HELLO WORLD", b"DON'T PANIC", b"SA SELF TEST", b"PLAY SOUNDS", b"ODD TEXT",
+                b"Insert coin", b"BOOK  KEEPING"):
+        assert cl._is_text(run), run
+    image = b"\0\0ddZZxxnn\0\0HELLO WORLD\0\0"
+    assert cl._text_runs(image, 0, len(image), set()) == [(12, 24)]
 
 
 def test_validate_finds_bad_ranges() -> None:
