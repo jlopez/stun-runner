@@ -151,6 +151,108 @@ def test_hardware_equates_are_the_ida_io_names() -> None:
     assert len(re.findall(r"\bequ\b", text)) == len(IO_68K)
 
 
+def snapshot_functions() -> list[dict]:
+    path = REPO / "data/ida/stunrun-68k.functions.jsonl"
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
+def functions_starting(start: int, end: int) -> int:
+    return sum(1 for f in snapshot_functions() if start <= f["start_ea"] < end)
+
+
+# A name the region headers or docs/06 section 4 give with its address: `name 012345`,
+# `name (012345` in asm/68k; `` `name` 0x012345 `` in docs/06's partition tables.
+ASM_NAME_AT = re.compile(r"\b([A-Za-z]\w*_\w+) \(?([0-9A-F]{6})\b")
+DOC_NAME_AT = re.compile(r"`([A-Za-z]\w*_\w+)` 0x([0-9A-F]{6})\b")
+ASM_FUNCTION_COUNT = re.compile(r"([0-9A-F]{6})-([0-9A-F]{6}): (\d+) IDA functions")
+DOC_FUNCTION_COUNT = re.compile(
+    r"^\| 0x([0-9A-F]{6}) \| 0x([0-9A-F]{6}) \|.*?; (\d+) functions;", re.M
+)
+DOC_PAIR_COUNTS = re.compile(r"(\d+) functions in pair S and (\d+) in pair T")
+
+
+def test_region_headers_and_docs06_follow_the_snapshot() -> None:
+    """Every name the region files' headers or docs/06 sections 4.1-4.2 give with an address is the
+    committed snapshot's name there (a user name or a function's), and every function count
+    they give is the snapshot's: a rename or a new function in IDA (M4e named 043718
+    `audio_test` and added five boot functions) fails until the prose follows."""
+    snapshot = json.loads((REPO / "data/ida/stunrun-68k.json").read_text())
+    where = {n["name"]: int(n["ea"], 16) for n in snapshot["names"]}
+    for f in snapshot_functions():
+        where.setdefault(f["name"], f["start_ea"])
+    docs06 = (REPO / "docs/06-code-map.md").read_text()
+    # the partition tables, 4.1 and 4.2 (elsewhere `name` 0x... is an instruction inside it)
+    section4 = "\n".join(
+        line
+        for line in docs06[docs06.index("\n### 4.1") : docs06.index("\n### 4.3")].splitlines()
+        if line.startswith("| 0x")
+    )
+    texts = {
+        str(path.relative_to(REPO)): "\n".join(
+            line for line in path.read_text().splitlines() if line.startswith(";")
+        )
+        for path in sorted(TREE.rglob("*.asm"))
+        if path.name != "hardware.asm"
+    }
+    cited = [(f, n, int(a, 16)) for f, t in texts.items() for n, a in ASM_NAME_AT.findall(t)]
+    cited += [("docs/06", n, int(a, 16)) for n, a in DOC_NAME_AT.findall(section4)]
+    assert len(cited) > 10
+    wrong = [
+        f"{file}: {name} {ea:06X}, snapshot "
+        + (f"{where[name]:06X}" if name in where else "has no such name")
+        for file, name, ea in cited
+        if where.get(name) != ea
+    ]
+    assert wrong == []
+    counts = [(f, *m) for f, t in texts.items() for m in ASM_FUNCTION_COUNT.findall(t)]
+    counts += [("docs/06", *m) for m in DOC_FUNCTION_COUNT.findall(section4)]
+    assert len(counts) >= 2
+    for file, start, end, n in counts:
+        assert functions_starting(int(start, 16), int(end, 16)) == int(n), (file, start, end)
+    pairs = DOC_PAIR_COUNTS.findall(section4)
+    assert pairs == [
+        (str(functions_starting(0x20000, 0x40000)), str(functions_starting(0x40000, 0x60000)))
+    ]
+
+
+WORDS = {"seven": 7, "eight": 8, "nine": 9, "ten": 10}
+
+
+def test_image_table_sites_are_docs06s() -> None:
+    """image_table.asm's header names two of the instructions that index the image table and
+    counts the others; docs/06's 0x0BFE00 row lists them all. With build/stunrun-68k.bin (`make`)
+    the instructions are every `lea $bfe00.l,An` and `addi.l #$bfe00,Dn` of the image."""
+    header = (TREE / "image_table.asm").read_text()
+    m = re.search(
+        r"lea \$bfe00 at ([0-9A-F]{6}) and addi\.l #\$bfe00 at ([0-9A-F]{6}) and "
+        r"(\w+) more\n; places",
+        header,
+    )
+    assert m is not None
+    row = next(
+        line
+        for line in (REPO / "docs/06-code-map.md").read_text().splitlines()
+        if line.startswith("| 0x0BFE00 |")
+    )
+    listed = row[row.index("indexed from its base") : row.index("; entry 1 read")]
+    sites = [int(a, 16) for a in re.findall(r"0x([0-9A-F]{6})", listed)]
+    assert sites[:2] == [int(m[1], 16), int(m[2], 16)]
+    assert len(sites) == 2 + WORDS[m[3]]
+    image_path = REPO / "build/stunrun-68k.bin"
+    if not image_path.exists():
+        pytest.skip("build/stunrun-68k.bin absent (make)")
+    image = image_path.read_bytes()
+    found = []
+    for at in range(2, 0x60000, 2):
+        if struct.unpack_from(">I", image, at)[0] != 0x000BFE00:
+            continue
+        op = struct.unpack_from(">H", image, at - 2)[0]
+        # lea (abs).l,An: 0100 nnn1 1111 1001; addi.l #imm,Dn: 0000 0110 1000 0nnn
+        if op & 0xF1FF == 0x41F9 or op & 0xFFF8 == 0x0680:
+            found.append(at - 2)
+    assert found == sites
+
+
 @needs_vasm
 def test_tree_assembles_a_random_blob(tmp_path: Path) -> None:
     image = random.Random(68010).randbytes(IMAGE_SIZE)

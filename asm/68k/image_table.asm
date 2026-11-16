@@ -2,7 +2,7 @@
 ; Owner: the images leg. Not source yet but the zero fill (docs/13-68k-source.md section 4).
 ;
 ; 0BFE00-0BFF18: 70 longs, entry 0 = 0, entries 1-68 point into images.asm, entry 69 = 0 ends it;
-; indexed from its base by lea $bfe00 at 022798 and addi.l #$bfe00 at 024AC4 and seven more
+; indexed from its base by lea $bfe00 at 022798 and addi.l #$bfe00 at 024AC4 and eight more
 ; places (docs/06 section 4.2). An incbin until the images leg gives the images labels.
 
 	assert	*=$0BFE00,"image_table.asm misplaced"

@@ -219,6 +219,10 @@ M5-0 checked every boundary of this partition against the image and kept them al
 fill below is all zero, and where the zero run in the image is longer, the extra zero bytes
 belong to the neighbour (a pointer's high byte, the image table's first and last entries;
 docs/13-68k-source.md section 2.1). The rows are the region files of docs/13 section 2.
+M5-0 also brought the rows' IDA facts up to the committed snapshot, which M4e changed after M2
+wrote them: 140 functions in the boot code (was 135), 429 in pair S (was 427), and 0x043718 is
+`audio_test` (was `sub_43718`); `tools/test_68k_tree.py` checks the names and counts of these
+tables and of the region files' headers against the snapshot.
 
 ### 4.1 Pair R, the boot program (0x000000-0x01FFFF)
 
@@ -226,7 +230,7 @@ docs/13-68k-source.md section 2.1). The rows are the region files of docs/13 sec
 |---|---|---|---|---|
 | 0x000000 | 0x000100 | 256 | boot vector table (64 longs) | docs/05 section 3 |
 | 0x000100 | 0x000212 | 274 | not a vector table; unclassified | docs/05 section 3 |
-| 0x000212 | 0x012DC6 | 76,724 | boot code with data islands | first function `boot_line_a_etc` 0x000212, last `sub_12DBC` 0x012DBC-0x012DC6; 135 functions; islands such as 0x00FB08-0x01076A (referenced from 0x002334, 0x009178) |
+| 0x000212 | 0x012DC6 | 76,724 | boot code with data islands | first function `boot_line_a_etc` 0x000212, last `sub_12DBC` 0x012DBC-0x012DC6; 140 functions; islands such as 0x00FB08-0x01076A (referenced from 0x002334, 0x009178) |
 | 0x012DC6 | 0x012F06 | 320 | boot data | referenced from 0x00F2A4 (0x012DD2) and 0x00F2B6 (0x012DDE) |
 | 0x012F06 | 0x017000 | 16,634 | zero fill | |
 | 0x017000 | 0x01702E | 46 | program table, two unknown longs, copyright text, an unknown word | section 2 |
@@ -242,7 +246,7 @@ docs/13-68k-source.md section 2.1). The rows are the region files of docs/13 sec
 | 0x020100 | 0x020112 | 18 | `game_entries`, three `jmp` | section 1.1 |
 | 0x020112 | 0x020418 | 774 | zero fill | |
 | 0x020418 | 0x020430 | 24 | game data | read by 0x02079A and 0x020D30 (`sub.b $20418.l`), 0x02093E (word 0x02041A); referenced from 0x0209AC, 0x020A88, 0x042324 |
-| 0x020430 | 0x04397E | 144,718 | game code | first function `sub_20430`; with the code row 0x046A00-0x046AEE, 427 functions in pair S and 77 in pair T; the last before the island is `sub_43718` 0x043718-0x04397E (called by `game_entry_2` at 0x0213AA, and calls `reload_gsp` at 0x04373A); 0x0436FE-0x043718 is code IDA has not made a function (`link`, two `pea`, `jsr $2effe`, `unlk`, `rts`) |
+| 0x020430 | 0x04397E | 144,718 | game code | first function `sub_20430`; with the code row 0x046A00-0x046AEE, 429 functions in pair S and 77 in pair T; the last before the island is `audio_test` 0x043718-0x04397E (called by `game_entry_2` at 0x0213AA, and calls `reload_gsp` at 0x04373A); 0x0436FE-0x043718 is code IDA has not made a function (`link`, two `pea`, `jsr $2effe`, `unlk`, `rts`) |
 | 0x04397E | 0x046A00 | 12,418 | game data island | starts after the `rts` at 0x04397C; 32 references, e.g. 0x0439BC from 0x041F1C, 0x0461F0 from 0x02444E |
 | 0x046A00 | 0x046AEE | 238 | game code | from `sub_46A00` 0x046A00-0x046A20 to the last function, `sub_46AC4` 0x046AC4-0x046AEE |
 | 0x046AEE | 0x05CF86 | 91,288 | game data (68k consumer) | 724 references from code, the first 0x046AEE from 0x046A0C, the last 0x05C63C from 0x043720 |
