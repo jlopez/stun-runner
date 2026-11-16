@@ -17,6 +17,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -279,10 +280,8 @@ def test_a_moved_region_fails_its_guard(tmp_path: Path) -> None:
     assert "game/code.asm does not end at 04397E" in r.stdout + r.stderr
 
 
-@needs_vasm
-def test_labels_on_the_tree(tmp_path: Path) -> None:
-    """`make labels` on the committed tree assembled against a random blob: no failure, the
-    program table's names are labels; a label taken out of source fails."""
+def labels_tool() -> types.ModuleType:
+    """tools/labels as a module (the script has no .py)."""
     import importlib.machinery
     import importlib.util
 
@@ -292,6 +291,50 @@ def test_labels_on_the_tree(tmp_path: Path) -> None:
     labels = importlib.util.module_from_spec(spec)
     sys.modules["labels_tool"] = labels  # its dataclass looks its module up there
     loader.exec_module(labels)
+    return labels
+
+
+# A vasm -L listing (vasm 2.0f's form) of two org sections with a gap at 000002-000010.
+GAP_LISTING = """Sections:
+00: "org0001:0" (0-2)
+01: "org0002:10" (10-12)
+
+
+Source: "t.asm"
+                            \t     1: \torg $0
+                            \t     2: first:
+00:00000000 0001            \t     3: \tdc.w 1
+                            \t     4: \torg $10
+                            \t     5: second:
+01:00000010 0002            \t     6: \tdc.w 2
+
+
+Symbols by name:
+first                            A:00000000
+second                           A:00000010
+
+Symbols by value:
+00000000 first
+00000010 second
+"""
+
+
+def test_labels_without_a_statement() -> None:
+    """A name whose address no statement of the listing holds fails `make labels`."""
+    labels = labels_tool()
+    report = labels.check(GAP_LISTING, [(0x000000, "first"), (0x000008, "gap"), (0xFF0000, "ram")])
+    assert report.labelled == ["first at 000000"]
+    assert report.in_blob == []
+    assert report.outside == ["ram at FF0000"]
+    assert report.failures == ["gap at 000008: no statement of the listing holds this address"]
+
+
+@needs_vasm
+def test_labels_on_the_tree(tmp_path: Path) -> None:
+    """`make labels` on the committed tree assembled against a random blob: no failure, the
+    program table's names are labels; a label taken out of source fails, and so does a snapshot
+    name the tree has at another address while the snapshot's address is still in a blob."""
+    labels = labels_tool()
     names = labels.snapshot_names(json.loads((REPO / "data/ida/stunrun-68k.json").read_text()))
     image = random.Random(2).randbytes(IMAGE_SIZE)
     _, listing, _ = assemble_68k(image, tmp_path / "a")
@@ -309,3 +352,13 @@ def test_labels_on_the_tree(tmp_path: Path) -> None:
     assert report.failures == [
         "gsp_program_ptr at 017004: asm/68k/programs.asm has it as source (data) without the label"
     ]
+    # vec_reset_pc is 000004 in the snapshot, inside boot/vectors.asm's incbin
+    tree = tmp_path / "tree2"
+    shutil.copytree(TREE, tree)
+    programs = tree / "programs.asm"
+    text = programs.read_text()
+    assert text.count("copyright_text:\n") == 1
+    programs.write_text(text.replace("copyright_text:\n", "vec_reset_pc:\ncopyright_text:\n"))
+    _, listing, _ = assemble_68k(image, tmp_path / "c", tree)
+    report = labels.check(listing, names)
+    assert report.failures == ["vec_reset_pc at 000004: the tree has this label at 017010"]
