@@ -364,7 +364,8 @@ switch2:
 	rts
 via_register:
 	lea	(computed-$40).l,a0
-	adda.l	#$40,a0
+	adda.l	#$44,a0
+	subq.l	#4,a0
 	jsr	(a0)
 	rts
 computed:
