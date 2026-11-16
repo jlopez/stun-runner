@@ -2,7 +2,7 @@
 
     tools/m68k classify [--image build/stunrun-68k.bin] [--out data/68k/classification.json]
                         [--operands data/68k/operands.json] [--seeds data/68k/seeds.json]
-                        [PCCOV_RUN ...]
+                        (PCCOV_RUN ... | --no-mame)
     tools/m68k stats    [--classification ...]
     tools/m68k gen START END --out FILE [--equates-out FILE] [--externals-out FILE]
                         [--equates asm/68k/hardware.asm] [--incbin PATH] [inputs as classify]
@@ -14,13 +14,17 @@
     tools/m68k pccov [--image ...] [--classification ...] --summary FILE RUN ...
 
 classify       runs the descent (with the MAME runs given as seeds) and rewrites the
-               classification and the operand decisions (commit both when they change)
+               classification and the operand decisions (commit both when they change); without
+               the runs of `make pccov` it refuses unless --no-mame says so (the committed file
+               is classified with them: three entries have MAME as their only evidence)
 stats          bytes per kind and region, the numbers of docs/14
 gen            the one-shot generator (gen.py): vasm source for START-END
 check-region   gen, then assemble the range alone in DIR with macros.asm, the equates and the
                externals, compare with the image (0 differences), run the listing descent
                check, the address lint and the shift test on it (needs the reference set)
-check-listing  the descent check and the address lint on any vasm listing and its binary
+check-listing  the descent check and the address lint on any vasm listing and its binary: fails
+               on an error of either, and on an instruction statement nothing reaches unless the
+               seeds file lists it under `unreached` with an argument
 check-unidasm  every instruction boundary of the code ranges against unidasm's
 pccov-read     drains a MAME trace pipe into the distinct PCs (make pccov)
 pccov          fails unless every executed PC starts a code instruction; writes the summary
@@ -64,6 +68,19 @@ def hexarg(s: str) -> int:
     return int(s, 16)
 
 
+def load_unreached(path: Path) -> dict[int, str]:
+    """The instruction statements the descent check may leave unreached, each with its written
+    argument (`unreached` of data/68k/seeds.json)."""
+    if not path.exists():
+        return {}
+    j = json.loads(path.read_text())
+    return {int(e["at"], 16): e["argument"] for e in j.get("unreached", [])}
+
+
+def switch_ranges(c: cl.Classification) -> list[tuple[int, int]]:
+    return [(s.start, s.end) for s in c.spans if s.kind == "switch"]
+
+
 def load_seeds(path: Path) -> tuple[list[tuple[int, str]], dict[int, str]]:
     if not path.exists():
         return [], {}
@@ -92,6 +109,10 @@ def mame_pcs(paths: list[Path]) -> set[int]:
 
 
 def cmd_classify(a: argparse.Namespace) -> int:
+    if not a.runs and not a.no_mame:
+        print("classify: no MAME run given: run `make pccov` first (the committed classification "
+              "takes three entries from it), or pass --no-mame for a classification without them")
+        return 1
     image = a.image.read_bytes()
     seeds, untaken = load_seeds(a.seeds)
     c = cl.classify(image, mame_pcs(a.runs), seeds, untaken, ida_functions(FUNCTIONS))
@@ -192,14 +213,16 @@ def check_region(a: argparse.Namespace, lo: int, hi: int, m: gn.Model) -> list[s
     ls.sizes(lst, hi)
     seeds, untaken = load_seeds(a.seeds)
     extra, outside = listed_seeds(m.cls, m.image, seeds, lambda x: lo <= x < hi)
-    rep = ls.descent_check(lst, built, lo, extra, set(), set(m.cls.noreturn), untaken, outside)
+    rep = ls.descent_check(lst, built, lo, extra, set(load_unreached(a.seeds)),
+                           set(m.cls.noreturn), untaken, outside)
     print(f"  descent check: {rep.reached} instruction statements reached, "
           f"{len(rep.unreached)} not, {len(rep.errors)} errors")
     probs += [f"  {e}" for e in rep.errors[:20]]
     if rep.unreached:
         probs.append(f"  {len(rep.unreached)} instruction statements unreached, the first "
                      + ", ".join(f"{x:06X}" for x in rep.unreached[:8]))
-    lint = ls.address_lint(lst, m.decisions, lo, hi, frozenset(macros))
+    lint = ls.address_lint(lst, m.decisions, lo, hi, frozenset(macros), built, lo,
+                           switch_ranges(m.cls))
     print(f"  address lint: {len(lint.errors)} errors, {lint.allowed} listed constants, "
           f"{len(lint.undecided)} undecided")
     probs += [f"  {e}" for e in lint.errors[:20]]
@@ -257,15 +280,20 @@ def cmd_check_listing(a: argparse.Namespace) -> int:
     code = {x.address for x in lst.statements if x.kind == "instr"}
     image = a.image.read_bytes()
     extra, outside = listed_seeds(c, image, seeds, lambda x: x in code)
-    rep = ls.descent_check(lst, binary, a.origin, extra, set(), set(c.noreturn), untaken,
+    allowed = load_unreached(a.seeds)
+    rep = ls.descent_check(lst, binary, a.origin, extra, set(allowed), set(c.noreturn), untaken,
                            outside)
     lst.statements = [s for s in lst.statements if lo <= s.address < hi]
-    lint = ls.address_lint(lst, opd.load(a.operands), lo, hi, frozenset(ls.macro_names(a.macros)))
+    lint = ls.address_lint(lst, opd.load(a.operands), lo, hi, frozenset(ls.macro_names(a.macros)),
+                           binary, a.origin, switch_ranges(c))
     print(f"descent: {rep.reached} reached, {len(rep.unreached)} unreached, {len(rep.errors)} "
           f"errors; lint: {len(lint.errors)} errors, {len(lint.undecided)} undecided")
     for e in rep.errors + lint.errors:
         print(" ", e)
-    return 1 if rep.errors or lint.errors else 0
+    for x in rep.unreached:
+        print(f"  {x:06X}: an instruction statement nothing reaches (list it under `unreached` "
+              f"in {a.seeds} with an argument, or make it data)")
+    return 1 if rep.errors or rep.unreached or lint.errors else 0
 
 
 def cmd_check_unidasm(a: argparse.Namespace) -> int:
@@ -335,6 +363,8 @@ def main() -> int:
     q.add_argument("--out", type=Path, default=CLASSIFICATION)
     q.add_argument("--operands", type=Path, default=OPERANDS)
     q.add_argument("--seeds", type=Path, default=SEEDS)
+    q.add_argument("--no-mame", action="store_true",
+                   help="classify without MAME runs (not the committed classification)")
     q.add_argument("runs", type=Path, nargs="*")
     q.set_defaults(func=cmd_classify)
 

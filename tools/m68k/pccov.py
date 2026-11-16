@@ -5,7 +5,8 @@
 fails unless every executed PC is the first byte of a `code` instruction of the classification;
 `summary` writes artifacts/pccov-summary.json: per run the frames, the number of distinct PCs
 and the executed PCs as ranges of consecutive instructions (start, end of the last instruction),
-plus the union. Addresses and counts only.
+plus the union; the runs in name order, so a re-run with the same PCs rewrites the same file.
+Addresses and counts only.
 """
 
 from __future__ import annotations
@@ -67,7 +68,7 @@ def summary(runs: dict[str, tuple[dict[str, str], set[int]]], lengths: dict[int,
             done: dict[str, str]) -> str:
     out: dict[str, object] = {"format": "stunrun-pccov 1", "runs": {}}
     allpcs: set[int] = set()
-    for name, (_header, pcs) in runs.items():
+    for name, (_header, pcs) in sorted(runs.items()):  # by name: a re-run gives the same file
         allpcs |= pcs
         rs = ranges(pcs, lengths)
         out["runs"][name] = {  # type: ignore[index]

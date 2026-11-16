@@ -569,11 +569,17 @@ M68K_TOOLS := $(wildcard tools/m68k/*.py)
 CLASSIFICATION := data/68k/classification.json
 
 # Re-run the descent over the image and rewrite data/68k/classification.json (commit it when it
-# changes): seeds from the image, data/68k/seeds.json and the MAME runs of `make pccov` when
-# present. Needs the reference set.
+# changes): seeds from the image, data/68k/seeds.json and the five MAME runs of `make pccov`,
+# which must be present (run `make -j5 pccov` first): without them three MAME entries are lost
+# and executed code becomes data. NO_MAME=1 classifies without them, into the same files: do not
+# commit that. Needs the reference set.
+PCCOV_FILES = $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt)
 classify: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
+	@if [ "$(NO_MAME)" != 1 ]; then for f in $(PCCOV_FILES); do test -f $$f || { \
+		echo "classify: $$f is missing: run make -j5 pccov first (or NO_MAME=1)"; exit 1; }; \
+		done; fi
 	$(PYTHON) tools/m68k classify --image $< --out $(CLASSIFICATION) \
-		$(wildcard $(BUILD)/mame/pccov-*.txt)
+		$(if $(filter 1,$(NO_MAME)),--no-mame,$(PCCOV_FILES))
 
 # Point 6 of issue #29 (docs/14 section 6): the generator's source for each code region,
 # assembled alone in build/m68k/, is the image (0 differences) and passes the descent check, the

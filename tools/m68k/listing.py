@@ -8,10 +8,12 @@ These are the checks a code leg runs on its own source, and the CI tests run on 
   descent decodes starts at an instruction statement and has its length; no flow enters a
   `dc`/`dcb`/`ds`/`incbin` statement (a call that never returns is allowed to be followed by
   data only when it is listed);
-- `address_lint`: no numeric operand that could be an address of the image: an absolute operand
-  with a value in 000000-0BFFFF (but `pea N.w`, always a constant in this ROM), a long immediate
-  or a `dc.l` value in 000100-0BFFFF that the operand decisions do not list as a constant
-  (undecided ones are reported apart);
+- `address_lint`: no operand that names no symbol (a number, or an expression of numbers such as
+  `$418B0+8`; its value is read from the assembled bytes) and could be an address of the image:
+  an absolute operand, a PC-relative operand or a branch target in 000000-0BFFFF (but
+  `pea N.w`, always a constant in this ROM), a long immediate or a `dc.l` value in 000100-0BFFFF
+  that the operand decisions do not list as a constant (undecided ones are reported apart), a
+  `dc.w` entry of a switch table;
 - `shift_check`: assembled again with a pad in front, exactly the statements whose operands
   name, other than PC-relatively, a symbol inside the moved range change, and each changed word
   grows by the pad.
@@ -27,7 +29,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .descent import Descent
+from .decode import ABSL, ABSW, IMM, PCDISP, PCINDEX, TARGET, Insn, decode
+from .descent import Descent, _abs
 
 STATEMENT = re.compile(r"^([0-9A-F]{2}):([0-9A-F]{8}) ([0-9A-F ]*)\t\s*(\d+)(M?)[: ] ?(.*)$")
 CONTINUATION = re.compile(r"^[0-9A-F]{2}:[0-9A-F]{8} [0-9A-F ]*$")
@@ -277,10 +280,29 @@ class LintReport:
     allowed: int = 0
 
 
+IDENT = re.compile(r"(?<![\w.$%@'])([A-Za-z_.][\w.]*)")
+REGISTERS = re.compile(r"^(d[0-7]|a[0-7]|sp|pc|sr|ccr|usp|vbr|sfc|dfc)(\.[wlbs])?$", re.I)
+
+
+def names_symbol(op: str) -> bool:
+    """Does an operand's text name a symbol (anything but registers, sizes and numbers)?"""
+    for m in IDENT.finditer(op.split(";", 1)[0]):
+        name = m.group(1)
+        if REGISTERS.match(name) or name.lower() in (".w", ".l", ".b", ".s", "w", "l"):
+            continue
+        return True
+    return False
+
+
 def address_lint(lst: Listing, decisions: dict[tuple[int, int], str],
-                 lo: int = 0, hi: int = 0x0C0000, macros: frozenset[str] = frozenset()
-                 ) -> LintReport:
+                 lo: int = 0, hi: int = 0x0C0000, macros: frozenset[str] = frozenset(),
+                 image: bytes | None = None, origin: int = 0,
+                 switches: list[tuple[int, int]] | None = None) -> LintReport:
+    """image: the assembled bytes (image[0] at origin), from which an operand's value is read
+    when its text names no symbol; switches: the switch tables' ranges, whose `dc.w` entries
+    must name their case."""
     rep = LintReport()
+    full = bytes(origin) + image if image is not None else None
     for s in lst.statements:
         if not lo <= s.address < hi or s.kind == "blob":
             continue
@@ -290,46 +312,91 @@ def address_lint(lst: Listing, decisions: dict[tuple[int, int], str],
         mn, ops = parts[0].lower(), _split_operands(parts[1])
         if s.kind == "data":
             if mn == "dc.l":
-                for op in ops:
+                for k, op in enumerate(ops):
                     v = _num(op)
+                    if v is None and full is not None and not names_symbol(op):
+                        p = s.address + 4 * k
+                        v = int.from_bytes(full[p : p + 4], "big")
                     if v is not None and 0x100 <= v < 0x0C0000:
                         rep.errors.append(f"{s.address:06X}: dc.l {op} could be an address")
+            elif mn == "dc.w" and any(a <= s.address < b for a, b in switches or []):
+                for op in ops:
+                    if not names_symbol(op):
+                        rep.errors.append(f"{s.address:06X}: dc.w {op}: a switch entry written "
+                                          f"as a number")
             continue
-        size = mn.rsplit(".", 1)[1] if "." in mn else ""
-        for i, op in enumerate(ops):
-            if op.startswith("#"):
-                v = _num(op[1:])
-                if v is None or not 0x100 <= v < 0x0C0000 or size != "l":
-                    continue
-                d = decisions.get((s.address, i))
-                if d == "constant":
-                    rep.allowed += 1
-                elif d == "undecided":
-                    rep.undecided.append(f"{s.address:06X}: {s.text}")
-                else:
-                    rep.errors.append(f"{s.address:06X}: {s.text}: the immediate {op} could be "
-                                      f"an address and has no decision")
-                continue
-            inner = op[1:-1] if op.startswith("(") and op.endswith(")") else op
-            for suffix in (".w", ".l", ".W", ".L"):
-                if op.endswith(suffix):
-                    inner = op[: -len(suffix)]
-                    inner = inner[1:-1] if inner.startswith("(") and inner.endswith(")") else inner
-            v = _num(inner)
-            if v is None or v >= 0x0C0000 or (mn in macros and v < 0x100):
-                continue  # a macro's small number is a register number, not an address
-            if mn == "pea" and op.lower().endswith(".w"):
-                continue
-            rep.errors.append(f"{s.address:06X}: {s.text}: the absolute operand {op} is a ROM "
-                              f"address written as a number")
+        insn = decode(full, s.address) if full is not None and mn not in macros else None
+        if insn is not None and len(insn.operands) == len(ops):
+            _lint_decoded(s, insn, ops, decisions, rep)
+            continue
+        _lint_text(s, ops, mn, decisions, macros, rep)
     return rep
 
 
+def _lint_decoded(s: Stmt, insn: Insn, ops: list[str],
+                  decisions: dict[tuple[int, int], str], rep: LintReport) -> None:
+    """The operands of an instruction statement, their values from the encoding."""
+    for i, (o, op) in enumerate(zip(insn.operands, ops, strict=True)):
+        if names_symbol(op):
+            continue
+        if o.mode == IMM:
+            v = o.value & 0xFFFFFFFF
+            if o.size != "l" or not 0x100 <= v < 0x0C0000:
+                continue
+            d = decisions.get((s.address, i))
+            if d == "constant":
+                rep.allowed += 1
+            elif d == "undecided":
+                rep.undecided.append(f"{s.address:06X}: {s.text}")
+            else:
+                rep.errors.append(f"{s.address:06X}: {s.text}: the immediate {op} could be an "
+                                  f"address and has no decision")
+        elif o.mode in (ABSW, ABSL):
+            v = _abs(o)
+            if v >= 0x0C0000 or (insn.mnemonic == "pea" and o.mode == ABSW):
+                continue
+            rep.errors.append(f"{s.address:06X}: {s.text}: the absolute operand {op} is a ROM "
+                              f"address written as a number")
+        elif o.mode in (PCDISP, PCINDEX, TARGET):
+            if (o.value & 0xFFFFFF) >= 0x0C0000:
+                continue
+            rep.errors.append(f"{s.address:06X}: {s.text}: the PC-relative operand or target {op} "
+                              f"is a ROM address written as a number")
+
+
+def _lint_text(s: Stmt, ops: list[str], mn: str, decisions: dict[tuple[int, int], str],
+               macros: frozenset[str], rep: LintReport) -> None:
+    """Without the bytes (or for a macro): single numbers in the text."""
+    size = mn.rsplit(".", 1)[1] if "." in mn else ""
+    for i, op in enumerate(ops):
+        if op.startswith("#"):
+            v = _num(op[1:])
+            if v is None or not 0x100 <= v < 0x0C0000 or size != "l":
+                continue
+            d = decisions.get((s.address, i))
+            if d == "constant":
+                rep.allowed += 1
+            elif d == "undecided":
+                rep.undecided.append(f"{s.address:06X}: {s.text}")
+            else:
+                rep.errors.append(f"{s.address:06X}: {s.text}: the immediate {op} could be "
+                                  f"an address and has no decision")
+            continue
+        inner = op[1:-1] if op.startswith("(") and op.endswith(")") else op
+        for suffix in (".w", ".l", ".W", ".L"):
+            if op.endswith(suffix):
+                inner = op[: -len(suffix)]
+                inner = inner[1:-1] if inner.startswith("(") and inner.endswith(")") else inner
+        v = _num(inner)
+        if v is None or v >= 0x0C0000 or (mn in macros and v < 0x100):
+            continue  # a macro's small number is a register number, not an address
+        if mn == "pea" and op.lower().endswith(".w"):
+            continue
+        rep.errors.append(f"{s.address:06X}: {s.text}: the absolute operand {op} is a ROM "
+                          f"address written as a number")
+
+
 # --- the shift test ----------------------------------------------------------------------------
-
-IDENT = re.compile(r"(?<![\w.$%@])([A-Za-z_.][\w.]*)")
-REGISTERS = re.compile(r"^(d[0-7]|a[0-7]|sp|pc|sr|ccr|usp|vbr|sfc|dfc)(\.[wl])?$", re.I)
-
 
 def symbolic_moving(s: Stmt, symbols: dict[str, int], lo: int, hi: int) -> bool:
     """Does the statement name, other than PC-relatively or as a difference, a symbol whose
