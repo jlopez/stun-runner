@@ -277,6 +277,14 @@ make m68k-check        # check-region for each code region into build/m68k/, the
 
 `make test` runs the same per region (`test_regions_reassemble`, skipped without the image).
 
+The CI tests catch a broken tool: fourteen planted faults in the tools (a short branch read
+unsigned, any byte-immediate high byte or a scale factor accepted, the switch's first case
+forced to 0, the return-address idiom or `subq` in a computed call ignored, the text rule
+without its word, absolute short RAM without `ABS_SHORT`, locals never promoted, the operand
+decisions ignored, the descent check's mid-instruction error, the lint's absolute operands,
+the shift test's missed moves, the MAME checker) each fail at least one CI test of
+`tools/test_m68k.py`.
+
 ## 7. MAME coverage
 
 `make pccov` (`tools/mame/pccov.lua`) runs MAME headless under `-debug -debugger none`, each run
@@ -319,13 +327,6 @@ called through a pointer the code keeps in RAM, HYP).
    instructions, the vectors and the calls from code still in blobs, and lets a flow end at
    classified code outside. The shift test as in `check-region` (a pad before the region's first
    statement).
-5. Mutation check of the CI tests (M5g): fourteen planted faults in the tools (a short branch read
-   unsigned, any byte-immediate high byte or a scale factor accepted, the switch's first case
-   forced to 0, the return-address idiom or `subq` in a computed call ignored, the text rule
-   without its word, absolute short RAM without `ABS_SHORT`, locals never promoted, the operand
-   decisions ignored, the descent check's mid-instruction error, the lint's absolute operands,
-   the shift test's missed moves, the MAME checker) each fail at least one CI test of
-   `tools/test_m68k.py`.
 4. Decide the undecided operands of the region (section 4) and the unknown ranges that decode
    cleanly (section 3) with written arguments.
 
