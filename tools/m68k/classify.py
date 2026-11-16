@@ -6,12 +6,10 @@ it adds, then classifies every byte that is not code:
 1. plain seeds: the vectors of both tables (000000, 020000) and `game_entries` (020100, 020106,
    02010C), with the idioms of descent.py (switches, computed calls, code-pointer tables, return
    addresses) as they come;
-2. address-register loads: `movea.l #X,An` with X in a code range (a routine's address held in a
-   register: a callback); the target must descend cleanly;
-3. code-pointer tables in data: a run of two or more aligned longs outside code, all pointing
+2. code-pointer tables in data: a run of two or more aligned longs outside code, all pointing
    into the code ranges, one of them at an instruction already decided; the others are seeded;
-4. MAME: every PC the `make pccov` runs executed (the runs given);
-5. reviewed seeds: data/68k/seeds.json, an address and the written argument for each.
+3. MAME: every PC the `make pccov` runs executed (the runs given);
+4. reviewed seeds: data/68k/seeds.json, an address and the written argument for each.
 
 Then, for the bytes that are no instruction and no table: text (a run of at least six printable
 characters, mostly letters, digits and the punctuation of messages, with its terminating zero),
@@ -26,7 +24,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .decode import ABSL, ABSW, CALL, IMM, JUMP, PCDISP, PCINDEX, STOP, decode
@@ -48,6 +46,19 @@ KNOWN = [
     (0x01907C, 0x01EFD4, "data", "the GSP program's section table, read by load_gsp_program "
                                  "02FDD0 (docs/06 section 3.2)"),
 ]
+
+
+@dataclass
+class Layout:
+    """Where code may be and what the image says about itself (the defaults: stunrun's)."""
+
+    end: int = END
+    eligible: list[tuple[int, int]] = field(default_factory=lambda: list(ELIGIBLE))
+    vector_tables: list[tuple[int, str]] = field(default_factory=lambda: list(VECTOR_TABLES))
+    entries: list[int] = field(default_factory=lambda: list(GAME_ENTRIES))
+    known: list[tuple[int, int, str, str]] = field(default_factory=lambda: list(KNOWN))
+
+
 KINDS = ("code", "switch", "pointers", "text", "data", "fill", "unknown")
 TEXT_MIN = 6
 FILL_MIN = 32
@@ -82,6 +93,7 @@ class Classification:
     noreturn: dict[int, str]
     rejected: dict[int, str]
     result: Result | None = None
+    end: int = END
 
     def code_starts(self, image: bytes) -> dict[int, int]:
         """Every instruction start of the code ranges and its length, by linear decoding."""
@@ -108,34 +120,28 @@ def _long(image: bytes, a: int) -> int:
 
 
 def run_descent(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
-                untaken: dict[int, str]) -> Descent:
-    d = Descent(image, ELIGIBLE, untaken)
-    for base, _ in VECTOR_TABLES:
+                untaken: dict[int, str], lay: Layout) -> Descent:
+    d = Descent(image, lay.eligible, untaken)
+    for base, _ in lay.vector_tables:
         d.table_bytes.update(range(base, base + 0x100))
-    d.table_bytes.update(range(0x017000, 0x017008))
+    for lo, hi, _, _ in lay.known:
+        d.table_bytes.update(range(lo, hi))
     # 1. plain seeds
-    for base, _ in VECTOR_TABLES:
+    for base, _ in lay.vector_tables:
         for n in range(1, 64):
             v = _long(image, base + 4 * n)
             if v and d.is_eligible(v):
                 d.add(v, None, plain=True)
-    for a in GAME_ENTRIES:
+    for a in lay.entries:
         d.add(a, None, plain=True)
     d.run()
-    # 2. address-register loads of a code address
-    for a, insn in sorted(d.r.insns.items()):
-        if insn.mnemonic == "movea" and insn.size == "l" and insn.operands[0].mode == IMM:
-            v = insn.operands[0].value
-            if d.is_eligible(v) and v not in d.r.insns:
-                d.add(v, f"address operand: movea.l at {a:06X}", P_LATE)
-    d.run()
-    # 3. code-pointer tables in data
-    _pointer_runs(d, image)
-    # 4. MAME
+    # 2. code-pointer tables in data
+    _pointer_runs(d, image, lay.end)
+    # 3. MAME
     for pc in sorted(mame_pcs):
         if pc not in d.r.insns:
             d.add(pc, "MAME executed (make pccov)", P_LATE)
-    # 5. reviewed seeds
+    # 4. reviewed seeds
     for a, why in seeds:
         d.add(a, f"reviewed: {why}", P_LATE)
     d.run()
@@ -149,20 +155,20 @@ def routine_starts(r: Result) -> set[int]:
     return out
 
 
-def _pointer_runs(d: Descent, image: bytes) -> None:
+def _pointer_runs(d: Descent, image: bytes, end: int) -> None:
     """Runs of at least three aligned longs outside code, all into the code ranges, at least
     half of them (and at least two) at routine starts already decided: the others are seeds."""
     for _ in range(4):
         starts = routine_starts(d.r)
         found = False
         a = 0
-        while a < END - 4:
+        while a < end - 4:
             if not d.is_free(a, 4) or not d.is_eligible(_long(image, a)):
                 a += 2
                 continue
             run = []
             p = a
-            while p < END - 4 and d.is_free(p, 4) and d.is_eligible(_long(image, p)):
+            while p < end - 4 and d.is_free(p, 4) and d.is_eligible(_long(image, p)):
                 run.append(p)
                 p += 4
             known = [q for q in run if _long(image, q) in starts]
@@ -181,7 +187,7 @@ def _pointer_runs(d: Descent, image: bytes) -> None:
         d.run()
 
 
-def _data_refs(r: Result) -> dict[int, list[int]]:
+def _data_refs(r: Result, end: int) -> dict[int, list[int]]:
     """Addresses below END that an instruction's operand designates as data."""
     refs: dict[int, list[int]] = {}
     for a, insn in r.insns.items():
@@ -198,12 +204,26 @@ def _data_refs(r: Result) -> dict[int, list[int]]:
                 v = o.value
             else:
                 continue
-            if v < END:
+            if v < end:
                 refs.setdefault(v, []).append(a)
     return refs
 
 
-def _text_runs(image: bytes, lo: int, hi: int) -> list[tuple[int, int]]:
+SAME_CASE = re.compile(rb"[A-Z]{4}|[a-z]{4}")
+
+
+def _is_text(run: bytes) -> bool:
+    """At least TEXT_MIN characters, nine in ten of them letters, digits, blanks or the
+    punctuation of messages, half of them letters, and a word of four letters of one case:
+    code is often printable too (4E71 4E75 is "NqNu")."""
+    wordy = sum(1 for c in run if c in TEXT_WORDY)
+    letters = sum(1 for c in run if chr(c).isalpha())
+    return (len(run) >= TEXT_MIN and wordy * 10 >= 9 * len(run) and letters * 2 >= len(run)
+            and SAME_CASE.search(run) is not None)
+
+
+def _text_runs(image: bytes, lo: int, hi: int, refs: set[int]) -> list[tuple[int, int]]:
+    """Printable runs that read as text, cut where an operand points (a string starts there)."""
     out = []
     a = lo
     while a < hi:
@@ -213,15 +233,12 @@ def _text_runs(image: bytes, lo: int, hi: int) -> list[tuple[int, int]]:
         b = a
         while b < hi and image[b] in TEXT_CHARS:
             b += 1
-        run = image[a:b]
-        wordy = sum(1 for c in run if c in TEXT_WORDY)
-        letters = sum(1 for c in run if chr(c).isalpha())
-        if b - a >= TEXT_MIN and wordy * 10 >= 9 * (b - a) and letters * 2 >= b - a:
-            end = b + 1 if b < hi and image[b] == 0 else b
-            out.append((a, end))
-            a = end
-        else:
-            a = b
+        cuts = [a] + sorted(r for r in refs if a < r < b) + [b]
+        for x, y in zip(cuts, cuts[1:], strict=False):
+            if _is_text(image[x:y]):
+                end = y + 1 if y == b and b < hi and image[b] == 0 else y
+                out.append((x, end))
+        a = b + 1 if b < hi and image[b] == 0 else b
     return out
 
 
@@ -233,8 +250,11 @@ def _zero_runs(image: bytes, lo: int, hi: int) -> list[tuple[int, int]]:
 
 
 def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
-             untaken: dict[int, str], ida_functions: dict[int, str]) -> Classification:
-    d = run_descent(image, mame_pcs, seeds, untaken)
+             untaken: dict[int, str], ida_functions: dict[int, str],
+             lay: Layout | None = None) -> Classification:
+    lay = lay or Layout()
+    END = lay.end  # noqa: N806
+    d = run_descent(image, mame_pcs, seeds, untaken, lay)
     r = d.r
     kind = ["unknown"] * END
     note: dict[int, str] = {}
@@ -242,7 +262,7 @@ def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
     for a, insn in r.insns.items():
         for b in range(a, a + insn.length):
             kind[b] = "code"
-    for base, why in VECTOR_TABLES:
+    for base, why in lay.vector_tables:
         for b in range(base, base + 0x100):
             kind[b] = "pointers"
         note[base] = why
@@ -253,16 +273,16 @@ def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
         for b in range(t.start, t.end):
             kind[b] = "pointers"
         note[t.start] = f"code-pointer table: {t.evidence}"
-    for lo, hi, k, why in KNOWN:
+    for lo, hi, k, why in lay.known:
         for b in range(lo, hi):
             assert kind[b] == "unknown", f"{b:06X}"
             kind[b] = k
         note[lo] = why
-    refs = _data_refs(r)
+    refs = _data_refs(r, END)
     # text, fill, data, unknown over what is left
     gaps = _runs(kind, "unknown")
     for lo, hi in gaps:
-        for a, b in _text_runs(image, lo, hi):
+        for a, b in _text_runs(image, lo, hi, set(refs)):
             for x in range(a, b):
                 kind[x] = "text"
     for lo, hi in _runs(kind, "unknown"):
@@ -301,9 +321,9 @@ def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
             spans.append(sp)
             start = x
     for sp in spans:
-        if sp.kind == "unknown" and any(lo <= sp.start < hi for lo, hi in ELIGIBLE):
+        if sp.kind == "unknown" and any(lo <= sp.start < hi for lo, hi in lay.eligible):
             sp.note = _unknown_note(image, sp, ida_functions)
-    return Classification(spans, dict(r.entries), dict(r.noreturn), dict(r.rejected), r)
+    return Classification(spans, dict(r.entries), dict(r.noreturn), dict(r.rejected), r, END)
 
 
 def _runs(kind: list[str], k: str) -> list[tuple[int, int]]:
@@ -352,7 +372,7 @@ FORMAT = "stunrun-68k-classification 1"
 
 
 def dump(c: Classification) -> str:
-    lines = ["{", f'  "format": "{FORMAT}",', f'  "range": ["000000", "{END:06X}"],',
+    lines = ["{", f'  "format": "{FORMAT}",', f'  "range": ["000000", "{c.end:06X}"],',
              '  "ranges": [']
     lines += [f"    {json.dumps(s.to_json())}," for s in c.spans]
     lines[-1] = lines[-1].rstrip(",")
@@ -383,11 +403,12 @@ def load(path: Path) -> Classification:
         spans.append(s)
     entries = {int(e["at"], 16): e["evidence"] for e in j["entries"]}
     noreturn = {int(e["call"], 16): e["why"] for e in j.get("noreturn", [])}
-    return Classification(spans, entries, noreturn, {})
+    return Classification(spans, entries, noreturn, {}, None, int(j["range"][1], 16))
 
 
-def validate(c: Classification, start: int = 0, end: int = END) -> list[str]:
+def validate(c: Classification, start: int = 0) -> list[str]:
     """Problems with the ranges: a gap, an overlap, an empty or odd range."""
+    end = c.end
     errs = []
     pos = start
     for s in c.spans:

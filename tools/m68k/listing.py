@@ -352,6 +352,8 @@ def symbolic_moving(s: Stmt, symbols: dict[str, int], lo: int, hi: int) -> bool:
             if REGISTERS.match(name) or name.lower() in ("w", "l"):
                 continue
             v = symbols.get(name)
+            if v is None and name[-2:].lower() in (".w", ".l"):
+                v = symbols.get(name[:-2])  # an absolute operand's size: sub_7000.w
             if v is not None and lo <= v < hi:
                 return True
     return False
