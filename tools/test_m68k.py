@@ -29,7 +29,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from m68k import classify as cl
 from m68k import gen as gn
 from m68k import listing as ls
