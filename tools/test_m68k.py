@@ -1082,6 +1082,33 @@ def test_gen_equates_and_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert built == image
 
 
+@needs_vasm
+def test_operand_rule_table_base(tmp_path: Path) -> None:
+    """R2b: add.l/addi.l #X,Dn then movea.l Dn,An with X in a table range is an address (the
+    boot program's 002FBE); without the movea of that register, or X outside a table, R6."""
+    src = ("\torg\t$1000\n"
+           "\taddi.l\t#$2000,d6\n\tmovea.l\td6,a6\n"      # R2b
+           "\tadd.l\t#$2004,d3\n\tmovea.l\td3,a0\n"       # R2b (add form)
+           "\taddi.l\t#$2000,d6\n\tmovea.l\td5,a6\n"      # another register: R6
+           "\taddi.l\t#$2000,d6\n\tnop\n"                 # no movea: R6
+           "\taddi.l\t#$3000,d6\n\tmovea.l\td6,a6\n")     # outside the table: R6
+    image, _ = assemble(tmp_path, "r2b", src)
+    image = bytes(0x1000) + image
+    insns = {}
+    a = 0x1000
+    while a < len(image):
+        insn = decode(image, a)
+        assert insn is not None
+        insns[a] = insn
+        a += insn.length
+    got = [(e["at"], e["rule"], e["decision"])
+           for e in opd.build(insns, set(), set(), [(0x2000, 0x2010)])]
+    assert got == [("001000", "R2b", "address"), ("001008", "R2b", "address"),
+                   ("001010", "R6", "constant"), ("001018", "R6", "constant"),
+                   ("001020", "R6", "constant")], got
+    assert [e["rule"] for e in opd.build(insns, set(), set())] == ["R6"] * 5
+
+
 def test_pccov_rejects_empty_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str],
                                   monkeypatch: pytest.MonkeyPatch) -> None:
     """A trace the debugger never wrote (an empty run file) or a run that did not finish (no
@@ -1157,6 +1184,9 @@ def test_committed_operands_and_seeds() -> None:
         assert set(e) == {"at", "argument"} and len(e["argument"]) > 40
     for e in j["untaken"]:
         assert any(lo <= int(e["at"], 16) < hi for lo, hi in code)
+    # R2b: the boot program's table bases added to an index and moved into A6 (002FBE ...)
+    for at in (0x002FBE, 0x00307C, 0x00317E, 0x0048CC, 0x0049A6):
+        assert d[(at, 0)] == "address", f"{at:06X}"
 
 
 def test_committed_pccov_summary() -> None:

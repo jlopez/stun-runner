@@ -69,6 +69,7 @@ REGIONS = [("boot vectors", 0x000000, 0x000212), ("boot code", 0x000212, 0x012F0
            ("game code", 0x020430, 0x04397E), ("game island", 0x04397E, 0x046AEE),
            ("game data", 0x046AEE, 0x05CF86)]
 CODE_REGIONS = [(0x000212, 0x012F06), (0x020430, 0x04397E), (0x04397E, 0x046AEE)]
+TABLE_KINDS = ("data", "text", "pointers")  # where rule R2b's table base may point
 
 
 def hexarg(s: str) -> int:
@@ -149,7 +150,8 @@ def cmd_classify(a: argparse.Namespace) -> int:
             if o.mode in ("absl", "pcdisp", "pcindex") or (o.mode == "absw" and
                                                            insn.mnemonic != "pea"):
                 addresses.add(o.value)
-    a.operands.write_text(opd.dump(opd.build(r.insns, starts, addresses)))
+    tables = [(s.start, s.end) for s in c.spans if s.kind in TABLE_KINDS]
+    a.operands.write_text(opd.dump(opd.build(r.insns, starts, addresses, tables)))
     st = cl.stats(c, REGIONS)
     code = sum(v["code"] for v in st.values())
     print(f"{a.out}: {len(c.spans)} ranges, {code} bytes of code, {len(c.entries)} entries with "

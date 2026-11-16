@@ -12,6 +12,10 @@ The rules, in order (the first that matches decides):
 
     R1 address    movea.l #X,An: a value loaded into an address register
     R2 address    X = 0BFE00, the image pointer table (docs/06 section 4.2), added to an index
+    R2b address   add/addi.l #X,Dn followed at once by movea.l Dn,An, X in a data, text or
+                  pointer range of the classification: a table base added to an index, the
+                  sum read through An (the boot program's 002FBE, 00307C, 00317E, 0048CC,
+                  0049A6)
     R3 address    move.l/pea of X where X starts a routine (a call target or an entry with
                   evidence): a routine's address handed on (a callback)
     R4 address    move.l of X >= 020000 where X is an address some instruction uses as an
@@ -31,13 +35,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .decode import AN, IMM, Insn
+from .decode import AN, DN, IMM, Insn
 
 LO, HI = 0x000100, 0x0C0000
 FORMAT = "stunrun-68k-operands 1"
 RULES = {
     "R1": ("address", "movea.l into an address register"),
     "R2": ("address", "the image pointer table 0BFE00 (docs/06 4.2)"),
+    "R2b": ("address", "a table base added to an index register that is then moved into an "
+            "address register"),
     "R3": ("address", "a routine's address handed on (a callback)"),
     "R4": ("address", "an address other instructions use as an operand"),
     "R5": ("constant", "a mask"),
@@ -56,13 +62,28 @@ def candidates(insn: Insn) -> list[int]:
             if o.mode == IMM and o.size == "l" and LO <= o.value < HI]
 
 
-def decide(insn: Insn, i: int, routine_starts: set[int], operand_addresses: set[int]) -> str:
+def table_base(insn: Insn, nxt: Insn | None, v: int, tables: list[tuple[int, int]]) -> bool:
+    """add/addi.l #X,Dn then movea.l Dn,An, with X in a table range (rule R2b)."""
+    if insn.mnemonic not in ("add", "addi") or insn.size != "l" or nxt is None:
+        return False
+    dst = insn.operands[-1]
+    if dst.mode != DN or nxt.mnemonic != "movea" or nxt.size != "l":
+        return False
+    src = nxt.operands[0]
+    return src.mode == DN and src.reg == dst.reg and any(a <= v < b for a, b in tables)
+
+
+def decide(insn: Insn, i: int, routine_starts: set[int], operand_addresses: set[int],
+           nxt: Insn | None = None, tables: list[tuple[int, int]] | None = None) -> str:
+    """nxt: the instruction after insn; tables: the data, text and pointer ranges."""
     v = insn.operands[i].value
     mn = insn.mnemonic
     if mn == "movea" and insn.operands[-1].mode == AN:
         return "R1"
     if v == 0x0BFE00:
         return "R2"
+    if table_base(insn, nxt, v, tables or []):
+        return "R2b"
     if mn in ("move", "pea") and v in routine_starts:
         return "R3"
     if mn == "move" and v in operand_addresses and v >= 0x020000:
@@ -76,12 +97,14 @@ def decide(insn: Insn, i: int, routine_starts: set[int], operand_addresses: set[
     return "R8"
 
 
-def build(insns: dict[int, Insn], routine_starts: set[int], operand_addresses: set[int]
-          ) -> list[dict[str, object]]:
+def build(insns: dict[int, Insn], routine_starts: set[int], operand_addresses: set[int],
+          tables: list[tuple[int, int]] | None = None) -> list[dict[str, object]]:
+    """tables: the classification's data, text and pointer ranges (rule R2b)."""
     out = []
     for a in sorted(insns):
         for i in candidates(insns[a]):
-            rule = decide(insns[a], i, routine_starts, operand_addresses)
+            nxt = insns.get(a + insns[a].length)
+            rule = decide(insns[a], i, routine_starts, operand_addresses, nxt, tables)
             out.append({"at": f"{a:06X}", "operand": i, "decision": RULES[rule][0],
                         "rule": rule})
     return out
