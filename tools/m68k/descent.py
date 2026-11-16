@@ -17,9 +17,15 @@ idioms that hide a flow behind a register or a table:
   an index (`movea.l (d,An,Xn)`, `movea.l (d,pc,Xn)`) or without (`movea.l (An)`/`(d,An)`), then
   `jsr`/`jmp (Am)` through the loaded register; the table's longs are taken while each one
   descends cleanly;
-- the return address of the boot program, which runs without a stack: `lea ret,An` directly
-  before an unconditional `bra`/`jmp`, with ret the address right after that branch (the callee
-  returns with `jmp (An)`).
+- a record table: the same load at an offset (`movea.l (off,An),Am`, `jsr (Am)`) inside a loop
+  that steps An by a constant stride after the call (`adda`/`addq #stride,An` or
+  `lea (stride,An),An`) and closes with `dbcc Dn`, Dn set before the loop from a word of the image
+  (`move.w abs,Dn`) or a constant (`moveq`/`move.w #`): count records of stride bytes from the
+  base, the routine pointer of each at +off (the boot program's 000EB2 walks 000E12-000EB2);
+- the return address of the boot program, which runs without a stack: a register holding the
+  address right after an unconditional `bra`/`jmp` when it is taken (`lea ret,An` directly before
+  it, or set earlier in the same straight line and not changed since, as 00953A `lea $954A,a2`,
+  009540 `movea.l #0,a0`, 009546 `bra.w`); the callee returns with `jmp (An)`.
 
 A seed's descent is a transaction: it is committed only if every instruction it reaches by a
 static flow decodes as a 68010 instruction (decode.py), lies inside the code-eligible ranges, does
@@ -98,12 +104,26 @@ class PointerTable:
 
 
 @dataclass
+class RecordTable:
+    start: int  # the first record
+    count: int  # records
+    stride: int  # bytes per record
+    offset: int  # of the routine pointer in a record
+    evidence: str
+
+    @property
+    def end(self) -> int:
+        return self.start + self.stride * self.count
+
+
+@dataclass
 class Result:
     insns: dict[int, Insn] = field(default_factory=dict)
     entries: dict[int, str] = field(default_factory=dict)  # evidence of the non-plain entries
     plain: set[int] = field(default_factory=set)  # instructions reached from plain seeds
     switches: dict[int, Switch] = field(default_factory=dict)  # by table start
     pointer_tables: dict[int, PointerTable] = field(default_factory=dict)
+    record_tables: dict[int, RecordTable] = field(default_factory=dict)
     rejected: dict[int, str] = field(default_factory=dict)  # seed -> why
     noreturn: dict[int, str] = field(default_factory=dict)  # call -> why its fall-through failed
 
@@ -123,6 +143,7 @@ class _Txn:
     calls: list[int] = field(default_factory=list)
     followups: list[tuple[int, int, str]] = field(default_factory=list)  # (prio, addr, evidence)
     tables: list[tuple[int, int, str]] = field(default_factory=list)  # (start, limit, evidence)
+    records: list[tuple[int, str]] = field(default_factory=list)  # (start, spec)
 
 
 class Descent:
@@ -168,6 +189,9 @@ class Descent:
             if job == "table":
                 assert evidence is not None
                 self._expand_table(addr, evidence)
+            elif job == "records":
+                assert evidence is not None
+                self._expand_records(addr, evidence)
             elif job == "call":
                 self._after_call(addr, plain)
             else:
@@ -199,6 +223,8 @@ class Descent:
             self.add(a, ev, prio)
         for start, limit, ev in t.tables:
             self._push("table", start, f"{limit}:{ev}", P_TABLE, False)
+        for start, spec in t.records:
+            self._push("records", start, spec, P_TABLE, False)
         return True
 
     def _after_call(self, call: int, plain: bool) -> None:
@@ -231,6 +257,29 @@ class Descent:
         if count:
             self.r.pointer_tables[start] = PointerTable(start, count, ev)
 
+    def _expand_records(self, start: int, spec: str) -> None:
+        """count records of stride bytes from start, a routine pointer at +offset in each: the
+        records are taken while each pointer descends cleanly."""
+        count_s, stride_s, off_s, ev = spec.split(":", 3)
+        count, stride, off = int(count_s), int(stride_s), int(off_s)
+        if start in self.r.record_tables or not self.is_free(start, stride * count):
+            return
+        done = 0
+        for k in range(count):
+            rec = start + stride * k
+            v = int.from_bytes(self.image[rec + off : rec + off + 4], "big")
+            if not self.is_eligible(v):
+                break
+            self.table_bytes.update(range(rec, rec + stride))
+            if not self._seed(v, f"entry {k} of the record table at {start:06X} ({count} records "
+                                 f"of {stride} bytes, the routine pointer at +{off}; {ev})", False):
+                self.table_bytes.difference_update(range(rec, rec + stride))
+                self.r.rejected.pop(v, None)
+                break
+            done += 1
+        if done:
+            self.r.record_tables[start] = RecordTable(start, done, stride, off, ev)
+
     # --- one transaction ----------------------------------------------------------------------
     def _descend(self, seed: int) -> _Txn:
         t = _Txn()
@@ -262,7 +311,7 @@ class Descent:
             elif insn.flow in (JUMP, CALL):
                 self._idioms(insn, regs, t)
             if insn.flow == JUMP:
-                self._return_address(insn, t)
+                self._return_address(insn, regs, t)
             if insn.flow == CALL:
                 t.calls.append(a)
             elif insn.flow in (FALL, BRANCH):
@@ -276,17 +325,24 @@ class Descent:
                 return p
         return None
 
-    def _return_address(self, insn: Insn, t: _Txn) -> None:
+    def _return_address(self, insn: Insn, regs: Regs, t: _Txn) -> None:
+        """An unconditional branch taken with the address right after it in a register: the
+        `lea` directly before it, or a register set earlier in the same straight line and not
+        changed since (00953A `lea $954A,a2`, 009540 `movea.l #0,a0`, 009546 `bra.w`)."""
+        ret = insn.addr + insn.length
         prev = self._prev(insn.addr, t)
-        if prev is None or prev.mnemonic != "lea":
-            return
-        src = prev.operands[0]
-        if src.mode not in (PCDISP, ABSL, ABSW):
-            return
-        ret = _abs(src)
-        if ret == insn.addr + insn.length:
+        if prev is not None and prev.mnemonic == "lea" \
+                and prev.operands[0].mode in (PCDISP, ABSL, ABSW) \
+                and _abs(prev.operands[0]) == ret:
             t.followups.append((P_COMPUTED, ret, f"return address: lea at {prev.addr:06X} before "
                                                  f"the {insn.mnemonic} at {insn.addr:06X}"))
+            return
+        for reg, (kind, value, at) in sorted(regs.items()):
+            if kind == "const" and value == ret:
+                t.followups.append((P_COMPUTED, ret, f"return address: a{reg} set at {at:06X}, "
+                                                     f"kept to the {insn.mnemonic} at "
+                                                     f"{insn.addr:06X}"))
+                return
 
     def _idioms(self, insn: Insn, regs: Regs, t: _Txn) -> None:
         op = insn.operands[0]
@@ -316,10 +372,84 @@ class Descent:
                 t.followups.append((P_COMPUTED, target, f"computed {insn.mnemonic}: a{op.reg} "
                                                         f"set at {at:06X}, {insn.mnemonic} at "
                                                         f"{insn.addr:06X}"))
+        elif kind == "ptr" and op.mode == IND and value % 2 == 0 \
+                and self._records(insn, value, at, t):
+            return
         elif kind in ("table", "ptr") and op.mode == IND and value % 2 == 0:
             how = "an indexed" if kind == "table" else "a"
             t.tables.append((value, 1024 if kind == "table" else 1,
                              f"{how} load at {at:06X}, {insn.mnemonic} at {insn.addr:06X}"))
+
+    def _records(self, call: Insn, value: int, at: int, t: _Txn) -> bool:
+        """The record-table idiom around a call through a pointer loaded at `at` from
+        (off,An): after the call, a step of An by a constant, then a dbcc Dn back to the load or
+        before it, Dn set before the loop from a word of the image or a constant."""
+        load = t.new.get(at) or self.r.insns.get(at)
+        if load is None or load.operands[0].mode not in (IND, DISP):
+            return False
+        src = load.operands[0]
+        base_reg, off = src.reg, (src.value if src.mode == DISP else 0)
+        a = call.addr + call.length
+        stride = None
+        loop = None
+        for _ in range(8):
+            i = decode(self.image, a)
+            if i is None:
+                return False
+            ops = i.operands
+            if i.flow == BRANCH and i.mnemonic.startswith("db"):
+                if stride is not None and i.target is not None and i.target <= at:
+                    loop = i
+                break
+            if i.flow != FALL:
+                return False
+            if stride is None and i.mnemonic in ("adda", "addq") and ops[-1].mode == AN \
+                    and ops[-1].reg == base_reg and ops[0].mode in (IMM, QUICK):
+                stride = _sw(ops[0].value) if i.size == "w" and ops[0].mode == IMM \
+                    else ops[0].value
+            elif stride is None and i.mnemonic == "lea" and ops[0].mode == DISP \
+                    and ops[0].reg == base_reg and ops[1].reg == base_reg:
+                stride = ops[0].value
+            elif any(o.mode == AN and o.reg == base_reg for o in ops) or \
+                    any(o.mode in (POSTINC, PREDEC) and o.reg == base_reg for o in ops):
+                return False
+            a += i.length
+        if loop is None or stride is None or stride < off + 4 or stride % 2:
+            return False
+        count = self._loop_count(loop, t)
+        if count is None or not 0 < count <= 1024:
+            return False
+        start = (value - off) & 0xFFFFFF
+        t.records.append((start, f"{count}:{stride}:{off}:a load at {at:06X}, {call.mnemonic} at "
+                                 f"{call.addr:06X}, {loop.mnemonic} at {loop.addr:06X}"))
+        return True
+
+    def _loop_count(self, loop: Insn, t: _Txn) -> int | None:
+        """The iterations of a dbcc loop whose counter is set, before the loop head, from a
+        word of the image (move.w abs,Dn) or a constant (moveq, move.w #): the value + 1."""
+        n = loop.operands[0].reg
+        head = loop.target
+        assert head is not None
+        cur = self._prev(head, t)
+        for _ in range(10):
+            if cur is None:
+                return None
+            ops = cur.operands
+            if ops and ops[-1].mode == DN and ops[-1].reg == n:
+                src = ops[0]
+                if cur.mnemonic == "moveq":
+                    return (src.value & 0xFFFF) + 1
+                if cur.mnemonic == "move" and cur.size == "w":
+                    if src.mode == IMM:
+                        return (src.value & 0xFFFF) + 1
+                    if src.mode in (ABSW, ABSL) and _abs(src) + 2 <= len(self.image):
+                        v = _abs(src)
+                        return int.from_bytes(self.image[v : v + 2], "big") + 1
+                return None
+            if cur.flow != FALL or cur.mnemonic in ("movem", "exg", "swap"):
+                return None
+            cur = self._prev(cur.addr, t)
+        return None
 
     def _switch(self, insn: Insn, t: _Txn) -> Switch | None:
         op = insn.operands[0]

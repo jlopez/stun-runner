@@ -273,6 +273,11 @@ def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
         for b in range(t.start, t.end):
             kind[b] = "pointers"
         note[t.start] = f"code-pointer table: {t.evidence}"
+    for rt in r.record_tables.values():
+        for b in range(rt.start, rt.end):
+            kind[b] = "data"
+        note[rt.start] = (f"record table: {rt.count} records of {rt.stride} bytes, a routine "
+                          f"pointer at +{rt.offset} of each ({rt.evidence})")
     for lo, hi, k, why in lay.known:
         for b in range(lo, hi):
             assert kind[b] == "unknown", f"{b:06X}"
@@ -320,9 +325,10 @@ def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
                 sp.note = f"switch at {s.jmp:06X}: cases {s.lo}-{s.lo + s.count - 1}, {s.bound}"
             spans.append(sp)
             start = x
+    index = reference_index(image, END)
     for sp in spans:
         if sp.kind == "unknown" and any(lo <= sp.start < hi for lo, hi in lay.eligible):
-            sp.note = _unknown_note(image, sp, ida_functions)
+            sp.note = _unknown_note(image, sp, ida_functions, index, spans)
     return Classification(spans, dict(r.entries), dict(r.noreturn), dict(r.rejected), r, END)
 
 
@@ -342,8 +348,46 @@ def _runs(kind: list[str], k: str) -> list[tuple[int, int]]:
     return out
 
 
-def _unknown_note(image: bytes, sp: Span, ida_functions: dict[int, str]) -> str:
-    a = sp.start + (sp.start & 1)
+def reference_index(image: bytes, end: int) -> dict[int, list[int]]:
+    """Every place in 000000-end that may refer to an address, by the address: a long at an even
+    address equal to it (an absolute long operand, a pointer, a `jmp abs.l` of a jump table), a
+    `jsr`/`jmp` absolute short to it, a branch or `bsr` (short or word) or a `jsr`/`jmp`/`lea`/
+    `pea` (d16,pc) to it. A search of the bytes, whatever their kind: a hit is a possible
+    reference, not a decided one."""
+    out: dict[int, list[int]] = {}
+    end = min(end, len(image))
+    for a in range(0, end - 1, 2):
+        w = int.from_bytes(image[a : a + 2], "big")
+        hits = []
+        if a + 4 <= end:
+            hits.append(int.from_bytes(image[a : a + 4], "big") & 0xFFFFFFFF)
+        nxt = int.from_bytes(image[a + 2 : a + 4], "big") if a + 4 <= end else None
+        if w >> 12 == 6:  # bra, bsr, bcc
+            d8 = w & 0xFF
+            if d8 == 0 and nxt is not None:
+                hits.append((a + 2 + (nxt - 0x10000 if nxt & 0x8000 else nxt)) & 0xFFFFFF)
+            elif d8 != 0xFF:
+                hits.append((a + 2 + (d8 - 0x100 if d8 & 0x80 else d8)) & 0xFFFFFF)
+        elif nxt is not None and (w in (0x4EBA, 0x4EFA, 0x487A) or (w & 0xF1FF) == 0x41FA):
+            hits.append((a + 2 + (nxt - 0x10000 if nxt & 0x8000 else nxt)) & 0xFFFFFF)
+        elif nxt is not None and w in (0x4EB8, 0x4EF8) and nxt < 0x8000:
+            hits.append(nxt)
+        for h in hits:
+            out.setdefault(h, []).append(a)
+    return out
+
+
+def _kind_at(spans: list[Span], a: int) -> str:
+    for s in spans:
+        if s.start <= a < s.end:
+            return s.kind
+    return "?"
+
+
+def _unknown_note(image: bytes, sp: Span, ida_functions: dict[int, str],
+                  index: dict[int, list[int]] | None = None,
+                  spans: list[Span] | None = None) -> str:
+    a0 = a = sp.start + (sp.start & 1)  # an instruction starts at an even address
     n = 0
     last = None
     while a < sp.end:
@@ -356,10 +400,17 @@ def _unknown_note(image: bytes, sp: Span, ida_functions: dict[int, str]) -> str:
     ida = [f"{name} {ea:06X}" for ea, name in ida_functions.items() if sp.start <= ea < sp.end]
     parts = []
     if a == sp.end and last is not None and last.flow in (STOP, JUMP):
-        parts.append(f"decodes cleanly as {n} instructions ending with {last.mnemonic} at "
-                     f"{last.addr:06X}; no reference found")
+        refs = [x for x in (index or {}).get(a0, []) if not sp.start <= x < sp.end]
+        where = ", ".join(f"{x:06X} ({_kind_at(spans or [], x)})" for x in refs[:6]) + (
+            f" and {len(refs) - 6} more" if len(refs) > 6 else "")
+        parts.append(f"decodes cleanly from {a0:06X} as {n} instructions ending with "
+                     f"{last.mnemonic} at {last.addr:06X}; "
+                     + (f"possible references: {where} (a long equal to it, or a branch or call "
+                        f"to it, found by a search of the bytes)" if refs and index is not None else
+                        "no reference found (no long equal to it, no branch or call to it in "
+                        "the bytes searched)" if index is not None else "references not searched"))
     elif n:
-        parts.append(f"decodes as {n} instructions from {sp.start:06X}, then "
+        parts.append(f"decodes as {n} instructions from {a0:06X}, then "
                      f"{'stops' if a >= sp.end else f'no instruction at {a:06X}'}")
     if ida:
         parts.append("IDA functions: " + ", ".join(ida[:4]) + (" ..." if len(ida) > 4 else ""))
