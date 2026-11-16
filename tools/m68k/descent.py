@@ -331,7 +331,7 @@ class Descent:
         if prev is None or prev.mnemonic != "move" or prev.size != "w":
             return None
         src, dst = prev.operands
-        if src.mode != PCINDEX or src.xreg != op.xreg or dst.mode != DN or dst.reg != n:
+        if src.mode != PCINDEX or src.xreg[:2] != op.xreg[:2] or dst.mode != DN or dst.reg != n:
             return None
         table = insn.addr + 4
         if (table - src.value) % 2:
@@ -363,21 +363,34 @@ class Descent:
         return sw
 
     def _bound(self, move: Insn, n: int, t: _Txn) -> tuple[int | None, str]:
-        """The compare and branch that bound the switch's index, in the straight line before."""
+        """The compare and branch that bound the switch's index dN, in the straight line before
+        the move: `cmp(i) #V,dN` then `bhi`/`bgt` (or `bcc`/`bge` with V - 1), or `moveq #V,dM`,
+        `cmp dN,dM` then `blt`/`bcs` (or `ble`/`bls`); a `sub #K,dN` after the compare moves
+        the bound down by K."""
         cur = move
-        for _ in range(8):
+        offset = 0
+        for _ in range(10):
             p = self._prev(cur.addr, t)
             if p is None:
                 return None, ""
             nxt, cur = cur, p
             ops = cur.operands
+            if cur.mnemonic in ("sub", "subi", "subq") and ops[-1].mode == DN \
+                    and ops[-1].reg == n and ops[0].mode in (IMM, QUICK):
+                offset += ops[0].value
+                continue
             if cur.mnemonic in ("cmpi", "cmp") and ops[-1].mode == DN and ops[-1].reg == n \
                     and ops[0].mode == IMM and nxt.mnemonic in ("bhi", "bgt", "bcc", "bge"):
-                v = ops[0].value
-                if nxt.mnemonic in ("bcc", "bge"):
-                    v -= 1  # leaves the switch when >= v: the last case is v - 1
-                return v, (f"bound: {cur.mnemonic} at {cur.addr:06X}, {nxt.mnemonic} at "
-                           f"{nxt.addr:06X}")
+                v = ops[0].value - (1 if nxt.mnemonic in ("bcc", "bge") else 0)
+                return v - offset, (f"bound: {cur.mnemonic} at {cur.addr:06X}, {nxt.mnemonic} "
+                                    f"at {nxt.addr:06X}")
+            if cur.mnemonic == "cmp" and ops[0].mode == DN and ops[0].reg == n \
+                    and ops[1].mode == DN and nxt.mnemonic in ("blt", "bcs", "ble", "bls"):
+                q = self._prev(cur.addr, t)
+                if q is not None and q.mnemonic == "moveq" and q.operands[1].reg == ops[1].reg:
+                    v = q.operands[0].value - (1 if nxt.mnemonic in ("ble", "bls") else 0)
+                    return v - offset, (f"bound: moveq at {q.addr:06X}, cmp at {cur.addr:06X}, "
+                                        f"{nxt.mnemonic} at {nxt.addr:06X}")
         return None, ""
 
 

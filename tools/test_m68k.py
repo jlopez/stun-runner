@@ -158,6 +158,9 @@ near:
 	jmp	(near2,pc,d0.w)
 	jmp	label
 	lea	(label,pc),a0
+	lea	(0,a0),a1
+	lea	$400,a0
+	move.w	#0,d0
 	lea	$0.w,a1
 	lea	label,a2
 	lea	($10,a3,d0.l),a4
@@ -397,6 +400,7 @@ callback:
 	dc.w	$4E71,$4E71,$4E75
 text:
 	dc.b	'HELLO WORLD',0
+	dc.b	"DON'T PANIC",0
 	even
 table:
 	dc.w	1,2,3,4
@@ -512,6 +516,7 @@ def test_generator_reassembles(tmp_path: Path) -> None:
     assert "#$12345" in src and "#$FFFF" in src  # constants by the operand rules
     assert "movea.l\t#tbl_" in src or "movea.l\t#dat_" in src  # an address register load
     assert "\tincbin\t" in src and "\tdc.b\t'HELLO WORLD',0" in src and "\tdcb.b\t" in src
+    assert "\tdc.b\t\"DON'T PANIC\",0" in src  # vasm has no escapes: the other quote
     assert "\tbra.s\t" in src and "\tbra.w\t" in src and "\tbsr.s\t" in src
     assert "jsr\tsub_7000.w" in src
     assert out.stats["macros"] == 2

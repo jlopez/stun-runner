@@ -711,6 +711,8 @@
     {"at": "040F78", "operand": 0, "decision": "address", "rule": "R1"},
     {"at": "040F82", "operand": 0, "decision": "address", "rule": "R1"},
     {"at": "0410CC", "operand": 0, "decision": "address", "rule": "R1"},
+    {"at": "04136A", "operand": 0, "decision": "constant", "rule": "R8"},
+    {"at": "041376", "operand": 0, "decision": "constant", "rule": "R8"},
     {"at": "0414F0", "operand": 0, "decision": "constant", "rule": "R8"},
     {"at": "0414FC", "operand": 0, "decision": "constant", "rule": "R8"},
     {"at": "04154E", "operand": 0, "decision": "address", "rule": "R1"},
