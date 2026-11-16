@@ -32,6 +32,7 @@ import argparse
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -42,6 +43,7 @@ from m68k import gen as gn  # noqa: E402
 from m68k import listing as ls  # noqa: E402
 from m68k import operands as opd  # noqa: E402
 from m68k import pccov as pc  # noqa: E402
+from m68k.decode import decode  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent.parent
 IMAGE = REPO / "build/stunrun-68k.bin"
@@ -189,21 +191,7 @@ def check_region(a: argparse.Namespace, lo: int, hi: int, m: gn.Model) -> list[s
     lst.statements = [s for s in lst.statements if lo <= s.address < hi]
     ls.sizes(lst, hi)
     seeds, untaken = load_seeds(a.seeds)
-    extra = [x for x in m.cls.entries if lo <= x < hi]
-    extra += [x for x, _ in seeds if lo <= x < hi]
-    # the plain seeds: the vector tables and game_entries live in other ranges
-    for base in (0, 0x20000):
-        for n in range(1, 64):
-            v = int.from_bytes(m.image[base + 4 * n : base + 4 * n + 4], "big")
-            if lo <= v < hi:
-                extra.append(v)
-    extra += [x for x in cl.GAME_ENTRIES if lo <= x < hi]
-    # a call into this range from another one reaches a routine start
-    for insn in m.insns.values():
-        t = insn.target
-        if t is not None and lo <= t < hi and not lo <= insn.addr < hi:
-            extra.append(t)
-    outside = {x for x in m.insns if not lo <= x < hi}
+    extra, outside = listed_seeds(m.cls, m.image, seeds, lambda x: lo <= x < hi)
     rep = ls.descent_check(lst, built, lo, extra, set(), set(m.cls.noreturn), untaken, outside)
     print(f"  descent check: {rep.reached} instruction statements reached, "
           f"{len(rep.unreached)} not, {len(rep.errors)} errors")
@@ -229,6 +217,29 @@ def check_region(a: argparse.Namespace, lo: int, hi: int, m: gn.Model) -> list[s
     return probs
 
 
+def listed_seeds(c: cl.Classification, image: bytes, seeds: list[tuple[int, str]],
+                 inside: Callable[[int], bool]
+                 ) -> tuple[list[int], set[int]]:
+    """For a descent check over part of the image: the seeds that lie inside (the entries with
+    evidence, the reviewed seeds, the vectors and game_entries, the static targets of
+    instructions outside) and the classified instruction starts outside (a flow may end there)."""
+    extra = [x for x in c.entries if inside(x)] + [x for x, _ in seeds if inside(x)]
+    for base, _ in cl.VECTOR_TABLES:
+        for n in range(1, 64):
+            v = int.from_bytes(image[base + 4 * n : base + 4 * n + 4], "big")
+            if inside(v):
+                extra.append(v)
+    extra += [x for x in cl.GAME_ENTRIES if inside(x)]
+    starts = c.code_starts(image)
+    for a in starts:
+        if not inside(a):
+            insn = decode(image, a)
+            t = insn.target if insn else None
+            if t is not None and inside(t):
+                extra.append(t)
+    return extra, {x for x in starts if not inside(x)}
+
+
 def cmd_check_region(a: argparse.Namespace) -> int:
     m = model(a, {a.start})
     probs = check_region(a, a.start, a.end, m)
@@ -243,8 +254,11 @@ def cmd_check_listing(a: argparse.Namespace) -> int:
     ls.sizes(lst, a.origin + len(binary))
     c = cl.load(a.classification)
     seeds, untaken = load_seeds(a.seeds)
-    rep = ls.descent_check(lst, binary, a.origin, list(c.entries) + [x for x, _ in seeds],
-                           set(), set(c.noreturn), untaken)
+    code = {x.address for x in lst.statements if x.kind == "instr"}
+    image = a.image.read_bytes()
+    extra, outside = listed_seeds(c, image, seeds, lambda x: x in code)
+    rep = ls.descent_check(lst, binary, a.origin, extra, set(), set(c.noreturn), untaken,
+                           outside)
     lst.statements = [s for s in lst.statements if lo <= s.address < hi]
     lint = ls.address_lint(lst, opd.load(a.operands), lo, hi, frozenset(ls.macro_names(a.macros)))
     print(f"descent: {rep.reached} reached, {len(rep.unreached)} unreached, {len(rep.errors)} "
@@ -346,6 +360,7 @@ def main() -> int:
     q.set_defaults(func=cmd_check_region)
 
     q = sub.add_parser("check-listing")
+    q.add_argument("--image", type=Path, default=IMAGE)
     q.add_argument("--listing", type=Path, required=True)
     q.add_argument("--binary", type=Path, required=True)
     q.add_argument("--origin", type=hexarg, default=0)
