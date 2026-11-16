@@ -637,7 +637,7 @@ def checks(tmp: Path, wrap: str, source: str, m: gn.Model, lo: int, hi: int,
     rep = ls.descent_check(lst, built, 0, list(m.cls.entries), set(),
                            set(m.cls.noreturn) if noreturn is None else noreturn)
     lint = ls.address_lint(lst, m.decisions, lo, hi, frozenset(ls.macro_names(MACROS)), built, 0,
-                           [(s.start, s.end) for s in m.cls.spans if s.kind == "switch"])
+                           cli.switch_ranges(m.cls), cli.pointer_ranges(m.cls))
     shifted = source.replace("\tassert\t*=$000000", "\tdcb.b\t2,0\n;", 1)
     shifted = shifted.replace(f"\tassert\t*=${hi:06X}", ";", 1)
     (tmp / "gen.asm").write_text(shifted)
@@ -738,6 +738,13 @@ def test_listing_checks_fail_on_more_broken_source(tmp_path: Path) -> None:
     _, lint, _, built = checks(tmp_path, wrap, src.replace(
         line, f"\tjsr\t${names[sym] - 8:X}+8", 1), m, 0, hi)
     assert built == image and any("written as a number" in e for e in lint.errors), lint.errors
+    # a pointer-table entry written as two numeric words: the lint (a dc.w in a pointer range)
+    line = next(x for x in src.splitlines() if x.startswith("\tdc.l\tsub_2"))
+    v = names[line.split("\t")[2]]
+    _, lint, _, built = checks(tmp_path, wrap, src.replace(
+        line, f"\tdc.w\t${v >> 16:04X},${v & 0xFFFF:04X}", 1), m, 0, hi)
+    assert built == image and any("dc.w in a pointer table" in e for e in lint.errors), \
+        lint.errors
     # a word that moves by something other than the pad: the shift test
     line = next(x for x in src.splitlines() if x.startswith("\tdc.l\tsub_2"))
     sym = line.split("\t")[2]
@@ -783,6 +790,10 @@ here:
 switch:
 	dc.w	$10
 	dc.w	here-switch
+pointers:
+	dc.l	here
+	dc.w	$0003,$0010
+	dc.w	0,0
 """
 
 
@@ -793,12 +804,15 @@ def test_address_lint_forms(tmp_path: Path) -> None:
     lst = ls.parse(lst_text, set())
     ls.sizes(lst, 0x30000 + len(image))
     sw = lst.symbols["switch"]
-    rep = ls.address_lint(lst, {}, 0, 0x0C0000, frozenset(), image, 0x30000, [(sw, sw + 4)])
+    pt = lst.symbols["pointers"]
+    rep = ls.address_lint(lst, {}, 0, 0x0C0000, frozenset(), image, 0x30000, [(sw, sw + 4)],
+                          [(pt, pt + 12)])
     bad = {e.split(":")[0] for e in rep.errors}
     flagged = {s.text.split(";")[0].strip() for s in lst.statements if f"{s.address:06X}" in bad}
     want = {"jsr\t$30010", "lea\t$BFF00,a0", "pea\t$30000", "jsr\t$418B0+8", "lea\t$20520+0,a1",
             "movea.l\t#$30220+0,a2", "lea\t($30000,pc),a1", "move.w\t($30004,pc,d0.w),d0",
-            "bra.w\t$30000", "dc.l\t$30000", "dc.l\t$40+$30000", "dc.w\t$10"}
+            "bra.w\t$30000", "dc.l\t$30000", "dc.l\t$40+$30000", "dc.w\t$10",
+            "dc.w\t$0003,$0010", "dc.w\t0,0"}
     assert flagged == want, flagged ^ want
 
 
@@ -995,6 +1009,106 @@ def test_macros(tmp_path: Path) -> None:
         insn = decode(image, at)
         assert insn is not None and insn.operands[0].raw == 0xFFFF
         assert format_insn(insn, None) == f"move.b\t#$FF,{dst}"
+
+
+def cli_files(tmp: Path, image: bytes, c: cl.Classification) -> list[str]:
+    """The synthetic program's image, classification and operand decisions as the CLI's files."""
+    assert c.result is not None
+    (tmp / "program.bin").write_bytes(image)
+    (tmp / "c.json").write_text(cl.dump(c))
+    starts = cl.routine_starts(c.result)
+    addrs = {o.value for i in c.result.insns.values() for o in i.operands
+             if o.mode in ("absl", "pcdisp")}
+    (tmp / "op.json").write_text(opd.dump(opd.build(c.result.insns, starts, addrs)))
+    return ["--image", str(tmp / "program.bin"), "--classification", str(tmp / "c.json"),
+            "--operands", str(tmp / "op.json"), "--seeds", str(tmp / "absent-seeds.json")]
+
+
+@needs_vasm
+def test_gen_reports_bad_cuts(tmp_path: Path, capsys: pytest.CaptureFixture[str],
+                              monkeypatch: pytest.MonkeyPatch) -> None:
+    """A START inside an instruction, or a range that leaves a used vasm local outside, is a
+    usage error (exit 2 and the reason), not a traceback."""
+    image, m, _, _ = generated(tmp_path)
+    files = cli_files(tmp_path, image, m.cls)
+    # a vasm local branched to from before it: the range up to it leaves it outside
+    hi = min(a for a, n in m.labels.items() if n.startswith(".l") and m.anchors[a] == "code"
+             and any(r < a for r in m.refs.get(a, ())))
+    r = min(m.refs[hi])
+    lo = max(a for a, n in m.labels.items() if a <= r and not n.startswith("."))
+    for cmd, rng in (("gen", (lo + 1, hi)), ("gen", (lo, hi)), ("check-region", (lo, hi))):
+        extra = ["--out", str(tmp_path / "g.asm")] if cmd == "gen" else \
+            ["--work", str(tmp_path / "w")]
+        monkeypatch.setattr("sys.argv", ["tools/m68k", cmd, *files, *extra,
+                                         f"{rng[0]:X}", f"{rng[1]:X}"])
+        assert cli.main() == 2, (cmd, rng)
+        err = capsys.readouterr().err
+        assert err.startswith(f"{cmd}: ") and "cut at global labels" in err, err
+        assert ("not an instruction start" in err) == (rng[0] == lo + 1), err
+    assert not (tmp_path / "g.asm").exists()
+
+
+@needs_vasm
+def test_gen_equates_and_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """gen with --equates and a snapshot (decision C2, docs/14 section 5): a name the equates
+    file defines is used and not emitted again; snapshot ROM and RAM names are used verbatim; a
+    snapshot function start is a global label."""
+    image, m, _, _ = generated(tmp_path)
+    files = cli_files(tmp_path, image, m.cls)
+    callback = next(a for a, e in m.cls.entries.items() if e.startswith("reviewed"))
+    assert m.labels[callback] == f"sub_{callback:X}"
+    local = min(a for a, n in m.labels.items() if n.startswith(".l") and m.anchors[a] == "code")
+    (tmp_path / "snapshot.json").write_text(json.dumps({
+        "names": [{"ea": f"0x{callback:06X}", "name": "my_callback"},
+                  {"ea": "0xFF9518", "name": "game_flag"}],
+        "functions": [f"0x{local:06X}"]}))
+    (tmp_path / "hw.asm").write_text("; test equates\nMY_PORT0\tequ\t$60C000\n")
+    monkeypatch.setattr("sys.argv", [
+        "tools/m68k", "gen", *files, "--snapshot", str(tmp_path / "snapshot.json"),
+        "--equates", str(tmp_path / "hw.asm"), "--incbin", str(tmp_path / "program.bin"),
+        "--out", str(tmp_path / "gen.asm"), "--equates-out", str(tmp_path / "equates.asm"),
+        "--externals-out", str(tmp_path / "externals.asm"), "0", f"{len(image):X}"])
+    assert cli.main() == 0
+    src = (tmp_path / "gen.asm").read_text()
+    eq = (tmp_path / "equates.asm").read_text()
+    assert "MY_PORT0" in src and "PORT0" not in src.replace("MY_PORT0", "")
+    assert "MY_PORT0" not in eq and "PORT0" not in eq
+    assert "game_flag" in src and "ram_FF9518" not in src and "game_flag\tequ\t$FF9518" in eq
+    assert "my_callback:" in src and f"sub_{callback:X}" not in src
+    assert f"sub_{local:X}:" in src and f".l{local:X}" not in src
+    wrap = (f'\tinclude\t"{MACROS}"\n\tinclude\t"hw.asm"\n\tinclude\t"equates.asm"\n'
+            '\tinclude\t"externals.asm"\n\torg\t0\n\tinclude\t"gen.asm"\n')
+    built, _ = assemble(tmp_path, "main", wrap)
+    assert built == image
+
+
+def test_pccov_rejects_empty_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str],
+                                  monkeypatch: pytest.MonkeyPatch) -> None:
+    """A trace the debugger never wrote (an empty run file) or a run that did not finish (no
+    `# run` line) fails pccov-read, pccov and classify instead of passing vacuously."""
+    trace = tmp_path / "empty.trace"
+    trace.write_text("")
+    monkeypatch.setattr("sys.argv", ["tools/m68k", "pccov-read", str(trace),
+                                     str(tmp_path / "pccov-empty.txt")])
+    assert cli.main() == 1
+    assert "no executed PC" in capsys.readouterr().err
+    empty = tmp_path / "pccov-empty.txt"
+    empty.write_text(empty.read_text() + "# run frames 120\n")
+    unfinished = tmp_path / "pccov-unfinished.txt"
+    unfinished.write_text("# trace_lines 1\n# distinct_pcs 1\n000216\n")
+    for run, why in ((empty, "no executed PC"), (unfinished, "no `# run` line")):
+        summary = tmp_path / "summary.json"
+        monkeypatch.setattr("sys.argv", ["tools/m68k", "pccov", "--image",
+                                         str(tmp_path / "absent.bin"), "--summary",
+                                         str(summary), str(run)])
+        assert cli.main() == 1
+        assert why in capsys.readouterr().out and not summary.exists()
+        monkeypatch.setattr("sys.argv", ["tools/m68k", "classify", "--image",
+                                         str(tmp_path / "absent.bin"), "--out",
+                                         str(tmp_path / "c.json"), str(run)])
+        with pytest.raises(SystemExit, match=why.replace("`", ".")):
+            cli.main()
+        assert not (tmp_path / "c.json").exists()
 
 
 # --- the committed files ---------------------------------------------------------------------

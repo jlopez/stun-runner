@@ -571,7 +571,8 @@ CLASSIFICATION := data/68k/classification.json
 # Re-run the descent over the image and rewrite data/68k/classification.json (commit it when it
 # changes): seeds from the image, data/68k/seeds.json and the five MAME runs of `make pccov`,
 # which must be present (run `make -j5 pccov` first): without them three MAME entries are lost
-# and executed code becomes data. NO_MAME=1 classifies without them, into the same files: do not
+# and executed code becomes data; `tools/m68k classify` also refuses a run file with no PCs or no
+# `# run` line (an empty trace). NO_MAME=1 classifies without them, into the same files: do not
 # commit that. Needs the reference set.
 PCCOV_FILES = $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt)
 classify: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
@@ -594,7 +595,7 @@ m68k-check: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
 
 # Which 68010 instructions MAME executes (docs/14 section 6): tools/mame/pccov.lua traces the
 # 68010 under the debugger into a named pipe that `tools/m68k pccov-read` drains into the
-# distinct PCs (build/mame/pccov-<run>.txt), in five headless runs from empty private state
+# distinct PCs (build/mame/pccov-<run>.txt; it fails on an empty trace), in five headless runs from empty private state
 # (attract, a game, the boot program's test menus to "SA SELF TEST" and to "PLAY SOUNDS" as
 # sndproto.lua drives them, and the power-on self-test left to run). Then `tools/m68k pccov`
 # fails unless every executed PC starts a code instruction of the classification and rewrites
@@ -616,9 +617,10 @@ $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt): $(BUILD)/mame/pccov-%.txt: tools/mame
 		SDL_VIDEODRIVER=dummy $(MAME) stunrun -debug -debugger none $(MAME_FLAGS) \
 		$(call TRACE_DIRS,pccov-$*) -autoboot_script tools/mame/pccov.lua; rc=$$?; \
 	kill -0 $$reader 2>/dev/null && : <> $(BUILD)/mame/pccov-$*.fifo; \
-	wait $$reader; rm -f $(BUILD)/mame/pccov-$*.fifo; \
+	wait $$reader; rrc=$$?; rm -f $(BUILD)/mame/pccov-$*.fifo; \
 	test $$rc -eq 0 && test -f $(BUILD)/mame/pccov-$*done || \
 		{ echo "pccov: the $* run did not finish"; exit 1; }; \
+	test $$rrc -eq 0 || { echo "pccov: the $* run traced no PC"; exit 1; }; \
 	{ printf '# run '; cat $(BUILD)/mame/pccov-$*done; } >> $@.tmp && mv $@.tmp $@
 
 pccov: $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt) $(BUILD)/$(SET)-68k.bin

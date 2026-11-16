@@ -297,10 +297,12 @@ def names_symbol(op: str) -> bool:
 def address_lint(lst: Listing, decisions: dict[tuple[int, int], str],
                  lo: int = 0, hi: int = 0x0C0000, macros: frozenset[str] = frozenset(),
                  image: bytes | None = None, origin: int = 0,
-                 switches: list[tuple[int, int]] | None = None) -> LintReport:
+                 switches: list[tuple[int, int]] | None = None,
+                 pointers: list[tuple[int, int]] | None = None) -> LintReport:
     """image: the assembled bytes (image[0] at origin), from which an operand's value is read
     when its text names no symbol; switches: the switch tables' ranges, whose `dc.w` entries
-    must name their case."""
+    must name their case; pointers: the pointer tables' ranges, where every statement is a
+    `dc.l` (a pointer written as two `dc.w` words or as bytes would escape the dc.l rule)."""
     rep = LintReport()
     full = bytes(origin) + image if image is not None else None
     for s in lst.statements:
@@ -311,7 +313,10 @@ def address_lint(lst: Listing, decisions: dict[tuple[int, int], str],
             continue
         mn, ops = parts[0].lower(), _split_operands(parts[1])
         if s.kind == "data":
-            if mn == "dc.l":
+            if mn != "dc.l" and any(a <= s.address < b for a, b in pointers or []):
+                rep.errors.append(f"{s.address:06X}: {mn} in a pointer table: write its entries "
+                                  f"as dc.l")
+            elif mn == "dc.l":
                 for k, op in enumerate(ops):
                     v = _num(op)
                     if v is None and full is not None and not names_symbol(op):

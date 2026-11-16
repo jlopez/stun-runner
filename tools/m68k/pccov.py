@@ -7,6 +7,11 @@ fails unless every executed PC is the first byte of a `code` instruction of the 
 and the executed PCs as ranges of consecutive instructions (start, end of the last instruction),
 plus the union; the runs in name order, so a re-run with the same PCs rewrites the same file.
 Addresses and counts only.
+
+A run file is valid only with PCs and the `# run` line `make pccov` appends from the Lua script's
+done marker (`valid`): a trace the debugger never wrote (MAME exits 0 and the script still
+writes its marker when `trace` fails) gives an empty file, which would pass the check vacuously
+and let `classify` drop the MAME entries.
 """
 
 from __future__ import annotations
@@ -33,6 +38,16 @@ def read_trace(fifo: Path, out: Path) -> int:
         + "".join(f"{pc:06X}\n" for pc in sorted(pcs))
     )
     return len(pcs)
+
+
+def valid(header: dict[str, str], pcs: set[int]) -> str | None:
+    """Why a run file cannot be used (no PCs, no `# run` line), or None."""
+    if not pcs:
+        return "no executed PC: the trace is empty (did the debugger's trace command fail?)"
+    if not header.get("run"):
+        return ("no `# run` line: the run did not finish (make pccov appends it from the done "
+                "marker)")
+    return None
 
 
 def load_run(path: Path) -> tuple[dict[str, str], set[int]]:

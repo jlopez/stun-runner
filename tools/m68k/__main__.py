@@ -19,7 +19,9 @@ classify       runs the descent (with the MAME runs given as seeds) and rewrites
                is classified with them: three entries have MAME as their only evidence)
 stats          bytes per kind and region, the numbers of docs/14
 gen            the one-shot generator (gen.py): vasm source for START-END (0 <= START <= END <=
-               the classification's end, else exit 2; check-region likewise)
+               the classification's end, else exit 2; check-region likewise); START and END
+               are global labels (routine or range starts): a cut inside an instruction or one
+               that leaves a used vasm local outside the range exits 2 with the reason
 check-region   gen, then assemble the range alone in DIR with macros.asm, the equates and the
                externals, compare with the image (0 differences), run the listing descent
                check, the address lint and the shift test on it (needs the reference set)
@@ -28,8 +30,10 @@ check-listing  the descent check and the address lint on any vasm listing and it
                seeds file lists it under `unreached` with an argument; with --range both report
                only what lies in START-END (the descent itself runs over the whole listing)
 check-unidasm  every instruction boundary of the code ranges against unidasm's
-pccov-read     drains a MAME trace pipe into the distinct PCs (make pccov)
-pccov          fails unless every executed PC starts a code instruction; writes the summary
+pccov-read     drains a MAME trace pipe into the distinct PCs (make pccov); fails on no PC
+pccov          fails unless every executed PC starts a code instruction; writes the summary;
+               fails, writing nothing, on a run file with no PCs or no `# run` line (classify
+               refuses such a file too)
 """
 
 from __future__ import annotations
@@ -84,6 +88,10 @@ def switch_ranges(c: cl.Classification) -> list[tuple[int, int]]:
     return [(s.start, s.end) for s in c.spans if s.kind == "switch"]
 
 
+def pointer_ranges(c: cl.Classification) -> list[tuple[int, int]]:
+    return [(s.start, s.end) for s in c.spans if s.kind == "pointers"]
+
+
 def load_seeds(path: Path) -> tuple[list[tuple[int, str]], dict[int, str]]:
     if not path.exists():
         return [], {}
@@ -105,9 +113,15 @@ def ida_functions(path: Path) -> dict[int, str]:
 
 
 def mame_pcs(paths: list[Path]) -> set[int]:
+    """The union of the runs' PCs; a run file with no PCs or no `# run` line fails (an empty
+    trace would silently drop the MAME entries)."""
     out: set[int] = set()
     for p in paths:
-        out |= pc.load_run(p)[1]
+        header, pcs = pc.load_run(p)
+        why = pc.valid(header, pcs)
+        if why:
+            raise SystemExit(f"{p}: {why}")
+        out |= pcs
     return out
 
 
@@ -116,9 +130,10 @@ def cmd_classify(a: argparse.Namespace) -> int:
         print("classify: no MAME run given: run `make pccov` first (the committed classification "
               "takes three entries from it), or pass --no-mame for a classification without them")
         return 1
+    pcs = mame_pcs(a.runs)
     image = a.image.read_bytes()
     seeds, untaken = load_seeds(a.seeds)
-    c = cl.classify(image, mame_pcs(a.runs), seeds, untaken, ida_functions(FUNCTIONS))
+    c = cl.classify(image, pcs, seeds, untaken, ida_functions(FUNCTIONS))
     errs = cl.validate(c)
     if errs:
         print("\n".join(errs))
@@ -178,8 +193,13 @@ def cmd_gen(a: argparse.Namespace) -> int:
     if bad:
         print(f"gen: {bad}", file=sys.stderr)
         return 2
-    m = model(a, {a.start})
-    out = gn.generate(m, a.start, a.end, a.incbin)
+    try:
+        m = model(a, {a.start})
+        out = gn.generate(m, a.start, a.end, a.incbin)
+    except gn.GenError as e:
+        print(f"gen: {e} (START and END must lie on statement boundaries, and a range must "
+              f"hold every vasm local its code uses: cut at global labels)", file=sys.stderr)
+        return 2
     a.out.write_text(out.source)
     if a.equates_out:
         a.equates_out.write_text(gn.equates_text(out.equates))
@@ -229,7 +249,7 @@ def check_region(a: argparse.Namespace, lo: int, hi: int, m: gn.Model) -> list[s
         probs.append(f"  {len(rep.unreached)} instruction statements unreached, the first "
                      + ", ".join(f"{x:06X}" for x in rep.unreached[:8]))
     lint = ls.address_lint(lst, m.decisions, lo, hi, frozenset(macros), built, lo,
-                           switch_ranges(m.cls))
+                           switch_ranges(m.cls), pointer_ranges(m.cls))
     print(f"  address lint: {len(lint.errors)} errors, {lint.allowed} listed constants, "
           f"{len(lint.undecided)} undecided")
     probs += [f"  {e}" for e in lint.errors[:20]]
@@ -282,8 +302,13 @@ def cmd_check_region(a: argparse.Namespace) -> int:
     if bad:
         print(f"check-region: {bad}", file=sys.stderr)
         return 2
-    m = model(a, {a.start})
-    probs = check_region(a, a.start, a.end, m)
+    try:
+        m = model(a, {a.start})
+        probs = check_region(a, a.start, a.end, m)
+    except gn.GenError as e:
+        print(f"check-region: {e} (START and END must lie on statement boundaries, and a range "
+              f"must hold every vasm local its code uses: cut at global labels)", file=sys.stderr)
+        return 2
     print("\n".join(probs) if probs else "ok")
     return 1 if probs else 0
 
@@ -325,7 +350,7 @@ def cmd_check_listing(a: argparse.Namespace) -> int:
         rep.errors = [e for e in rep.errors if in_range(e, lo, hi)]
     lst.statements = [s for s in lst.statements if lo <= s.address < hi]
     lint = ls.address_lint(lst, opd.load(a.operands), lo, hi, frozenset(ls.macro_names(a.macros)),
-                           binary, a.origin, switch_ranges(c))
+                           binary, a.origin, switch_ranges(c), pointer_ranges(c))
     print(f"descent: {rep.reached} reached, {len(rep.unreached)} unreached, {len(rep.errors)} "
           f"errors; lint: {len(lint.errors)} errors, {len(lint.undecided)} undecided")
     for e in rep.errors + lint.errors:
@@ -364,25 +389,36 @@ def cmd_check_unidasm(a: argparse.Namespace) -> int:
 
 
 def cmd_pccov(a: argparse.Namespace) -> int:
+    loaded = {}
+    for p in a.runs:  # every run file valid before anything is read or written
+        header, pcs = pc.load_run(p)
+        why = pc.valid(header, pcs)
+        if why:
+            print(f"{p}: {why}; {a.summary} not written")
+            return 1
+        loaded[p.stem.removeprefix("pccov-")] = (header, pcs)
     image = a.image.read_bytes()
     c = cl.load(a.classification)
     starts = c.code_starts(image)
-    runs = {}
-    done = {}
-    fail = 0
-    for p in a.runs:
-        name = p.stem.removeprefix("pccov-")
-        header, pcs = pc.load_run(p)
-        runs[name] = (header, pcs)
-        done[name] = header.get("run", "")
+    fail = False
+    for name, (_header, pcs) in loaded.items():
         bad = pc.check(pcs, set(starts))
         print(f"{name}: {len(pcs)} distinct PCs, {len(bad)} not a classified instruction start")
         for x in bad[:20]:
             print(f"  {x:06X}")
         fail |= bool(bad)
-    a.summary.write_text(pc.summary(runs, starts, done))
+    done = {name: header["run"] for name, (header, _pcs) in loaded.items()}
+    a.summary.write_text(pc.summary(loaded, starts, done))
     print(f"{a.summary} written")
     return 1 if fail else 0
+
+
+def cmd_pccov_read(a: argparse.Namespace) -> int:
+    n = pc.read_trace(a.fifo, a.out)
+    if n == 0:
+        print(f"pccov-read: {a.fifo}: no executed PC in the trace", file=sys.stderr)
+        return 1
+    return 0
 
 
 def main() -> int:
@@ -450,7 +486,7 @@ def main() -> int:
     q = sub.add_parser("pccov-read")
     q.add_argument("fifo", type=Path)
     q.add_argument("out", type=Path)
-    q.set_defaults(func=lambda a: pc.read_trace(a.fifo, a.out) and 0)
+    q.set_defaults(func=cmd_pccov_read)
 
     q = sub.add_parser("pccov")
     q.add_argument("--image", type=Path, default=IMAGE)
