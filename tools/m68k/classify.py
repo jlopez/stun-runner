@@ -1,0 +1,420 @@
+"""The classification of the 68k image's 000000-05CF86 (data/68k/classification.json, docs/14).
+
+`classify(image, ...)` runs the descent in stages, each recorded in the evidence of the entries
+it adds, then classifies every byte that is not code:
+
+1. plain seeds: the vectors of both tables (000000, 020000) and `game_entries` (020100, 020106,
+   02010C), with the idioms of descent.py (switches, computed calls, code-pointer tables, return
+   addresses) as they come;
+2. address-register loads: `movea.l #X,An` with X in a code range (a routine's address held in a
+   register: a callback); the target must descend cleanly;
+3. code-pointer tables in data: a run of two or more aligned longs outside code, all pointing
+   into the code ranges, one of them at an instruction already decided; the others are seeded;
+4. MAME: every PC the `make pccov` runs executed (the runs given);
+5. reviewed seeds: data/68k/seeds.json, an address and the written argument for each.
+
+Then, for the bytes that are no instruction and no table: text (a run of at least six printable
+characters, mostly letters, digits and the punctuation of messages, with its terminating zero),
+fill (a run of at least 32 zero bytes that no operand references), data (from an address an
+operand references to the next boundary) and unknown (the rest; in a code range a note says when
+the bytes decode cleanly as instructions and whether IDA has a function there).
+
+The file holds addresses, kinds, notes and evidence strings only: no byte of the image.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+from .decode import ABSL, ABSW, CALL, IMM, JUMP, PCDISP, PCINDEX, STOP, decode
+from .descent import P_LATE, Descent, Result, _abs
+
+END = 0x05CF86
+# where code may be (docs/06 section 4): pair R below the program table, the game's entry
+# table and pairs S-T up to the data at 046AEE
+ELIGIBLE = [(0x000100, 0x017000), (0x020100, 0x046AEE)]
+VECTOR_TABLES = [(0x000000, "the boot program's vector table (docs/06 section 1.2)"),
+                 (0x020000, "the game's vector table, installed at 000294 (docs/06 section 1.2)")]
+GAME_ENTRIES = [0x020100, 0x020106, 0x02010C]
+# ranges whose kind the code map decides (docs/06 sections 2-3)
+KNOWN = [
+    (0x017000, 0x017008, "pointers", "the program table: adsp_program, gsp_program (read at "
+                                     "02C204, 02C1B6, 02DCB0; docs/06 section 2)"),
+    (0x01702E, 0x01907C, "data", "the ADSP program's record stream, read by load_adsp_program "
+                                 "02D2E0 (docs/06 section 3.1)"),
+    (0x01907C, 0x01EFD4, "data", "the GSP program's section table, read by load_gsp_program "
+                                 "02FDD0 (docs/06 section 3.2)"),
+]
+KINDS = ("code", "switch", "pointers", "text", "data", "fill", "unknown")
+TEXT_MIN = 6
+FILL_MIN = 32
+TEXT_CHARS = set(range(0x20, 0x7F))
+TEXT_WORDY = set(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 *.-:/!?',()#%=&+")
+
+
+@dataclass
+class Span:
+    start: int
+    end: int
+    kind: str
+    note: str = ""
+    jmp: int = -1  # switch: the jmp
+    base: int = -1  # switch: the targets' base
+
+    def to_json(self) -> dict[str, object]:
+        d: dict[str, object] = {"start": f"{self.start:06X}", "end": f"{self.end:06X}",
+                                "kind": self.kind}
+        if self.jmp >= 0:
+            d["jmp"] = f"{self.jmp:06X}"
+            d["base"] = f"{self.base:06X}"
+        if self.note:
+            d["note"] = self.note
+        return d
+
+
+@dataclass
+class Classification:
+    spans: list[Span]
+    entries: dict[int, str]
+    noreturn: dict[int, str]
+    rejected: dict[int, str]
+    result: Result | None = None
+
+    def code_starts(self, image: bytes) -> dict[int, int]:
+        """Every instruction start of the code ranges and its length, by linear decoding."""
+        out: dict[int, int] = {}
+        for s in self.spans:
+            if s.kind != "code":
+                continue
+            a = s.start
+            while a < s.end:
+                insn = decode(image, a)
+                if insn is None:
+                    raise ValueError(f"code range {s.start:06X}-{s.end:06X}: no instruction at "
+                                     f"{a:06X}")
+                out[a] = insn.length
+                a += insn.length
+            if a != s.end:
+                raise ValueError(f"code range {s.start:06X}-{s.end:06X} ends inside an "
+                                 f"instruction")
+        return out
+
+
+def _long(image: bytes, a: int) -> int:
+    return int.from_bytes(image[a : a + 4], "big")
+
+
+def run_descent(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
+                untaken: dict[int, str]) -> Descent:
+    d = Descent(image, ELIGIBLE, untaken)
+    for base, _ in VECTOR_TABLES:
+        d.table_bytes.update(range(base, base + 0x100))
+    d.table_bytes.update(range(0x017000, 0x017008))
+    # 1. plain seeds
+    for base, _ in VECTOR_TABLES:
+        for n in range(1, 64):
+            v = _long(image, base + 4 * n)
+            if v and d.is_eligible(v):
+                d.add(v, None, plain=True)
+    for a in GAME_ENTRIES:
+        d.add(a, None, plain=True)
+    d.run()
+    # 2. address-register loads of a code address
+    for a, insn in sorted(d.r.insns.items()):
+        if insn.mnemonic == "movea" and insn.size == "l" and insn.operands[0].mode == IMM:
+            v = insn.operands[0].value
+            if d.is_eligible(v) and v not in d.r.insns:
+                d.add(v, f"address operand: movea.l at {a:06X}", P_LATE)
+    d.run()
+    # 3. code-pointer tables in data
+    _pointer_runs(d, image)
+    # 4. MAME
+    for pc in sorted(mame_pcs):
+        if pc not in d.r.insns:
+            d.add(pc, "MAME executed (make pccov)", P_LATE)
+    # 5. reviewed seeds
+    for a, why in seeds:
+        d.add(a, f"reviewed: {why}", P_LATE)
+    d.run()
+    return d
+
+
+def routine_starts(r: Result) -> set[int]:
+    """Addresses a call reaches, or that a seed with evidence entered: where routines start."""
+    out = {i.target for i in r.insns.values() if i.flow == CALL and i.target is not None}
+    out |= set(r.entries)
+    return out
+
+
+def _pointer_runs(d: Descent, image: bytes) -> None:
+    """Runs of at least three aligned longs outside code, all into the code ranges, at least
+    half of them (and at least two) at routine starts already decided: the others are seeds."""
+    for _ in range(4):
+        starts = routine_starts(d.r)
+        found = False
+        a = 0
+        while a < END - 4:
+            if not d.is_free(a, 4) or not d.is_eligible(_long(image, a)):
+                a += 2
+                continue
+            run = []
+            p = a
+            while p < END - 4 and d.is_free(p, 4) and d.is_eligible(_long(image, p)):
+                run.append(p)
+                p += 4
+            known = [q for q in run if _long(image, q) in starts]
+            if len(run) >= 3 and len(known) >= 2 and 2 * len(known) >= len(run) \
+                    and len(known) < len(run):
+                for k, q in enumerate(run):
+                    v = _long(image, q)
+                    if v not in d.r.insns:
+                        d.add(v, f"entry {k} of the code-pointer run at {run[0]:06X} ({len(run)} "
+                                 f"longs into code, {len(known)} of them at routine starts)",
+                              P_LATE)
+                        found = True
+            a = p
+        if not found:
+            return
+        d.run()
+
+
+def _data_refs(r: Result) -> dict[int, list[int]]:
+    """Addresses below END that an instruction's operand designates as data."""
+    refs: dict[int, list[int]] = {}
+    for a, insn in r.insns.items():
+        if insn.flow == JUMP or insn.target is not None:
+            ops = insn.operands[:-1]
+        else:
+            ops = insn.operands
+        for o in ops:
+            if o.mode in (ABSW, ABSL) and not (insn.mnemonic == "pea" and o.mode == ABSW):
+                v = _abs(o)
+            elif o.mode in (PCDISP, PCINDEX):
+                v = o.value
+            elif o.mode == IMM and insn.mnemonic == "movea" and insn.size == "l":
+                v = o.value
+            else:
+                continue
+            if v < END:
+                refs.setdefault(v, []).append(a)
+    return refs
+
+
+def _text_runs(image: bytes, lo: int, hi: int) -> list[tuple[int, int]]:
+    out = []
+    a = lo
+    while a < hi:
+        if image[a] not in TEXT_CHARS:
+            a += 1
+            continue
+        b = a
+        while b < hi and image[b] in TEXT_CHARS:
+            b += 1
+        run = image[a:b]
+        wordy = sum(1 for c in run if c in TEXT_WORDY)
+        letters = sum(1 for c in run if chr(c).isalpha())
+        if b - a >= TEXT_MIN and wordy * 10 >= 9 * (b - a) and letters * 2 >= b - a:
+            end = b + 1 if b < hi and image[b] == 0 else b
+            out.append((a, end))
+            a = end
+        else:
+            a = b
+    return out
+
+
+def _zero_runs(image: bytes, lo: int, hi: int) -> list[tuple[int, int]]:
+    out = []
+    for m in re.finditer(rb"\x00{%d,}" % FILL_MIN, image[lo:hi]):
+        out.append((lo + m.start(), lo + m.end()))
+    return out
+
+
+def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
+             untaken: dict[int, str], ida_functions: dict[int, str]) -> Classification:
+    d = run_descent(image, mame_pcs, seeds, untaken)
+    r = d.r
+    kind = ["unknown"] * END
+    note: dict[int, str] = {}
+    spans: list[Span] = []
+    for a, insn in r.insns.items():
+        for b in range(a, a + insn.length):
+            kind[b] = "code"
+    for base, why in VECTOR_TABLES:
+        for b in range(base, base + 0x100):
+            kind[b] = "pointers"
+        note[base] = why
+    for s in r.switches.values():
+        for b in range(s.table, s.end):
+            kind[b] = "switch"
+    for t in r.pointer_tables.values():
+        for b in range(t.start, t.end):
+            kind[b] = "pointers"
+        note[t.start] = f"code-pointer table: {t.evidence}"
+    for lo, hi, k, why in KNOWN:
+        for b in range(lo, hi):
+            assert kind[b] == "unknown", f"{b:06X}"
+            kind[b] = k
+        note[lo] = why
+    refs = _data_refs(r)
+    # text, fill, data, unknown over what is left
+    gaps = _runs(kind, "unknown")
+    for lo, hi in gaps:
+        for a, b in _text_runs(image, lo, hi):
+            for x in range(a, b):
+                kind[x] = "text"
+    for lo, hi in _runs(kind, "unknown"):
+        for a, b in _zero_runs(image, lo, hi):
+            # up to the first address an operand references (a base pointing into the zeros)
+            b = min([b] + [v for v in refs if a <= v < b])
+            if b - a < FILL_MIN:
+                continue
+            for x in range(a, b):
+                kind[x] = "fill"
+    ref_starts = sorted(v for v in refs if kind[v] in ("unknown",))
+    for v in ref_starts:
+        x = v
+        if kind[x] != "unknown":
+            continue
+        note.setdefault(v, "referenced from " + ", ".join(f"{i:06X}" for i in sorted(refs[v])[:4])
+                        + (f" and {len(refs[v]) - 4} more" if len(refs[v]) > 4 else ""))
+        while x < END and kind[x] == "unknown":
+            kind[x] = "data"
+            x += 1
+    # spans: maximal runs of one kind, split where a note starts (a table, a reference)
+    switch_at = {s.table: s for s in r.switches.values()}
+    table_at = set(r.pointer_tables)
+    start = 0
+    for x in range(1, END + 1):
+        split = x == END or kind[x] != kind[start] or x in note or x in switch_at \
+            or x in table_at
+        if kind[start] == "code" and x < END and kind[x] == "code" and x not in table_at:
+            split = False  # code is one range per run of instructions
+        if split:
+            sp = Span(start, x, kind[start], note.get(start, ""))
+            if sp.kind == "switch":
+                s = switch_at[start]
+                sp.jmp, sp.base = s.jmp, s.base
+                sp.note = f"switch at {s.jmp:06X}: cases {s.lo}-{s.lo + s.count - 1}, {s.bound}"
+            spans.append(sp)
+            start = x
+    for sp in spans:
+        if sp.kind == "unknown" and any(lo <= sp.start < hi for lo, hi in ELIGIBLE):
+            sp.note = _unknown_note(image, sp, ida_functions)
+    return Classification(spans, dict(r.entries), dict(r.noreturn), dict(r.rejected), r)
+
+
+def _runs(kind: list[str], k: str) -> list[tuple[int, int]]:
+    out = []
+    a = 0
+    n = len(kind)
+    while a < n:
+        if kind[a] != k:
+            a += 1
+            continue
+        b = a
+        while b < n and kind[b] == k:
+            b += 1
+        out.append((a, b))
+        a = b
+    return out
+
+
+def _unknown_note(image: bytes, sp: Span, ida_functions: dict[int, str]) -> str:
+    a = sp.start + (sp.start & 1)
+    n = 0
+    last = None
+    while a < sp.end:
+        insn = decode(image, a)
+        if insn is None or a + insn.length > sp.end:
+            break
+        n += 1
+        last = insn
+        a += insn.length
+    ida = [f"{name} {ea:06X}" for ea, name in ida_functions.items() if sp.start <= ea < sp.end]
+    parts = []
+    if a == sp.end and last is not None and last.flow in (STOP, JUMP):
+        parts.append(f"decodes cleanly as {n} instructions ending with {last.mnemonic} at "
+                     f"{last.addr:06X}; no reference found")
+    elif n:
+        parts.append(f"decodes as {n} instructions from {sp.start:06X}, then "
+                     f"{'stops' if a >= sp.end else f'no instruction at {a:06X}'}")
+    if ida:
+        parts.append("IDA functions: " + ", ".join(ida[:4]) + (" ..." if len(ida) > 4 else ""))
+    return "; ".join(parts)
+
+
+# --- the file -------------------------------------------------------------------------------
+
+FORMAT = "stunrun-68k-classification 1"
+
+
+def dump(c: Classification) -> str:
+    lines = ["{", f'  "format": "{FORMAT}",', f'  "range": ["000000", "{END:06X}"],',
+             '  "ranges": [']
+    lines += [f"    {json.dumps(s.to_json())}," for s in c.spans]
+    lines[-1] = lines[-1].rstrip(",")
+    lines += ["  ],", '  "entries": [']
+    ent = [f'    {json.dumps({"at": f"{a:06X}", "evidence": e})},'
+           for a, e in sorted(c.entries.items())]
+    if ent:
+        ent[-1] = ent[-1].rstrip(",")
+    lines += ent + ["  ],", '  "noreturn": [']
+    nr = [f'    {json.dumps({"call": f"{a:06X}", "why": w})},' for a, w in sorted(c.noreturn.items())]
+    if nr:
+        nr[-1] = nr[-1].rstrip(",")
+    lines += nr + ["  ]", "}"]
+    return "\n".join(lines) + "\n"
+
+
+def load(path: Path) -> Classification:
+    j = json.loads(path.read_text())
+    if j.get("format") != FORMAT:
+        raise ValueError(f"{path}: not {FORMAT}")
+    spans = []
+    for r in j["ranges"]:
+        s = Span(int(r["start"], 16), int(r["end"], 16), r["kind"], r.get("note", ""),
+                 int(r.get("jmp", "-1"), 16) if "jmp" in r else -1,
+                 int(r["base"], 16) if "base" in r else -1)
+        if s.kind not in KINDS:
+            raise ValueError(f"{path}: unknown kind {s.kind}")
+        spans.append(s)
+    entries = {int(e["at"], 16): e["evidence"] for e in j["entries"]}
+    noreturn = {int(e["call"], 16): e["why"] for e in j.get("noreturn", [])}
+    return Classification(spans, entries, noreturn, {})
+
+
+def validate(c: Classification, start: int = 0, end: int = END) -> list[str]:
+    """Problems with the ranges: a gap, an overlap, an empty or odd range."""
+    errs = []
+    pos = start
+    for s in c.spans:
+        if s.start != pos:
+            errs.append(f"{'gap' if s.start > pos else 'overlap'} at {pos:06X}-{s.start:06X}")
+        if s.end <= s.start:
+            errs.append(f"empty range at {s.start:06X}")
+        if s.kind in ("code", "switch", "pointers") and (s.start % 2 or s.end % 2):
+            errs.append(f"{s.kind} range {s.start:06X}-{s.end:06X} is not word-aligned")
+        if s.kind == "pointers" and (s.end - s.start) % 4:
+            errs.append(f"pointer range {s.start:06X}-{s.end:06X} is not whole longs")
+        pos = s.end
+    if pos != end:
+        errs.append(f"the ranges end at {pos:06X}, not {end:06X}")
+    return errs
+
+
+def stats(c: Classification, regions: list[tuple[str, int, int]]) -> dict[str, dict[str, int]]:
+    out: dict[str, dict[str, int]] = {}
+    for name, lo, hi in regions:
+        row = dict.fromkeys(KINDS, 0)
+        for s in c.spans:
+            a, b = max(s.start, lo), min(s.end, hi)
+            if a < b:
+                row[s.kind] += b - a
+        out[name] = row
+    return out
+
+
+__all__ = ["Classification", "Span", "classify", "dump", "load", "validate", "stats"]

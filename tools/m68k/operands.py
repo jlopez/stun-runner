@@ -1,0 +1,106 @@
+"""Which long immediates are addresses (data/68k/operands.json, docs/14 section 4).
+
+Byte identity cannot tell `#$47406` the address from `#$47406` the number. Every long immediate
+of a code instruction whose value lies in 000100-0BFFFF (where the image's addresses are; below
+000100 only the vector table) gets a decision and the rule that made it:
+
+    address    the generator writes a label (the shift test checks it moves with its target)
+    constant   the generator writes the number (the address lint allows it)
+    undecided  the generator writes the number; the lint reports it (docs/14 lists them)
+
+The rules, in order (the first that matches decides):
+
+    R1 address    movea.l #X,An: a value loaded into an address register
+    R2 address    X = 0BFE00, the image pointer table (docs/06 section 4.2), added to an index
+    R3 address    move.l/pea of X where X starts a routine (a call target or an entry with
+                  evidence): a routine's address handed on (a callback)
+    R4 address    move.l of X >= 020000 where X is an address some instruction uses as an
+                  absolute or PC-relative operand
+    R5 constant   and/or/eor (immediate or not): a mask
+    R6 constant   add/sub/cmp and their immediate and address forms, mul/div: an arithmetic
+                  operand
+    R7 undecided  move.l of X >= 04397E (the data island, the data, the images): a pointer into
+                  the data or a large number (16.16 fixed point), not decided
+    R8 constant   move.l of a smaller X: a count, a delay or a fixed-point value
+
+The file holds instruction addresses, operand indexes, decisions and rule names: no value.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from .decode import AN, IMM, Insn
+
+LO, HI = 0x000100, 0x0C0000
+FORMAT = "stunrun-68k-operands 1"
+RULES = {
+    "R1": ("address", "movea.l into an address register"),
+    "R2": ("address", "the image pointer table 0BFE00 (docs/06 4.2)"),
+    "R3": ("address", "a routine's address handed on (a callback)"),
+    "R4": ("address", "an address other instructions use as an operand"),
+    "R5": ("constant", "a mask"),
+    "R6": ("constant", "an arithmetic or compare operand"),
+    "R7": ("undecided", "a pointer into the data or a large number, not decided"),
+    "R8": ("constant", "a count, a delay or a fixed-point value below the data"),
+}
+LOGICAL = {"and", "andi", "or", "ori", "eor", "eori"}
+ARITH = {"add", "addi", "adda", "sub", "subi", "suba", "cmp", "cmpi", "cmpa", "mulu", "muls",
+         "divu", "divs", "addq", "subq"}
+
+
+def candidates(insn: Insn) -> list[int]:
+    """Operand indexes of the long immediates in the decided range."""
+    return [i for i, o in enumerate(insn.operands)
+            if o.mode == IMM and o.size == "l" and LO <= o.value < HI]
+
+
+def decide(insn: Insn, i: int, routine_starts: set[int], operand_addresses: set[int]) -> str:
+    v = insn.operands[i].value
+    mn = insn.mnemonic
+    if mn == "movea" and insn.operands[-1].mode == AN:
+        return "R1"
+    if v == 0x0BFE00:
+        return "R2"
+    if mn in ("move", "pea") and v in routine_starts:
+        return "R3"
+    if mn == "move" and v in operand_addresses and v >= 0x020000:
+        return "R4"
+    if mn in LOGICAL:
+        return "R5"
+    if mn in ARITH:
+        return "R6"
+    if v >= 0x04397E:
+        return "R7"
+    return "R8"
+
+
+def build(insns: dict[int, Insn], routine_starts: set[int], operand_addresses: set[int]
+          ) -> list[dict[str, object]]:
+    out = []
+    for a in sorted(insns):
+        for i in candidates(insns[a]):
+            rule = decide(insns[a], i, routine_starts, operand_addresses)
+            out.append({"at": f"{a:06X}", "operand": i, "decision": RULES[rule][0],
+                        "rule": rule})
+    return out
+
+
+def dump(entries: list[dict[str, object]]) -> str:
+    rules = {k: f"{d}: {why}" for k, (d, why) in RULES.items()}
+    lines = ["{", f'  "format": "{FORMAT}",', f'  "rules": {json.dumps(rules, indent=4)},',
+             '  "operands": [']
+    lines[-2] = lines[-2].replace("\n}", "\n  }")
+    body = [f"    {json.dumps(e)}," for e in entries]
+    if body:
+        body[-1] = body[-1].rstrip(",")
+    return "\n".join(lines + body + ["  ]", "}"]) + "\n"
+
+
+def load(path: Path) -> dict[tuple[int, int], str]:
+    """(instruction address, operand index) -> decision."""
+    j = json.loads(path.read_text())
+    if j.get("format") != FORMAT:
+        raise ValueError(f"{path}: not {FORMAT}")
+    return {(int(e["at"], 16), int(e["operand"])): e["decision"] for e in j["operands"]}

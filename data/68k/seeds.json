@@ -1,0 +1,8 @@
+{
+  "format": "stunrun-68k-seeds 1",
+  "comment": "Reviewed seeds of the 68k descent (docs/14-68k-descent.md section 2.4): code entries the image's own references do not reach, and static branch targets that are never taken, each with its written argument. tools/m68k classify reads it.",
+  "seeds": [],
+  "untaken": [
+    {"at": "004B74", "argument": "dbf d2 whose displacement (3562) points into the boot program's menu text at 0080D8, where no instruction decodes (0080DE). The same loop at 004B82 has the displacement FFFC (back to the move.l d0,(a0) at 004B80). D2 is FF947E >> 1, then dbf: the branch is taken only when that count is not 0. MAME executed 004B74 and 004B78 in the self-test runs of make pccov and never 0080D8 (HYP: a bad displacement in the ROM that the hardware never exercises)."}
+  ]
+}
