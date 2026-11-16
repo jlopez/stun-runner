@@ -120,13 +120,20 @@ their kind (the program table's two pointers at 017000, the ADSP and GSP streams
   `pea N.w`) to the next boundary, with the first referencing instructions in the note;
 - **unknown**: the rest. In a code range the note says when the bytes decode cleanly as
   instructions to a `rts`/`rte`/`jmp`/`bra` (from the first even address: a range that starts at
-  an odd byte is decoded from the next one) and which IDA functions start there. For a range that
-  decodes cleanly the note also gives the result of a search of 000000-05CF86 for its address
-  (`reference_index`): a long equal to it at an even address (an absolute operand, a pointer, a
+  an odd byte is decoded from the next one) and which IDA functions start there. The decode steps
+  over the word table of a C switch (the idiom of section 2.3, `a switch table at ...` in the
+  note) and needs every case to start one of its instructions: 02E506-02E79C (`move.w
+  (02E54C,pc,d0.l),d0` at 02E544, `jmp (02E54C,pc,d0.w)` at 02E548, and a second switch at
+  02E62E) and 03B548-03B5E4 (`cmpi`/`blt` and `cmpi #6`/`bgt` bound the index, `jmp` at 03B58C)
+  decode cleanly that way. For a range that decodes cleanly the note also gives the result of a
+  search of 000000-05CF86 (`reference_index`) for the address of every place a routine may start
+  in it: its start, each instruction after a `rts`/`rte`/`jmp`, and IDA's function starts. The
+  search finds a long equal to the address at an even address (an absolute operand, a pointer, a
   `jmp abs.l` of a jump table), a branch or `bsr` to it, a `jsr`/`jmp` absolute short or a
   `jsr`/`jmp`/`lea`/`pea` (d16,pc) to it. A hit is a possible reference in bytes the descent did
-  not decide (`possible references: ...`); "no reference found" is written only when the search
-  is empty.
+  not decide (`possible references: ...` for the start, `possible references to X inside it:
+  ...` for an inner start); "no reference found" is written only when the search is empty for
+  all of them.
 
 ## 3. The classification
 
@@ -157,27 +164,40 @@ Bytes per kind and region (`tools/m68k stats`):
 194 switch cases, 152 return addresses, 102 code-pointer table entries, 2 record-table entries, 4
 computed calls, 3 MAME (030C8E, 03C18A, 0410C0). Against IDA's 40,210 instruction heads: no
 boundary conflicts; 6,908 instructions (28,492 bytes) are code here and not in IDA, 2,435 IDA
-heads (7,126 bytes) are not code here (IDA functions nothing references, below).
+heads (7,126 bytes) are not code here, all in unknown ranges: 3,138 bytes in the 11 ranges
+whose notes name IDA functions (3,136 in the ten that decode cleanly and hold the 12 functions
+below, 2 at 023EDE, `send_sound_byte_once`), 3,508 in 29 other ranges that decode cleanly
+(routines IDA made code without a function, e.g. 02E506-02E79C, 630 bytes, and 035AE8-035CA2,
+442), and 480 in 0109EC-010F32, where the note's decode stops (recounted from IDA's 40,210 code
+heads against the classification's instruction starts).
 
 What is not decided, and why:
 
-- **Routines no decided code reaches.** 74 unknown ranges inside the code ranges, 10,351 bytes,
+- **Routines no decided code reaches.** 76 unknown ranges inside the code ranges, 11,169 bytes,
   decode cleanly to a `rts` (or `bra`) and no decided instruction references them (one, 020DE1,
-  from 020DE2, the byte after its odd start); 10 of them hold IDA functions (12 functions, 3,338
-  bytes: e.g. 02D382-02D706, where `copy_adsp_dram_to_18000` 02D6D8 lies, docs/06 section 4.5;
-  02C9E4-02CCD8; 02D80E-02DA6E). For 65 of them (9,567 bytes) the search of section 2.5 finds no
-  reference at all. Nine have possible references from bytes the descent left undecided:
-  0006AC, 00246E, 0026A0 and 006410 are targets of the `jmp abs.l` table at 000100-0001F0 (40
-  `jmp abs.l`, unknown: no reference to the table is decided), 0006AC also of longs at 000A1A and
-  000A28 (data) and 00A4E4; 000CBC of a `jsr` at 00A70C, 00273E of one at 00991A, 022DEA of one at
-  02C850, 023F72 (`get_sound_response`) of one at 03002C in `sound_watchdog` (03001E), its only
-  caller, which nothing calls (docs/11 section 2) (all four `jsr` in unknown bytes); 009900 of longs in the game data (0467A6,
-  046836, 046896, 047CF2). None is proven to be code or dead by the image or MAME, so they stay
-  `unknown` (issue #29: "do not guess") and become `incbin` slices. A reviewed seed in
+  from 020DE2, the byte after its odd start); two of them (02E506-02E79C, 03B548-03B5E4, 818
+  bytes) hold a C switch (section 2.5); 10 hold IDA functions (12 functions, 3,338 bytes: e.g.
+  02D382-02D706, where `copy_adsp_dram_to_18000` 02D6D8 lies, docs/06 section 4.5;
+  02C9E4-02CCD8; 02D80E-02DA6E). For 64 of them (9,635 bytes) the search of section 2.5 finds no
+  reference to their start or to any routine start inside them. Twelve have possible references
+  from bytes the descent left undecided: 0006AC, 00246E, 0026A0 and 006410 are targets of the
+  `jmp abs.l` table at 000100-0001F0 (40 `jmp abs.l`, unknown: no reference to the table is
+  decided; 00648C, inside 006410, is one too), 0006AC also of longs at 000A1A and 000A28 (data)
+  and 00A4E4; 000CBC of a `jsr` at 00A70C (and 000CFE inside it of a long in data at 01E348),
+  00273E of one at 00991A (and 002772 inside it of a `jsr` at 0099F4), 022DEA of one at 02C850,
+  023F72 (`get_sound_response`) of one at 03002C in `sound_watchdog` (03001E), its only caller,
+  which nothing calls (docs/11 section 2) (all these `jsr` in unknown bytes); 009900 of longs in
+  the game data (0467A6, 046836, 046896, 047CF2). Three are reached only at a routine inside
+  them, from other unknown ranges, so some of these ranges call one another: 0224C2 (IDA's
+  `sub_224C2`, in 02249E-02256C) by `jsr $224C2.l` at 02D9A8, 02DA38 and 02DA5C in 02D80E-02DA6E;
+  02F400 (`sub_2F400`, in 02F33A-02F470) by `jsr $2F400.l` at 02CB12 in 02C9E4-02CCD8; 0214FC (in
+  0214C0-0215AA) by five `bsr.w` (021AC4, 021B1E, 021BC4, 02202C, 0220AE) in the unknown
+  021744-0222DA. None is proven to be code or dead by the image or MAME, so they stay `unknown`
+  (issue #29: "do not guess") and become `incbin` slices. A reviewed seed in
   `data/68k/seeds.json` with its argument makes one code.
 - **Dead instructions** such as 02045A (four bytes between a `bra.s` at 020458 and its target,
   a `bclr #5,d2`): `unknown`.
-- **The rest of the unknown bytes** (23,950 in the code ranges, 274 of them at 000100-000212;
+- **The rest of the unknown bytes** (23,132 in the code ranges, 274 of them at 000100-000212;
   3,604 in the data; 11 in the program table) do not decode cleanly or are tables of no known
   format: the boot program's menu
   records (a few control bytes, among them a row and a length, before each string, e.g. at
@@ -201,13 +221,21 @@ index, decision, rule; no value), the first rule that matches:
 | R7 | undecided | `move.l` of X >= 04397E (the island, the data, the images) | 32 |
 | R8 | constant | `move.l` of a smaller X: a count, a delay, a fixed-point value | 101 |
 
-The 32 undecided (`move.l #X` into memory with X in the data or the images: a data pointer or a
-large 16.16 number) are at 02444E, 0245F8, 024FA8, 025E9C, 026F12, 028476, 02A302, 02A30A,
+The 32 undecided (`move.l #X` into memory or a data register, X in the island, the data or the
+images: a data pointer or a large 16.16 number; 15 store into memory, 17 load a data register:
+025E9C into d2, the six of 02A302-02A33C, 03152A and 040F66 into d3, 03163E into d4, 02FC76,
+031644 and 03F572-03F6BE into d5; six values lie in the island: 0439C8, 0461F0 three times,
+045830, 0466A0) are at 02444E, 0245F8, 024FA8, 025E9C, 026F12, 028476, 02A302, 02A30A,
 02A31A, 02A322, 02A334, 02A33C, 02DCCC, 02FC76, 03152A, 03163E, 031644, 03164A, 031F92, 03F572,
 03F5C6, 03F61A, 03F66C, 03F6BE, 0405B0, 040620, 0407E6, 04084C, 0408C6, 0409D4, 0409F6, 040F66.
 The generator writes them as numbers and the address lint reports them apart; the game data leg,
 which will know what lies at each X, decides them (docs/06 names 0461F0 from 02444E as an IDA
-cross-reference, which decision C5 does not trust).
+cross-reference, which decision C5 does not trust). Evidence for that leg already in the image:
+four of them store into a variable that other stores give an R4 address. 02444E and 0245F8
+`move.l #$461F0,$FF9558` where 024D0E, 026F98, 0286DC, 0287C6, 0288D0 and 02A8C4 store 044630
+and 0284A4 and 02AA7E store 044930 (R4); 026F12 `move.l #$461F0,$FFDB3C` and 02DCCC `move.l
+#$45830,$FFDB3C` where 02716A and 02B69A store 044630 (R4). The rules decide per instruction,
+not per variable, so these four stay undecided here.
 
 ## 5. The generator
 
@@ -323,7 +351,12 @@ PC-relative and branch-target rule, its switch-entry rule, its values read from 
 `pea` exempted, absolute operands linted only below 020000; `validate` returning nothing; the
 record-table idiom, the return address kept across another load, the reference search and the
 even start of an unknown range's note; the summary's run order; `classify` without the MAME
-runs.
+runs. And ten from the second review: a zero or ineligible vector taken as a seed of a partial
+check, the layout's entries, the targets of code still in blobs and the classified starts
+outside left out of `check-listing`'s seeds (a synthetic tree with one range as source and the
+rest as `incbin` slices), `--range` not scoping the unreached statements, `gen` and
+`check-region` without their range check, an unknown range's switch table not stepped over,
+and the inner routine starts not searched (two variants).
 
 ## 7. MAME coverage
 
@@ -375,7 +408,9 @@ name order, so a re-run with the same PCs rewrites the same file.
    seeds from the source's `dc.l`/`dc.w a-b`, the classification's entries inside the source's
    instructions, the vectors and the calls from code still in blobs, and lets a flow end at
    classified code outside; it exits 1 on any error and on any instruction statement nothing
-   reaches that `unreached` of `data/68k/seeds.json` does not list. The shift test as in
+   reaches that `unreached` of `data/68k/seeds.json` does not list. With `--range` the descent
+   still runs over the whole listing, but both checks report only what lies in START-END (an
+   error by the first address it names), so another leg's statements do not fail this one. The shift test as in
    `check-region` (a pad before the region's first statement).
 4. Decide the undecided operands of the region (section 4) and the unknown ranges that decode
    cleanly (section 3) with written arguments.
@@ -394,8 +429,8 @@ name order, so a re-run with the same PCs rewrites the same file.
   bad displacement the hardware never exercises). Recorded as an untaken branch in
   `data/68k/seeds.json`.
 - Every `jmp (d8,pc,Xn)` of the code is a switch (33); some bound their index with `moveq`/`cmp`
-  instead of `cmpi` (025704, 041116), some subtract before indexing (0380B6), one index is `.l`
-  in the `move.w` and `.w` in the `jmp` (025712).
+  instead of `cmpi` (025704, 041116), some subtract before indexing (0380B6), two indexes are
+  `.l` in the `move.w` and `.w` in the `jmp` (025712, 041124).
 - No call in the code is followed by data (the `noreturn` list is empty).
 - **000E12-000EB2 is a table of 16 records of 10 bytes** walked by 000EB2-000ED8 (count word
   at 000E10, routine pointer at +4, `jsr (a0)` at 000ECE, step `adda.l #$A,a3`): records 0-7 call
@@ -408,12 +443,15 @@ name order, so a re-run with the same PCs rewrites the same file.
 
 ## 10. Open questions
 
-1. The 74 ranges no decided code reaches that decode cleanly (10,351 bytes, section 3): for the
-   65 with no reference at all, accept a "dead C function" argument (a range between two code
-   ranges that starts after a `rts`, decodes to a `rts` and branches only inside itself) as
-   evidence, or keep them `unknown` until a reference is found? The nine with possible references
-   from undecided bytes (the `jmp abs.l` table at 000100, four `jsr` in unknown bytes, longs in
-   data) wait for those bytes to be decided.
+1. The 76 ranges no decided code reaches that decode cleanly (11,169 bytes, section 3): for the
+   64 where the search finds no reference to their start or to any routine start inside them,
+   accept a "dead C function" argument (a range between two code ranges that starts after a
+   `rts`, decodes to a `rts` and branches only inside itself) as evidence, or keep them
+   `unknown` until a reference is found? The twelve with possible references from undecided bytes
+   (the `jmp abs.l` table at 000100, `jsr` and `bsr` in other unknown ranges, longs in data) wait
+   for those bytes to be decided; three of them are called only from other unknown ranges
+   (02D80E calls 0224C2, 02C9E4 calls 02F400, 021744-0222DA calls 0214FC), so the unknown ranges
+   are not all isolated.
 2. The 32 undecided long immediates (section 4): the data leg's.
 3. 000100-000212 (274 bytes) and the boot program's menu records: their formats are the boot
    leg's.
