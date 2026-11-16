@@ -21,7 +21,8 @@ Since M2 the 68k image has one more step: `tools/extract-programs` cuts the ADSP
 programs out of `build/stunrun-68k.bin` into `build/adsp/program.bin` and
 `build/gsp/program.bin` (plus the unpacked oracle images `pm.bin` and `vram.bin`), and
 `asm/68k/stunrun.asm` incbins them under `adsp_program` and `gsp_program` between two slices of
-the image (docs/06-code-map.md section 3.4, which also holds the partition of the 768 KB).
+the image (docs/06-code-map.md section 3.4, which also holds the partition of the 768 KB). That
+was the tree until M5-0; the next paragraph is the tree since.
 
 Since M5-0 (docs/13-68k-source.md) `asm/68k/stunrun.asm` is `org 0`, `hardware.asm` (the I/O
 equates) and nine region files in address order, one per later owner, each with a guard at both
@@ -105,7 +106,7 @@ rom_s:
 	incbin	"../../build/stunrun-68k.bin",$020000,$20000
 ```
 
-- **vasm incbin syntax** (verified on vasm 2.0f, Motorola syntax module 3.19f): `incbin "file"[,offset[,length]]`, the path relative to the source file's directory (it also works when vasm runs from the repository root). As documented.
+- **vasm incbin syntax** (verified on vasm 2.0f, Motorola syntax module 3.19f): `incbin "file"[,offset[,length]]`, the path relative to the main source file's directory (it also works when vasm runs from the repository root). As documented. The main file's directory holds for an `include`d file too, also one in a subdirectory: `asm/68k/game/code.asm` writes `"../../build/stunrun-68k.bin"`, resolved from `asm/68k`, since `asm/68k/game/../../build` does not exist (verified on vasm 2.0f in M5-0; docs/13-68k-source.md section 2).
 - **vasm guards**: `assert <expr>[,"message"]` fails the assembly with `error 48 ... assertion "*=$020000" failed: pair S misplaced`. `if *<>$20000` does **not** work in vasm's Motorola syntax (`<>` gives error 10, "number or identifier expected"); `if *!=$20000` / `fail` and `ifne *-$20000` do. The trees use `assert`.
 - **64tass** (1.60): `.binary "file", offset, length`, `.cerror cond, "message"`. The 6502 program counter wraps from $FFFF to $0000 after a full 64 KB, so `* != $10000` is always true at the end of the image: `asm/jsa/jsa.asm` guards the slices at $1000/$2000/$3000/$4000, the end with `* != $0000`, and the blob's size with `len(binary(IMAGE)) != $10000`. The 6502 tree is cut into the four bank pages and the $4000-$FFFF window so that M4 can give each its own file and `.logical $3000`. (M4a: the four pages are zero in this set, so they became `.fill`s with no `.logical`; the window became the region files of docs/09 section 2.)
 
