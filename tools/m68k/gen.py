@@ -15,8 +15,8 @@ What each kind becomes:
 
     code      instructions; flow targets, PC-relative operands and absolute operands in the ROM
               (000000-0BFFFF) as labels, I/O and RAM operands as equates, long immediates as the
-              operand decisions say (operands.py); `pea N.w` stays a number (all 1,695 are
-              constants)
+              operand decisions say (operands.py); `pea N.w` stays a number (a constant
+              in this ROM, issue #29)
     switch    dc.w case-base, one per entry
     pointers  dc.l label (0 and values outside the ROM stay numbers)
     text      dc.b 'string',0

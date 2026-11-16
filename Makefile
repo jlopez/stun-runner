@@ -560,7 +560,7 @@ clean:
 # --- M5g: the 68k descent, classification and generator (docs/14-68k-descent.md) ------------
 # tools/m68k is a package run as `uv run python tools/m68k <command>`; its CI tests are
 # tools/test_m68k.py (part of `make test`). `make lint` also type-checks the package.
-.PHONY: lint-m68k classify pccov m68k-regions
+.PHONY: lint-m68k classify pccov m68k-check
 lint: lint-m68k
 lint-m68k:
 	uv run --frozen mypy -p m68k
@@ -574,6 +574,17 @@ CLASSIFICATION := data/68k/classification.json
 classify: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
 	$(PYTHON) tools/m68k classify --image $< --out $(CLASSIFICATION) \
 		$(wildcard $(BUILD)/mame/pccov-*.txt)
+
+# Point 6 of issue #29 (docs/14 section 6): the generator's source for each code region,
+# assembled alone in build/m68k/, is the image (0 differences) and passes the descent check, the
+# address lint and the shift test; every instruction boundary equals unidasm's. Needs the
+# reference set and unidasm.
+M68K_CODE_REGIONS := 000212:012F06 020430:04397E 04397E:046AEE
+
+m68k-check: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
+	@for r in $(M68K_CODE_REGIONS); do \
+		$(PYTHON) tools/m68k check-region $${r%:*} $${r#*:} --work $(BUILD)/m68k || exit 1; done
+	$(PYTHON) tools/m68k check-unidasm --unidasm $(UNIDASM)
 
 # Which 68010 instructions MAME executes (docs/14 section 6): tools/mame/pccov.lua traces the
 # 68010 under the debugger into a named pipe that `tools/m68k pccov-read` drains into the

@@ -143,6 +143,7 @@ def sizes(lst: Listing, end: int) -> None:
 
 def assemble(src: Path, out: Path, vasm: str = "vasmm68k_mot") -> tuple[bytes, str]:
     """vasm as the Makefile runs it (-Fbin -no-opt -m68010), with a listing."""
+    out = out.resolve()
     lst = out.with_suffix(".lst")
     r = subprocess.run([vasm, "-quiet", "-Fbin", "-no-opt", "-m68010", "-L", str(lst), "-o",
                         str(out), src.name], cwd=src.parent, capture_output=True, text=True,

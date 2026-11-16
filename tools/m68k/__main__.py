@@ -163,7 +163,7 @@ def cmd_gen(a: argparse.Namespace) -> int:
 
 def check_region(a: argparse.Namespace, lo: int, hi: int, m: gn.Model) -> list[str]:
     """Generate lo-hi, assemble it alone, compare with the image, run the listing checks."""
-    work = a.work / f"{lo:06X}"
+    work = a.work.resolve() / f"{lo:06X}"
     work.mkdir(parents=True, exist_ok=True)
     incbin = str(a.image.resolve())
     out = gn.generate(m, lo, hi, incbin)
