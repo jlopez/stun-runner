@@ -45,7 +45,7 @@ neither 00 nor a sign extension (FFxx with bit 7 of xx set). Checks:
   but for the ten FFFF byte immediates of section 5.2.
 - `tools/m68k check-unidasm` (local): every instruction boundary of the classification's 183 code
   ranges equals unidasm's linear decoding of the range, **44,658 boundaries, 0 ranges differ**.
-- `tools/test_m68k.py::test_decoder_round_trip` (CI): about 200 instruction forms covering every
+- `tools/test_m68k.py::test_decoder_round_trip` (CI): 176 instruction forms covering every
   decoder path are assembled by vasm; each decodes to its statement's length and the decoder's
   text assembles back to the same bytes. `test_not_code` (CI): the forms above decode to nothing.
 
@@ -313,9 +313,19 @@ called through a pointer the code keeps in RAM, HYP).
    C6), with `asm/68k/macros.asm` included before it; `make check` must stay 0 differences.
 3. From then on edit the source by hand (names, comments, explained data); never run the
    generator over it again. After each change: `make check`, and `tools/m68k check-listing
-   --listing build/stunrun-68k.lst --binary build/stunrun-68k.out --range START END` for the
-   descent check and the address lint; the shift test as in `check-region` (pad the region's
-   first statement).
+   --listing build/stunrun-68k.lst --binary build/stunrun-68k.out --range START END` (after
+   `make coverage`, which writes the listing) for the descent check and the address lint: it
+   seeds from the source's `dc.l`/`dc.w a-b`, the classification's entries inside the source's
+   instructions, the vectors and the calls from code still in blobs, and lets a flow end at
+   classified code outside. The shift test as in `check-region` (a pad before the region's first
+   statement).
+5. Mutation check of the CI tests (M5g): fourteen planted faults in the tools (a short branch read
+   unsigned, any byte-immediate high byte or a scale factor accepted, the switch's first case
+   forced to 0, the return-address idiom or `subq` in a computed call ignored, the text rule
+   without its word, absolute short RAM without `ABS_SHORT`, locals never promoted, the operand
+   decisions ignored, the descent check's mid-instruction error, the lint's absolute operands,
+   the shift test's missed moves, the MAME checker) each fail at least one CI test of
+   `tools/test_m68k.py`.
 4. Decide the undecided operands of the region (section 4) and the unknown ranges that decode
    cleanly (section 3) with written arguments.
 
