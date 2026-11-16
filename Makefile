@@ -28,7 +28,7 @@ SRC_stunrun-jsa   := asm/jsa/jsa.asm
 
 ROMSET_TOOLS := tools/romset.py tools/romsets/$(SET).json
 
-.PHONY: all check coverage test lint roms roms-refresh selftest clean ida ida-export ida-annotate ida-sync \
+.PHONY: all check coverage labels test lint roms roms-refresh selftest clean ida ida-export ida-annotate ida-sync \
 	dasm oracle pcwatch objects objtrace objlevels pictures view somdump fieldext depthkeys vskip \
 	okitrace samples sndtrace soundcheck listen sndproto musictrace FORCE
 .SECONDEXPANSION:
@@ -100,14 +100,16 @@ $(OKI_ASM): $(OKI_MANIFEST) $(wildcard data/oki/*.wav) $(OKI_TOOLS) FORCE
 
 .SECONDARY: $(OKI_ASM)
 
-# image -> the files its tree includes: its blob (the merged image) and any others; the object
-# tree includes only the generated page sources, never build/stunrun-obj.bin, the OKI tree
-# only the include generated from data/oki, never build/stunrun-oki.bin, and the 6502 tree is all
-# source (docs/09-sound-program.md): its own files, data/ included, and nothing from build/
-EXTRA_stunrun-68k   := $(BUILD)/stunrun-68k.bin $(PROGRAMS)
+# image -> the files its tree includes: its blob (the merged image) and any others; the 68k tree
+# is every file under asm/68k (the region files under boot/ and game/ included, docs/13) plus its
+# blobs, the object tree includes only the generated page sources, never build/stunrun-obj.bin,
+# the OKI tree only the include generated from data/oki, never build/stunrun-oki.bin, the NVRAM
+# tree is two zero fills (M5-0) and includes nothing, and the 6502 tree is all source
+# (docs/09-sound-program.md): its own files, data/ included, and nothing from build/
+EXTRA_stunrun-68k   := $(BUILD)/stunrun-68k.bin $(PROGRAMS) $(shell find asm/68k -type f -name '*.asm')
 EXTRA_stunrun-obj   := $(OBJECT_ASM)
 EXTRA_stunrun-oki   := $(OKI_ASM) FORCE
-EXTRA_stunrun-nvram := $(BUILD)/stunrun-nvram.bin
+EXTRA_stunrun-nvram :=
 EXTRA_stunrun-jsa   := $(wildcard asm/jsa/data/*.asm)
 
 # The listing is a co-target of the assembly (a pattern rule with two targets is one recipe for
@@ -133,13 +135,20 @@ check:
 	$(PYTHON) tools/bytecheck --set $(SET) --built $(ROMDIR) && [ $$hashes -eq 0 ]
 
 coverage: all $(LISTINGS)
-	$(PYTHON) tools/coverage --set $(SET) $(LISTINGS)
+	$(PYTHON) tools/coverage --set $(SET) $(foreach g,$(MAX_BLOB),--max-blob $(g)) $(LISTINGS)
+
+# The 68k IDA snapshot's names against the tree's labels (docs/13-68k-source.md section 7): a
+# name in source must be a label at its address; names in blobs are counted. Listing only, so
+# it runs without the reference set on any build of the tree (tools/test_build.py runs it on the
+# synthetic one in CI).
+labels: $(BUILD)/stunrun-68k.lst
+	$(PYTHON) tools/labels --listing $< --snapshot data/ida/stunrun-68k.json
 
 test: selftest
 	$(PYTHON) -m pytest -q tools
 
 PYTOOLS := tools/romset.py tools/listings.py tools/programs.py tools/test_*.py \
-	tools/check-roms tools/merge-roms tools/split-roms tools/bytecheck tools/coverage \
+	tools/check-roms tools/merge-roms tools/split-roms tools/bytecheck tools/coverage tools/labels \
 	tools/extract-programs tools/dasm-programs tools/annotate-listing tools/displaylist.py \
 	tools/sndtrace.py tools/jsa_music.py
 

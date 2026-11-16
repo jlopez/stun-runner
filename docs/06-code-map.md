@@ -182,14 +182,16 @@ assembled) writes:
 
 | File | What |
 |---|---|
-| `build/adsp/program.bin` | 0x01702E-0x01907C as is: what `asm/68k/stunrun.asm` incbins under `adsp_program` |
+| `build/adsp/program.bin` | 0x01702E-0x01907C as is: what `asm/68k/programs.asm` (until M5-0 `asm/68k/stunrun.asm`) incbins under `adsp_program` |
 | `build/gsp/program.bin` | 0x01907C-0x01EFD4 as is, under `gsp_program` |
 | `build/adsp/pm.bin`, `pm.ranges.json` | program RAM after the loader: 0x2000 words as 32-bit little-endian (top byte 0), zero where nothing is loaded; the loaded word ranges, one per record |
 | `build/gsp/vram.bin`, `vram.ranges.json` | a sparse byte image of GSP bit addresses FF800000-FFFFFFFF (byte offset = (bit address - FF800000) / 8, 16-bit words little-endian) written only where loaded; the loaded bit ranges, one per section |
 
 It checks that the table at 0x017000 points to 0x01702E and 0x01907C, that the ADSP stream ends
 exactly where the GSP table starts and that the GSP table ends at 0x01EFD4; the 68k tree asserts
-the same boundaries. Pair R is split into four statements:
+the same boundaries. In M2 pair R was split into four statements (since M5-0 the two programs are
+in `asm/68k/programs.asm` between the program table, now source, and two zero fills; the slices
+before and after belong to the region files of docs/13-68k-source.md):
 
 ```
 rom_r:        incbin "../../build/stunrun-68k.bin",$000000,$1702E
@@ -198,7 +200,8 @@ gsp_program:  incbin "../../build/gsp/program.bin"       ; asserts * = $01EFD4 a
 rom_r_tail:   incbin "../../build/stunrun-68k.bin",$01EFD4,$20000-$01EFD4
 ```
 
-`make coverage` now lists every blob by label with the file it includes and its size:
+`make coverage` now lists every blob by label with the file it includes and its size (since
+M5-0 the source column says `asm/68k/programs.asm`):
 
 ```
 adsp_program            1702E     8270  ../../build/adsp/program.bin      asm/68k/stunrun.asm
@@ -211,6 +214,11 @@ Function extents are IDA 9.1's after `make ida` with this leg's snapshot (639 fu
 references are IDA's cross-references from code heads. "Read by" ranges come from a MAME read
 watchpoint on the 68010 over 3,600 frames of attract mode and one game started at frame 960
 (`wpset`, method as in section 7; a scratch script, not committed).
+
+M5-0 checked every boundary of this partition against the image and kept them all: each zero
+fill below is all zero, and where the zero run in the image is longer, the extra zero bytes
+belong to the neighbour (a pointer's high byte, the image table's first and last entries;
+docs/13-68k-source.md section 2.1). The rows are the region files of docs/13 section 2.
 
 ### 4.1 Pair R, the boot program (0x000000-0x01FFFF)
 

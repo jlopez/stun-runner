@@ -23,6 +23,15 @@ programs out of `build/stunrun-68k.bin` into `build/adsp/program.bin` and
 `asm/68k/stunrun.asm` incbins them under `adsp_program` and `gsp_program` between two slices of
 the image (docs/06-code-map.md section 3.4, which also holds the partition of the 768 KB).
 
+Since M5-0 (docs/13-68k-source.md) `asm/68k/stunrun.asm` is `org 0`, `hardware.asm` (the I/O
+equates) and nine region files in address order, one per later owner, each with a guard at both
+ends: `boot/vectors.asm`, `boot/boot.asm`, `programs.asm` (the program table as source and the
+two program incbins), `game/vectors.asm`, `game/code.asm`, `game/island.asm`, `data.asm`,
+`images.asm`, `image_table.asm`. The six zero runs are `dcb.b` fills; what is not source yet is
+an `incbin` of `build/stunrun-68k.bin` with offset and length. The 68k image depends on every
+`.asm` file under `asm/68k` (the Makefile finds them, subdirectories included). The NVRAM images
+are entirely zero and their tree is two `dcb.b` fills: it includes nothing from `build/`.
+
 Since M3 the object image is not an incbin of `build/stunrun-obj.bin` any more: its source is
 `data/objects` (a manifest and one mesh file per object, docs/07-objects.md), which
 `tools/objects asm` turns into `build/obj/page0.asm`-`page2.asm` (one per /MP page of 0x10000
@@ -76,11 +85,11 @@ Decision (M1a coordinator): the 68k image and the four data images are separate 
 
 | Image | Region(s) | Size | Contents | Tree |
 |---|---|---|---|---|
-| `stunrun-68k` | `mainpcb:maincpu` | 786,432 (0x000000-0x0BFFFF) | six 200x/210x pairs interleaved; image offset = 68010 address | `asm/68k/stunrun.asm` (vasm) |
+| `stunrun-68k` | `mainpcb:maincpu` | 786,432 (0x000000-0x0BFFFF) | six 200x/210x pairs interleaved; image offset = 68010 address | `asm/68k/stunrun.asm` and its region files (vasm; docs/13) |
 | `stunrun-obj` | `mainpcb:user1` | 393,216 | `90h/90k` at 0x00000, `10h/10k` at 0x20000, `9h/9k` at 0x40000, interleaved; byte offset / 2 = the ADSP's object-ROM word index (/MP page = offset / 0x20000) | `asm/obj/objects.asm` (vasm) |
 | `stunrun-oki` | `mainpcb:jsa:oki1` | 262,144 | `1fh`, `1ef`, `1de`, `1cd` one after the other; offset = OKI M6295 address | `asm/oki/samples.asm` (vasm) + `build/oki/samples.asm` (`tools/adpcm asm` from `data/oki`) |
 | `stunrun-jsa` | `mainpcb:jsa:cpu` | 65,536 | `136070-2123.10c` as is: 0000-3FFF the four 4 KB pages banked at 3000-3FFF, 4000-FFFF at its own address | `asm/jsa/jsa.asm` (64tass) |
-| `stunrun-nvram` | `mainpcb:200e`, `mainpcb:210e` | 4,096 | `stunrun.200e` then `stunrun.210e` | `asm/nvram/nvram.asm` (vasm) |
+| `stunrun-nvram` | `mainpcb:200e`, `mainpcb:210e` | 4,096 | `stunrun.200e` then `stunrun.210e` (both all zero, M5-0) | `asm/nvram/nvram.asm` (vasm, two fills) |
 | | | **1,511,424** | the whole set | |
 
 Decision (M1a coordinator): every one of the 25 files is produced from an assembler listing, so that one coverage number covers the whole set, data ROMs included; the incbin source is always a build artefact under `build/`, never the archive path.
@@ -114,6 +123,22 @@ Flags: `vasmm68k_mot -quiet -Fbin -no-opt -m68010 -L build/<image>.lst -o build/
 
 - `make coverage`: `tools/coverage` reads the five listings (vasm `-L`: a `Sections:` header, `Source:` blocks, `SS:AAAAAAAA hex  \t N: source` lines and `*` for repeated runs; 64tass `-L`: `>addr\thex\t...\tsource` lines and `Processing file` markers) and attributes to each statement the bytes from its address to the next statement's (or the section's / image's end), classified as `instr`, `data` (`dc.*`, `.byte`, `.word`, `.text`...), `blob` (`incbin`, `.binary`) or `fill` (`ds.*`, `dcb.*`, `blk.*`, `.fill`). Per source file, per image, the total, the blob share and a JSON line; it fails unless the total is the set's size, 1,511,424. The blob share only goes down (CLAUDE.md section 2).
 - `make test`: `tools/check-roms --selftest`, then pytest over `tools/test_*.py`: the merge/split round trip on a synthetic set (random bytes with the real snapshot's sizes, regions and offsets, never ROM data), the interleave positions, bytecheck's report and CPU addresses on planted differences, the coverage parser on hand-written vasm and 64tass listings, and, when vasm and 64tass are available, the whole `make all` + bytecheck + `make coverage` + a planted blob corruption on a copy of the Makefile, `asm/`, `tools/` and `data/objects` fed with a synthetic set (this is how CI exercises the real trees without ROMs; since M3a the synthetic set carries the object image the committed data encodes to, `make all` must rebuild it, also with `build/stunrun-obj.bin` deleted, and an edited mesh must change the built chip; since M4g it carries the OKI image the committed WAVs encode to, `make all` must rebuild it with `build/stunrun-oki.bin` deleted, one sample changed in a WAV must change the built file first at that sample's byte, a longer WAV must move the later samples, and a phrase renamed with its WAV must build the same bytes). `tools/test_adpcm.py` adds the PCM WAV reader, the derived layout, the phrase table, the decoder and the encoder's properties (docs/10-adpcm.md sections 5-6), and runs in CI against the real hashes: the committed `data/oki` encodes to the four OKI chips with MAME's CRC-32 and SHA-1, and the 52 WAVs are the only audio `git ls-files` shows. `tools/test_objects.py` adds the object format's tests (docs/07 section 8.3), among them one that runs in CI against the real hashes: the committed data/objects (meshes and the residue constant) encodes to all six object chips with MAME's CRC-32 and SHA-1.
+  Since M5-0 the rows give a file relative to the repository (vasm names an include relative to
+  the main file's directory: `asm/68k/game/code.asm`, `build/obj/page0.asm`), and
+  `--max-blob FILE=BYTES` (repeatable; `make coverage MAX_BLOB="FILE=N ..."`) fails when a source
+  file has more blob bytes than N or no listing has it: the gate a 68k leg puts on its region
+  file (docs/13 section 6). The JSON line stays the last line of the output.
+- `make labels` (since M5-0; no ROMs, no IDA): `tools/labels` checks that every user name of the
+  committed 68k IDA snapshot at a ROM address that lies in source is a label at that address in
+  the tree (from `build/stunrun-68k.lst`: statements and vasm's symbol table), counts the names
+  still in blobs and outside ROM, and fails otherwise (docs/13 section 7).
+- `tools/test_68k_tree.py` (CI; vasm for the assembled half): the region files tile the image
+  in address order with their guards, the six fills, `hardware.asm` equal to
+  `ida/memory_map.py`'s I/O names, the tree assembled against a random blob (fills zero, the
+  table's pointers and text), a moved region failing its guard, `tools/labels` on the tree. The
+  synthetic `make all` of `tools/test_build.py` carries the 68k image the tree assembles from a
+  random blob and zero NVRAM images, runs `make labels` and the coverage gate, and checks that an
+  edit of `asm/68k/programs.asm` reaches `200r` at 68k address 017010.
 - `make lint`: ruff and mypy over the tools.
 - `make okitrace` (needs MAME and the ROMs; never in CI; `-j3` runs the three runs at once):
   `tools/mame/okitrace.lua` taps the 6502's OKI, /WRIO and /MIX writes and its reads of the
@@ -299,6 +324,18 @@ After M4g (`make coverage`, 2026-11-05) the OKI samples are generated from the c
 
 `blob: 52.3% of 1511424 bytes come from incbin/.binary` (790,528 blob bytes, 260,864 fewer: the
 68k image's 786,432 and the NVRAM's 4,096 are all that is left).
+
+After M5-0 (`make coverage`, 2026-11-16) the 68k image is nine region files (the per-file table
+is docs/13 section 6) and the NVRAM image two fills:
+
+| Source file | Bytes | instr | data | blob | fill |
+|---|---|---|---|---|---|
+| `asm/68k/*.asm`, `asm/68k/{boot,game}/*.asm` | 786,432 | 0 | 36 | 691,513 | 94,883 |
+| `asm/nvram/nvram.asm` | 4,096 | 0 | 0 | 0 | 4,096 |
+
+`blob: 45.8% of 1511424 bytes come from incbin/.binary` (691,513 blob bytes, 99,015 fewer: the
+six zero runs, the program table's pointers and text, the NVRAM). The generated sources'
+rows are now `build/obj/page0.asm`-`page2.asm` and `build/oki/samples.asm`.
 
 ## 6. Tools and versions
 

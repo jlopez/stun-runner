@@ -27,13 +27,16 @@ board. Four instruction sets, no graphics ROMs. Details with MAME references in
 | [`docs/10-adpcm.md`](docs/10-adpcm.md) | the OKI M6295 samples: phrase table, the 52 committed PCM WAVs (`data/oki`) as the image's source, `tools/adpcm` |
 | [`docs/11-sound-protocol.md`](docs/11-sound-protocol.md) | the 68010-6502 sound protocol and the command set (`data/sound/commands.json`) |
 | [`docs/12-sound-music.md`](docs/12-sound-music.md) | the sequencer, its ops, streams and YM2151 patches as structured source |
+| [`docs/13-68k-source.md`](docs/13-68k-source.md) | the 68k source tree: region files and owners, conventions, the coverage gate and `make labels` |
 
-Status (2026-11-05): milestones 0-4 are done (`CLAUDE.md` section 4, `docs/03-plan.md`). The
+Status (2026-11-16): milestones 0-4 are done (`CLAUDE.md` section 4, `docs/03-plan.md`). The
 object ROMs, the 6502 sound program and the OKI samples (from 52 committed PCM WAVs under
-`data/oki`) are built from source and data; the 68k program (with the GSP and ADSP programs
-inside it) and the NVRAM images are still blobs (52.3% of the set's bytes, 790,528). Next: M5,
-the 68k source by region waves. The listening check of M4 is done: Jesus ran `make listen` on
-2026-11-05 and heard the sound.
+`data/oki`) are built from source and data, and the NVRAM images (all zero) are fills. M5's wave
+0 is done: the 68k tree is nine region files, one per owner, with its zero runs and program table
+as source (docs/13); the rest of the 68k program (with the GSP and ADSP programs inside it) is
+still blob, 45.8% of the set's bytes (691,513). Next: M5's tools leg (M5g) and the conversion
+legs. The listening check of M4 is done: Jesus ran `make listen` on 2026-11-05 and heard the
+sound.
 
 ## ROMs
 
@@ -57,6 +60,8 @@ make                # merge the set into five images, cut out the GSP/ADSP progr
                     # object ROM sources from data/objects, assemble asm/*, split into build/roms/stunrun/
 make check          # the 25 built files against MAME's hashes and byte for byte against the set
 make coverage       # bytes per source file: instructions, data, incbin blobs, fills; every blob by label
+                    # (MAX_BLOB="asm/68k/<file>=N" fails when that file has more blob bytes)
+make labels         # the 68k IDA snapshot's names in converted source are labels at their addresses
 make test           # tool self-tests on synthetic data (no ROMs needed)
 make objects        # re-decode the object ROMs into data/objects (the object image's source)
 make lint           # ruff + mypy

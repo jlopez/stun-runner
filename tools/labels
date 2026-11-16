@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""The 68k IDA snapshot's names against the 68k tree's labels (`make labels`).
+
+    tools/labels [--listing build/stunrun-68k.lst] [--snapshot data/ida/stunrun-68k.json]
+
+Every user name of the committed snapshot at a ROM address (000000-0BFFFF) is classified by the
+statement of the vasm listing that holds that address:
+
+    label     a label of that name is at that address (in source or at the start of a blob)
+    in blob   the address lies in an incbin and no label of that name is there: not checked yet
+    FAIL      the address lies in source (instructions, data, fills) and no label of that name
+              is there, or a label of that name is at another address
+
+Names outside the ROM (I/O, ZRAM, RAM) are counted, not checked here: the I/O equates of
+asm/68k/hardware.asm are checked against ida/memory_map.py by tools/test_68k_tree.py, the RAM
+equates belong to the boot and game legs. A leg that turns a blob into source makes the names
+in it bite: each must then be a label at its address (docs/13-68k-source.md section 7).
+Reads the listing and the snapshot only: no IDA, no ROM (CI runs it on the synthetic build).
+"""
+
+from __future__ import annotations
+
+import argparse
+import bisect
+import json
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from listings import repo_path, vasm_main, vasm_statements, vasm_symbols  # noqa: E402
+
+ROM_END = 0xC0000
+
+
+@dataclass
+class Report:
+    labelled: list[str] = field(default_factory=list)
+    in_blob: list[str] = field(default_factory=list)
+    outside: list[str] = field(default_factory=list)
+    failures: list[str] = field(default_factory=list)
+
+
+def snapshot_names(snapshot: dict) -> list[tuple[int, str]]:
+    return sorted((int(n["ea"], 16), n["name"]) for n in snapshot["names"])
+
+
+def check(listing: str, names: list[tuple[int, str]]) -> Report:
+    spans = sorted(
+        ((s.address, s.address + size, s.cls, s.file) for s, size in vasm_statements(listing)),
+        key=lambda t: t[0],
+    )
+    main = vasm_main(listing)
+    starts = [a for a, _, _, _ in spans]
+    labels = {
+        name: value for name, (kind, value) in vasm_symbols(listing).items() if kind != "E"
+    }
+    report = Report()
+    for ea, name in names:
+        where = f"{name} at {ea:06X}"
+        if ea >= ROM_END:
+            report.outside.append(where)
+            continue
+        if name in labels and labels[name] != ea:
+            report.failures.append(f"{where}: the tree has this label at {labels[name]:06X}")
+            continue
+        if labels.get(name) == ea:
+            report.labelled.append(where)
+            continue
+        i = bisect.bisect_right(starts, ea) - 1
+        if i < 0 or not spans[i][0] <= ea < spans[i][1]:
+            report.failures.append(f"{where}: no statement of the listing holds this address")
+            continue
+        _, _, cls, file = spans[i]
+        if cls == "blob":
+            report.in_blob.append(where)
+        else:
+            report.failures.append(
+                f"{where}: {repo_path(main, file)} has it as source ({cls}) without the label"
+            )
+    return report
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    ap.add_argument("--listing", type=Path, default=Path("build/stunrun-68k.lst"))
+    ap.add_argument("--snapshot", type=Path, default=Path("data/ida/stunrun-68k.json"))
+    ap.add_argument("-v", "--verbose", action="store_true", help="list the names in blob too")
+    args = ap.parse_args()
+    listing = args.listing.read_text(errors="replace")
+    report = check(listing, snapshot_names(json.loads(args.snapshot.read_text())))
+    if args.verbose:
+        for where in report.in_blob:
+            print(f"in blob: {where}")
+    for where in report.failures:
+        print(f"FAIL {where}")
+    rom = len(report.labelled) + len(report.in_blob) + len(report.failures)
+    print(
+        f"labels: {rom} snapshot names in ROM: {len(report.labelled)} labels in the tree, "
+        f"{len(report.in_blob)} in blob, {len(report.failures)} failures; "
+        f"{len(report.outside)} outside ROM (I/O, ZRAM, RAM: not checked here)"
+    )
+    return 1 if report.failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
