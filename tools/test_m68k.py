@@ -300,6 +300,7 @@ start:
 	bsr.s	near
 	bsr.w	far
 	jsr	switch
+	jsr	switch2
 	jsr	via_register
 	jsr	via_table
 	jsr	low.w
@@ -340,6 +341,23 @@ switch:
 .c2:
 	moveq	#2,d1
 .default:
+	rts
+switch2:
+	cmpi.w	#2,d0
+	bcs.s	.out
+	cmpi.w	#4,d0
+	bhi.s	.out
+	add.w	d0,d0
+	move.w	(.tbl-4,pc,d0.w),d0
+	jmp	(.tbl,pc,d0.w)
+.tbl:
+	dc.w	.c2-.tbl,.c3-.tbl,.out-.tbl
+.c2:
+	moveq	#2,d1
+	rts
+.c3:
+	moveq	#3,d1
+.out:
 	rts
 via_register:
 	lea	(computed-$40).l,a0
@@ -426,6 +444,7 @@ def test_descent_and_classification(tmp_path: Path) -> None:
     assert cl.validate(c) == []
     syms = ls.parse(lst_text, ls.macro_names(MACROS)).symbols
     kinds = {s.start: s.kind for s in c.spans}
+    ev = c.entries
     r = c.result
     assert r is not None
 
@@ -436,11 +455,14 @@ def test_descent_and_classification(tmp_path: Path) -> None:
                  "no_stack", "fatal", "handler", "low", "callback"):
         assert syms[name] in r.insns, name
     # the switch: table, bound, cases
-    tbl = next(s for s in r.switches.values())
+    tbl, tbl2 = sorted(r.switches.values(), key=lambda x: x.table)
     assert tbl.count == 3 and tbl.lo == 0 and "bound" in tbl.bound
     assert kinds[tbl.table] == "switch"
+    # cases 2-4: the move reads (table - 4) + 2 * index, as at 026CCE
+    assert (tbl2.lo, tbl2.count, tbl2.table, tbl2.base) == (2, 3, tbl2.jmp + 4, tbl2.jmp + 4)
+    assert ev[syms["switch2.c3"] if "switch2.c3" in syms else tbl2.targets(image)[1]] \
+        .startswith("case 3 of the switch")
     # the idioms leave their evidence
-    ev = c.entries
     assert ev[syms["computed"]].startswith("computed jsr")
     assert ev[syms["r1"]].startswith("entry 1 of the code-pointer table")
     assert ev[syms[".ret"]].startswith("return address")
@@ -564,6 +586,17 @@ def test_listing_checks_fail_on_broken_source(tmp_path: Path) -> None:
     rep, _, _, built = checks(tmp_path, wrap, "\n".join(lines) + "\n", m, 0, hi)
     assert built == image and rep.errors == []
     assert rep.unreached == [unk.start, unk.start + 2, unk.start + 4]
+
+
+@needs_vasm
+def test_descent_check_mid_instruction(tmp_path: Path) -> None:
+    """A flow into the middle of an instruction statement is reported."""
+    image, lst_text = assemble(tmp_path, "mid", "\torg\t0\nb:\tmove.l\t#$4E714E75,d0\n")
+    lst = ls.parse(lst_text, set())
+    ls.sizes(lst, len(image))
+    rep = ls.descent_check(lst, image, 0, [2], set(), set())
+    assert any("where no instruction statement starts" in e for e in rep.errors), rep.errors
+    assert rep.unreached == [0]
 
 
 @needs_vasm
