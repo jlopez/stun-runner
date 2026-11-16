@@ -214,10 +214,19 @@ index, decision, rule; no value), the first rule that matches:
 |---|---|---|---:|
 | R1 | address | `movea.l #X,An`: a value loaded into an address register | 339 |
 | R2 | address | X = 0BFE00, the image pointer table, added to an index (docs/06 4.2) | 9 |
+| R2b | address | `add.l`/`addi.l #X,Dn` then at once `movea.l Dn,An`, X in a data, text or pointer range: a table base plus an index | 5 |
 | R3 | address | `move.l`/`pea` of a routine start (a callback) | 8 |
 | R4 | address | `move.l` of X >= 020000 that other instructions use as an operand | 11 |
 | R5 | constant | `and`/`or`/`eor`: a mask | 104 |
-| R6 | constant | `add`/`sub`/`cmp` and their forms, `mul`/`div`: an arithmetic operand | 136 |
+| R6 | constant | `add`/`sub`/`cmp` and their forms, `mul`/`div`: an arithmetic operand | 131 |
+
+R2b is the boot program's table access: at 002FBE an index computed in D6 (`andi.l`, `asr.l` at
+002FB6) gets `addi.l #$2F62,d6`, then `movea.l d6,a6` and reads at `(a6)`, `($2,a6)`, `($4,a6)`;
+00307C (`#$2F82`, after `muls.w #$C,d6`) and 00317E (`#$2F9A`) do the same into the data range
+002F3E-002FA2, and 0048CC and 0049A6 (`#$4854`, reads at `($4,a6)`, `($6,a6)`) into 004576-004894
+(unidasm at those addresses). Without the rule R6 made the five constants, the generator wrote
+them as numbers and no check could see it (review round 3); they are the only matches in the
+image.
 | R7 | undecided | `move.l` of X >= 04397E (the island, the data, the images) | 32 |
 | R8 | constant | `move.l` of a smaller X: a count, a delay, a fixed-point value | 101 |
 
@@ -246,6 +255,9 @@ decision C5) and the hardware equates (`--equates`, a vasm file of `NAME equ $X`
 names of `ida/memory_map.py`'s `IO_68K`, the same spelling). **It is one-shot scaffolding**: a
 code leg runs it once over its region and commits the output; from then on the source is the
 truth, and the generator is frozen and never runs over a hand-edited file (its header says so).
+START and END are global labels (routine or range starts): a START inside an instruction, or an
+END that leaves a vasm local the range uses outside it, ends `gen` and `check-region` with exit 2
+and the reason (as a reversed or out-of-image range does).
 
 ### 5.1 What it writes
 
@@ -308,8 +320,9 @@ A statement that invokes a macro of `asm/68k/macros.asm` is one instruction.
   target written as a number in 000000-0BFFFF (but `pea N.w`, a constant in this ROM by issue
   #29's decision: 1,695 in IDA's code, 1,813 in this classification's), a long immediate or a
   `dc.l` value written as a number in 000100-0BFFFF that the operand decisions do not list as a
-  constant, and a `dc.w` entry of a classified switch table written as a number (`dc.w $146` for
-  `dc.w sub_2468A-.l24544`); the undecided immediates are reported apart. (Word immediates are
+  constant, a `dc.w` entry of a classified switch table written as a number (`dc.w $146` for
+  `dc.w sub_2468A-.l24544`), and any statement but `dc.l` in a classified pointer table (a
+  pointer written as `dc.w $0000,$1206` would otherwise escape the `dc.l` rule); the undecided immediates are reported apart. (Word immediates are
   not checked: none can hold a game address; 000000-0000FF is the vector table. A macro's
   operands are read from its text.)
 - **Shift test** (`shift_check`): the source is assembled again with a two-byte pad in front of
@@ -331,7 +344,7 @@ make m68k-check        # check-region for each code region into build/m68k/, the
 
 | Region | Bytes | Differences | Instructions | Labels (locals) | incbin bytes | Descent check | Lint | Shift test |
 |---|---:|---:|---:|---:|---:|---|---|---|
-| 000212-012F06 | 77,044 | 0 | 8,220 | 2,163 (777) | 33,111 | 8,220 reached, 0 not, 0 errors | 0 errors, 53 constants | 1,228 changed = expected |
+| 000212-012F06 | 77,044 | 0 | 8,220 | 2,167 (777) | 33,111 | 8,220 reached, 0 not, 0 errors | 0 errors, 48 constants | 1,233 changed = expected |
 | 020430-04397E | 144,718 | 0 | 36,379 (9 macros) | 3,893 (2,938) | 15,189 | 36,379 reached, 0 not, 0 errors | 0 errors, 288 constants, 32 undecided | 2,372 changed = expected |
 | 04397E-046AEE | 12,656 | 0 | 81 | 32 (5) | 12,269 | 81 reached, 0 not, 0 errors | 0 errors | 0 changed = expected |
 
@@ -356,7 +369,12 @@ check, the layout's entries, the targets of code still in blobs and the classifi
 outside left out of `check-listing`'s seeds (a synthetic tree with one range as source and the
 rest as `incbin` slices), `--range` not scoping the unreached statements, `gen` and
 `check-region` without their range check, an unknown range's switch table not stepped over,
-and the inner routine starts not searched (two variants).
+and the inner routine starts not searched (two variants). And seven from the third review: the
+`--equates` file ignored, a name it defines emitted again by `--equates-out`, the snapshot's RAM
+names ignored, its function starts ignored (`test_gen_equates_and_snapshot`, `gen` through the
+CLI with a small equates file and snapshot), an empty or unfinished MAME run accepted, the
+pointer-table `dc.l`-only rule, and rule R2b; `gen` and `check-region` on a bad cut exit 2
+(`test_gen_reports_bad_cuts`).
 
 ## 7. MAME coverage
 
@@ -366,7 +384,11 @@ from an empty private NVRAM and cfg state. The debugger's `trace` command writes
 drains into the set of distinct PCs (a trace file would take gigabytes: the attract run traces
 70 million lines); `tools/m68k pccov` then fails unless every executed PC is the start of a code
 instruction of the classification, and writes `artifacts/pccov-summary.json` (per run the frames,
-the counts and the number of ranges; over all runs the ranges of executed instructions). The
+the counts and the number of ranges; over all runs the ranges of executed instructions). A
+failed trace cannot pass: when the debugger's `trace` command fails MAME still exits 0 and the
+script still writes its done marker, so `pccov-read` fails on a trace with no PC (and the make
+rule on its exit status), and `pccov` and `classify` refuse a run file with no PCs or without the
+`# run` line the rule appends from the done marker (review round 3). The
 self-test runs drive the boot program's menus with sndproto.lua's input steps (docs/11 section 5).
 `make -j5 pccov` takes about eight minutes.
 
