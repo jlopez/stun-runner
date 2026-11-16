@@ -43,8 +43,8 @@ neither 00 nor a sign extension (FFxx with bit 7 of xx set). Checks:
 - On the 40,210 instruction heads of IDA's code (the scout's unidasm dump), every one decodes, with
   unidasm's length; formatted as vasm text and reassembled over the image, they give the image back
   but for the ten FFFF byte immediates of section 5.2.
-- `tools/m68k check-unidasm` (local): every instruction boundary of the classification's 183 code
-  ranges equals unidasm's linear decoding of the range, **44,658 boundaries, 0 ranges differ**.
+- `tools/m68k check-unidasm` (local): every instruction boundary of the classification's 180 code
+  ranges equals unidasm's linear decoding of the range, **44,683 boundaries, 0 ranges differ**.
 - `tools/test_m68k.py::test_decoder_round_trip` (CI): 176 instruction forms covering every
   decoder path are assembled by vasm; each decodes to its statement's length and the decoder's
   text assembles back to the same bytes. `test_not_code` (CI): the forms above decode to nothing.
@@ -68,11 +68,13 @@ classification's `noreturn` list is empty) and every idiom target (section 2.3).
 |---|---|---|---|
 | C switch | `move.w (T,pc,dN.w),dN` directly before `jmp (B,pc,dN.w)`; the word table starts after the `jmp`, target = B + entry; the first case lo = (table - T) / 2; the last from the bound check before it: `cmp(i) #V,dN` with `bhi`/`bgt` (or `bcc`/`bge`, V - 1), or `moveq #V,dM` / `cmp dN,dM` with `blt`/`bcs` (`ble`/`bls`), less any `sub #K,dN` between; without a bound, up to the lowest target | 026CC6 `cmpi.w #$B,d0`, 026CCA `bhi.s`, 026CCC `add.w d0,d0`, 026CCE `move.w (026CD2,pc,d0.w),d0`, 026CD2 `jmp (026CD6,pc,d0.w)`: cases 2-11 at 026CD6-026CEA (T is the `jmp` itself, two words before the table); 025704 `moveq #8,d0` / 025706 `cmp.l d1,d0` / 025708 `blt.w`; 0380B6 `sub.w #$C7,d0` after the compare at 0380B0 | 33 switches, 780 bytes of tables, 194 cases; every `jmp (d8,pc,Xn)` of the code is one |
 | computed call | an address register set to a constant (`lea abs`/`lea (d,pc)`, `movea.l #`, then `adda`/`suba`/`addq`/`subq`/`lea (d,An)` on it) and used by `jsr`/`jmp (An)` or `(d,An)` in the same straight line | 0223E0 `lea $441EC,a0`, 0223E6 `adda.l #$404,a0`, 0223EC `jsr (a0)`: 0445F0 | 4 entries |
-| code-pointer table | an address register set to a table base, a long loaded through it with an index (`movea.l (d,An,Xn)`, `movea.l (d,pc,Xn)`) or without (`movea.l (An)`, `(d,An)`), then `jsr`/`jmp (Am)`; the longs are taken while each one descends cleanly | 0010A8 `lea $FA2,a0`, 0010B4 `movea.l (0,a0,d0.w),a0`, 0010B8 `jsr (a0)`: the boot menus' table at 000FA2 | 12 tables (000E16, 000FA2, 001136, 00173A, 001840, 001B3A, 008D60, 00B47A, 00C0FC, 00C340, 00D2CA, 00DCE6), 103 entries |
-| return address | the boot program runs without a stack and calls with `lea ret,An` then `bra`/`jmp`; the callee returns with `jmp (An)`: a register holding the address right after an unconditional branch | 005072 `lea (507A,pc),a0`, 005076 `bra.w 53F2`; 00953A `lea $954A,a2`, 009540 `movea.l #0,a0`, 009546 `bra.w 95A2` | 150 entries |
+| code-pointer table | an address register set to a table base, a long loaded through it with an index (`movea.l (d,An,Xn)`, `movea.l (d,pc,Xn)`) or without (`movea.l (An)`, `(d,An)`), then `jsr`/`jmp (Am)`; the longs are taken while each one descends cleanly | 0010A8 `lea $FA2,a0`, 0010B4 `movea.l (0,a0,d0.w),a0`, 0010B8 `jsr (a0)`: the boot menus' table at 000FA2 | 11 tables (000FA2, 001136, 00173A, 001840, 001B3A, 008D60, 00B47A, 00C0FC, 00C340, 00D2CA, 00DCE6), 102 entries |
+| record table | the same load at an offset, `movea.l (off,An),Am` then `jsr (Am)`, in a loop that steps An by a constant after the call (`adda`/`addq #stride,An`, `lea (stride,An),An`) and ends with `dbcc Dn` back to the load or before it, Dn set before the loop from a word of the image (`move.w abs,Dn`) or a constant (`moveq`, `move.w #`): count records of stride bytes, the routine pointer of each at +off; the records are taken while each pointer descends cleanly, and are `data` with a note | 000EB2 `move.w $E10,d7` (the count word, 15), 000EB8 `lea $E12,a3`, 000ECA `movea.l (4,a3),a0`, 000ECE `jsr (a0)`, 000ED0 `adda.l #$A,a3`, 000ED6 `dbf d7,$EBE`: 16 records of 10 bytes at 000E12-000EB2, records 0-7 call 000EDC and 8-15 call 000EEA | 1 table (000E12), 2 entries |
+| return address | the boot program runs without a stack and calls with `lea ret,An` then `bra`/`jmp`; the callee returns with `jmp (An)`: a register holding the address right after an unconditional branch when it is taken, set by the `lea` directly before it or earlier in the same straight line and not changed since | 005072 `lea (507A,pc),a0`, 005076 `bra.w 53F2`; 00953A `lea $954A,a2`, 009540 `movea.l #0,a0`, 009546 `bra.w 95A2`, whose callee ends with `jmp (a2)` at 0095CA (likewise 00956E-00957A to 0095CC, `jmp (a2)` at 0095FA) | 152 entries |
 
 The register tracking forgets a register at anything that may change it (a call, `movem`, `exg`,
-a write, `(An)+`/`-(An)`), and it follows only the fall-through, never a branch.
+a write, `(An)+`/`-(An)`), and it follows only the fall-through, never a branch: a register loaded
+before a branch or a call and used after it is not followed (section 7).
 
 ### 2.4 The stages and the evidence
 
@@ -91,10 +93,14 @@ evidence of the stage that added it (`entries` of the file):
 
 What is not a seed, and why: an address loaded by `movea.l #` alone (a callback, or a data table:
 the synthetic test program has a table loaded with `movea.l #` whose words decode cleanly up to an
-`rts`, and this rule made it code; the three such loads of this ROM that do point to code,
-030C0E, 03C1DC and 04154E, are executed in MAME and come in through stage 3); `pea X.l` and
+`rts`, and this rule made it code). In this ROM 43 `movea.l #X,An` of the code load an instruction
+start (e.g. 02430E loads 0301CA, `queue_sound_command`); all but three of those targets are
+reached otherwise, and the three whose target nothing else reaches, 030C0E, 03C1DC and 04154E, are
+executed in MAME and come in through stage 3 (section 7). `pea X.l` is not a code seed either: all
+271 `pea X.l` of the code with X in 000000-0BFFFF point at classified data (31 at a range start,
+80 inside one) or text (96 at a string start, 64 inside one), e.g. 028932 `pea $47D34`. Nor is
 `move.l #X` (mostly constants: 0x10000, 0xFFFF and the like are even addresses in the boot
-range); a long in data that merely points into the code ranges.
+range), nor a long in data that merely points into the code ranges.
 
 ### 2.5 The bytes that are not code
 
@@ -113,47 +119,65 @@ their kind (the program table's two pointers at 017000, the ADSP and GSP streams
 - **data**: from an address an operand references (absolute, PC-relative, a `movea.l #`; not
   `pea N.w`) to the next boundary, with the first referencing instructions in the note;
 - **unknown**: the rest. In a code range the note says when the bytes decode cleanly as
-  instructions to a `rts`/`rte`/`jmp`/`bra` and which IDA functions start there.
+  instructions to a `rts`/`rte`/`jmp`/`bra` (from the first even address: a range that starts at
+  an odd byte is decoded from the next one) and which IDA functions start there. For a range that
+  decodes cleanly the note also gives the result of a search of 000000-05CF86 for its address
+  (`reference_index`): a long equal to it at an even address (an absolute operand, a pointer, a
+  `jmp abs.l` of a jump table), a branch or `bsr` to it, a `jsr`/`jmp` absolute short or a
+  `jsr`/`jmp`/`lea`/`pea` (d16,pc) to it. A hit is a possible reference in bytes the descent did
+  not decide (`possible references: ...`); "no reference found" is written only when the search
+  is empty.
 
 ## 3. The classification
 
 `data/68k/classification.json` (format `stunrun-68k-classification 1`, about 180 KB, one range or
 entry per line): `ranges` (start, end, kind, note; a switch also its `jmp` and `base`) cover
 000000-05CF86 with no gap and no overlap (`validate`, in CI); `entries` (address, evidence) the
-454 entries that plain descent does not reach; `noreturn` the calls whose fall-through is not code
+457 entries that plain descent does not reach; `noreturn` the calls whose fall-through is not code
 (none). Addresses, kinds, notes and evidence only: no byte of the image. `make classify` rewrites
-it (with the MAME runs of `make pccov` when present) together with `data/68k/operands.json`.
+it together with `data/68k/operands.json`, from the five runs of `make pccov`, which must be
+present: without them the three MAME entries are lost and the code only they reach (0410C0-041542,
+030C8E-030CDE, 03C18A-03C1C8) becomes data, so `make classify` and `tools/m68k classify` refuse to
+run without them (`NO_MAME=1`, `--no-mame` force it, for a classification not to commit).
 
 Bytes per kind and region (`tools/m68k stats`):
 
 | Region | code | switch | pointers | text | data | fill | unknown |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | boot vectors 000000-000212 | 0 | 0 | 256 | 0 | 0 | 0 | 274 |
-| boot code 000212-012F06 | 35,210 | 0 | 420 | 7,618 | 17,284 | 603 | 15,909 |
+| boot code 000212-012F06 | 35,296 | 0 | 416 | 7,618 | 17,368 | 603 | 15,743 |
 | programs 012F06-020000 | 0 | 0 | 8 | 27 | 32,678 | 20,774 | 11 |
 | game vectors 020000-020430 | 18 | 0 | 256 | 0 | 48 | 750 | 0 |
 | game code 020430-04397E | 128,062 | 780 | 0 | 648 | 857 | 39 | 14,332 |
 | game island 04397E-046AEE | 262 | 0 | 0 | 125 | 8,317 | 0 | 3,952 |
 | game data 046AEE-05CF86 | 0 | 0 | 0 | 8,269 | 79,066 | 349 | 3,604 |
-| **total** | **163,552** | **780** | **940** | **16,687** | **138,250** | **22,515** | **38,082** |
+| **total** | **163,638** | **780** | **936** | **16,687** | **138,334** | **22,515** | **37,916** |
 
-44,658 instructions (boot 8,195, game 36,463) in 183 code ranges. Entries with evidence: 194
-switch cases, 150 return addresses, 103 code-pointer table entries, 4 computed calls, 3 MAME
-(030C8E, 03C18A, 0410C0). Against IDA's 40,210 instruction heads: no boundary conflicts; 6,893
-instructions (28,442 bytes) are code here and not in IDA, 2,445 IDA heads (7,162 bytes) are not
-code here (IDA functions nothing references, below).
+44,683 instructions (boot 8,220, game 36,463) in 180 code ranges. Entries with evidence (457):
+194 switch cases, 152 return addresses, 102 code-pointer table entries, 2 record-table entries, 4
+computed calls, 3 MAME (030C8E, 03C18A, 0410C0). Against IDA's 40,210 instruction heads: no
+boundary conflicts; 6,908 instructions (28,492 bytes) are code here and not in IDA, 2,435 IDA
+heads (7,126 bytes) are not code here (IDA functions nothing references, below).
 
 What is not decided, and why:
 
-- **Unreferenced routines.** 75 unknown ranges inside the code ranges, 10,365 bytes, decode
-  cleanly to a `rts` (or `bra`) and nothing references them; 11 of them hold an IDA function
-  (3,340 bytes: e.g. 02D382-02D706, where `copy_adsp_dram_to_18000` 02D6D8 lies, docs/06 section
-  4.5; 02C9E4-02CCD8; 02D80E-02DA6E). They are most likely dead C functions, but nothing in the
-  image or in MAME proves it, so they stay `unknown` (issue #29: "do not guess") and become
-  `incbin` slices. A reviewed seed in `data/68k/seeds.json` with its argument makes one code.
+- **Routines no decided code reaches.** 74 unknown ranges inside the code ranges, 10,351 bytes,
+  decode cleanly to a `rts` (or `bra`) and no decided instruction references them (one, 020DE1,
+  from 020DE2, the byte after its odd start); 10 of them hold IDA functions (12 functions, 3,338
+  bytes: e.g. 02D382-02D706, where `copy_adsp_dram_to_18000` 02D6D8 lies, docs/06 section 4.5;
+  02C9E4-02CCD8; 02D80E-02DA6E). For 65 of them (9,567 bytes) the search of section 2.5 finds no
+  reference at all. Nine have possible references from bytes the descent left undecided:
+  0006AC, 00246E, 0026A0 and 006410 are targets of the `jmp abs.l` table at 000100-0001F0 (40
+  `jmp abs.l`, unknown: no reference to the table is decided), 0006AC also of longs at 000A1A and
+  000A28 (data) and 00A4E4; 000CBC of a `jsr` at 00A70C, 00273E of one at 00991A, 022DEA of one at
+  02C850, 023F72 (`get_sound_response`) of one at 03002C in `sound_watchdog` (03001E), its only
+  caller, which nothing calls (docs/11 section 2) (all four `jsr` in unknown bytes); 009900 of longs in the game data (0467A6,
+  046836, 046896, 047CF2). None is proven to be code or dead by the image or MAME, so they stay
+  `unknown` (issue #29: "do not guess") and become `incbin` slices. A reviewed seed in
+  `data/68k/seeds.json` with its argument makes one code.
 - **Dead instructions** such as 02045A (four bytes between a `bra.s` at 020458 and its target,
   a `bclr #5,d2`): `unknown`.
-- **The rest of the unknown bytes** (24,102 in the code ranges, 274 of them at 000100-000212;
+- **The rest of the unknown bytes** (23,950 in the code ranges, 274 of them at 000100-000212;
   3,604 in the data; 11 in the program table) do not decode cleanly or are tables of no known
   format: the boot program's menu
   records (a few control bytes, among them a row and a length, before each string, e.g. at
@@ -245,13 +269,21 @@ A statement that invokes a macro of `asm/68k/macros.asm` is one instruction.
   entries (the classification's evidence entries and reviewed seeds). It fails on a flow into a
   `dc`/`dcb`/`ds`/`incbin` statement or outside the code, an instruction decoded where no
   instruction statement starts or with another length, a call falling through into data unless
-  the classification lists it as `noreturn`; it reports every instruction statement not reached.
-- **Address lint** (`address_lint`): fails on an absolute operand written as a number in
-  000000-0BFFFF (but `pea N.w`, a constant in this ROM by issue #29's decision: 1,695 in IDA's
-  code, 1,813 in this classification's), a long immediate or a
+  the classification lists it as `noreturn`, and an instruction statement nothing reaches unless
+  `unreached` of `data/68k/seeds.json` lists its address with a written argument (the issue's
+  "listed set"; empty today). `check-listing` and `check-region` print each such address and
+  exit 1.
+- **Address lint** (`address_lint`): an operand counts as a number when its text names no symbol
+  (a number, or an expression of numbers such as `$418B0+8`), and its value is then read from the
+  assembled bytes (the instruction decoded at the statement, the long of a `dc.l`). It fails on
+  an absolute operand, a PC-relative operand (`($206D8,pc)`, `($24544,pc,d0.w)`) or a branch
+  target written as a number in 000000-0BFFFF (but `pea N.w`, a constant in this ROM by issue
+  #29's decision: 1,695 in IDA's code, 1,813 in this classification's), a long immediate or a
   `dc.l` value written as a number in 000100-0BFFFF that the operand decisions do not list as a
-  constant; the undecided ones are reported apart. (Word immediates are not checked: none can
-  hold a game address; 000000-0000FF is the vector table.)
+  constant, and a `dc.w` entry of a classified switch table written as a number (`dc.w $146` for
+  `dc.w sub_2468A-.l24544`); the undecided immediates are reported apart. (Word immediates are
+  not checked: none can hold a game address; 000000-0000FF is the vector table. A macro's
+  operands are read from its text.)
 - **Shift test** (`shift_check`): the source is assembled again with a two-byte pad in front of
   it, so everything it defines moves; exactly the statements that name a symbol inside the range
   other than PC-relatively or as a difference must change, and each changed word by the pad. A
@@ -271,19 +303,27 @@ make m68k-check        # check-region for each code region into build/m68k/, the
 
 | Region | Bytes | Differences | Instructions | Labels (locals) | incbin bytes | Descent check | Lint | Shift test |
 |---|---:|---:|---:|---:|---:|---|---|---|
-| 000212-012F06 | 77,044 | 0 | 8,195 | 2,163 (775) | 33,193 | 8,195 reached, 0 not, 0 errors | 0 errors, 53 constants | 1,229 changed = expected |
+| 000212-012F06 | 77,044 | 0 | 8,220 | 2,163 (777) | 33,111 | 8,220 reached, 0 not, 0 errors | 0 errors, 53 constants | 1,228 changed = expected |
 | 020430-04397E | 144,718 | 0 | 36,379 (9 macros) | 3,893 (2,938) | 15,189 | 36,379 reached, 0 not, 0 errors | 0 errors, 288 constants, 32 undecided | 2,372 changed = expected |
 | 04397E-046AEE | 12,656 | 0 | 81 | 32 (5) | 12,269 | 81 reached, 0 not, 0 errors | 0 errors | 0 changed = expected |
 
 `make test` runs the same per region (`test_regions_reassemble`, skipped without the image).
 
-The CI tests catch a broken tool: fourteen planted faults in the tools (a short branch read
+The CI tests catch a broken tool. Fourteen planted faults in the tools (a short branch read
 unsigned, any byte-immediate high byte or a scale factor accepted, the switch's first case
 forced to 0, the return-address idiom or `subq` in a computed call ignored, the text rule
 without its word, absolute short RAM without `ABS_SHORT`, locals never promoted, the operand
 decisions ignored, the descent check's mid-instruction error, the lint's absolute operands,
 the shift test's missed moves, the MAME checker) each fail at least one CI test of
-`tools/test_m68k.py`.
+`tools/test_m68k.py`; so do eighteen more, each a throwaway edit run with bytecode caching off
+(`tools/test_m68k.py -k "not regions"`): the descent check's `noreturn` error, its
+statement-size error, its unreached statements ignored by `check-listing`; the shift test's
+"changed without naming a moved symbol" and "not by the pad" errors; the lint's `dc.l` rule, its
+PC-relative and branch-target rule, its switch-entry rule, its values read from the bytes, every
+`pea` exempted, absolute operands linted only below 020000; `validate` returning nothing; the
+record-table idiom, the return address kept across another load, the reference search and the
+even start of an unknown range's note; the summary's run order; `classify` without the MAME
+runs.
 
 ## 7. MAME coverage
 
@@ -307,26 +347,36 @@ self-test runs drive the boot program's menus with sndproto.lua's input steps (d
 | union | | 22,118 | 1,699 | 20,419 |
 
 Every executed PC is a classified instruction start (`0 not a classified instruction start` in
-every run). The union covers 78,774 of the 163,552 code bytes in 718 ranges. Without the MAME
+every run). The union covers 78,774 of the 163,638 code bytes in 718 ranges. Without the MAME
 seeds the descent reaches all but 192 of the 22,118 executed PCs; those 192 are the routines
-entered through the three MAME entries (030C8E, 03C18A, 0410C0: each loaded by a `movea.l #` and
-called through a pointer the code keeps in RAM, HYP).
+entered through the three MAME entries 030C8E, 03C18A and 0410C0. Each is loaded into an address
+register by a `movea.l #` and called through that register in the same function, after branches
+or calls, which the register tracking does not follow (section 2.3) **CODE**: 030C0E `movea.l
+#$30C8E,a0`, then `jsr (a0)` at 030C46 and 030C60; 03C1DC `movea.l #$3C18A,a4`, then `jsr (a4)`
+at 03C498, 03C4A8, 03C4D0 and 03C4E0; 04154E `movea.l #$410C0,a2`, then `jsr (a2)` at 041598,
+04159E, 0415A4, 0415B0, 0415BC, 0415C2, 0415C8 and 0415CE. The runs are written to the summary in
+name order, so a re-run with the same PCs rewrites the same file.
 
 ## 8. How the code legs use the tools
 
 1. Fix any wrong range in the classification first, with evidence (a reviewed seed or untaken
-   branch in `data/68k/seeds.json`, a corrected idiom in `tools/m68k`), `make classify`, commit.
+   branch in `data/68k/seeds.json`, a corrected idiom in `tools/m68k`), then `make -j5 pccov`
+   (unless its five runs are already in `build/mame/`) and `make classify`, and commit. `make
+   classify` refuses to run without the runs (section 3).
 2. `tools/m68k gen START END --out asm/68k/<file> --equates asm/68k/hardware.asm --equates-out
-   <ram equates> --incbin <path relative to the file>` once, into the leg's region file (decision
-   C6), with `asm/68k/macros.asm` included before it; `make check` must stay 0 differences.
+   <ram equates>` once, into the leg's region file (decision C6), with `asm/68k/macros.asm`
+   included before it; `make check` must stay 0 differences. The incbin path is resolved by vasm
+   relative to `asm/68k` (the main source's directory, whatever directory the region file is in),
+   so keep the default `--incbin ../../build/stunrun-68k.bin`.
 3. From then on edit the source by hand (names, comments, explained data); never run the
    generator over it again. After each change: `make check`, and `tools/m68k check-listing
    --listing build/stunrun-68k.lst --binary build/stunrun-68k.out --range START END` (after
    `make coverage`, which writes the listing) for the descent check and the address lint: it
    seeds from the source's `dc.l`/`dc.w a-b`, the classification's entries inside the source's
    instructions, the vectors and the calls from code still in blobs, and lets a flow end at
-   classified code outside. The shift test as in `check-region` (a pad before the region's first
-   statement).
+   classified code outside; it exits 1 on any error and on any instruction statement nothing
+   reaches that `unreached` of `data/68k/seeds.json` does not list. The shift test as in
+   `check-region` (a pad before the region's first statement).
 4. Decide the undecided operands of the region (section 4) and the unknown ranges that decode
    cleanly (section 3) with written arguments.
 
@@ -347,13 +397,23 @@ called through a pointer the code keeps in RAM, HYP).
   instead of `cmpi` (025704, 041116), some subtract before indexing (0380B6), one index is `.l`
   in the `move.w` and `.w` in the `jmp` (025712).
 - No call in the code is followed by data (the `noreturn` list is empty).
+- **000E12-000EB2 is a table of 16 records of 10 bytes** walked by 000EB2-000ED8 (count word
+  at 000E10, routine pointer at +4, `jsr (a0)` at 000ECE, step `adda.l #$A,a3`): records 0-7 call
+  000EDC and records 8-15 call 000EEA, its sibling (`bsr` 000EF8, `addq.w #1,d1`, `subq.w #1,d0`
+  where 000EDC adds to both). Review found it; the record-table idiom now decides it.
+- **00954A-00956E and 00957E-0095A2 are code** reached by the boot program's return address
+  with a `movea.l #0,a0` between the `lea` and the `bra` (00953A-009546, 00956E-00957A): the
+  callees, 0095A2 and 0095CC (the ROM sum loops), end with `jmp (a2)` at 0095CA and 0095FA.
+  Review found them; the return-address idiom now keeps the register across such loads.
 
 ## 10. Open questions
 
-1. The 75 unreferenced ranges that decode cleanly (10,365 bytes, section 3): accept a "dead C
-   function" argument (a range between two code ranges that starts after a `rts`, decodes to a
-   `rts` and branches only inside itself) as evidence, or keep them `unknown` until a reference
-   is found?
+1. The 74 ranges no decided code reaches that decode cleanly (10,351 bytes, section 3): for the
+   65 with no reference at all, accept a "dead C function" argument (a range between two code
+   ranges that starts after a `rts`, decodes to a `rts` and branches only inside itself) as
+   evidence, or keep them `unknown` until a reference is found? The nine with possible references
+   from undecided bytes (the `jmp abs.l` table at 000100, four `jsr` in unknown bytes, longs in
+   data) wait for those bytes to be decided.
 2. The 32 undecided long immediates (section 4): the data leg's.
 3. 000100-000212 (274 bytes) and the boot program's menu records: their formats are the boot
    leg's.
