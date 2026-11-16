@@ -110,9 +110,14 @@ their kind (the program table's two pointers at 017000, the ADSP and GSP streams
 `data`). Over the rest:
 
 - **text**: a printable run of at least six characters, nine in ten of them letters, digits,
-  blanks or the punctuation of messages, half of them letters, with a word of four letters of one
-  case (code is often printable: `4E71 4E71 4E75` reads "NqNqNu"), cut where an operand points (a
-  string starts there), with its terminating zero;
+  blanks or the punctuation of messages, half of them letters, at least three distinct
+  characters, with a word of four letters of one case and at least two distinct letters, and not
+  made of equal byte pairs (code is often printable: `4E71 4E71 4E75` reads "NqNqNu"; so are
+  numeric tables whose words have two equal bytes: 01266A, 012742, 0128A6, 0128C6, 012B42,
+  012B82, 012CC6 and 01286A in the boot tables, one byte sixteen times at 0022DC, which is
+  001FBC + 50 x 16 in the 16-byte records `sub_22EC` indexes at 0022F0-0022FC, and 04D764, two
+  distinct characters: 145 bytes that a looser rule made text, review round 4), cut where an
+  operand points (a string starts there), with its terminating zero;
 - **fill**: a run of at least 32 zero bytes, up to the first address an operand references (the
   game's 020112-020418 becomes fill to 020400 and data from there: `movea.l #$20400,a2` at 042356
   is a base, 020418 the table it indexes, HYP);
@@ -152,13 +157,13 @@ Bytes per kind and region (`tools/m68k stats`):
 | Region | code | switch | pointers | text | data | fill | unknown |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | boot vectors 000000-000212 | 0 | 0 | 256 | 0 | 0 | 0 | 274 |
-| boot code 000212-012F06 | 35,296 | 0 | 416 | 7,618 | 17,368 | 603 | 15,743 |
+| boot code 000212-012F06 | 35,296 | 0 | 416 | 7,486 | 17,384 | 603 | 15,859 |
 | programs 012F06-020000 | 0 | 0 | 8 | 27 | 32,678 | 20,774 | 11 |
 | game vectors 020000-020430 | 18 | 0 | 256 | 0 | 48 | 750 | 0 |
 | game code 020430-04397E | 128,062 | 780 | 0 | 648 | 857 | 39 | 14,332 |
 | game island 04397E-046AEE | 262 | 0 | 0 | 125 | 8,317 | 0 | 3,952 |
-| game data 046AEE-05CF86 | 0 | 0 | 0 | 8,269 | 79,066 | 349 | 3,604 |
-| **total** | **163,638** | **780** | **936** | **16,687** | **138,334** | **22,515** | **37,916** |
+| game data 046AEE-05CF86 | 0 | 0 | 0 | 8,256 | 79,079 | 349 | 3,604 |
+| **total** | **163,638** | **780** | **936** | **16,542** | **138,363** | **22,515** | **38,032** |
 
 44,683 instructions (boot 8,220, game 36,463) in 180 code ranges. Entries with evidence (457):
 194 switch cases, 152 return addresses, 102 code-pointer table entries, 2 record-table entries, 4
@@ -197,7 +202,7 @@ What is not decided, and why:
   `data/68k/seeds.json` with its argument makes one code.
 - **Dead instructions** such as 02045A (four bytes between a `bra.s` at 020458 and its target,
   a `bclr #5,d2`): `unknown`.
-- **The rest of the unknown bytes** (23,132 in the code ranges, 274 of them at 000100-000212;
+- **The rest of the unknown bytes** (23,248 in the code ranges, 274 of them at 000100-000212;
   3,604 in the data; 11 in the program table) do not decode cleanly or are tables of no known
   format: the boot program's menu
   records (a few control bytes, among them a row and a length, before each string, e.g. at
@@ -219,16 +224,16 @@ index, decision, rule; no value), the first rule that matches:
 | R4 | address | `move.l` of X >= 020000 that other instructions use as an operand | 11 |
 | R5 | constant | `and`/`or`/`eor`: a mask | 104 |
 | R6 | constant | `add`/`sub`/`cmp` and their forms, `mul`/`div`: an arithmetic operand | 131 |
+| R7 | undecided | `move.l` of X >= 04397E (the island, the data, the images) | 32 |
+| R8 | constant | `move.l` of a smaller X: a count, a delay, a fixed-point value | 101 |
 
-R2b is the boot program's table access: at 002FBE an index computed in D6 (`andi.l`, `asr.l` at
-002FB6) gets `addi.l #$2F62,d6`, then `movea.l d6,a6` and reads at `(a6)`, `($2,a6)`, `($4,a6)`;
-00307C (`#$2F82`, after `muls.w #$C,d6`) and 00317E (`#$2F9A`) do the same into the data range
+R2b is the boot program's table access: at 002FBE an index computed in D6 (`andi.l` at 002FB4,
+`asr.l` at 002FBC) gets `addi.l #$2F62,d6`, then `movea.l d6,a6` and reads at `(a6)`, `($2,a6)`,
+`($4,a6)`; 00307C (`#$2F82`, after `muls.w #$C,d6`) and 00317E (`#$2F9A`) do the same into the data range
 002F3E-002FA2, and 0048CC and 0049A6 (`#$4854`, reads at `($4,a6)`, `($6,a6)`) into 004576-004894
 (unidasm at those addresses). Without the rule R6 made the five constants, the generator wrote
 them as numbers and no check could see it (review round 3); they are the only matches in the
 image.
-| R7 | undecided | `move.l` of X >= 04397E (the island, the data, the images) | 32 |
-| R8 | constant | `move.l` of a smaller X: a count, a delay, a fixed-point value | 101 |
 
 The 32 undecided (`move.l #X` into memory or a data register, X in the island, the data or the
 images: a data pointer or a large 16.16 number; 15 store into memory, 17 load a data register:
@@ -344,7 +349,7 @@ make m68k-check        # check-region for each code region into build/m68k/, the
 
 | Region | Bytes | Differences | Instructions | Labels (locals) | incbin bytes | Descent check | Lint | Shift test |
 |---|---:|---:|---:|---:|---:|---|---|---|
-| 000212-012F06 | 77,044 | 0 | 8,220 | 2,167 (777) | 33,111 | 8,220 reached, 0 not, 0 errors | 0 errors, 48 constants | 1,233 changed = expected |
+| 000212-012F06 | 77,044 | 0 | 8,220 | 2,152 (777) | 33,243 | 8,220 reached, 0 not, 0 errors | 0 errors, 48 constants | 1,233 changed = expected |
 | 020430-04397E | 144,718 | 0 | 36,379 (9 macros) | 3,893 (2,938) | 15,189 | 36,379 reached, 0 not, 0 errors | 0 errors, 288 constants, 32 undecided | 2,372 changed = expected |
 | 04397E-046AEE | 12,656 | 0 | 81 | 32 (5) | 12,269 | 81 reached, 0 not, 0 errors | 0 errors | 0 changed = expected |
 
@@ -374,7 +379,11 @@ and the inner routine starts not searched (two variants). And seven from the thi
 names ignored, its function starts ignored (`test_gen_equates_and_snapshot`, `gen` through the
 CLI with a small equates file and snapshot), an empty or unfinished MAME run accepted, the
 pointer-table `dc.l`-only rule, and rule R2b; `gen` and `check-region` on a bad cut exit 2
-(`test_gen_reports_bad_cuts`).
+(`test_gen_reports_bad_cuts`). And two from the fourth review: the text rule without its
+equal-pair, distinct-character and two-letter-word conditions (`test_text_rule`: `ddZZxxnn`,
+the doubled runs of the boot tables, one byte repeated and two distinct characters are not text),
+and every absolute short operand exempted from the lint instead of `pea N.w` only (`lea $0.w,a0`
+and `jsr $7000.w` in `test_address_lint_forms`).
 
 ## 7. MAME coverage
 

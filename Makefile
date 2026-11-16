@@ -593,7 +593,7 @@ m68k-check: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
 		$(PYTHON) tools/m68k check-region $${r%:*} $${r#*:} --work $(BUILD)/m68k || exit 1; done
 	$(PYTHON) tools/m68k check-unidasm --unidasm $(UNIDASM)
 
-# Which 68010 instructions MAME executes (docs/14 section 6): tools/mame/pccov.lua traces the
+# Which 68010 instructions MAME executes (docs/14 section 7): tools/mame/pccov.lua traces the
 # 68010 under the debugger into a named pipe that `tools/m68k pccov-read` drains into the
 # distinct PCs (build/mame/pccov-<run>.txt; it fails on an empty trace), in five headless runs from empty private state
 # (attract, a game, the boot program's test menus to "SA SELF TEST" and to "PLAY SOUNDS" as

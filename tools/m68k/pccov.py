@@ -1,4 +1,4 @@
-"""MAME's executed 68010 PCs (`make pccov`, tools/mame/pccov.lua; docs/14 section 6).
+"""MAME's executed 68010 PCs (`make pccov`, tools/mame/pccov.lua; docs/14 section 7).
 
 `read_trace` drains the debugger's trace pipe into the distinct PCs and writes them to a run file
 (build/mame/pccov-<run>.txt: "# key value" header lines, then one PC per line, sorted). `check`
