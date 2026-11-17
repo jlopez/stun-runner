@@ -130,7 +130,7 @@ word the format does not explain is not committed as a number without Jesus's sa
 ## 6. Coverage
 
 Since M5c the code files are source and the numbers below are wave 0's; docs/16 section 2.1 has
-the current ones (68k blob 517,381 bytes, set blob share 34.2%), and `make labels` gives 223 labels,
+the current ones (68k blob 517,385 bytes, set blob share 34.2%), and `make labels` gives 223 labels,
 0 in blob.
 
 `make coverage` (2026-11-16, after this leg). vasm names an included file as the `include`
@@ -213,7 +213,8 @@ studied here; it belongs to the game leg (docs/03, M5).
 ## 9. The tests
 
 - `tools/test_68k_tree.py` (CI): the includes of `stunrun.asm` are `hardware.asm` and the nine
-  region files in address order, each file's first and last guards are its range and the ranges
+  region files in address order (since M5c: `hardware.asm`, `ram.asm`, `macros.asm`, then the
+  region files of docs/16 section 2.1 in address order), each file's first and last guards are its range and the ranges
   tile 000000-0C0000; the six fills are the documented 94,883 bytes, each inside one file;
   exactly one snapshot function crosses 040000 (`sub_3FEA6`); `hardware.asm`'s equates are
   `ida/memory_map.py`'s `IO_68K`, same names, same addresses, same order, each citing a docs/01

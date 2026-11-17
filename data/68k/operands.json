@@ -165,7 +165,7 @@
     {"at": "02819C", "operand": 0, "decision": "address", "rule": "R1"},
     {"at": "028350", "operand": 0, "decision": "address", "rule": "R1"},
     {"at": "02836A", "operand": 0, "decision": "constant", "rule": "R5"},
-    {"at": "028476", "operand": 0, "decision": "address", "rule": "reviewed", "reason": "stores into FF9B90, which the next instruction but one, 028480, loads into A0 (movea.l $FF9B90,a0): a data pointer"},
+    {"at": "028476", "operand": 0, "decision": "address", "rule": "reviewed", "reason": "stores into FF9B90, which the next instruction, 028480, loads into A0 (movea.l $FF9B90,a0): a data pointer"},
     {"at": "0284A4", "operand": 0, "decision": "address", "rule": "R4"},
     {"at": "02867E", "operand": 0, "decision": "constant", "rule": "R5"},
     {"at": "0286DC", "operand": 0, "decision": "address", "rule": "R4"},
