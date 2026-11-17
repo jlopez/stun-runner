@@ -487,6 +487,38 @@ def test_tree_checks_pass(tmp_path: Path) -> None:
     assert len(rep.foreign) == 15 and all("tbl_BFE00+$" in x for x in rep.foreign)
 
 
+COUNT_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+               "nine": 9, "ten": 10, "eleven": 11, "twelve": 12}
+
+
+@needs_vasm
+def test_pointer_variable_reasons_cite_every_store(tmp_path: Path) -> None:
+    """A reviewed operand decision that calls a RAM long a pointer variable from its stores
+    ("stores into FFxxxx, a pointer variable: ...") cites every instruction of the tree that
+    stores into it (but the decided ones of the same variable, and up to the "and N more" it
+    counts): FF9558's
+    reasons had left out 0270B0, 027268 and 0273DA."""
+    _, text, _ = assemble_68k(bytes(IMAGE_SIZE), tmp_path)
+    lst = ls.parse(text, ls.macro_names(TREE / "macros.asm"))
+    data = json.loads((REPO / "data/68k/operands.json").read_text())
+    checked = 0
+    for op in data["operands"]:
+        m = re.match(r"stores into (FF[0-9A-F]{4}), a pointer variable: ", op.get("reason", ""))
+        if not m:
+            continue
+        dest = re.compile(rf",\s*(?:ram_{m[1]}|\${m[1]}(?:\.l)?)\s*$", re.I)
+        stores = {s.address for s in lst.statements
+                  if s.kind == "instr" and s.text.split()[0].lower().startswith(("move", "clr"))
+                  and dest.search(s.text)}
+        cited = {int(x, 16) for x in re.findall(r"\b0[0-9A-F]{5}\b", op["reason"])}
+        more = sum(COUNT_WORDS[w] for w in re.findall(r"and (\w+) more store", op["reason"]))
+        decided = {int(o["at"], 16) for o in data["operands"]
+                   if o.get("reason", "").startswith(f"stores into {m[1]},")}
+        missing = stores - cited - decided
+        assert len(missing) <= more, (op["at"], sorted(f"{x:06X}" for x in missing))
+        checked += 1
+    assert checked >= 3
+
 def planted(tmp: Path, file: str, old: str, new: str, *more: tuple[str, str, str]) -> Path:
     """A copy of the tree with `old` replaced by `new` in `file` (and each further
     (file, old, new) applied the same way)."""

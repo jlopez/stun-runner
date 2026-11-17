@@ -315,7 +315,7 @@ refuses a reviewed entry without its reason. 31 are addresses, one a constant (C
 
 | Instructions | Decision | Why |
 |---|---|---|
-| 02444E, 0245F8 (`#$461F0` into FF9558) | address | FF9558 is a pointer variable: 024D0E, 026F98, 0286DC, 0287C6, 0288D0, 02A8C4 store 044630 there and 0284A4, 02AA7E 044930 (R4), five instructions a long from a table; every read pushes it as an argument |
+| 02444E, 0245F8 (`#$461F0` into FF9558) | address | FF9558 is a pointer variable: 024D0E, 026F98, 0286DC, 0287C6, 0288D0, 02A8C4 store 044630 there and 0284A4, 02AA7E 044930 (R4), five instructions a long from a table and 0270B0, 027268, 0273DA one from 04816C-04817C; every read pushes it as an argument |
 | 026F12 (`#$461F0`), 02DCCC (`#$45830`) into FFDB3C | address | FFDB3C holds the RAM address FF9584 (fourteen stores), 044630 (02716A, 02B69A) or a long read from the data |
 | 024FA8 (`#$466A0` into FFDB40) | address | 04055C and 02DAD4 store longs from tables there; 02F1DE tests it for zero and 02F1E6 pushes it |
 | 028476 (`#$439C8` into FF9B90) | address | 028480 `movea.l $FF9B90,a0` |
