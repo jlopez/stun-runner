@@ -147,9 +147,10 @@ field; the other fields stay incbin slices) and `audio_test_list` (3.3).
 | 05C47C | 6 | pointers | `sub_42262`: `movea.l ($0,a0,d0.w),a3` at 042278, `cmpa.w #$0,a3` at 04227C |
 
 Every target got a label where it had none (`dat_X`, the slice cut there: 047D46, 047D80,
-047DBA, 047DF4, 047E2E, 047E68, 047EA2, 047EDC, 047F16, the zero bytes 0485E6/0485E8 that two level
-records name as empty strings, and more in 04B142-04C70A and 04F104-05BE04). An incbin slice that a
-table split carries its own label (C3). The targets of 048068 are the palettes of section 2
+047DBA, 047DF4, 047E2E, 047E68, 047EA2, 047EDC, 047F16, the two one-blank strings 0485E6/0485E8
+that level record 1 (0481A8) names, which `sub_2DD1E` copies as strings (`move.b (a0)+,(a3)+`
+02DD4C; still incbin: the classification does not call them text), and more in 04B142-04C70A
+and 04F104-05BE04). An incbin slice that a table split carries its own label (C3). The targets of 048068 are the palettes of section 2
 (`pal_overlay_*`, `dat_45B60` for entry 69), of 047406 the six `pal_level_base_*`.
 
 04CB36 is not 048180's +0, though its bytes are 048068 indices too: `movea.l #dat_4CB36,a0` then
