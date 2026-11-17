@@ -429,6 +429,31 @@ def test_palette_bin_is_rebuilt_on_every_make() -> None:
         assert "FORCE" in rule[0].split(":", 1)[1].split(), f"{target} is rebuilt by mtime only"
 
 
+def test_trace_names_the_first_differing_word(tmp_path: Path) -> None:
+    """A complete unpacking whose words differ from the decoder's only in content is reported by
+    the word and its GSP address, not by two equal lengths (synthetic trace, CI)."""
+    from gspimages.trace import summary
+
+    m, images = committed()
+    image = bytes(g.REGION) + g.build(m, images)[0]
+    start = int.from_bytes(image[0x0BFE00 + 4 : 0x0BFE08], "big")  # entry 1
+    up = unpack(image, start)
+    w = words(up.data)
+    run = tmp_path / "imgtrace-synthetic.txt"
+    run.write_text(f"# frames 10\n"
+                   f"call 1 frame 5 dest FFDE0000 words {len(w)} first {start:06X} "
+                   f"last {up.end - 1:06X} pc 022602\n# done\n")
+    blob = bytearray(b"".join(x.to_bytes(2, "big") for x in w))
+    run.with_suffix(".vram").write_bytes(bytes(blob))
+    run.with_suffix(".words").write_bytes(bytes(blob))
+    assert summary(m, image, [run], PALETTES)[1] == []
+    blob[2 * 7] ^= 0x10
+    run.with_suffix(".words").write_bytes(bytes(blob))
+    problems = summary(m, image, [run], PALETTES)[1]
+    assert problems == [f"imgtrace-synthetic: stream {start:06X} (entry 1) at frame 5: word 7 "
+                        f"(GSP {0xFFDE0000 + 16 * 7:08X}) differs from the decoded stream's"]
+
+
 # --- with the reference set ---------------------------------------------------------------------
 
 

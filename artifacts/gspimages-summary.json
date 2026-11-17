@@ -1,5 +1,5 @@
 {
- "comment": "make imgtrace (tools/mame/gspimages.lua, tools/gspimages trace): per stream (keyed by its first table entry) the MAME runs that unpacked it, the GSP destinations, unpackings, complete ones, HSTDATA words checked against the decoder and read back equal one frame later; per run the image-table reads (entry:count); per palette spec of the manifest the most colours it defines that equal MAME's palette at one dump (every 100 frames), with the run and frame. Counts, frames and addresses only.",
+ "comment": "make imgtrace (tools/mame/gspimages.lua, tools/gspimages trace): per stream (keyed by its first table entry) the MAME runs that unpacked it, the GSP destinations, unpackings, complete ones, HSTDATA words checked against the decoder and read back equal one frame later; per run the image-table reads (entry:count); per palette spec of the manifest the most colours it defines that equal MAME's palette at one dump (every 50 frames, 20 in the level runs), with the run and frame. Counts, frames and addresses only.",
  "entries": {
   "1": {
    "entries": [

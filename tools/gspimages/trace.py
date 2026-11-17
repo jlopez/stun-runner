@@ -185,12 +185,14 @@ def summary(
             end, ents, want = streams[u.stream]
             complete = u in done and u.last_read == end - 1
             got = u.words
-            if complete and got != want:
-                problems.append(f"{run.name}: stream {u.stream:06X} (entry {ents[0]}) at frame "
-                                f"{u.frame}: {len(got)} words, not the decoded {len(want)}")
-            elif not complete and got != want[: len(got)]:
-                problems.append(f"{run.name}: stream {u.stream:06X} (entry {ents[0]}) at frame "
-                                f"{u.frame}: its words are not the decoded stream's start")
+            where = f"{run.name}: stream {u.stream:06X} (entry {ents[0]}) at frame {u.frame}"
+            diff = next((i for i, (a, b) in enumerate(zip(got, want, strict=False)) if a != b),
+                        None)
+            if diff is not None:
+                problems.append(f"{where}: word {diff} (GSP {u.dest + 16 * diff:08X}) differs from "
+                                f"the decoded stream's")
+            elif len(got) > len(want) or (complete and len(got) != len(want)):
+                problems.append(f"{where}: {len(got)} words, not the decoded {len(want)}")
             e = entries.setdefault(ents[0], EntryStats(ents, u.stream))
             rr = e.runs.setdefault(run.name, {"first_frame": u.frame, "unpackings": 0})
             rr["unpackings"] += 1
@@ -223,7 +225,7 @@ def summary(
                    "destinations, unpackings, complete ones, HSTDATA words checked against the "
                    "decoder and read back equal one frame later; per run the image-table reads "
                    "(entry:count); per palette spec of the manifest the most colours it defines "
-                   "that equal MAME's palette at one dump (every 100 frames), with the run and "
+                   "that equal MAME's palette at one dump (every 50 frames, 20 in the level runs), with the run and "
                    "frame. Counts, frames and addresses only.",
         "entries": {str(k): entries[k].doc() for k in sorted(entries)},
         "not_seen": [s.entries[0] for s in m.stream_order() if s.entries[0] not in entries],
