@@ -18,15 +18,15 @@
 ;   boot/code_*.asm       000212-012F06    boot naming legs (six files, cut at routine starts)
 ;   programs.asm          012F06-020000    M5-0 (the table), M6 (the two programs)
 ;   game/vectors.asm      020000-020430    game naming legs
-;   game/code.asm         020430-04397E    game leg
+;   game/code_*.asm       020430-04397E    game naming legs (nine files, cut at routine starts)
 ;   game/island.asm       04397E-046AEE    game naming legs
 ;   data.asm              046AEE-060000    data leg
 ;   images.asm            060000-0BFE00    images leg
 ;   image_table.asm       0BFE00-0C0000    images leg
 ;
 ; The pair boundaries (020000 S, 040000 T, 060000 U, 080000 V, 0A0000 W) are not file
-; boundaries: game/code.asm crosses 040000 (the function at 03FEA6 does), images.asm 080000 and
-; 0A0000.
+; boundaries: game/code_03FC22.asm crosses 040000 (the function at 03FEA6 does), images.asm
+; 080000 and 0A0000.
 
 	org	0
 
@@ -43,7 +43,15 @@
 	include	"boot/code_0109D4.asm"
 	include	"programs.asm"
 	include	"game/vectors.asm"
-	include	"game/code.asm"
+	include	"game/code_020430.asm"
+	include	"game/code_024306.asm"
+	include	"game/code_028194.asm"
+	include	"game/code_02C0D2.asm"
+	include	"game/code_030012.asm"
+	include	"game/code_034010.asm"
+	include	"game/code_037C52.asm"
+	include	"game/code_03BC3C.asm"
+	include	"game/code_03FC22.asm"
 	include	"game/island.asm"
 	include	"data.asm"
 	include	"images.asm"
