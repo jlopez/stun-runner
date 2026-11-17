@@ -60,7 +60,7 @@
       "end": "04C9EA",
       "label": "dat_4C712",
       "format": "pointers",
-      "reader": "182 longs, 0 or a pointer: 0311CC-0311D2 (movea.l #dat_4C712,a0; move.l ($0,a0,d0.l),d3, the index masked with 1FFh and 0 skipped at 0311B8-0311C4), then movea.l d3,a5 and movea.l (a5)+,a4 at 0311DA-0311DC (and 0317A2-0317A4); 0358B8 and 03A0A8 read it too. The run ends at the first long that points nowhere in the data (the 306 bytes after it stay blob)"
+      "reader": "182 longs, 0 or a pointer: 0311CC-0311D2 (movea.l #dat_4C712,a0; move.l ($0,a0,d0.l),d3, the index masked with 1FFh and 0 skipped at 0311B8-0311C4), then movea.l d3,a5 and movea.l (a5)+,a4 at 0311DA-0311DC (and movea.l d3,a5; move.w ($6,a5),d0 at 0317A2-0317A4, movea.l d3,a0; tst.l (a0) at 03146C-03146E); 0358B8 and 03A0A8 read it too. The run ends at the first long that points nowhere in the data (the 306 bytes after it stay blob)"
     },
     {
       "start": "04D628",
