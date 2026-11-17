@@ -304,7 +304,7 @@ After M4g (`make coverage`, 2026-11-05) the OKI samples are generated from the c
 
 | Tool | Version | Where |
 |---|---|---|
-| vasm (`vasmm68k_mot`) | 2.0f (m68k backend 2.8c, Motorola syntax 3.19f), `make CPU=m68k SYNTAX=mot` | local: `~/.local/bin/vasmm68k_mot`; CI: built from `http://phoenix.owl.de/tags/vasm2_0f.tar.gz`, sha256 `c84b2de1cbb87831795fe64a85c5d9a7002a766e3a7c30b0a2d7d5e99d878f49`, cached by that hash. The rolling `sun.hasenbraten.de/vasm/release/vasm.tar.gz` is not a pin; `phoenix.owl.de/tags/` keeps every release. Override with `make VASM=...` |
+| vasm (`vasmm68k_mot`) | 2.0f (m68k backend 2.8c, Motorola syntax 3.19f), `make CPU=m68k SYNTAX=mot` | local: `~/.local/bin/vasmm68k_mot`; CI: built from `https://github.com/jlopez/stun-runner/releases/download/toolchain/vasm2_0f.tar.gz` (the unmodified upstream tarball, originally `http://phoenix.owl.de/tags/vasm2_0f.tar.gz`, which upstream removed in November 2026), sha256 `c84b2de1cbb87831795fe64a85c5d9a7002a766e3a7c30b0a2d7d5e99d878f49`, cached by that hash. The rolling `sun.hasenbraten.de/vasm/release/vasm.tar.gz` is not a pin; `phoenix.owl.de/tags/` keeps every release. Override with `make VASM=...` |
 | 64tass | 1.60.3243 locally (brew `tass64`); CI: Ubuntu's `64tass` package, 1.59.3120 on ubuntu-latest (2026-11-04), same listing format (the synthetic `make all` test parses it) | `make TASS=...` |
 | Python | 3.13 (`.python-version`), `requires-python >=3.11`, uv; dev group ruff, mypy, pytest | `make PYTHON=...` (default `uv run --frozen python`) |
 | make | GNU make 3.81 (macOS) and 4.x (CI); the Makefile avoids 4.3-only grouped targets | |

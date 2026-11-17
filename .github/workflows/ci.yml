@@ -17,8 +17,9 @@ jobs:
       # here; frozen installs from uv.lock without re-resolving it (the `ida` group is not a
       # default group, so idapro itself is never installed).
       UV_FROZEN: "1"
-      # vasm pinned: the release tarball the local build used (docs/04-build.md).
-      VASM_URL: http://phoenix.owl.de/tags/vasm2_0f.tar.gz
+      # vasm pinned: the unmodified 2.0f release tarball, served from this repository's `toolchain`
+      # release since upstream removed it (card A14, 2026-11-16; docs/04-build.md).
+      VASM_URL: https://github.com/jlopez/stun-runner/releases/download/toolchain/vasm2_0f.tar.gz
       VASM_SHA256: c84b2de1cbb87831795fe64a85c5d9a7002a766e3a7c30b0a2d7d5e99d878f49
     steps:
       # LFS: large non-ROM binaries, if any (the IDA databases are never committed).
