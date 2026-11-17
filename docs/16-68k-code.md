@@ -274,7 +274,9 @@ lint), a label pinned by an `equ` (the shift test). `test_raw_data_check_fails` 
 raw-data faults in one copy (a `dc.l` wall in a data range, a text string as numeric `dc.b`, a
 `dcb.b 40,$FF`, a switch entry written as a number, a count written back as the first
 character of `str_7161`, an item byte as the first of `str_20FD6`, the next record's column 20h written back as the last
-character of `str_7A70`) and finds each. `test_constant_written_as_a_label_fails` writes a listed
+character of `str_7A70`, a string in `data.asm` starting in the command word of the
+`audio_test_list` record at 05C702) and finds each. `test_text_rule_command_word_records`
+(`tools/test_m68k.py`) checks the record rule and its FFFF end word on made-up records. `test_constant_written_as_a_label_fails` writes a listed
 constant (020CB4) and a reviewed one (02FC76) as ROM labels of the same value and the lint
 refuses both. `test_shift_test_pads_generated_includes` moves a fill of `game/vectors.asm` into
 a file under `build/` with an assert, and the shift test still passes. `test_runs_need_distinct_names`
