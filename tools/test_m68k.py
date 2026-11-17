@@ -853,10 +853,16 @@ def test_text_rule_record_fields() -> None:
     assert runs(pre + bytes([n]) + text[:-1] + b"\x01") == []
     assert runs(b"ENABLED\0vCONTINUE ADVANCES\0") == [(0, 8), (9, 27)]
     assert runs(b"\0Insert coin\0") == [(1, 13)]
-    ramp = bytes([0x08, 0x08, 0x11, 0x11]) + b"###+++444===FFFNNNWWW```iiiqqqzzz" + b"\x83\x83"
-    assert runs(ramp) == []
-    assert runs(b"\x0b\x0c!$+-198=HCIVOVeZbsen\x81\x71") == []
-    assert runs(b"\x80\\QIVVnTddlt\x7f\x63") == []
+    # made-up tables of the same shape as the island's (no ROM bytes): a non-printable prefix,
+    # a printable run of rising values that reads as text, no terminator, a non-printable
+    # continuation
+    ramp = bytes(v for v in range(0x24, 0x7B, 9) for _ in range(3))
+    for pre, run, post in ((b"\x07\x07\x10\x10", ramp, b"\x84\x84"),
+                           (b"\x0a\x0d", b"#'-08>CHKORVafkruz", b"\x82\x86"),
+                           (b"\x81", b"PRUZcfjmpsy", b"\x7f\x66")):
+        assert cl._is_text(run), run  # text by the character rule alone
+        assert runs(pre + run + post) == []
+        assert runs(pre + run + b"\0") == [(len(pre), len(pre) + len(run) + 1)]
     assert runs(b"\x83\x83HELLO WORLD\x83", frozenset({2})) == [(2, 13)]
 
 
@@ -1216,6 +1222,28 @@ def test_pccov_rejects_empty_runs(tmp_path: Path, capsys: pytest.CaptureFixture[
         with pytest.raises(SystemExit, match=why.replace("`", ".")):
             cli.main()
         assert not (tmp_path / "c.json").exists()
+
+
+def test_runs_need_distinct_names(tmp_path: Path, capsys: pytest.CaptureFixture[str],
+                                  monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two run files with one name (pccov-game.txt from two directories) fail pccov and
+    check-tree: keyed by name, the first would be replaced by the second without a check."""
+    runs = []
+    for d in ("bad", "good"):
+        (tmp_path / d).mkdir()
+        p = tmp_path / d / "pccov-game.txt"
+        p.write_text("# run frames 120\n000216\n")
+        runs.append(str(p))
+    binary = tmp_path / "image.bin"
+    binary.write_bytes(bytes(16))
+    summary = tmp_path / "summary.json"
+    for argv in (["pccov", "--image", str(binary), "--summary", str(summary)],
+                 ["check-tree", "--listing", str(tmp_path / "absent.lst"), "--binary",
+                  str(binary), "--no-shift"]):
+        monkeypatch.setattr("sys.argv", ["tools/m68k", *argv, *runs])
+        assert cli.main() == 1
+        assert "a second run named 'game'" in capsys.readouterr().out
+    assert not summary.exists()
 
 
 # --- the committed files ---------------------------------------------------------------------
