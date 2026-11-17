@@ -93,10 +93,10 @@ pixels with each pair swapped. A PNG holds the pixels in row-major order, `width
 
 ### 4.2 The PNGs and the manifest
 
-One indexed 8-bit PNG per distinct image (C15): 165 images in the 54 streams, 140 distinct by
-content (149 headed images minus 17 repeats among the figure streams 65, 66 and 68, plus the 8
-raw screens). The scout counted 157 by stream position; the repeats are one PNG each, named in
-every stream that holds them. Entries that share a stream (4/5, 6/7, 8/9, 10/11, 12/13, 14/15,
+One indexed 8-bit PNG per distinct image (C15): 157 images in the 54 streams (165 counted per
+table entry, since 7 streams serve two entries), 140 distinct by content (149 headed images minus
+17 repeats among the figure streams 65, 66 and 68, plus the 8 raw screens); the repeats are one
+PNG each, named in every stream that holds them. Entries that share a stream (4/5, 6/7, 8/9, 10/11, 12/13, 14/15,
 18/19) are one stream with several entries. The 7 placeholder entries 58-64 point at 060000, the
 pair-U adjust word (section 5), not at a stream.
 
@@ -115,7 +115,7 @@ may save it; `make images` writes them canonically (8-bit, filter 0, 256-entry P
 | Range | What |
 |---|---|
 | 060000-060001 | `gsp_images_sum_u`, the pair-U adjust word (also `dat_60000`) |
-| 060002-09848D | the streams of entries 1-34 (32 streams) |
+| 060002-09848D | the streams of entries 1-34 (27 streams) |
 | 09848E-09848F | `gsp_images_sum_v` |
 | 098490-0A5B65 | the streams of entries 35-57, the level maps |
 | 0A5B66-0A5B67 | `gsp_images_sum_w` |
@@ -340,8 +340,11 @@ reader on filters 1-4 and a 4-bit file; a one-pixel edit (a value outside the st
 re-encodes and decodes to the edit with the chip sums still right; a size change fails with the
 message of section 6; a broken manifest fails; every PNG's PLTE is its spec; every palette is
 used; the PNGs are the only images under `data/`; `palcheck` passes and fails on a planted
-colour (synthetic image). With the reference set: the committed data is what the image decodes
-to and builds back to it; every palette equals the image. With `make imgtrace`'s runs: the trace
+colour (synthetic image); this document's stream and image counts (sections 4.2 and 5) are the
+manifest's, and every `full` spec that no MAME dump matched but for colour 1D is named, with its
+best count, here (section 8) and in `CLAUDE.md`'s `make imgtrace` bullet. With the reference set:
+the committed data is what the image decodes to and builds back to it; every palette equals the
+image. With `make imgtrace`'s runs: the trace
 check passes. `tools/test_68k_tree.py` and `tools/test_build.py` generate the includes and expect
 pairs U-W from the data.
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 import shutil
 import struct
 import subprocess
@@ -514,3 +515,67 @@ def test_imgtrace_runs_match_the_decoder() -> None:
     doc, problems = summary(m, reference_68k(), runs)
     assert problems == []
     assert doc["entries"]
+
+
+# --- what the documents say about the data -------------------------------------------------------
+
+DOC = REPO / "docs/15-gsp-images.md"
+
+
+def doc_section(number: int) -> str:
+    text = DOC.read_text()
+    start = text.index(f"\n## {number}. ")
+    end = text.find("\n## ", start + 1)
+    return text[start : end if end >= 0 else len(text)]
+
+
+def test_doc_counts_are_the_manifest() -> None:
+    """docs/15's stream and image counts are the manifest's (review of PR #36: 32 streams before
+    the pair-V word and 165 images in 54 streams were wrong)."""
+    m = g.read_manifest(DATA / "manifest.json")
+    s4, s5 = doc_section(4), doc_section(5)
+    streams = len(m.streams)
+    images = sum(len(s.images) for s in m.streams)
+    per_entry = sum(len(s.images) * len(s.entries) for s in m.streams)
+    shared = sum(1 for s in m.streams if len(s.entries) > 1)
+    headed = sum(len(s.images) for s in m.streams if s.kind == "headed")
+    raw = sum(len(s.images) for s in m.streams if s.kind == "raw")
+    stated = re.search(r"(\d+) images in the (\d+) streams \((\d+) counted per\s+table entry, "
+                       r"since (\d+) streams serve two entries\), (\d+) distinct", s4)
+    assert stated is not None
+    assert [int(x) for x in stated.groups()] == [
+        images, streams, per_entry, shared, len(m.images)]
+    split = re.search(r"\((\d+) headed images minus\s+(\d+) repeats.*?plus the (\d+)\s+raw",
+                      s4, re.S)
+    assert split is not None
+    h, rep, r = (int(x) for x in split.groups())
+    assert (h, r, h - rep + r) == (headed, raw, len(m.images))
+    before_v = next(a.before_entry for a in m.adjust if a.pair == "V")
+    row = re.search(r"\| the streams of entries 1-(\d+) \((\d+) streams\) \|", s5)
+    assert row is not None
+    assert int(row.group(1)) == before_v - 1
+    assert int(row.group(2)) == sum(1 for s in m.streams if s.entries[0] < before_v)
+
+
+def test_notebook_names_every_static_palette_mame_did_not_match() -> None:
+    """CLAUDE.md's `make imgtrace` bullet and docs/15 section 8 must name each `full` spec that no
+    MAME dump matched but for the cycling colour (review of PR #36: `fbi_seal`'s 240)."""
+    from gspimages.trace import spec_key
+
+    m = g.read_manifest(DATA / "manifest.json")
+    summary = json.loads((REPO / "artifacts/gspimages-summary.json").read_text())["palettes"]
+    notebook = next(line for line in (REPO / "CLAUDE.md").read_text().splitlines()
+                    if line.startswith("- 2026-11-16 (M5i): `make imgtrace`"))
+    s8 = doc_section(8)
+    for name, info in m.images.items():
+        spec = info["palette"]
+        assert isinstance(spec, dict)
+        if spec["kind"] != "full":
+            continue
+        got = summary.get(spec_key(spec))
+        assert got is not None, name
+        if got["best_equal"] >= got["defined"] - 1:
+            continue
+        for text in (notebook, s8):
+            assert f"`{name}`" in text and f"{got['best_equal']}" in text, name
+
