@@ -71,10 +71,13 @@ unknown bytes in the same range:
 | `game/island.asm` | 04397E-046AEE | 12,656 | 262 | 61 | 12,333 | 0 | 12,292 | 41 |
 | **code files** | | **236,020** | **163,638** | **9,848** | **61,118** | **1,416** | **30,581** | **30,561** |
 
-Instructions, labels (vasm locals) per file as generated: boot 8,220 instructions in six files
-(2,152 labels, 777 locals), game 36,463 (9 of them the `moveb_ffff_*` macros) in nine files and
-the island (3,929 labels, 2,943 locals), the vectors 65 + 70 labels; 44,683 instructions, 6,216
-labels, 3,720 locals in all.
+Instructions, labels (vasm locals) in the committed files: boot 8,220 instructions in six files
+(2,154 labels, 777 locals), game 36,463 (9 of them the `moveb_ffff_*` macros) in nine files and
+the island (3,925 labels, 2,943 locals), the vectors 65 + 70 labels; 44,683 instructions, 6,214
+labels, 3,720 locals in all. The first generation (commit 0f28553) had 2,152, 3,929 and 6,216
+labels: the review fixes applied the generator's diff (the screen-record header slices in
+`code_0065E0.asm`, `dat_20FD5`/`str_20FD6` and `dat_210FC`/`str_210FD`, the island's three
+`str_` labels gone); `tools/test_68k_tree.py` checks these counts against the tree.
 
 In every code file the blob is exactly the classification's data and unknown bytes of its range
 (`data (cl.)` + `unknown (cl.)` = `blob`), but in `game/vectors.asm`: 020400-020418 is data by

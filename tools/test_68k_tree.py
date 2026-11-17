@@ -487,6 +487,25 @@ def test_tree_checks_pass(tmp_path: Path) -> None:
     assert len(rep.foreign) == 15 and all("tbl_BFE00+$" in x for x in rep.foreign)
 
 
+def test_docs16_label_counts_are_the_trees() -> None:
+    """docs/16 section 2's label and local counts are the committed tree's (they had stayed
+    the first generation's after the review fixes changed the labels)."""
+    label = re.compile(r"^[.A-Za-z_][A-Za-z0-9_]*:", re.M)
+    local = re.compile(r"^\.[A-Za-z0-9_]*:", re.M)
+
+    def count(files: list[str]) -> tuple[int, int]:
+        texts = [(TREE / f).read_text() for f in files]
+        return sum(len(label.findall(t)) for t in texts), sum(len(local.findall(t)) for t in texts)
+
+    boot = count([f for f in CODE_FILES if f.startswith("boot/code_")])
+    game = count([f for f in CODE_FILES if f.startswith("game/code_") or f == "game/island.asm"])
+    vec = count(["boot/vectors.asm", "game/vectors.asm"])
+    doc = " ".join((REPO / "docs/16-68k-code.md").read_text().split())
+    assert f"({boot[0]:,} labels, {boot[1]:,} locals)" in doc, boot
+    assert f"the island ({game[0]:,} labels, {game[1]:,} locals)" in doc, game
+    total = boot[0] + game[0] + vec[0], boot[1] + game[1] + vec[1]
+    assert f"{total[0]:,} labels, {total[1]:,} locals in all" in doc, total
+
 COUNT_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
                "nine": 9, "ten": 10, "eleven": 11, "twelve": 12}
 
