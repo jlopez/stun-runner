@@ -14,6 +14,7 @@
     tools/m68k check-unidasm [--image ...] [--classification ...] [--unidasm unidasm]
     tools/m68k pccov-read FIFO OUT
     tools/m68k pccov [--image ...] [--classification ...] [--listing L] --summary FILE RUN ...
+    tools/m68k sound-equates [--commands data/sound/commands.json] --out FILE
 
 classify       runs the descent (with the MAME runs given as seeds) and rewrites the
                classification and the operand decisions (commit both when they change); without
@@ -45,6 +46,9 @@ pccov          fails unless every executed PC starts a code instruction (and, wi
                an instruction statement of that listing); writes the summary;
                fails, writing nothing, on a run file with no PCs or no `# run` line (classify
                refuses such a file too)
+sound-equates  writes the sound command equates of data/sound/commands.json (sound.py, M5d,
+               docs/17) as the vasm include the tree includes after ram.asm; rewrites the file
+               only when its text changes
 """
 
 from __future__ import annotations
@@ -515,6 +519,13 @@ def cmd_pccov_read(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sound_equates(a: argparse.Namespace) -> int:
+    from m68k import sound
+
+    sound.write_equates(a.commands, a.out)
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser(prog="tools/m68k", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -603,6 +614,11 @@ def main() -> int:
     q.add_argument("--listing", type=Path)
     q.add_argument("runs", type=Path, nargs="+")
     q.set_defaults(func=cmd_pccov)
+
+    q = sub.add_parser("sound-equates")
+    q.add_argument("--commands", type=Path, default=REPO / "data/sound/commands.json")
+    q.add_argument("--out", type=Path, required=True)
+    q.set_defaults(func=cmd_sound_equates)
 
     a = p.parse_args()
     return int(a.func(a))

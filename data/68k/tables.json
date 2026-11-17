@@ -2,5 +2,12 @@
   "format": "stunrun-68k-data-tables 1",
   "comment": "The tables of the 68k data whose format the reading instructions prove (M5d, docs/17 section 4; decision C18): range, label, format and the reader cited. tools/m68k check-tree's raw-data check accepts the statements of a table only in its format: pointers, dc.l of labels or 0; audio_test_list, 22-byte records of a command word (an equate of build/68k/sound_commands.asm) and a name, ended by FFFF. Addresses and citations only, no byte of the image.",
   "tables": [
+    {
+      "start": "05C63C",
+      "end": "05CF86",
+      "label": "audio_test_list",
+      "format": "audio_test_list",
+      "reader": "audio_test 043718: movea.l #audio_test_list,a4 at 043720; lea ($2,a4),a3 at 043828 (the names at +2); both pointers stepped by 16h at 043896-04389C until cmpi.w #$FFFF,(a2) at 0438A4; mulu.w #$16,d0 at 043950 and move.w ($0,a4,d0.w),d1 at 043954, sent by send_sound_byte at 04395C (docs/11 section 5, docs/16 section 3.1)"
+    }
   ]
 }

@@ -1,6 +1,7 @@
 ; S.T.U.N. Runner (rev 6), 68010 program space 000000-0BFFFF: the twelve 200x/210x files.
 ;
-; The main file: org 0, the equates (hardware.asm, ram.asm) and the macros, then the region files
+; The main file: org 0, the equates (hardware.asm, ram.asm, the sound commands generated from
+; data/sound/commands.json since M5d, docs/17) and the macros, then the region files
 ; in address order (docs/13-68k-source.md); the code is neutral source since M5c (docs/16).
 ; Each region file is one contiguous range with an assert at both ends and one owner (the table
 ; below); a later leg may split its own file into several under its directory but never moves a
@@ -32,6 +33,7 @@
 
 	include	"hardware.asm"
 	include	"ram.asm"
+	include	"../../build/68k/sound_commands.asm"
 	include	"macros.asm"
 
 	include	"boot/vectors.asm"

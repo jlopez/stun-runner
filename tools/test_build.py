@@ -331,6 +331,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     shutil.copytree(REPO / "data/oki", work / "data/oki")
     shutil.copytree(REPO / "data/gsp-images", work / "data/gsp-images")  # pairs U-W (docs/15)
     shutil.copytree(REPO / "data/palettes", work / "data/palettes")
+    shutil.copytree(REPO / "data/sound", work / "data/sound")  # the sound equates (docs/17)
     (work / "data/ida").mkdir()
     shutil.copy(REPO / "data/ida/stunrun-68k.json", work / "data/ida")  # for `make labels`
     env = dict(os.environ, STUNRUN_ROMS=str(tmp_path / "archive"))

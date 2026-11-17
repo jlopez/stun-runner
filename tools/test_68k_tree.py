@@ -31,6 +31,7 @@ from m68k import listing as ls
 from m68k import operands as opd
 from m68k import tree as tr
 from m68k.__main__ import load_seeds, load_unreached
+from m68k.sound import write_equates
 from programs import ADSP_START, GSP_END, GSP_START, PROGRAM_TABLE
 
 from ida.memory_map import IO_68K
@@ -103,6 +104,8 @@ def assemble_68k(
     (build / "gsp/program.bin").write_bytes(image[GSP_START:GSP_END])
     # pairs U-W come from data/gsp-images (docs/15), the palettes from data/palettes (docs/17)
     write_includes(build / "gsp-images", palettes=palettes)
+    # the sound command equates (M5d, docs/17 section 3), from data/sound/commands.json
+    write_equates(REPO / "data/sound/commands.json", build / "68k/sound_commands.asm")
     for path, text in (generated or {}).items():
         (build / path).parent.mkdir(parents=True, exist_ok=True)
         (build / path).write_text(text)
@@ -143,8 +146,9 @@ def gsp_region() -> bytes:
 def test_regions_tile_the_image_in_address_order() -> None:
     main = (TREE / "stunrun.asm").read_text()
     includes = INCLUDE.findall(main)
-    assert includes[:3] == ["hardware.asm", "ram.asm", "macros.asm"]
-    assert includes[3:] == [f for f, _, _ in REGIONS]
+    assert includes[:4] == ["hardware.asm", "ram.asm", "../../build/68k/sound_commands.asm",
+                            "macros.asm"]
+    assert includes[4:] == [f for f, _, _ in REGIONS]
     # no file under boot/ or game/ is left out (a stale boot/boot.asm or game/code.asm)
     assert sorted(
         str(p.relative_to(TREE)) for d in ("boot", "game") for p in (TREE / d).rglob("*.asm")
@@ -685,16 +689,21 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
          "\tincbin\t\"../../build/stunrun-68k.bin\",$7A7F,$4\n",
          "\tdc.b\t'INC*PM*DATA*0-7 '\ndat_7A80:\n"
          "\tincbin\t\"../../build/stunrun-68k.bin\",$7A80,$3\n"),
-        ("data.asm", "\tincbin\t\"../../build/stunrun-68k.bin\",$05C63C,$94A\n",
-         "\tincbin\t\"../../build/stunrun-68k.bin\",$05C63C,$C7\n\tdc.b\t'XMADEUP',0\n"
-         "\tincbin\t\"../../build/stunrun-68k.bin\",$05C70B,$87B\n"),
+        # (since M5d the list is source: the record at 05C702 rewritten, same length)
+        ("data.asm", "\tdc.w\tsnd_boostc\n\tdc.b\t'BOOSTC',0\n\tdcb.b\t13,0\n",
+         "\tdc.b\t0\n\tdc.b\t'XMADEUP',0\n\tdcb.b\t13,0\n"),
     )
     # the blob is random: the header bytes the check reads are written into it, made up but
     # for the counts, which are the strings' lengths (15 before the 16 characters, 18 for
     # CONTROL*LEFT/RIGHT, a non-printable byte after it)
     patch = {0x7A6F: bytes([15]), 0x7A80: bytes([0x01, 0x01, 18]), 0x7A95: b"\x01"}
     rep = tree_check(tmp_path, tree, shift=False, patch=patch)
-    assert len(rep.raw) == 8, rep.raw
+    # the rewritten record also breaks its format (a dc.b 0 where its command word was, so the
+    # record has no dc.w at 05C702): two more errors
+    assert len(rep.raw) == 10, rep.raw
+    assert any(e.startswith("05C702: dc.b\t0:") and "audio_test_list record" in e
+               for e in rep.raw), rep.raw
+    assert any(e.startswith("05C702:") and "not 22 bytes" in e for e in rep.raw), rep.raw
     assert any(e.startswith("05C703: dc.b") and "record at 05C702" in e
                and "audio_test_list" in e for e in rep.raw), rep.raw
     assert any("'INC*PM*DATA*0-7 '" in e and "next record's 4-byte header" in e
@@ -763,3 +772,46 @@ def test_promoted_range_fails(tmp_path: Path) -> None:
     assert rep.extra_code[: n // 2] == nops, rep.extra_code
     assert any(e.startswith(f"{a:06X}: an instruction statement that is no classified")
                for e in rep.errors())
+
+
+def test_sound_equates_are_commands_json(tmp_path: Path) -> None:
+    """M5d (docs/17 section 3): build/68k/sound_commands.asm holds one equate per command of
+    data/sound/commands.json, its name and value, 00-6C; a doubled name is refused."""
+    from m68k import sound
+
+    out = tmp_path / "s.asm"
+    assert write_equates(REPO / "data/sound/commands.json", out)
+    assert not write_equates(REPO / "data/sound/commands.json", out)  # unchanged: not rewritten
+    got = re.findall(r"^(\w+)\tequ\t\$([0-9A-F]{2})\t;", out.read_text(), re.M)
+    data = json.loads((REPO / "data/sound/commands.json").read_text())["commands"]
+    assert got == [(c["name"], c["value"]) for c in sorted(data, key=lambda c: c["value"])]
+    assert [int(v, 16) for _, v in got] == list(range(0x6D))
+    bad = json.loads((REPO / "data/sound/commands.json").read_text())
+    bad["commands"][1]["name"] = bad["commands"][0]["name"]
+    (tmp_path / "bad.json").write_text(json.dumps(bad))
+    with pytest.raises(ValueError, match="occurs twice"):
+        sound.commands(tmp_path / "bad.json")
+
+
+@needs_vasm
+def test_audio_test_list_is_source(tmp_path: Path) -> None:
+    """M5d (docs/17 section 3): audio_test_list (05C63C) is 108 records of 22 bytes from source
+    whatever the blob: each the command word of an equate whose audio-test name is the
+    record's name, at the record commands.json gives (audio_test_entry), then FFFF."""
+    image = random.Random(9).randbytes(IMAGE_SIZE)
+    out, listing, _ = assemble_68k(image, tmp_path)
+    data = json.loads((REPO / "data/sound/commands.json").read_text())["commands"]
+    by_value = {int(c["value"], 16): c for c in data}
+    base = vasm_symbols(listing)["audio_test_list"][1]
+    assert base == 0x05C63C
+    seen = []
+    for k in range(108):
+        rec = out[base + 22 * k : base + 22 * k + 22]
+        value = int.from_bytes(rec[:2], "big")
+        name = rec[2 : rec.index(0, 2)].decode()
+        assert not any(rec[3 + len(name) :]), k
+        c = by_value[value]
+        assert c["audio_test"] == name and int(c["audio_test_entry"], 16) == base + 22 * k
+        seen.append(value)
+    assert out[base + 22 * 108 : base + 22 * 108 + 2] == b"\xff\xff"
+    assert sorted(seen) == [v for v in range(0x6D) if v != 3]

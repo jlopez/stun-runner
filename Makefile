@@ -632,6 +632,19 @@ pccov: $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt) $(BUILD)/$(SET)-68k.bin $(BUILD
 		--listing $(BUILD)/$(SET)-68k.lst \
 		--summary artifacts/pccov-summary.json $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt)
 
+# --- M5d: the sound command equates (docs/17 section 3) ----------------------------------------
+# data/sound/commands.json names every sound command (docs/11 section 11); tools/m68k
+# sound-equates writes build/68k/sound_commands.asm (`snd_<name> equ $NN`), which
+# asm/68k/stunrun.asm includes after ram.asm. On every make (a fraction of a second, rewritten
+# only when its text changes), as the image includes below.
+SOUND_EQUATES := $(BUILD)/68k/sound_commands.asm
+
+$(SOUND_EQUATES): FORCE
+	$(PYTHON) tools/m68k sound-equates --commands data/sound/commands.json --out $@
+
+.SECONDARY: $(SOUND_EQUATES)
+EXTRA_stunrun-68k += $(SOUND_EQUATES)
+
 # --- M5i: the packed GSP images and their palettes (docs/15-gsp-images.md) --------------------
 # tools/gspimages is a package run as `uv run python tools/gspimages <command>`; its CI tests are
 # tools/test_gspimages.py. The 68k tree's 060000-0C0000 comes from data/gsp-images alone:

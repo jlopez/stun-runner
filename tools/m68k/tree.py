@@ -236,8 +236,7 @@ def audio_test_records(lst: ls.Listing, tb: Table) -> list[str]:
     words = [s.address for s in stmts if s.text.split()[0].lower() == "dc.w"]
     want = list(range(tb.start, tb.end, 0x16))
     if words != want:
-        bad = next((w for w, x in zip(words, want, strict=False) if w != x),
-                   words[len(want)] if len(words) > len(want) else tb.end)
+        bad = min(set(words) ^ set(want))
         out.append(f"{bad:06X}: the audio_test_list records are not 22 bytes, each starting "
                    f"with its command word (docs/17 section 3)")
     return out
