@@ -70,6 +70,18 @@ cannot give back exactly (an edit). `tools/adpcm` is a package directory, run as
 `data/oki` (after a decoder change or a rename; `make test` fails while the WAVs and the image
 disagree), `make okitrace` (`-j3`: three MAME runs of `tools/mame/okitrace.lua`) records what
 the 6502 tells the OKI and rewrites the manifest's play evidence.
+Since M5i (issue #34, docs/15-gsp-images.md) pairs U-W of the 68k image, 060000-0C0000, come from
+`data/gsp-images` (the manifest and one indexed PNG per image) alone: `tools/gspimages asm`, on
+every `make` (a fraction of a second, a file rewritten only when it changes), takes the PNGs'
+pixel indices (never their colours; a PNG whose size differs from the manifest's fails), encodes
+every stream, computes the three checksum-adjust words from the self-test's expected sums and
+writes `build/gsp-images/images.asm` and `table.asm`, which `asm/68k/images.asm` and
+`image_table.asm` include (a label and an assert per stream, asserts at the pair boundaries,
+`dc.l` labels in the table). It also writes `build/gsp-images/palettes.asm`, the palettes of
+`data/palettes` as `dc.b`; `make check` has the prerequisite `palcheck`, which assembles them and
+compares each with `build/stunrun-68k.bin` at its address (skipped without the reference set).
+`make images` re-decodes the merged image into `data/gsp-images`; `make -j6 imgtrace` checks the
+unpackers in MAME (docs/15 section 8).
 Since M4a the 6502 image is not an incbin of `build/stunrun-jsa.bin` either: `asm/jsa/jsa.asm`
 and the files it includes (`hardware.asm`, `ram.asm`, `data/macros.asm` and the region files,
 `data/sounds.asm` and the stream and patch files of `data/` among them, docs/12-sound-music.md
@@ -86,7 +98,7 @@ Decision (M1a coordinator): the 68k image and the four data images are separate 
 
 | Image | Region(s) | Size | Contents | Tree |
 |---|---|---|---|---|
-| `stunrun-68k` | `mainpcb:maincpu` | 786,432 (0x000000-0x0BFFFF) | six 200x/210x pairs interleaved; image offset = 68010 address | `asm/68k/stunrun.asm` and its region files (vasm; docs/13) |
+| `stunrun-68k` | `mainpcb:maincpu` | 786,432 (0x000000-0x0BFFFF) | six 200x/210x pairs interleaved; image offset = 68010 address | `asm/68k/stunrun.asm` and its region files (vasm; docs/13) + `build/gsp-images/*.asm` (`tools/gspimages asm` from `data/gsp-images`, docs/15) |
 | `stunrun-obj` | `mainpcb:user1` | 393,216 | `90h/90k` at 0x00000, `10h/10k` at 0x20000, `9h/9k` at 0x40000, interleaved; byte offset / 2 = the ADSP's object-ROM word index (/MP page = offset / 0x20000) | `asm/obj/objects.asm` (vasm) |
 | `stunrun-oki` | `mainpcb:jsa:oki1` | 262,144 | `1fh`, `1ef`, `1de`, `1cd` one after the other; offset = OKI M6295 address | `asm/oki/samples.asm` (vasm) + `build/oki/samples.asm` (`tools/adpcm asm` from `data/oki`) |
 | `stunrun-jsa` | `mainpcb:jsa:cpu` | 65,536 | `136070-2123.10c` as is: 0000-3FFF the four 4 KB pages banked at 3000-3FFF, 4000-FFFF at its own address | `asm/jsa/jsa.asm` (64tass) |

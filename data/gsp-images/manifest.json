@@ -1,5 +1,6 @@
 {
   "format": "stunrun-gsp-images 1",
+  "comment": "The packed GSP images of pairs U-W (docs/15-gsp-images.md): streams in entry order (their table entries, kind raw or headed, image names = PNG file stems), the placeholder entries, where the checksum-adjust words go, the six chip sums the boot self-test expects, and per image its size and palette spec (data/palettes). tools/gspimages asm builds 060000-0C0000 from this and the PNGs; make images rewrites it (names and palette specs kept).",
   "streams": [
     {
       "entries": [1],

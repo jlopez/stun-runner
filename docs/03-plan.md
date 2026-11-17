@@ -59,6 +59,8 @@ Legs, as agreed with Jesus on 2026-11-16 ("mechanical first"; he delegated the o
 
 **Check**: per leg `make check`, `make coverage MAX_BLOB="asm/68k/<file>=0"` (the leg's region file reports 0 blob bytes, or only documented residue), `make labels` (every IDA snapshot name in converted source is a label at its address; docs/13 section 7); at the end the 68k image is 100% source and data files. (For the 6502 the same check as `make labels` is `tools/test_ida_sync.py`, which fails in CI when the committed snapshot's names are not the source's, docs/05 section 6.)
 
+**M5i done 2026-11-16** (issue #34, docs/15-gsp-images.md): pairs U-W are built from `data/gsp-images` (140 indexed PNGs and a manifest) with their colours from `data/palettes` (32 palettes, compared with the image by `make check`); `images.asm` and `image_table.asm` 0 blob; the 68k blob 359,222 bytes (from 691,513), the set's blob share 23.8%; CI checks the six chips' CRC-32 and SHA-1 from the committed data; `make imgtrace` checks every unpacking MAME makes (48 of 54 streams reached, all 23 level maps).
+
 **Wave 0 done 2026-11-16** (M5-0, docs/13), measured: `make check` 25 files, 0 differences; `asm/68k` is nine region files with guards at both ends; the six zero runs (94,883 bytes) are fills and the program table's pointers and text (36 bytes) data; the 68k blob is 691,513 bytes (from 786,432); the NVRAM images, both entirely zero, are fills; the set's blob share is 45.8% (691,513 of 1,511,424); `make labels`: 223 snapshot names in ROM, 11 labels in the tree, 212 in blob, 0 failures.
 
 ## M6. GSP and ADSP programs as source

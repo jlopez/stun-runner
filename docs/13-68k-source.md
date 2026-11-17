@@ -33,8 +33,8 @@ No byte of the set changed: `make check` gives 25 files, 0 differences.
 | `game/code.asm` | 020430-04397E | 144,718 | incbin (`sub_20430`) | game leg |
 | `game/island.asm` | 04397E-046AEE | 12,656 | incbin: the data island (`dat_4397E`, 12,418) and the last code (`sub_46A00`, 238) | game leg |
 | `data.asm` | 046AEE-060000 | 103,698 | incbin (`dat_46AEE`, 91,288); fill 05CF86-060000 | data leg |
-| `images.asm` | 060000-0BFE00 | 392,704 | incbin (`dat_60000`, 332,011); fill 0B10EB-0BFE00 | images leg |
-| `image_table.asm` | 0BFE00-0C0000 | 512 | incbin: the 70 longs (`tbl_BFE00`, 280); fill 0BFF18-0C0000 | images leg |
+| `images.asm` | 060000-0BFE00 | 392,704 | since M5i (docs/15): `dat_60000`, the include `build/gsp-images/images.asm` generated from `data/gsp-images` (54 streams, 3 computed adjust words, 332,011 bytes of data); fill 0B10EB-0BFE00 | images leg |
+| `image_table.asm` | 0BFE00-0C0000 | 512 | since M5i: `tbl_BFE00`, the include `build/gsp-images/table.asm` (70 `dc.l`, 280); fill 0BFF18-0C0000 | images leg |
 
 Every region file is one contiguous range and starts and ends with an `assert *=$addr`; a file
 may assert more inside (`programs.asm` asserts the table and both programs). Paths of `include`
