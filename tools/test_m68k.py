@@ -1040,15 +1040,24 @@ def cli_files(tmp: Path, image: bytes, c: cl.Classification) -> list[str]:
             "--operands", str(tmp / "op.json"), "--seeds", str(tmp / "absent-seeds.json")]
 
 
-def test_gen_is_frozen_over_the_tree(capsys: pytest.CaptureFixture[str],
+def test_gen_is_frozen_over_the_tree(tmp_path: Path, capsys: pytest.CaptureFixture[str],
                                     monkeypatch: pytest.MonkeyPatch) -> None:
-    """Decision C12 (M5c): gen never writes over a file of asm/68k, whatever the range."""
-    target = REPO / "asm/68k/game/island.asm"
-    before = target.read_text()
-    monkeypatch.setattr("sys.argv", ["tools/m68k", "gen", "4397E", "46AEE", "--out", str(target)])
-    assert cli.main() == 2
-    assert "the generator is frozen" in capsys.readouterr().err
-    assert target.read_text() == before
+    """Decision C12 (M5c): gen never writes over a file of asm/68k, whatever the range and
+    whichever of its three outputs names it (--out, --equates-out, --externals-out)."""
+    scratch = tmp_path / "g.asm"
+    for flag, rel in (("--out", "game/island.asm"), ("--equates-out", "ram.asm"),
+                      ("--externals-out", "boot/vectors.asm")):
+        target = REPO / "asm/68k" / rel
+        before = target.read_text()
+        outs = {"--out": scratch, "--equates-out": tmp_path / "e.asm",
+                "--externals-out": tmp_path / "x.asm"}
+        outs[flag] = target
+        args = [x for k, v in outs.items() for x in (k, str(v))]
+        monkeypatch.setattr("sys.argv", ["tools/m68k", "gen", "4397E", "46AEE", *args])
+        assert cli.main() == 2, flag
+        assert "the generator is frozen" in capsys.readouterr().err, flag
+        assert target.read_text() == before, flag
+        assert not scratch.exists(), flag
 
 
 @needs_vasm

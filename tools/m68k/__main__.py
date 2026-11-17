@@ -205,12 +205,16 @@ TREE = REPO / "asm/68k"
 
 
 def cmd_gen(a: argparse.Namespace) -> int:
-    out = a.out.resolve()
-    if out.exists() and TREE.resolve() in out.parents:
-        print(f"gen: {a.out} is a file of the 68k tree: the generator is frozen since M5c "
-              f"(decision C12, docs/16) and never writes over the source; write to scratch",
-              file=sys.stderr)
-        return 2
+    for path in (a.out, a.equates_out, a.externals_out):
+        if path is None:
+            continue
+        res = path.resolve()
+        if res.exists() and TREE.resolve() in res.parents:
+            print(f"gen: {path} is a file of the 68k tree: the generator is frozen since M5c "
+                  f"(decision C12, docs/16) and never writes over the source (--out, "
+                  f"--equates-out and --externals-out alike); write to scratch",
+                  file=sys.stderr)
+            return 2
     bad = check_range_args(a)
     if bad:
         print(f"gen: {bad}", file=sys.stderr)
