@@ -274,8 +274,13 @@ source; until then a moved build diverges, as it does in frame 414.
   leg (`RAW_FILES`), `data.asm` included, with the kinds of section 4 (strings and fills as in the
   code files, palette triples inside a palette of `data/palettes`, the statements of a table of
   `data/68k/tables.json` in its format, under the label the registry names at the table's
-  start, which the listing must define there). `load_tables` refuses a table without its reader,
-  of an unknown format or overlapping another.
+  start, which the listing must define there). Each symbolic `dc.l` operand of a pointer table
+  is resolved through the assembled bytes, so a constant written as a symbol of the same value
+  fails: an equate (a sound command), a symbol of value 0 (the null is written 0) and, in a
+  `pointer_or_count` table, a symbol below its count limit; `audio_test_list`'s command word must
+  be a sound-command equate (`snd_*` or `cmd_03_imm`), not a ROM label of the same value (review
+  of #38). `load_tables` refuses a table without its reader, of an unknown format or overlapping
+  another.
 - **The address lint** refuses a label+offset reference into `images.asm`/`image_table.asm`
   through any label the listing defines in 060000-0C0000 (`tbl_BFE00+$64`, `gsp_image_entry_24+4`,
   `4+gsp_image_entry_24`, `gsp_image_NN-$10`; a difference of two labels is no offset).
@@ -290,11 +295,14 @@ source; until then a moved build diverges, as it does in frame 414.
   source; the raw-data check fails on a planted `dc.b` wall in `data.asm` (at 04A88C), a record
   header of 048180 written as `dc.l`, a count in a pointer table, 400h in 047F50 and a registered
   table left an incbin slice, three numbers `dc.b $01,$02,$03` outside every palette and a
-  registry label the listing does not define at the table's start
-  (`test_data_asm_raw_data_check_fails`), and on a broken
+  registry label the listing does not define at the table's start, and constants written as
+  symbols: `snd_stop` in 04C712, `vec_reset_sp` (000000) as 047F50's null, `vec_reserved_60`
+  (0000F0) as one of its counts (`test_data_asm_raw_data_check_fails`), `vec_reset_pc` (000004)
+  as a command word of `audio_test_list` (`test_raw_data_check_fails`), and on a broken
   `audio_test_list` record; the moved tree keeps 000000-020000 and 060000-0C0000 and moves the
-  labels between by the pad (`test_moved_build`), and `moved-compare` finds the first differing
-  frame on made-up logs.
+  labels between by the pad (`test_moved_build`), `moved-compare` finds the first differing
+  frame on made-up logs, and `moved-candidates` never counts a long with bit 31 set
+  (`test_moved_candidates_skip_flagged_longs`).
 - **Local** (needs the reference set): `make check`, `make m68k-check` (labels, descent, lint,
   raw data, shift, unidasm), `make coverage`, `make test`, `make lint`, `make movedcheck` (MAME).
 

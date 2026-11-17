@@ -711,6 +711,10 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
         # (since M5d the list is source: the record at 05C702 rewritten, same length)
         ("data.asm", "\tdc.w\tsnd_boostc\n\tdc.b\t'BOOSTC',0\n\tdcb.b\t13,0\n",
          "\tdc.b\t0\n\tdc.b\t'XMADEUP',0\n\tdcb.b\t13,0\n"),
+        # a command word written as a ROM label of the same value (vec_reset_pc, 000004 =
+        # snd_ytst): the bytes are equal, the statement names no sound-command equate (review
+        # of #38)
+        ("data.asm", "\tdc.w\tsnd_ytst\n", "\tdc.w\tvec_reset_pc\n"),
     )
     # the blob is random: the header bytes the check reads are written into it, made up but
     # for the counts, which are the strings' lengths (15 before the 16 characters, 18 for
@@ -719,8 +723,10 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
     rep = tree_check(tmp_path, tree, shift=False, patch=patch)
     # the rewritten record also breaks its format (a dc.b 0 where its command word was, so the
     # record has no dc.w at 05C702): two more errors
-    assert len(rep.raw) == 10, rep.raw
+    assert len(rep.raw) == 11, rep.raw
     assert any(e.startswith("05C702: dc.b\t0:") and "audio_test_list record" in e
+               for e in rep.raw), rep.raw
+    assert any("dc.w\tvec_reset_pc:" in e and "sound-command equate" in e
                for e in rep.raw), rep.raw
     assert any(e.startswith("05C702:") and "not 22 bytes" in e for e in rep.raw), rep.raw
     assert any(e.startswith("05C703: dc.b") and "record at 05C702" in e
@@ -869,6 +875,21 @@ def test_data_asm_raw_data_check_fails(tmp_path: Path) -> None:
                    '\tdc.b\t$01,$02,$03\n\tincbin\t"../../build/stunrun-68k.bin",$04A88F,$1B\n')
     rep = tree_check(tmp_path / "p", tree, shift=False)
     assert [e.split(":")[0] for e in rep.raw] == ["04A88C"], rep.raw
+    # constants written as symbols of the same value, so the bytes and the shift test do not
+    # see them (review of #38): an equate (snd_stop, 0) as a pointer, a ROM label of value 0
+    # (vec_reset_sp, 000000) as the null of 047F50, a ROM label below 400h (vec_reserved_60,
+    # 0000F0) as one of its counts
+    tree = planted(tmp_path / "s", "data.asm", "dat_4C712:\n\tdc.l\t0\n",
+                   "dat_4C712:\n\tdc.l\tsnd_stop\n",
+                   ("data.asm", "dat_47F50:\n\tdc.l\t0\n", "dat_47F50:\n\tdc.l\tvec_reset_sp\n"),
+                   ("data.asm", "dat_47F58:\n\tdc.l\t$F0\n",
+                    "dat_47F58:\n\tdc.l\tvec_reserved_60\n"))
+    rep = tree_check(tmp_path / "s", tree, shift=True)
+    assert len(rep.raw) == 3 and rep.errors() == rep.raw, rep.errors()
+    assert rep.raw[0].startswith("047F50: dc.l\tvec_reset_sp:") and "value 0" in rep.raw[0], rep.raw
+    assert rep.raw[1].startswith("047F58: dc.l\tvec_reserved_60:") and "below 400h" in rep.raw[1], \
+        rep.raw
+    assert rep.raw[2].startswith("04C712: dc.l\tsnd_stop:") and "an equate" in rep.raw[2], rep.raw
     # a registry label the listing does not define at the table's start (review of #38)
     ex = tr.load_explained()
     ex.tables = [dataclasses.replace(t, label="dat_nonexistent") if t.start == 0x047406

@@ -22,8 +22,10 @@ blob, as CI does), not on scratch output:
   quoted strings and zeros in text, a `dcb.b N,0` fill, the three colour components of a
   palette of data/palettes (`dc.b r,g,b` inside its range), and the statements of a table of
   data/68k/tables.json in its format, under the label the registry names at its start (a
-  proven pointer table: `dc.l` of labels or 0;
-  `audio_test_list`'s records: the command word as a symbol, the name, zeros). A `dc.b` wall in
+  proven pointer table: `dc.l` of labels or 0, each symbol resolved so that an equate, a
+  symbol of value 0 or, in a `pointer_or_count` table, of a value below its count limit fails;
+  `audio_test_list`'s records: the command word as a sound-command equate of
+  build/68k/sound_commands.asm, the name, zeros). A `dc.b` wall in
   place of an `incbin` slice of unknown or data bytes fails (decision C3), and so does a string
   that starts with a record field (a count or an item byte, `record_field`) or ends with one
   (the next screen record's first header byte, `trailing_field`); in any file, a quoted `dc.b`
@@ -224,26 +226,66 @@ def trailing_field(ops: list[str], address: int, binary: bytes) -> str:
     return ""
 
 
-def _table_statement(tb: Table, s: ls.Stmt, mn: str, ops: list[str]) -> str:
+def _names_equate(lst: ls.Listing, op: str) -> bool:
+    """Does an operand's text name one of the listing's equates (vasm's `E:` symbols)?"""
+    return any(m.group(1) in lst.equates for m in ls.IDENT.finditer(op.split(";", 1)[0]))
+
+
+def sound_equate(lst: ls.Listing, op: str) -> bool:
+    """Is an operand exactly one sound-command equate of build/68k/sound_commands.asm (`snd_`
+    and the 68010's audio-test name, or cmd_03_imm; tools/m68k/sound.py)?"""
+    return op in lst.equates and (op.startswith("snd_") or op == "cmd_03_imm")
+
+
+def _pointer_ops(lst: ls.Listing, tb: Table, s: ls.Stmt, ops: list[str],
+                 binary: bytes) -> str:
+    """Why the dc.l operands of a pointer table's statement are not labels or 0, or "": a
+    symbolic operand is resolved through the assembled bytes, so a constant written as a symbol
+    is refused: an equate (a sound command, say), a symbol whose value is 0 (the null is
+    written 0), and in a pointer_or_count table a symbol whose value is below the table's count
+    limit (a count is written as a number)."""
+    for k, op in enumerate(ops):
+        if op in ("0", "$0"):
+            continue
+        if not ls.names_symbol(op):
+            return f"{op} is a number, not a label"
+        if _names_equate(lst, op):
+            return f"{op} names an equate, not a label"
+        a = s.address + 4 * k
+        v = int.from_bytes(binary[a : a + 4], "big") if a + 4 <= len(binary) else None
+        if v == 0:
+            return f"{op} has the value 0: the null is written 0"
+        if tb.format == "pointer_or_count" and v is not None and v < tb.below:
+            return f"{op} has a value below {tb.below:X}h, a count: write it as a number"
+    return ""
+
+
+def _table_statement(tb: Table, s: ls.Stmt, mn: str, ops: list[str], lst: ls.Listing,
+                     binary: bytes) -> str:
     """Why a dc statement inside a table of data/68k/tables.json is not of its format, or ""."""
     pointer = mn == "dc.l" and ops and all(ls.names_symbol(op) or op in ("0", "$0") for op in ops)
+    why = _pointer_ops(lst, tb, s, ops, binary) if pointer else ""
     if tb.format == "pointers":
-        return "" if pointer else "a proven pointer table holds dc.l of labels or 0 only"
+        if pointer and not why:
+            return ""
+        return f"a proven pointer table holds dc.l of labels or 0 only{': ' + why if why else ''}"
     if tb.format == "pointer_or_count":
         nums = [ls._num(op) for op in ops]
-        if pointer or (mn == "dc.l" and ops and all(n is not None and n < tb.below
-                                                     for n in nums)):
+        if pointer and not why:
             return ""
-        return f"this table holds dc.l of labels or of counts below {tb.below:X}h only"
+        if mn == "dc.l" and ops and all(n is not None and n < tb.below for n in nums):
+            return ""
+        return (f"this table holds dc.l of labels or of counts below {tb.below:X}h only"
+                f"{': ' + why if why else ''}")
     if tb.format == "records":
         lo, hi = tb.pointers
         at = (s.address - tb.start) % tb.stride
-        if pointer and lo <= at and at + 4 * len(ops) <= hi:
+        if pointer and not why and lo <= at and at + 4 * len(ops) <= hi:
             return ""
         return (f"a record's bytes +{lo:X}-+{hi:X} are dc.l of labels or 0; its other fields "
-                f"stay incbin slices")
+                f"stay incbin slices{': ' + why if why else ''}")
     # audio_test_list: per record dc.w <command equate>, dc.b '<name>',0, dcb.b N,0; FFFF last
-    if mn == "dc.w" and len(ops) == 1 and (ls.names_symbol(ops[0])
+    if mn == "dc.w" and len(ops) == 1 and (sound_equate(lst, ops[0])
                                             or (ops[0].upper() == "$FFFF"
                                                 and s.address == tb.end - 2)):
         return ""
@@ -252,7 +294,8 @@ def _table_statement(tb: Table, s: ls.Stmt, mn: str, ops: list[str]) -> str:
         return ""
     if mn == "dcb.b" and FILL.match(s.text):
         return ""
-    return ("an audio_test_list record is dc.w <command equate>, dc.b '<name>',0 and zeros; "
+    return ("an audio_test_list record is dc.w <sound-command equate (snd_*, cmd_03_imm)>, "
+            "dc.b '<name>',0 and zeros; "
             "the list ends with dc.w $FFFF")
 
 
@@ -298,7 +341,7 @@ def raw_data(lst: ls.Listing, c: cl.Classification, binary: bytes,
             continue
         tb = ex.table_at(s.address)
         if tb is not None:
-            why = _table_statement(tb, s, mn, ops)
+            why = _table_statement(tb, s, mn, ops, lst, binary)
             if why:
                 out.append(f"{s.address:06X}: {s.text}: {why} (table {tb.label}, "
                            f"data/68k/tables.json)")
