@@ -482,37 +482,37 @@ dat_714C:
 str_7150:
 	dc.b	'SA*AUDIO*TEST'
 dat_715D:
-	incbin	"../../build/stunrun-68k.bin",$715D,$3
-str_7160:
-	dc.b	'&ERROR*80**P1BAD**6502*PROGRAM*PROM*BAD'
+	incbin	"../../build/stunrun-68k.bin",$715D,$4
+str_7161:
+	dc.b	'ERROR*80**P1BAD**6502*PROGRAM*PROM*BAD'
 dat_7187:
-	incbin	"../../build/stunrun-68k.bin",$7187,$3
-str_718A:
-	dc.b	'&ERROR*40**P2BAD**6502*PROGRAM*PROM*BAD'
+	incbin	"../../build/stunrun-68k.bin",$7187,$4
+str_718B:
+	dc.b	'ERROR*40**P2BAD**6502*PROGRAM*PROM*BAD'
 dat_71B1:
-	incbin	"../../build/stunrun-68k.bin",$71B1,$3
-str_71B4:
-	dc.b	'&ERROR*20**P3BAD**6502*PROGRAM*PROM*BAD'
+	incbin	"../../build/stunrun-68k.bin",$71B1,$4
+str_71B5:
+	dc.b	'ERROR*20**P3BAD**6502*PROGRAM*PROM*BAD'
 dat_71DB:
-	incbin	"../../build/stunrun-68k.bin",$71DB,$3
-str_71DE:
-	dc.b	'!ERROR*10**R1BAD**1ST*0000*RAM*BAD'
+	incbin	"../../build/stunrun-68k.bin",$71DB,$4
+str_71DF:
+	dc.b	'ERROR*10**R1BAD**1ST*0000*RAM*BAD'
 dat_7200:
-	incbin	"../../build/stunrun-68k.bin",$7200,$3
-str_7203:
-	dc.b	'!ERROR*08**R2BAD**2ND*0800*RAM*BAD'
+	incbin	"../../build/stunrun-68k.bin",$7200,$4
+str_7204:
+	dc.b	'ERROR*08**R2BAD**2ND*0800*RAM*BAD'
 dat_7225:
-	incbin	"../../build/stunrun-68k.bin",$7225,$3
-str_7228:
-	dc.b	'!ERROR*04**IRBAD**IRQS*NOT*PRESENT'
+	incbin	"../../build/stunrun-68k.bin",$7225,$4
+str_7229:
+	dc.b	'ERROR*04**IRBAD**IRQS*NOT*PRESENT'
 dat_724A:
-	incbin	"../../build/stunrun-68k.bin",$724A,$3
-str_724D:
-	dc.b	'!ERROR*02**YMBAD**YAMAHA*TIMED*OUT'
+	incbin	"../../build/stunrun-68k.bin",$724A,$4
+str_724E:
+	dc.b	'ERROR*02**YMBAD**YAMAHA*TIMED*OUT'
 dat_726F:
-	incbin	"../../build/stunrun-68k.bin",$726F,$3
-str_7272:
-	dc.b	'%ERROR*01**MLBAD**MAINLINE*NOT*RUNNING'
+	incbin	"../../build/stunrun-68k.bin",$726F,$4
+str_7273:
+	dc.b	'ERROR*01**MLBAD**MAINLINE*NOT*RUNNING'
 dat_7298:
 	incbin	"../../build/stunrun-68k.bin",$7298,$4
 str_729C:
@@ -630,11 +630,7 @@ dat_7651:
 str_7655:
 	dc.b	'ZRAM*OK'
 dat_765C:
-	incbin	"../../build/stunrun-68k.bin",$765C,$4
-str_7660:
-	dc.b	'BAD*ZRAM*AT:'
-dat_766C:
-	incbin	"../../build/stunrun-68k.bin",$766C,$14
+	incbin	"../../build/stunrun-68k.bin",$765C,$24
 str_7680:
 	dc.b	'ADSP*BOARD*TESTS'
 dat_7690:
@@ -682,13 +678,13 @@ dat_7787:
 str_778B:
 	dc.b	'ADSP*TIMEOUT'
 dat_7797:
-	incbin	"../../build/stunrun-68k.bin",$7797,$3
-str_779A:
-	dc.b	'*ADSP*HIGH*BANK*PROGRAM*MEMORY*TEST*TIMEOUT'
+	incbin	"../../build/stunrun-68k.bin",$7797,$4
+str_779B:
+	dc.b	'ADSP*HIGH*BANK*PROGRAM*MEMORY*TEST*TIMEOUT'
 dat_77C5:
-	incbin	"../../build/stunrun-68k.bin",$77C5,$3
-str_77C8:
-	dc.b	')ADSP*LOW*BANK*PROGRAM*MEMORY*TEST*TIMEOUT'
+	incbin	"../../build/stunrun-68k.bin",$77C5,$4
+str_77C9:
+	dc.b	'ADSP*LOW*BANK*PROGRAM*MEMORY*TEST*TIMEOUT'
 dat_77F2:
 	incbin	"../../build/stunrun-68k.bin",$77F2,$4
 str_77F6:
@@ -718,17 +714,17 @@ dat_7956:
 str_795A:
 	dc.b	'SEQ*INPUT*MEM*ADR*WRITES'
 dat_7972:
-	incbin	"../../build/stunrun-68k.bin",$7972,$3
-str_7975:
-	dc.b	'"SEQ*OUTPUT*WRITES,*INC*DATA,*BUF*1'
+	incbin	"../../build/stunrun-68k.bin",$7972,$4
+str_7976:
+	dc.b	'SEQ*OUTPUT*WRITES,*INC*DATA,*BUF*1'
 dat_7998:
 	incbin	"../../build/stunrun-68k.bin",$7998,$4
 str_799C:
 	dc.b	'SEQ*OUTPUT*ADR*WRITES,*BUF*1'
 dat_79B8:
-	incbin	"../../build/stunrun-68k.bin",$79B8,$3
-str_79BB:
-	dc.b	'"SEQ*OUTPUT*WRITES,*INC*DATA,*BUF*2'
+	incbin	"../../build/stunrun-68k.bin",$79B8,$4
+str_79BC:
+	dc.b	'SEQ*OUTPUT*WRITES,*INC*DATA,*BUF*2'
 dat_79DE:
 	incbin	"../../build/stunrun-68k.bin",$79DE,$4
 str_79E2:
@@ -878,15 +874,23 @@ dat_7D2B:
 str_7D2F:
 	dc.b	'SEQ*OUTPUT*BUFFER*CONTROL*CHECK'
 dat_7D4E:
-	incbin	"../../build/stunrun-68k.bin",$7D4E,$3
-str_7D51:
-	dc.b	'268010*WRITES*0000*TO*BUFFER*1*AND*FFFF*TO*BUFFER*2'
+	incbin	"../../build/stunrun-68k.bin",$7D4E,$4
+str_7D52:
+	dc.b	'68010*WRITES*0000*TO*BUFFER*1*AND*FFFF*TO*BUFFER*2'
 dat_7D84:
-	incbin	"../../build/stunrun-68k.bin",$7D84,$55
-str_7DD9:
-	dc.b	'268010*WRITES*FFFF*TO*BUFFER*1*AND*0000*TO*BUFFER*2'
+	incbin	"../../build/stunrun-68k.bin",$7D84,$2D
+str_7DB1:
+	dc.b	'BUFFER*2*****WRITE*=*FFFF*****READ*=*'
+dat_7DD6:
+	incbin	"../../build/stunrun-68k.bin",$7DD6,$4
+str_7DDA:
+	dc.b	'68010*WRITES*FFFF*TO*BUFFER*1*AND*0000*TO*BUFFER*2'
 dat_7E0C:
-	incbin	"../../build/stunrun-68k.bin",$7E0C,$56
+	incbin	"../../build/stunrun-68k.bin",$7E0C,$4
+str_7E10:
+	dc.b	'BUFFER*1*****WRITE*=*FFFF*****READ*=*'
+dat_7E35:
+	incbin	"../../build/stunrun-68k.bin",$7E35,$2D
 str_7E62:
 	dc.b	'BUFFER*CONTROL*.BCON.*OK'
 dat_7E7A:
@@ -894,71 +898,71 @@ dat_7E7A:
 str_7E7E:
 	dc.b	'CHECK*.BCON.*SIGNAL'
 dat_7E91:
-	incbin	"../../build/stunrun-68k.bin",$7E91,$A
-str_7E9B:
-	dc.b	'?4ROTATE*ONES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$7E91,$C
+str_7E9D:
+	dc.b	'ROTATE*ONES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.68010.'
 dat_7ED1:
-	incbin	"../../build/stunrun-68k.bin",$7ED1,$2
-str_7ED3:
-	dc.b	'p3ROTATE*ONES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$7ED1,$4
+str_7ED5:
+	dc.b	'ROTATE*ONES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.2100.'
 dat_7F08:
-	incbin	"../../build/stunrun-68k.bin",$7F08,$2
-str_7F0A:
-	dc.b	'?6ROTATE*ZEROES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$7F08,$4
+str_7F0C:
+	dc.b	'ROTATE*ZEROES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.68010.'
 dat_7F42:
-	incbin	"../../build/stunrun-68k.bin",$7F42,$2
-str_7F44:
-	dc.b	'p5ROTATE*ZEROES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$7F42,$4
+str_7F46:
+	dc.b	'ROTATE*ZEROES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.2100.'
 dat_7F7B:
-	incbin	"../../build/stunrun-68k.bin",$7F7B,$2
-str_7F7D:
-	dc.b	'?,TEST*ALL*DATA*AT*BUFFER*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$7F7B,$4
+str_7F7F:
+	dc.b	'TEST*ALL*DATA*AT*BUFFER*ADDRESS*0000*.68010.'
 dat_7FAB:
-	incbin	"../../build/stunrun-68k.bin",$7FAB,$2
-str_7FAD:
-	dc.b	'p+TEST*ALL*DATA*AT*BUFFER*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$7FAB,$4
+str_7FAF:
+	dc.b	'TEST*ALL*DATA*AT*BUFFER*ADDRESS*0000*.2100.'
 dat_7FDA:
-	incbin	"../../build/stunrun-68k.bin",$7FDA,$2
-str_7FDC:
-	dc.b	"?'ROTATE*ONES*THRU*BUFFER*ADDRESS*.68010."
+	incbin	"../../build/stunrun-68k.bin",$7FDA,$4
+str_7FDE:
+	dc.b	'ROTATE*ONES*THRU*BUFFER*ADDRESS*.68010.'
 dat_8005:
-	incbin	"../../build/stunrun-68k.bin",$8005,$2
-str_8007:
-	dc.b	'p&ROTATE*ONES*THRU*BUFFER*ADDRESS*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8005,$4
+str_8009:
+	dc.b	'ROTATE*ONES*THRU*BUFFER*ADDRESS*.2100.'
 dat_802F:
-	incbin	"../../build/stunrun-68k.bin",$802F,$2
-str_8031:
-	dc.b	'?)ROTATE*ZEROES*THRU*BUFFER*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$802F,$4
+str_8033:
+	dc.b	'ROTATE*ZEROES*THRU*BUFFER*ADDRESS*.68010.'
 dat_805C:
-	incbin	"../../build/stunrun-68k.bin",$805C,$2
-str_805E:
-	dc.b	'p(ROTATE*ZEROES*THRU*BUFFER*ADDRESS*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$805C,$4
+str_8060:
+	dc.b	'ROTATE*ZEROES*THRU*BUFFER*ADDRESS*.2100.'
 dat_8088:
-	incbin	"../../build/stunrun-68k.bin",$8088,$2
-str_808A:
-	dc.b	'?#TEST*BUFFER,*DATA*=*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8088,$4
+str_808C:
+	dc.b	'TEST*BUFFER,*DATA*=*ADDRESS*.68010.'
 dat_80AF:
-	incbin	"../../build/stunrun-68k.bin",$80AF,$2
-str_80B1:
-	dc.b	'p*TEST*BUFFER,*DATA*=*ADDRESS*.2100*INC'
+	incbin	"../../build/stunrun-68k.bin",$80AF,$4
+str_80B3:
+	dc.b	'TEST*BUFFER,*DATA*=*ADDRESS*.2100*INC'
 str_80D8:
 	dc.b	'*ADR.'
 dat_80DD:
-	incbin	"../../build/stunrun-68k.bin",$80DD,$2
-str_80DF:
-	dc.b	'p+TEST*BUFFER,*DATA*=*ADDRESS*.2100*LOAD*ADR.'
+	incbin	"../../build/stunrun-68k.bin",$80DD,$4
+str_80E1:
+	dc.b	'TEST*BUFFER,*DATA*=*ADDRESS*.2100*LOAD*ADR.'
 dat_810C:
-	incbin	"../../build/stunrun-68k.bin",$810C,$2
-str_810E:
-	dc.b	'? TEST*BUFFER,*RANDOM*DATA*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$810C,$4
+str_8110:
+	dc.b	'TEST*BUFFER,*RANDOM*DATA*.68010.'
 dat_8130:
-	incbin	"../../build/stunrun-68k.bin",$8130,$2
-str_8132:
-	dc.b	"p'TEST*BUFFER,*RANDOM*DATA*.2100*INC*ADR."
+	incbin	"../../build/stunrun-68k.bin",$8130,$4
+str_8134:
+	dc.b	'TEST*BUFFER,*RANDOM*DATA*.2100*INC*ADR.'
 dat_815B:
-	incbin	"../../build/stunrun-68k.bin",$815B,$2
-str_815D:
-	dc.b	'p(TEST*BUFFER,*RANDOM*DATA*.2100*LOAD*ADR.'
+	incbin	"../../build/stunrun-68k.bin",$815B,$4
+str_815F:
+	dc.b	'TEST*BUFFER,*RANDOM*DATA*.2100*LOAD*ADR.'
 dat_8187:
 	incbin	"../../build/stunrun-68k.bin",$8187,$4
 str_818B:
@@ -976,9 +980,9 @@ dat_81DB:
 str_81DF:
 	dc.b	'ADSP*PROGRAM*MEMORY*TESTS'
 dat_81F8:
-	incbin	"../../build/stunrun-68k.bin",$81F8,$C
-str_8204:
-	dc.b	',DATA*ERROR******PRESS*INC*OR*DEC*TO*CONTINUE'
+	incbin	"../../build/stunrun-68k.bin",$81F8,$D
+str_8205:
+	dc.b	'DATA*ERROR******PRESS*INC*OR*DEC*TO*CONTINUE'
 dat_8231:
 	incbin	"../../build/stunrun-68k.bin",$8231,$4
 str_8235:
@@ -1004,109 +1008,109 @@ dat_82B5:
 str_82B9:
 	dc.b	'ADSP*II*BOARD'
 dat_82C6:
-	incbin	"../../build/stunrun-68k.bin",$82C6,$3
-str_82C9:
-	dc.b	'4ROTATE*ONES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$82C6,$4
+str_82CA:
+	dc.b	'ROTATE*ONES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.68010.'
 dat_82FE:
-	incbin	"../../build/stunrun-68k.bin",$82FE,$3
-str_8301:
-	dc.b	'3ROTATE*ONES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$82FE,$4
+str_8302:
+	dc.b	'ROTATE*ONES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.2100.'
 dat_8335:
-	incbin	"../../build/stunrun-68k.bin",$8335,$3
-str_8338:
-	dc.b	'6ROTATE*ZEROES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8335,$4
+str_8339:
+	dc.b	'ROTATE*ZEROES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.68010.'
 dat_836F:
-	incbin	"../../build/stunrun-68k.bin",$836F,$3
-str_8372:
-	dc.b	'5ROTATE*ZEROES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$836F,$4
+str_8373:
+	dc.b	'ROTATE*ZEROES*THRU*BUFFER*DATA*AT*ADDRESS*0000*.2100.'
 dat_83A8:
-	incbin	"../../build/stunrun-68k.bin",$83A8,$3
-str_83AB:
-	dc.b	',TEST*ALL*DATA*AT*BUFFER*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$83A8,$4
+str_83AC:
+	dc.b	'TEST*ALL*DATA*AT*BUFFER*ADDRESS*0000*.68010.'
 dat_83D8:
-	incbin	"../../build/stunrun-68k.bin",$83D8,$3
-str_83DB:
-	dc.b	'+TEST*ALL*DATA*AT*BUFFER*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$83D8,$4
+str_83DC:
+	dc.b	'TEST*ALL*DATA*AT*BUFFER*ADDRESS*0000*.2100.'
 dat_8407:
-	incbin	"../../build/stunrun-68k.bin",$8407,$3
-str_840A:
-	dc.b	"'ROTATE*ONES*THRU*BUFFER*ADDRESS*.68010."
+	incbin	"../../build/stunrun-68k.bin",$8407,$4
+str_840B:
+	dc.b	'ROTATE*ONES*THRU*BUFFER*ADDRESS*.68010.'
 dat_8432:
-	incbin	"../../build/stunrun-68k.bin",$8432,$3
-str_8435:
-	dc.b	'&ROTATE*ONES*THRU*BUFFER*ADDRESS*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8432,$4
+str_8436:
+	dc.b	'ROTATE*ONES*THRU*BUFFER*ADDRESS*.2100.'
 dat_845C:
-	incbin	"../../build/stunrun-68k.bin",$845C,$3
-str_845F:
-	dc.b	')ROTATE*ZEROES*THRU*BUFFER*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$845C,$4
+str_8460:
+	dc.b	'ROTATE*ZEROES*THRU*BUFFER*ADDRESS*.68010.'
 dat_8489:
-	incbin	"../../build/stunrun-68k.bin",$8489,$3
-str_848C:
-	dc.b	'(ROTATE*ZEROES*THRU*BUFFER*ADDRESS*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8489,$4
+str_848D:
+	dc.b	'ROTATE*ZEROES*THRU*BUFFER*ADDRESS*.2100.'
 dat_84B5:
-	incbin	"../../build/stunrun-68k.bin",$84B5,$3
-str_84B8:
-	dc.b	'#TEST*BUFFER,*DATA*=*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$84B5,$4
+str_84B9:
+	dc.b	'TEST*BUFFER,*DATA*=*ADDRESS*.68010.'
 dat_84DC:
-	incbin	"../../build/stunrun-68k.bin",$84DC,$3
-str_84DF:
-	dc.b	'*TEST*BUFFER,*DATA*=*ADDRESS*.2100*INC*ADR.'
+	incbin	"../../build/stunrun-68k.bin",$84DC,$4
+str_84E0:
+	dc.b	'TEST*BUFFER,*DATA*=*ADDRESS*.2100*INC*ADR.'
 dat_850A:
-	incbin	"../../build/stunrun-68k.bin",$850A,$3
-str_850D:
-	dc.b	'+TEST*BUFFER,*DATA*=*ADDRESS*.2100*LOAD*ADR.'
+	incbin	"../../build/stunrun-68k.bin",$850A,$4
+str_850E:
+	dc.b	'TEST*BUFFER,*DATA*=*ADDRESS*.2100*LOAD*ADR.'
 dat_8539:
-	incbin	"../../build/stunrun-68k.bin",$8539,$3
-str_853C:
-	dc.b	' TEST*BUFFER,*RANDOM*DATA*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8539,$4
+str_853D:
+	dc.b	'TEST*BUFFER,*RANDOM*DATA*.68010.'
 dat_855D:
-	incbin	"../../build/stunrun-68k.bin",$855D,$3
-str_8560:
-	dc.b	"'TEST*BUFFER,*RANDOM*DATA*.2100*INC*ADR."
+	incbin	"../../build/stunrun-68k.bin",$855D,$4
+str_8561:
+	dc.b	'TEST*BUFFER,*RANDOM*DATA*.2100*INC*ADR.'
 dat_8588:
-	incbin	"../../build/stunrun-68k.bin",$8588,$3
-str_858B:
-	dc.b	'(TEST*BUFFER,*RANDOM*DATA*.2100*LOAD*ADR.'
+	incbin	"../../build/stunrun-68k.bin",$8588,$4
+str_858C:
+	dc.b	'TEST*BUFFER,*RANDOM*DATA*.2100*LOAD*ADR.'
 dat_85B4:
-	incbin	"../../build/stunrun-68k.bin",$85B4,$A
-str_85BE:
-	dc.b	'?0ROTATE*ONES*THRU*DM*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$85B4,$C
+str_85C0:
+	dc.b	'ROTATE*ONES*THRU*DM*DATA*AT*ADDRESS*0000*.68010.'
 dat_85F0:
-	incbin	"../../build/stunrun-68k.bin",$85F0,$2
-str_85F2:
-	dc.b	'p/ROTATE*ONES*THRU*DM*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$85F0,$4
+str_85F4:
+	dc.b	'ROTATE*ONES*THRU*DM*DATA*AT*ADDRESS*0000*.2100.'
 dat_8623:
-	incbin	"../../build/stunrun-68k.bin",$8623,$2
-str_8625:
-	dc.b	'?2ROTATE*ZEROES*THRU*DM*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8623,$4
+str_8627:
+	dc.b	'ROTATE*ZEROES*THRU*DM*DATA*AT*ADDRESS*0000*.68010.'
 dat_8659:
-	incbin	"../../build/stunrun-68k.bin",$8659,$2
-str_865B:
-	dc.b	'p1ROTATE*ZEROES*THRU*DM*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8659,$4
+str_865D:
+	dc.b	'ROTATE*ZEROES*THRU*DM*DATA*AT*ADDRESS*0000*.2100.'
 dat_868E:
-	incbin	"../../build/stunrun-68k.bin",$868E,$2
-str_8690:
-	dc.b	'?(TEST*ALL*DATA*AT*DM*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$868E,$4
+str_8692:
+	dc.b	'TEST*ALL*DATA*AT*DM*ADDRESS*0000*.68010.'
 dat_86BA:
-	incbin	"../../build/stunrun-68k.bin",$86BA,$2
-str_86BC:
-	dc.b	"p'TEST*ALL*DATA*AT*DM*ADDRESS*0000*.2100."
+	incbin	"../../build/stunrun-68k.bin",$86BA,$4
+str_86BE:
+	dc.b	'TEST*ALL*DATA*AT*DM*ADDRESS*0000*.2100.'
 dat_86E5:
-	incbin	"../../build/stunrun-68k.bin",$86E5,$2
-str_86E7:
-	dc.b	'?#ROTATE*ONES*THRU*DM*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$86E5,$4
+str_86E9:
+	dc.b	'ROTATE*ONES*THRU*DM*ADDRESS*.68010.'
 dat_870C:
-	incbin	"../../build/stunrun-68k.bin",$870C,$2
-str_870E:
-	dc.b	'p"ROTATE*ONES*THRU*DM*ADDRESS*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$870C,$4
+str_8710:
+	dc.b	'ROTATE*ONES*THRU*DM*ADDRESS*.2100.'
 dat_8732:
-	incbin	"../../build/stunrun-68k.bin",$8732,$2
-str_8734:
-	dc.b	'?%ROTATE*ZEROES*THRU*DM*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8732,$4
+str_8736:
+	dc.b	'ROTATE*ZEROES*THRU*DM*ADDRESS*.68010.'
 dat_875B:
-	incbin	"../../build/stunrun-68k.bin",$875B,$2
-str_875D:
-	dc.b	'p$ROTATE*ZEROES*THRU*DM*ADDRESS*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$875B,$4
+str_875F:
+	dc.b	'ROTATE*ZEROES*THRU*DM*ADDRESS*.2100.'
 dat_8783:
 	incbin	"../../build/stunrun-68k.bin",$8783,$4
 str_8787:
@@ -1124,45 +1128,45 @@ dat_87E8:
 str_87EC:
 	dc.b	'TEST*DM,*RANDOM*DATA*.2100.'
 dat_8807:
-	incbin	"../../build/stunrun-68k.bin",$8807,$3
-str_880A:
-	dc.b	'0ROTATE*ONES*THRU*DM*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8807,$4
+str_880B:
+	dc.b	'ROTATE*ONES*THRU*DM*DATA*AT*ADDRESS*0000*.68010.'
 dat_883B:
-	incbin	"../../build/stunrun-68k.bin",$883B,$3
-str_883E:
-	dc.b	'/ROTATE*ONES*THRU*DM*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$883B,$4
+str_883F:
+	dc.b	'ROTATE*ONES*THRU*DM*DATA*AT*ADDRESS*0000*.2100.'
 dat_886E:
-	incbin	"../../build/stunrun-68k.bin",$886E,$3
-str_8871:
-	dc.b	'2ROTATE*ZEROES*THRU*DM*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$886E,$4
+str_8872:
+	dc.b	'ROTATE*ZEROES*THRU*DM*DATA*AT*ADDRESS*0000*.68010.'
 dat_88A4:
-	incbin	"../../build/stunrun-68k.bin",$88A4,$3
-str_88A7:
-	dc.b	'1ROTATE*ZEROES*THRU*DM*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$88A4,$4
+str_88A8:
+	dc.b	'ROTATE*ZEROES*THRU*DM*DATA*AT*ADDRESS*0000*.2100.'
 dat_88D9:
-	incbin	"../../build/stunrun-68k.bin",$88D9,$3
-str_88DC:
-	dc.b	"'TEST*ALL*DATA*AT*DM*ADDRESS*0000*.68010."
+	incbin	"../../build/stunrun-68k.bin",$88D9,$4
+str_88DD:
+	dc.b	'TEST*ALL*DATA*AT*DM*ADDRESS*0000*.68010.'
 dat_8905:
-	incbin	"../../build/stunrun-68k.bin",$8905,$3
-str_8908:
-	dc.b	'&TEST*ALL*DATA*AT*DM*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8905,$4
+str_8909:
+	dc.b	'TEST*ALL*DATA*AT*DM*ADDRESS*0000*.2100.'
 dat_8930:
-	incbin	"../../build/stunrun-68k.bin",$8930,$3
-str_8933:
-	dc.b	'#ROTATE*ONES*THRU*DM*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8930,$4
+str_8934:
+	dc.b	'ROTATE*ONES*THRU*DM*ADDRESS*.68010.'
 dat_8957:
-	incbin	"../../build/stunrun-68k.bin",$8957,$3
-str_895A:
-	dc.b	'"ROTATE*ONES*THRU*DM*ADDRESS*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8957,$4
+str_895B:
+	dc.b	'ROTATE*ONES*THRU*DM*ADDRESS*.2100.'
 dat_897D:
-	incbin	"../../build/stunrun-68k.bin",$897D,$3
-str_8980:
-	dc.b	'%ROTATE*ZEROES*THRU*DM*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$897D,$4
+str_8981:
+	dc.b	'ROTATE*ZEROES*THRU*DM*ADDRESS*.68010.'
 dat_89A6:
-	incbin	"../../build/stunrun-68k.bin",$89A6,$3
-str_89A9:
-	dc.b	'$ROTATE*ZEROES*THRU*DM*ADDRESS*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$89A6,$4
+str_89AA:
+	dc.b	'ROTATE*ZEROES*THRU*DM*ADDRESS*.2100.'
 dat_89CE:
 	incbin	"../../build/stunrun-68k.bin",$89CE,$4
 str_89D2:
@@ -1180,53 +1184,53 @@ dat_8A33:
 str_8A37:
 	dc.b	'TEST*DM,*RANDOM*DATA*.2100.'
 dat_8A52:
-	incbin	"../../build/stunrun-68k.bin",$8A52,$A
-str_8A5C:
-	dc.b	'?0ROTATE*ONES*THRU*PM*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8A52,$C
+str_8A5E:
+	dc.b	'ROTATE*ONES*THRU*PM*DATA*AT*ADDRESS*0000*.68010.'
 dat_8A8E:
-	incbin	"../../build/stunrun-68k.bin",$8A8E,$2
-str_8A90:
-	dc.b	'p/ROTATE*ONES*THRU*PM*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8A8E,$4
+str_8A92:
+	dc.b	'ROTATE*ONES*THRU*PM*DATA*AT*ADDRESS*0000*.2100.'
 dat_8AC1:
-	incbin	"../../build/stunrun-68k.bin",$8AC1,$2
-str_8AC3:
-	dc.b	'?2ROTATE*ZEROES*THRU*PM*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8AC1,$4
+str_8AC5:
+	dc.b	'ROTATE*ZEROES*THRU*PM*DATA*AT*ADDRESS*0000*.68010.'
 dat_8AF7:
-	incbin	"../../build/stunrun-68k.bin",$8AF7,$2
-str_8AF9:
-	dc.b	'p1ROTATE*ZEROES*THRU*PM*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8AF7,$4
+str_8AFB:
+	dc.b	'ROTATE*ZEROES*THRU*PM*DATA*AT*ADDRESS*0000*.2100.'
 dat_8B2C:
-	incbin	"../../build/stunrun-68k.bin",$8B2C,$2
-str_8B2E:
-	dc.b	'?#ROTATE*ONES*THRU*PM*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8B2C,$4
+str_8B30:
+	dc.b	'ROTATE*ONES*THRU*PM*ADDRESS*.68010.'
 dat_8B53:
-	incbin	"../../build/stunrun-68k.bin",$8B53,$2
-str_8B55:
-	dc.b	'?%ROTATE*ZEROES*THRU*PM*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8B53,$4
+str_8B57:
+	dc.b	'ROTATE*ZEROES*THRU*PM*ADDRESS*.68010.'
 dat_8B7C:
-	incbin	"../../build/stunrun-68k.bin",$8B7C,$3
-str_8B7F:
-	dc.b	'0ROTATE*ONES*THRU*PM*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8B7C,$4
+str_8B80:
+	dc.b	'ROTATE*ONES*THRU*PM*DATA*AT*ADDRESS*0000*.68010.'
 dat_8BB0:
-	incbin	"../../build/stunrun-68k.bin",$8BB0,$3
-str_8BB3:
-	dc.b	'/ROTATE*ONES*THRU*PM*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8BB0,$4
+str_8BB4:
+	dc.b	'ROTATE*ONES*THRU*PM*DATA*AT*ADDRESS*0000*.2100.'
 dat_8BE3:
-	incbin	"../../build/stunrun-68k.bin",$8BE3,$3
-str_8BE6:
-	dc.b	'2ROTATE*ZEROES*THRU*PM*DATA*AT*ADDRESS*0000*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8BE3,$4
+str_8BE7:
+	dc.b	'ROTATE*ZEROES*THRU*PM*DATA*AT*ADDRESS*0000*.68010.'
 dat_8C19:
-	incbin	"../../build/stunrun-68k.bin",$8C19,$3
-str_8C1C:
-	dc.b	'1ROTATE*ZEROES*THRU*PM*DATA*AT*ADDRESS*0000*.2100.'
+	incbin	"../../build/stunrun-68k.bin",$8C19,$4
+str_8C1D:
+	dc.b	'ROTATE*ZEROES*THRU*PM*DATA*AT*ADDRESS*0000*.2100.'
 dat_8C4E:
-	incbin	"../../build/stunrun-68k.bin",$8C4E,$3
-str_8C51:
-	dc.b	'#ROTATE*ONES*THRU*PM*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8C4E,$4
+str_8C52:
+	dc.b	'ROTATE*ONES*THRU*PM*ADDRESS*.68010.'
 dat_8C75:
-	incbin	"../../build/stunrun-68k.bin",$8C75,$3
-str_8C78:
-	dc.b	'%ROTATE*ZEROES*THRU*PM*ADDRESS*.68010.'
+	incbin	"../../build/stunrun-68k.bin",$8C75,$4
+str_8C79:
+	dc.b	'ROTATE*ZEROES*THRU*PM*ADDRESS*.68010.'
 loc_8C9E:
 	clr.w	(ram_FF8036-ABS_SHORT).w
 	clr.w	(ram_FF8046-ABS_SHORT).w

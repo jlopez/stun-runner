@@ -907,8 +907,10 @@ str_20FC4:
 	dc.b	'DISABLED',0
 str_20FCD:
 	dc.b	'ENABLED',0
-str_20FD5:
-	dc.b	'vCONTINUE ADVANCES TO NEXT LEVEL',0
+dat_20FD5:
+	incbin	"../../build/stunrun-68k.bin",$20FD5,$1
+str_20FD6:
+	dc.b	'CONTINUE ADVANCES TO NEXT LEVEL',0
 dat_20FF6:
 	incbin	"../../build/stunrun-68k.bin",$20FF6,$6
 str_20FFC:
@@ -961,8 +963,10 @@ str_210EB:
 	dc.b	'DISABLED',0
 str_210F4:
 	dc.b	'ENABLED',0
-str_210FC:
-	dc.b	'vCONTINUE ADVANCES TO NEXT LEVEL',0
+dat_210FC:
+	incbin	"../../build/stunrun-68k.bin",$210FC,$1
+str_210FD:
+	dc.b	'CONTINUE ADVANCES TO NEXT LEVEL',0
 dat_2111D:
 	incbin	"../../build/stunrun-68k.bin",$2111D,$6
 str_21123:

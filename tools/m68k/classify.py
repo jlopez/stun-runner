@@ -13,7 +13,8 @@ it adds, then classifies every byte that is not code:
 
 Then, for the bytes that are no instruction and no table: text (a run of at least six printable
 characters, mostly letters, digits and the punctuation of messages, with a word and not made of
-equal byte pairs, with its terminating zero),
+equal byte pairs, with its terminating zero; without one only a counted string or a run an
+operand references, and a count or item byte at its start left out: _text_runs),
 fill (a run of at least 32 zero bytes that no operand references), data (from an address an
 operand references to the next boundary) and unknown (the rest; in a code range a note says when
 the bytes decode cleanly as instructions and whether IDA has a function there).
@@ -239,8 +240,37 @@ def _is_text(run: bytes) -> bool:
             and any(len(set(w)) >= 2 for w in SAME_CASE.findall(run)))
 
 
+COUNT_MAX = 0x3F
+ITEM_PREFIX = re.compile(rb"[a-z][^a-z]*\Z")
+
+
+def _counted(image: bytes, x: int, y: int) -> int | None:
+    """Where the text of an unterminated run x-y starts when it is a counted string: the count
+    is the byte before the run, or the run's first byte, or its second byte after an attribute
+    byte (the boot program's screen records, 4-byte headers column, row, attribute, count, as
+    at 007154-007158: a count of 20h-3Fh is printable and was read as a character). The count
+    equals the characters after it, or one fewer (006D9C, 0088DC: the ROM's count is one short
+    of the text). None when the run is no counted string."""
+    if x > 0 and image[x - 1] in (y - x, y - x - 1):
+        return x
+    for p in (0, 1):
+        if x + p >= y:
+            break
+        c, n = image[x + p], y - (x + p + 1)
+        if c <= COUNT_MAX and n >= TEXT_MIN and c in (n, n - 1):
+            return x + p + 1
+    return None
+
+
 def _text_runs(image: bytes, lo: int, hi: int, refs: set[int]) -> list[tuple[int, int]]:
-    """Printable runs that read as text, cut where an operand points (a string starts there)."""
+    """Printable runs that read as text, cut where an operand points (a string starts there).
+
+    A run that ends with a terminating zero is a C string; a lower-case first byte before
+    upper-case text is a record field (the option records at 020ED0-021148 start with an item
+    byte, 76h at 020FD5 and 0210FC as FDh, CCh, BBh, ... before the others). A run with no
+    terminating zero is text only when it is a counted string (`_counted`, the count left
+    out) or an operand references its start: the printable middle of a numeric table (045A79,
+    045AD6, 04659B in the island, values rising through and past the run) is neither."""
     out = []
     a = lo
     while a < hi:
@@ -252,9 +282,17 @@ def _text_runs(image: bytes, lo: int, hi: int, refs: set[int]) -> list[tuple[int
             b += 1
         cuts = [a] + sorted(r for r in refs if a < r < b) + [b]
         for x, y in zip(cuts, cuts[1:], strict=False):
+            terminated = y == b and b < hi and image[b] == 0
+            if terminated:
+                if x not in refs and ITEM_PREFIX.match(image[x:y]):
+                    x += 1
+            elif x not in refs:
+                start = _counted(image, x, y)
+                if start is None:
+                    continue
+                x = start
             if _is_text(image[x:y]):
-                end = y + 1 if y == b and b < hi and image[b] == 0 else y
-                out.append((x, end))
+                out.append((x, y + 1 if terminated else y))
         a = b + 1 if b < hi and image[b] == 0 else b
     return out
 

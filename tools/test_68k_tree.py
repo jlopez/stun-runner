@@ -546,7 +546,8 @@ def test_tree_checks_fail(tmp_path: Path) -> None:
 def test_raw_data_check_fails(tmp_path: Path) -> None:
     """The raw-data check (decision C3) refuses every dc/dcb statement of a code file that is not
     one of the generator's explained kinds: a dc.l wall in a data range, numeric dc.b in a text
-    range, a dcb.b fill of a byte other than zero, a switch entry that is not a difference."""
+    range, a dcb.b fill of a byte other than zero, a switch entry that is not a difference, and
+    a string that starts with a record field (a count, an item byte)."""
     file = "boot/code_000212.asm"
     line, a, n = slice_of(file, "data", align=4)
     text = "GAME DIFFICULTY"
@@ -556,9 +557,17 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
          "\tdc.b\t" + ",".join(f"${ord(ch):02X}" for ch in text) + ",0\n"),
         (file, "\tdcb.b\t40,0\n", "\tdcb.b\t40,$FF\n"),
         ("game/code_02C0D2.asm", "\tdc.w\t.l2C4A8-.l2C48C\n", "\tdc.w\t$1C\n"),
+        # a record field written back into its string (the same number of bytes): a count as
+        # the first character (37 = '%', the characters after it), an item byte
+        ("boot/code_0065E0.asm", "\tdc.b\t'ERROR*80**P1BAD**6502*PROGRAM*PROM*BAD'\n",
+         "\tdc.b\t'%RROR*80**P1BAD**6502*PROGRAM*PROM*BAD'\n"),
+        ("game/code_020430.asm", "\tdc.b\t'CONTINUE ADVANCES TO NEXT LEVEL',0\n",
+         "\tdc.b\t'vONTINUE ADVANCES TO NEXT LEVEL',0\n"),
     )
     rep = tree_check(tmp_path, tree, shift=False)
-    assert len(rep.raw) == 4, rep.raw
+    assert len(rep.raw) == 6, rep.raw
+    assert any("'%RROR" in e and "count of the 37 after it" in e for e in rep.raw), rep.raw
+    assert any("'vONTINUE" in e and "item byte" in e for e in rep.raw), rep.raw
     assert rep.raw[0].startswith(f"{a:06X}: dc.l") and "in a data range" in rep.raw[0], rep.raw
     assert any("$47,$41,$4D,$45" in e and "in a text range" in e for e in rep.raw), rep.raw
     assert any("dcb.b" in e and "$FF" in e for e in rep.raw), rep.raw

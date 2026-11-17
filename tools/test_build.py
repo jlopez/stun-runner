@@ -372,7 +372,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert summary["images"]["stunrun-68k"] == total
     assert total["instr"] == 163_638
     code = [c for f, c in files68k.items() if f.startswith(("asm/68k/boot/", "asm/68k/game/"))]
-    assert sum(c["blob"] for c in code) == 60_999
+    assert sum(c["blob"] for c in code) == 61_114
     assert summary["images"]["stunrun-nvram"] == {"instr": 0, "data": 0, "blob": 0, "fill": 4096}
     assert {f: sum(c.values()) for f, c in files68k.items()} == {
         f"asm/68k/{f}": b - a for f, a, b in REGIONS}

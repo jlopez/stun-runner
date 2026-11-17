@@ -832,6 +832,34 @@ def test_text_rule() -> None:
     assert cl._text_runs(image, 0, len(image), set()) == [(12, 24)]
 
 
+def test_text_rule_record_fields() -> None:
+    """Counted strings start after their count (before the run, as its first byte, or as its
+    second after an attribute byte, the count equal to the characters after it or one fewer:
+    007161, 007E9D, 0088DD); a lower-case item byte before upper-case text is no character
+    (020FD5); an unterminated run that is neither counted nor referenced is no text (the
+    island's numeric tables at 045A79, 045AD6, 04659B)."""
+    text = b"ROTATE*ONES*THRU*BUFFER"
+    n = len(text)
+
+    def runs(image: bytes, refs: frozenset[int] = frozenset()) -> list[tuple[int, int]]:
+        return cl._text_runs(image, 0, len(image), set(refs))
+
+    pre = b"\x01\x0b\x9f"
+    assert runs(pre + bytes([n]) + text + b"\x01") == [(4, 4 + n)]
+    assert runs(pre + bytes([n]) + text + b"*\x01") == [(4, 5 + n)]  # count one short
+    assert runs(b"\x01\x0b" + bytes([0x3F, n]) + text + b"\x01") == [(4, 4 + n)]
+    assert runs(b"\x01\x0b" + bytes([0x70, n]) + text + b"\x01") == [(4, 4 + n)]
+    # a count that does not match the run (007660: 9 before 12 characters) is no counted string
+    assert runs(pre + bytes([n]) + text[:-1] + b"\x01") == []
+    assert runs(b"ENABLED\0vCONTINUE ADVANCES\0") == [(0, 8), (9, 27)]
+    assert runs(b"\0Insert coin\0") == [(1, 13)]
+    ramp = bytes([0x08, 0x08, 0x11, 0x11]) + b"###+++444===FFFNNNWWW```iiiqqqzzz" + b"\x83\x83"
+    assert runs(ramp) == []
+    assert runs(b"\x0b\x0c!$+-198=HCIVOVeZbsen\x81\x71") == []
+    assert runs(b"\x80\\QIVVnTddlt\x7f\x63") == []
+    assert runs(b"\x83\x83HELLO WORLD\x83", frozenset({2})) == [(2, 13)]
+
+
 def test_validate_finds_bad_ranges() -> None:
     def c(*spans: tuple[int, int, str]) -> cl.Classification:
         return cl.Classification([cl.Span(a, b, k) for a, b, k in spans], {}, {}, {}, None, 0x20)
@@ -1209,6 +1237,14 @@ def test_committed_classification() -> None:
     sw = span(0x026CD6)
     assert sw.kind == "switch" and sw.jmp == 0x026CD2
     assert all(s.start % 2 == 0 for s in by_kind["code"])
+    # record fields are not text (docs/16 section 3): the count of the boot program's screen
+    # records, the attribute byte before it, the option records' item byte, and the island's
+    # numeric tables whose printable middle once read as text
+    for a in (0x007160, 0x007E9B, 0x007E9C, 0x007FDC, 0x007FDD, 0x020FD5, 0x0210FC):
+        assert span(a).kind != "text", f"{a:06X}"
+    for a in (0x007161, 0x007E9D, 0x007FDE, 0x020FD6, 0x0210FD):
+        assert span(a).kind == "text" and span(a).start == a, f"{a:06X}"
+    assert not [s for s in by_kind["text"] if s.start < 0x046AEE and s.end > 0x044630]
     # addresses, kinds and evidence only: no byte values
     j = json.loads(CLASSIFICATION.read_text())
     assert set(j) == {"format", "range", "ranges", "entries", "noreturn"}

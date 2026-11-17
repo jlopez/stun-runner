@@ -49,21 +49,9 @@ dat_44651:
 dat_44930:
 	incbin	"../../build/stunrun-68k.bin",$44930,$F00
 dat_45830:
-	incbin	"../../build/stunrun-68k.bin",$45830,$249
-str_45A79:
-	dc.b	'###+++444===FFFNNNWWW```iiiqqqzzz'
-dat_45A9A:
-	incbin	"../../build/stunrun-68k.bin",$45A9A,$3C
-str_45AD6:
-	dc.b	'!$+-198=HCIVOVeZbsen'
-dat_45AEA:
-	incbin	"../../build/stunrun-68k.bin",$45AEA,$706
+	incbin	"../../build/stunrun-68k.bin",$45830,$9C0
 dat_461F0:
-	incbin	"../../build/stunrun-68k.bin",$461F0,$3AB
-str_4659B:
-	dc.b	'\QIVVnTddlt'
-dat_465A6:
-	incbin	"../../build/stunrun-68k.bin",$465A6,$FA
+	incbin	"../../build/stunrun-68k.bin",$461F0,$4B0
 dat_466A0:
 	incbin	"../../build/stunrun-68k.bin",$466A0,$360
 sub_46A00:

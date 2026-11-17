@@ -19,7 +19,8 @@ blob, as CI does), not on scratch output:
   statement is one of the kinds the generator emits for explained bytes: `dc.l` in a vector or
   pointer table, `dc.w a-b` in a switch table, `dc.b` of quoted strings and zeros in text, a
   `dcb.b N,0` fill. A `dc.b` wall in place of an `incbin` slice of unknown or data bytes fails
-  (decision C3);
+  (decision C3), and so does a string that starts with a record field (a count or an item
+  byte, `record_field`);
 - the shift test: the tree copied, its guards commented out, a two-byte pad after `org 0` (and
   every `dcb.b $X-*` fill kept at its length), assembled again: exactly the statements that name
   a ROM symbol other than PC-relatively or as a difference change, each by the pad;
@@ -81,6 +82,29 @@ def in_code_files(a: int) -> bool:
     return any(lo <= a < hi for lo, hi in CODE_FILES)
 
 
+def _unquote(op: str) -> str:
+    return op[1:-1].replace("''", "'") if op.startswith("'") else op[1:-1]
+
+
+def record_field(ops: list[str]) -> str:
+    """Why a text statement's first characters are record fields, or "": an unterminated string
+    whose first or second character is a count of the characters after it (or one more than
+    them), or a terminated one whose first character is a lower-case item byte before
+    upper-case text: the classifier's rules (classify._counted, classify.ITEM_PREFIX) on the
+    source, so that a hand edit cannot put the field back into the string."""
+    if not ops or ops[0] in ("0", "$0"):
+        return ""
+    s = _unquote(ops[0]).encode("latin-1")
+    if len(ops) == 1:
+        for p in (0, 1):
+            c, n = s[p] if p < len(s) else 0x100, len(s) - p - 1
+            if c <= cl.COUNT_MAX and n >= cl.TEXT_MIN and c in (n, n - 1):
+                return f"character {p + 1} is the count of the {n} after it"
+    elif cl.ITEM_PREFIX.match(s):
+        return "the lower-case first character is an item byte before upper-case text"
+    return ""
+
+
 def raw_data(lst: ls.Listing, c: cl.Classification) -> list[str]:
     """Every dc/dcb statement of the code files is an explained kind (module doc)."""
     starts = [s.start for s in c.spans]
@@ -106,6 +130,10 @@ def raw_data(lst: ls.Listing, c: cl.Classification) -> list[str]:
                                                   for op in ops):
             continue
         if mn == "dc.b" and k == "text" and ops and all(STRING.match(op) for op in ops):
+            why = record_field(ops)
+            if why:
+                out.append(f"{s.address:06X}: {s.text}: {why} (a record field stays an incbin "
+                           f"slice; the text starts after it, docs/16 section 3)")
             continue
         out.append(f"{s.address:06X}: {s.text}: not an explained dc statement in a {k} range "
                    f"(an unexplained blob stays an incbin slice, decision C3)")
