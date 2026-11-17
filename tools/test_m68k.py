@@ -832,6 +832,67 @@ def test_text_rule() -> None:
     assert cl._text_runs(image, 0, len(image), set()) == [(12, 24)]
 
 
+def test_text_rule_record_fields() -> None:
+    """Counted strings start after their count (before the run, as its first byte, or as its
+    second after an attribute byte, the count equal to the characters after it or one fewer:
+    007161, 007E9D, 0088DD); a lower-case item byte before upper-case text is no character
+    (020FD5); an unterminated run that is neither counted nor referenced is no text (the
+    island's numeric tables at 045A79, 045AD6, 04659B)."""
+    text = b"ROTATE*ONES*THRU*BUFFER"
+    n = len(text)
+
+    def runs(image: bytes, refs: frozenset[int] = frozenset()) -> list[tuple[int, int]]:
+        return cl._text_runs(image, 0, len(image), set(refs))
+
+    pre = b"\x01\x0b\x9f"
+    assert runs(pre + bytes([n]) + text + b"\x01") == [(4, 4 + n)]
+    assert runs(pre + bytes([n]) + text + b"*\x01") == [(4, 5 + n)]  # count one short
+    assert runs(b"\x01\x0b" + bytes([0x3F, n]) + text + b"\x01") == [(4, 4 + n)]
+    assert runs(b"\x01\x0b" + bytes([0x70, n]) + text + b"\x01") == [(4, 4 + n)]
+    # a count that does not match the run (007660: 9 before 12 characters) is no counted string
+    assert runs(pre + bytes([n]) + text[:-1] + b"\x01") == []
+    # the run's last byte is the next screen record's column (20h), its header 20 06 3F 12
+    # counting the 18 characters after it (007A7F); a one-short count before a byte that
+    # starts no such header keeps the byte (007398)
+    nxt = b"CONTROL*LEFT/RIGHT"
+    rec = pre + bytes([n]) + text + b" \x06\x3f" + bytes([len(nxt)]) + nxt + b"\x01"
+    assert runs(rec) == [(4, 4 + n), (8 + n, 8 + n + len(nxt))]
+    rec = pre + bytes([n]) + text + b" \x06\x3f" + bytes([len(nxt) + 2]) + nxt + b"\x01"
+    assert runs(rec)[0] == (4, 5 + n)
+    assert runs(b"ENABLED\0vCONTINUE ADVANCES\0") == [(0, 8), (9, 27)]
+    assert runs(b"\0Insert coin\0") == [(1, 13)]
+    # made-up tables of the same shape as the island's (no ROM bytes): a non-printable prefix,
+    # a printable run of rising values that reads as text, no terminator, a non-printable
+    # continuation
+    ramp = bytes(v for v in range(0x24, 0x7B, 9) for _ in range(3))
+    for pre, run, post in ((b"\x07\x07\x10\x10", ramp, b"\x84\x84"),
+                           (b"\x0a\x0d", b"#'-08>CHKORVafkruz", b"\x82\x86"),
+                           (b"\x81", b"PRUZcfjmpsy", b"\x7f\x66")):
+        assert cl._is_text(run), run  # text by the character rule alone
+        assert runs(pre + run + post) == []
+        assert runs(pre + run + b"\0") == [(len(pre), len(pre) + len(run) + 1)]
+    assert runs(b"\x83\x83HELLO WORLD\x83", frozenset({2})) == [(2, 13)]
+
+
+def test_text_rule_command_word_records() -> None:
+    """In a record table of TEXT_RECORDS (audio_test_list: a command word, then the name at +2,
+    043828, 043950-043954) the text starts at the name: a printable low byte of the word is no
+    character, whatever its case (made-up records, no ROM bytes); the table must end at its
+    FFFF word, as the loop at 0438A4 does."""
+    records = ((b"X", b"RAYONS"), (b"r", b"DOWNUP"), (b"\x15", b"MADEUP"), (b"A", b"CL"))
+    image = b"".join(b"\0" + w + n.ljust(20, b"\0") for w, n in records) + b"\xff\xff"
+    rec = [(0, 4 * 22, 22, 2, "made-up records")]
+    fields = cl.text_fields(rec)
+    assert fields[1] == 2 and fields[22] == 24 and 2 not in fields and 4 * 22 not in fields
+    runs = cl._text_runs(image, 0, len(image), set(), fields)
+    assert runs == [(2, 9), (24, 31), (46, 53)], runs
+    assert cl._text_runs(image, 0, len(image), set())[0][0] == 1  # without the record rule
+    assert cl.text_record_errors(image, rec) == []
+    assert cl.text_record_errors(image, [(0, 3 * 22, 22, 2, "short")]) != []
+    assert cl.text_record_errors(image[:-2] + b"\0\0", rec) != []
+    assert cl.TEXT_RECORDS[0][:4] == (0x05C63C, 0x05CF84, 0x16, 2)
+
+
 def test_validate_finds_bad_ranges() -> None:
     def c(*spans: tuple[int, int, str]) -> cl.Classification:
         return cl.Classification([cl.Span(a, b, k) for a, b, k in spans], {}, {}, {}, None, 0x20)
@@ -1040,6 +1101,26 @@ def cli_files(tmp: Path, image: bytes, c: cl.Classification) -> list[str]:
             "--operands", str(tmp / "op.json"), "--seeds", str(tmp / "absent-seeds.json")]
 
 
+def test_gen_is_frozen_over_the_tree(tmp_path: Path, capsys: pytest.CaptureFixture[str],
+                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    """Decision C12 (M5c): gen never writes over a file of asm/68k, whatever the range and
+    whichever of its three outputs names it (--out, --equates-out, --externals-out)."""
+    scratch = tmp_path / "g.asm"
+    for flag, rel in (("--out", "game/island.asm"), ("--equates-out", "ram.asm"),
+                      ("--externals-out", "boot/vectors.asm")):
+        target = REPO / "asm/68k" / rel
+        before = target.read_text()
+        outs = {"--out": scratch, "--equates-out": tmp_path / "e.asm",
+                "--externals-out": tmp_path / "x.asm"}
+        outs[flag] = target
+        args = [x for k, v in outs.items() for x in (k, str(v))]
+        monkeypatch.setattr("sys.argv", ["tools/m68k", "gen", "4397E", "46AEE", *args])
+        assert cli.main() == 2, flag
+        assert "the generator is frozen" in capsys.readouterr().err, flag
+        assert target.read_text() == before, flag
+        assert not scratch.exists(), flag
+
+
 @needs_vasm
 def test_gen_reports_bad_cuts(tmp_path: Path, capsys: pytest.CaptureFixture[str],
                               monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1123,6 +1204,22 @@ def test_operand_rule_table_base(tmp_path: Path) -> None:
                    ("001010", "R6", "constant"), ("001018", "R6", "constant"),
                    ("001020", "R6", "constant")], got
     assert [e["rule"] for e in opd.build(insns, set(), set())] == ["R6"] * 5
+    # a reviewed decision replaces its rule's and survives a rewrite of the file (make classify)
+    why = "a reviewed decision with its written reason, long enough to pass"
+    rev = {(0x1010, 0): {"at": "001010", "operand": 0, "decision": "address",
+                         "rule": "reviewed", "reason": why}}
+    path = tmp_path / "op.json"
+    path.write_text(opd.dump(opd.build(insns, set(), set(), [(0x2000, 0x2010)], rev)))
+    assert opd.load(path)[(0x1010, 0)] == "address"
+    kept = opd.load_reviewed(path)
+    assert list(kept) == [(0x1010, 0)] and kept[(0x1010, 0)]["reason"] == why
+    path.write_text(opd.dump(opd.build(insns, set(), set(), [(0x2000, 0x2010)], kept)))
+    assert opd.load_reviewed(path) == kept
+    # a reviewed entry without its reason, or undecided, is refused
+    for bad in ({"reason": "short"}, {"decision": "undecided"}):
+        path.write_text(opd.dump([{**rev[(0x1010, 0)], **bad}]))
+        with pytest.raises(ValueError, match="reviewed decision"):
+            opd.load(path)
 
 
 def test_pccov_rejects_empty_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str],
@@ -1154,6 +1251,28 @@ def test_pccov_rejects_empty_runs(tmp_path: Path, capsys: pytest.CaptureFixture[
         assert not (tmp_path / "c.json").exists()
 
 
+def test_runs_need_distinct_names(tmp_path: Path, capsys: pytest.CaptureFixture[str],
+                                  monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two run files with one name (pccov-game.txt from two directories) fail pccov and
+    check-tree: keyed by name, the first would be replaced by the second without a check."""
+    runs = []
+    for d in ("bad", "good"):
+        (tmp_path / d).mkdir()
+        p = tmp_path / d / "pccov-game.txt"
+        p.write_text("# run frames 120\n000216\n")
+        runs.append(str(p))
+    binary = tmp_path / "image.bin"
+    binary.write_bytes(bytes(16))
+    summary = tmp_path / "summary.json"
+    for argv in (["pccov", "--image", str(binary), "--summary", str(summary)],
+                 ["check-tree", "--listing", str(tmp_path / "absent.lst"), "--binary",
+                  str(binary), "--no-shift"]):
+        monkeypatch.setattr("sys.argv", ["tools/m68k", *argv, *runs])
+        assert cli.main() == 1
+        assert "a second run named 'game'" in capsys.readouterr().out
+    assert not summary.exists()
+
+
 # --- the committed files ---------------------------------------------------------------------
 
 
@@ -1173,6 +1292,18 @@ def test_committed_classification() -> None:
     sw = span(0x026CD6)
     assert sw.kind == "switch" and sw.jmp == 0x026CD2
     assert all(s.start % 2 == 0 for s in by_kind["code"])
+    # record fields are not text (docs/16 section 3): the count of the boot program's screen
+    # records, the attribute byte before it, the option records' item byte, and the island's
+    # numeric tables whose printable middle once read as text
+    for a in (0x007160, 0x007E9B, 0x007E9C, 0x007FDC, 0x007FDD, 0x020FD5, 0x0210FC):
+        assert span(a).kind != "text", f"{a:06X}"
+    for a in (0x007161, 0x007E9D, 0x007FDE, 0x020FD6, 0x0210FD):
+        assert span(a).kind == "text" and span(a).start == a, f"{a:06X}"
+    # the next screen record's first header byte (its column) ends no string: 007A7F, 007A95,
+    # 007B42, 007B53
+    for a in (0x007A7F, 0x007A95, 0x007B42, 0x007B53):
+        assert span(a).kind != "text" and span(a - 1).kind == "text", f"{a:06X}"
+    assert not [s for s in by_kind["text"] if s.start < 0x046AEE and s.end > 0x044630]
     # addresses, kinds and evidence only: no byte values
     j = json.loads(CLASSIFICATION.read_text())
     assert set(j) == {"format", "range", "ranges", "entries", "noreturn"}
@@ -1192,7 +1323,11 @@ def test_committed_operands_and_seeds() -> None:
     assert d
     for (a, i), decision in d.items():
         assert any(lo <= a < hi for lo, hi in code), f"{a:06X}"
-        assert decision in ("address", "constant", "undecided") and 0 <= i < 2
+        assert decision in ("address", "constant") and 0 <= i < 2, f"{a:06X}"
+    # M5c decided the 32 operands rule R7 left undecided (docs/16), each with its reason
+    reviewed = opd.load_reviewed(REPO / "data/68k/operands.json")
+    assert len(reviewed) == 32
+    assert [k for k, e in reviewed.items() if e["decision"] == "constant"] == [(0x02FC76, 0)]
     j = json.loads((REPO / "data/68k/seeds.json").read_text())
     assert j["format"] == "stunrun-68k-seeds 1"
     assert set(j) == {"format", "comment", "seeds", "untaken", "unreached"}

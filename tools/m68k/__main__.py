@@ -9,16 +9,19 @@
     tools/m68k check-region START END --work DIR [--equates FILE]
     tools/m68k check-listing --listing L --binary B [--origin N] [--classification ...]
                         [--operands ...] [--macros asm/68k/macros.asm] [--range START END]
+    tools/m68k check-tree --listing L --binary B [--tree asm/68k] [--build build] [--no-shift]
+                        [--classification ...] [--operands ...] [--seeds ...] [PCCOV_RUN ...]
     tools/m68k check-unidasm [--image ...] [--classification ...] [--unidasm unidasm]
     tools/m68k pccov-read FIFO OUT
-    tools/m68k pccov [--image ...] [--classification ...] --summary FILE RUN ...
+    tools/m68k pccov [--image ...] [--classification ...] [--listing L] --summary FILE RUN ...
 
 classify       runs the descent (with the MAME runs given as seeds) and rewrites the
                classification and the operand decisions (commit both when they change); without
                the runs of `make pccov` it refuses unless --no-mame says so (the committed file
                is classified with them: three entries have MAME as their only evidence)
 stats          bytes per kind and region, the numbers of docs/14
-gen            the one-shot generator (gen.py): vasm source for START-END (0 <= START <= END <=
+gen            the one-shot generator (gen.py), frozen since M5c: it refuses to write over a
+               file of asm/68k (docs/16); vasm source for START-END (0 <= START <= END <=
                the classification's end, else exit 2; check-region likewise); START and END
                are global labels (routine or range starts): a cut inside an instruction or one
                that leaves a used vasm local outside the range exits 2 with the reason
@@ -29,9 +32,17 @@ check-listing  the descent check and the address lint on any vasm listing and it
                on an error of either, and on an instruction statement nothing reaches unless the
                seeds file lists it under `unreached` with an argument; with --range both report
                only what lies in START-END (the descent itself runs over the whole listing)
+check-tree     the checks on the committed tree's listing (tree.py, docs/16): the descent check
+               over the whole listing, the address lint, the raw-data check of the code files,
+               every classified instruction start an instruction statement and every
+               instruction statement a classified instruction start, the shift test (a
+               copy of the tree assembled with a pad; --no-shift skips it) and, given the run
+               files of `make pccov`, every executed PC an instruction statement; exit 1 on any
+               error
 check-unidasm  every instruction boundary of the code ranges against unidasm's
 pccov-read     drains a MAME trace pipe into the distinct PCs (make pccov); fails on no PC
-pccov          fails unless every executed PC starts a code instruction; writes the summary;
+pccov          fails unless every executed PC starts a code instruction (and, with --listing,
+               an instruction statement of that listing); writes the summary;
                fails, writing nothing, on a run file with no PCs or no `# run` line (classify
                refuses such a file too)
 """
@@ -151,7 +162,8 @@ def cmd_classify(a: argparse.Namespace) -> int:
                                                            insn.mnemonic != "pea"):
                 addresses.add(o.value)
     tables = [(s.start, s.end) for s in c.spans if s.kind in TABLE_KINDS]
-    a.operands.write_text(opd.dump(opd.build(r.insns, starts, addresses, tables)))
+    reviewed = opd.load_reviewed(a.operands)
+    a.operands.write_text(opd.dump(opd.build(r.insns, starts, addresses, tables, reviewed)))
     st = cl.stats(c, REGIONS)
     code = sum(v["code"] for v in st.values())
     print(f"{a.out}: {len(c.spans)} ranges, {code} bytes of code, {len(c.entries)} entries with "
@@ -190,7 +202,20 @@ def model(a: argparse.Namespace, forced: set[int]) -> gn.Model:
     return m
 
 
+TREE = REPO / "asm/68k"
+
+
 def cmd_gen(a: argparse.Namespace) -> int:
+    for path in (a.out, a.equates_out, a.externals_out):
+        if path is None:
+            continue
+        res = path.resolve()
+        if res.exists() and TREE.resolve() in res.parents:
+            print(f"gen: {path} is a file of the 68k tree: the generator is frozen since M5c "
+                  f"(decision C12, docs/16) and never writes over the source (--out, "
+                  f"--equates-out and --externals-out alike); write to scratch",
+                  file=sys.stderr)
+            return 2
     bad = check_range_args(a)
     if bad:
         print(f"gen: {bad}", file=sys.stderr)
@@ -363,6 +388,59 @@ def cmd_check_listing(a: argparse.Namespace) -> int:
     return 1 if rep.errors or rep.unreached or lint.errors else 0
 
 
+def run_name(p: Path) -> str:
+    """The name a run file is reported under: its stem without `pccov-`."""
+    return p.stem.removeprefix("pccov-")
+
+
+def cmd_check_tree(a: argparse.Namespace) -> int:
+    from m68k import tree as tr
+
+    binary = a.binary.read_bytes()
+    c = cl.load(a.classification)
+    seeds, untaken = load_seeds(a.seeds)
+    runs = {}
+    for p in a.runs:
+        header, pcs = pc.load_run(p)
+        why = pc.valid(header, pcs)
+        if why:
+            print(f"{p}: {why}")
+            return 1
+        name = run_name(p)
+        if name in runs:
+            print(f"{p}: a second run named {name!r}; every run file needs its own name")
+            return 1
+        runs[name] = pcs
+    rep = tr.check(a.listing.read_text(), binary, c, opd.load(a.operands),
+                   ls.macro_names(a.macros), seeds, untaken, set(load_unreached(a.seeds)),
+                   None if a.no_shift else a.tree, a.build, runs)
+    d = rep.descent
+    print(f"descent check: {d.reached} instruction statements reached, {len(d.unreached)} not, "
+          f"{len(d.errors)} errors; {len(rep.missing_code)} classified instruction starts "
+          f"without a statement, {len(rep.extra_code)} instruction statements at no classified "
+          f"instruction start")
+    print(f"address lint: {len(rep.lint.errors)} errors, {rep.lint.allowed} listed constants, "
+          f"{len(rep.lint.undecided)} undecided; {len(rep.foreign)} references into "
+          f"images.asm/image_table.asm as label+offset")
+    print(f"raw-data check: {len(rep.raw)} errors")
+    if rep.shift is not None:
+        print(f"shift test: {rep.shift.changed} statements changed, {rep.shift.expected} "
+              f"expected, {len(rep.shift.errors)} errors")
+    for name, bad in rep.pccov.items():
+        print(f"pccov {name}: {len(runs[name])} distinct PCs, {len(bad)} not an instruction "
+              f"statement")
+    if a.verbose:
+        for x in rep.foreign:
+            print(f"  foreign: {x}")
+    errors = rep.errors()
+    for e in errors[:50]:
+        print(" ", e)
+    if len(errors) > 50:
+        print(f"  ... {len(errors) - 50} more")
+    print("ok" if not errors else f"{len(errors)} errors")
+    return 1 if errors else 0
+
+
 def cmd_check_unidasm(a: argparse.Namespace) -> int:
     image = a.image.read_bytes()
     c = cl.load(a.classification)
@@ -398,17 +476,31 @@ def cmd_pccov(a: argparse.Namespace) -> int:
         if why:
             print(f"{p}: {why}; {a.summary} not written")
             return 1
-        loaded[p.stem.removeprefix("pccov-")] = (header, pcs)
+        name = run_name(p)
+        if name in loaded:
+            print(f"{p}: a second run named {name!r}; {a.summary} not written")
+            return 1
+        loaded[name] = (header, pcs)
     image = a.image.read_bytes()
     c = cl.load(a.classification)
     starts = c.code_starts(image)
     fail = False
+    instr: set[int] = set()
+    if a.listing:  # since M5c: the tree's own instruction statements as well
+        lst = ls.parse(a.listing.read_text(), ls.macro_names(MACROS))
+        instr = {s.address for s in lst.statements if s.kind == "instr"}
     for name, (_header, pcs) in loaded.items():
         bad = pc.check(pcs, set(starts))
         print(f"{name}: {len(pcs)} distinct PCs, {len(bad)} not a classified instruction start")
         for x in bad[:20]:
             print(f"  {x:06X}")
         fail |= bool(bad)
+        if a.listing:
+            bad = pc.check(pcs, instr)
+            print(f"{name}: {len(bad)} not an instruction statement of {a.listing}")
+            for x in bad[:20]:
+                print(f"  {x:06X}")
+            fail |= bool(bad)
     done = {name: header["run"] for name, (header, _pcs) in loaded.items()}
     a.summary.write_text(pc.summary(loaded, starts, done))
     print(f"{a.summary} written")
@@ -479,6 +571,20 @@ def main() -> int:
     q.add_argument("--macros", type=Path, default=MACROS)
     q.set_defaults(func=cmd_check_listing)
 
+    q = sub.add_parser("check-tree")
+    q.add_argument("--listing", type=Path, required=True)
+    q.add_argument("--binary", type=Path, required=True)
+    q.add_argument("--tree", type=Path, default=REPO / "asm/68k")
+    q.add_argument("--build", type=Path, default=REPO / "build")
+    q.add_argument("--no-shift", action="store_true")
+    q.add_argument("--classification", type=Path, default=CLASSIFICATION)
+    q.add_argument("--operands", type=Path, default=OPERANDS)
+    q.add_argument("--seeds", type=Path, default=SEEDS)
+    q.add_argument("--macros", type=Path, default=MACROS)
+    q.add_argument("-v", "--verbose", action="store_true")
+    q.add_argument("runs", type=Path, nargs="*")
+    q.set_defaults(func=cmd_check_tree)
+
     q = sub.add_parser("check-unidasm")
     q.add_argument("--image", type=Path, default=IMAGE)
     q.add_argument("--classification", type=Path, default=CLASSIFICATION)
@@ -494,6 +600,7 @@ def main() -> int:
     q.add_argument("--image", type=Path, default=IMAGE)
     q.add_argument("--classification", type=Path, default=CLASSIFICATION)
     q.add_argument("--summary", type=Path, required=True)
+    q.add_argument("--listing", type=Path)
     q.add_argument("runs", type=Path, nargs="+")
     q.set_defaults(func=cmd_pccov)
 

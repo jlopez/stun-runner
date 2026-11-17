@@ -27,7 +27,13 @@ The rules, in order (the first that matches decides):
                   the data or a large number (16.16 fixed point), not decided
     R8 constant   move.l of a smaller X: a count, a delay or a fixed-point value
 
-The file holds instruction addresses, operand indexes, decisions and rule names: no value.
+A code leg overrides a rule with a reviewed decision (rule `reviewed`, decision `address` or
+`constant`, and a `reason` of at least 40 characters that cites the instructions): `tools/m68k
+classify` keeps every reviewed entry of the file it rewrites (`load_reviewed`, `build`), so a
+re-run of `make classify` never loses one. M5c decided the 32 R7 operands this way (docs/16).
+
+The file holds instruction addresses, operand indexes, decisions, rule names and reasons: no
+value.
 """
 
 from __future__ import annotations
@@ -51,6 +57,8 @@ RULES = {
     "R7": ("undecided", "a pointer into the data or a large number, not decided"),
     "R8": ("constant", "a count, a delay or a fixed-point value below the data"),
 }
+REVIEWED = "reviewed"
+REVIEWED_TEXT = "address or constant: decided by a code leg, the reason in the entry"
 LOGICAL = {"and", "andi", "or", "ori", "eor", "eori"}
 ARITH = {"add", "addi", "adda", "sub", "subi", "suba", "cmp", "cmpi", "cmpa", "mulu", "muls",
          "divu", "divs", "addq", "subq"}
@@ -98,11 +106,18 @@ def decide(insn: Insn, i: int, routine_starts: set[int], operand_addresses: set[
 
 
 def build(insns: dict[int, Insn], routine_starts: set[int], operand_addresses: set[int],
-          tables: list[tuple[int, int]] | None = None) -> list[dict[str, object]]:
-    """tables: the classification's data, text and pointer ranges (rule R2b)."""
-    out = []
+          tables: list[tuple[int, int]] | None = None,
+          reviewed: dict[tuple[int, int], dict[str, object]] | None = None
+          ) -> list[dict[str, object]]:
+    """tables: the classification's data, text and pointer ranges (rule R2b); reviewed: the
+    reviewed entries to keep (load_reviewed), each in place of its rule's decision."""
+    out: list[dict[str, object]] = []
+    reviewed = reviewed or {}
     for a in sorted(insns):
         for i in candidates(insns[a]):
+            if (a, i) in reviewed:
+                out.append(dict(reviewed[(a, i)]))
+                continue
             nxt = insns.get(a + insns[a].length)
             rule = decide(insns[a], i, routine_starts, operand_addresses, nxt, tables)
             out.append({"at": f"{a:06X}", "operand": i, "decision": RULES[rule][0],
@@ -112,6 +127,7 @@ def build(insns: dict[int, Insn], routine_starts: set[int], operand_addresses: s
 
 def dump(entries: list[dict[str, object]]) -> str:
     rules = {k: f"{d}: {why}" for k, (d, why) in RULES.items()}
+    rules[REVIEWED] = REVIEWED_TEXT
     lines = ["{", f'  "format": "{FORMAT}",', f'  "rules": {json.dumps(rules, indent=4)},',
              '  "operands": [']
     lines[-2] = lines[-2].replace("\n}", "\n  }")
@@ -121,9 +137,33 @@ def dump(entries: list[dict[str, object]]) -> str:
     return "\n".join(lines + body + ["  ]", "}"]) + "\n"
 
 
+def check_reviewed(e: dict[str, object]) -> None:
+    """A reviewed entry: address or constant, with a written reason."""
+    if e.get("decision") not in ("address", "constant") or set(e) != {
+            "at", "operand", "decision", "rule", "reason"} or len(str(e["reason"])) < 40:
+        raise ValueError(f"operand {e.get('at')}/{e.get('operand')}: a reviewed decision needs "
+                         f"decision address or constant and a reason of 40 characters or more")
+
+
+def load_reviewed(path: Path) -> dict[tuple[int, int], dict[str, object]]:
+    """The reviewed entries of an operands file (none when it does not exist)."""
+    if not path.exists():
+        return {}
+    j = json.loads(path.read_text())
+    out = {}
+    for e in j["operands"]:
+        if e.get("rule") == REVIEWED:
+            check_reviewed(e)
+            out[(int(e["at"], 16), int(e["operand"]))] = e
+    return out
+
+
 def load(path: Path) -> dict[tuple[int, int], str]:
     """(instruction address, operand index) -> decision."""
     j = json.loads(path.read_text())
     if j.get("format") != FORMAT:
         raise ValueError(f"{path}: not {FORMAT}")
+    for e in j["operands"]:
+        if e.get("rule") == REVIEWED:
+            check_reviewed(e)
     return {(int(e["at"], 16), int(e["operand"])): e["decision"] for e in j["operands"]}

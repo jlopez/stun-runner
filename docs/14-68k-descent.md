@@ -117,7 +117,9 @@ their kind (the program table's two pointers at 017000, the ADSP and GSP streams
   012B82, 012CC6 and 01286A in the boot tables, one byte sixteen times at 0022DC, which is
   001FBC + 50 x 16 in the 16-byte records `sub_22EC` indexes at 0022F0-0022FC, and 04D764, two
   distinct characters: 145 bytes that a looser rule made text, review round 4), cut where an
-  operand points (a string starts there), with its terminating zero;
+  operand points (a string starts there), with its terminating zero; since M5c's review (docs/16
+  section 3.1) a count byte or a lower-case item byte at the start of a run is no character, and
+  a run with no terminating zero is text only when it is a counted string or referenced;
 - **fill**: a run of at least 32 zero bytes, up to the first address an operand references (the
   game's 020112-020418 becomes fill to 020400 and data from there: `movea.l #$20400,a2` at 042356
   is a base, 020418 the table it indexes, HYP);
@@ -242,7 +244,9 @@ images: a data pointer or a large 16.16 number; 15 store into memory, 17 load a 
 045830, 0466A0) are at 02444E, 0245F8, 024FA8, 025E9C, 026F12, 028476, 02A302, 02A30A,
 02A31A, 02A322, 02A334, 02A33C, 02DCCC, 02FC76, 03152A, 03163E, 031644, 03164A, 031F92, 03F572,
 03F5C6, 03F61A, 03F66C, 03F6BE, 0405B0, 040620, 0407E6, 04084C, 0408C6, 0409D4, 0409F6, 040F66.
-The generator writes them as numbers and the address lint reports them apart; the game data leg,
+The generator writes them as numbers and the address lint reports them apart. (Decided since
+M5c: 31 addresses and one constant, each with its reason, `"rule": "reviewed"` in
+`data/68k/operands.json`, which `make classify` keeps; docs/16 section 5.) The game data leg,
 which will know what lies at each X, decides them (docs/06 names 0461F0 from 02444E as an IDA
 cross-reference, which decision C5 does not trust). Evidence for that leg already in the image:
 four of them store into a variable that other stores give an R4 address. 02444E and 0245F8
@@ -347,6 +351,10 @@ the three code regions, and `check-unidasm`, with the reference set merged:
 make m68k-check        # check-region for each code region into build/m68k/, then check-unidasm
 ```
 
+(Since M5c the code regions are the committed source, and `make m68k-check` runs the checks on
+the tree's own listing instead: `make labels`, `tools/m68k check-tree` and `check-unidasm`;
+docs/16 section 4. `check-region` and the numbers below stay as the generator's record.)
+
 | Region | Bytes | Differences | Instructions | Labels (locals) | incbin bytes | Descent check | Lint | Shift test |
 |---|---:|---:|---:|---:|---:|---|---|---|
 | 000212-012F06 | 77,044 | 0 | 8,220 | 2,152 (777) | 33,243 | 8,220 reached, 0 not, 0 errors | 0 errors, 48 constants | 1,233 changed = expected |
@@ -423,14 +431,18 @@ name order, so a re-run with the same PCs rewrites the same file.
 
 ## 8. How the code legs use the tools
 
+(Steps 1-2 were done once by M5c for all three code regions, into the files of docs/16 section
+2.1 and the one `asm/68k/ram.asm`; docs/16 section 6 is how the later legs work on them.)
+
 1. Fix any wrong range in the classification first, with evidence (a reviewed seed or untaken
    branch in `data/68k/seeds.json`, a corrected idiom in `tools/m68k`), then `make -j5 pccov`
    (unless its five runs are already in `build/mame/`) and `make classify`, and commit. `make
    classify` refuses to run without the runs (section 3).
 2. `tools/m68k gen START END --out asm/68k/<file> --equates asm/68k/hardware.asm --equates-out
    <ram equates>` once, into the leg's region file (decision C6; the region files of docs/13
-   section 2: `boot/boot.asm` 000212-012F06, `game/code.asm` 020430-04397E, `game/island.asm`
-   04397E-046AEE, the three regions of section 6), with `asm/68k/macros.asm` included before it
+   section 2: wave 0's `boot/boot.asm` 000212-012F06, `game/code.asm` 020430-04397E and
+   `game/island.asm` 04397E-046AEE, the three regions of section 6; M5c has done this for all
+   three, into the `boot/code_*.asm` and `game/code_*.asm` files of docs/16 section 2.1), with `asm/68k/macros.asm` included before it
    (`stunrun.asm` already includes `hardware.asm`, whose 17 equates are the generator's default
    names, `ida/memory_map.py`'s `IO_68K`); the RAM equates go to the one shared `asm/68k/ram.asm`
    (issue #33); `make check` must stay 0 differences. The incbin path is resolved by vasm
