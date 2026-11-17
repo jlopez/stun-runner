@@ -12,6 +12,7 @@ listing, and each fails on the fault it exists for.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import random
@@ -478,7 +479,8 @@ def test_labels_on_the_tree(tmp_path: Path) -> None:
 
 def tree_check(tmp: Path, tree: Path = TREE, seed: int = 16, shift: bool = True,
                runs: dict[str, set[int]] | None = None, patch: dict[int, bytes] | None = None,
-               generated: dict[str, str] | None = None) -> tr.TreeReport:
+               generated: dict[str, str] | None = None,
+               explained: tr.Explained | None = None) -> tr.TreeReport:
     """tools/m68k check-tree's checks on `tree` assembled against a random blob (with `patch`
     written into it), the output and listing left in tmp/build/68k.out and 68k.lst."""
     blob = bytearray(random.Random(seed).randbytes(IMAGE_SIZE))
@@ -492,6 +494,7 @@ def tree_check(tmp: Path, tree: Path = TREE, seed: int = 16, shift: bool = True,
         opd.load(REPO / "data/68k/operands.json"), ls.macro_names(tree / "macros.asm"), seeds,
         untaken, set(load_unreached(REPO / "data/68k/seeds.json")),
         tmp / "asm/68k" if shift else None, tmp / "build" if shift else None, runs,
+        explained=explained,
     )
 
 
@@ -625,6 +628,22 @@ def test_tree_checks_fail(tmp_path: Path) -> None:
     rep = tree_check(tmp_path / "e", tree, shift=False)
     assert len(rep.foreign) == 1 and "tbl_BFE00+$64" in rep.foreign[0], rep.foreign
     assert any("as label+offset (write the entry's label" in e for e in rep.errors())
+    # the same through the new labels: an entry label plus an offset (entry 25 as entry 24 + 4),
+    # an image label plus an offset, an offset before the label (review of #38: the lint had
+    # seen only tbl_BFE00+ and dat_60000+)
+    tree = planted(tmp_path / "f", "game/code_028194.asm", "\tmove.l\tgsp_image_entry_25,-(sp)",
+                   "\tmove.l\tgsp_image_entry_24+4,-(sp)",
+                   ("game/code_024306.asm", "\tmove.l\tgsp_image_entry_25,-(sp)",
+                    "\tmove.l\t4+gsp_image_entry_24,-(sp)"))
+    rep = tree_check(tmp_path / "f", tree, shift=False)
+    assert sorted(x.split(": ", 1)[1] for x in rep.foreign) == [
+        "move.l\t4+gsp_image_entry_24,-(sp)", "move.l\tgsp_image_entry_24+4,-(sp)"], rep.foreign
+    lst = ls.Listing()
+    lst.symbols.update({"gsp_image_03": 0x061000, "sub_20430": 0x020430})
+    lst.statements = [ls.Stmt(0x020000, "instr", "lea\t(gsp_image_03-$10,pc),a0"),
+                      ls.Stmt(0x020004, "instr", "lea\t(sub_20430+$10,pc),a0"),
+                      ls.Stmt(0x020008, "data", "dc.w\tgsp_image_03-sub_20430")]
+    assert tr.foreign_refs(lst) == ["020000: lea\t(gsp_image_03-$10,pc),a0"]
 
 
 @needs_vasm
@@ -843,6 +862,23 @@ def test_data_asm_raw_data_check_fails(tmp_path: Path) -> None:
     assert any(e.startswith("04E3B4: table dat_4E3B4") and "9 longs missing" in e
                for e in rep.raw), rep.raw
     assert len(rep.raw) == 5, rep.raw
+    # three numbers outside any palette: the dc.b r,g,b allowance holds only inside a palette
+    # of data/palettes (review of #38: no plant had three operands)
+    tree = planted(tmp_path / "p", "data.asm",
+                   '\tincbin\t"../../build/stunrun-68k.bin",$04A88C,$1E\n',
+                   '\tdc.b\t$01,$02,$03\n\tincbin\t"../../build/stunrun-68k.bin",$04A88F,$1B\n')
+    rep = tree_check(tmp_path / "p", tree, shift=False)
+    assert [e.split(":")[0] for e in rep.raw] == ["04A88C"], rep.raw
+    # a registry label the listing does not define at the table's start (review of #38)
+    ex = tr.load_explained()
+    ex.tables = [dataclasses.replace(t, label="dat_nonexistent") if t.start == 0x047406
+                 else dataclasses.replace(t, label="dat_47406") if t.start == 0x048068 else t
+                 for t in ex.tables]
+    rep = tree_check(tmp_path / "q", shift=False, explained=ex)
+    assert sorted(rep.raw) == [
+        "047406: table dat_nonexistent (data/68k/tables.json): the listing defines no such label",
+        "048068: table dat_47406 (data/68k/tables.json): the listing defines that label at "
+        "047406, not at the table's start"], rep.raw
 
 
 @needs_vasm

@@ -13,14 +13,16 @@ blob, as CI does), not on scratch output:
   not call code cannot become instructions without a reviewed seed and `make classify`
   (decision C8): a `dc.l` naming it, which seeds the descent, is not enough;
 - the address lint over 000000-0C0000 (docs/14 section 5.3); a reference into `images.asm` or
-  `image_table.asm` written as a label there plus an offset (`tbl_BFE00+$64`, decision C10) is
-  an error since M5d: every table entry has its label (`gsp_image_entry_NN`, docs/17);
+  `image_table.asm` written as a label there plus an offset (`tbl_BFE00+$64`, decision C10, or
+  through any other label the listing defines in 060000-0C0000, `gsp_image_entry_24+4`) is an
+  error since M5d: every table entry has its label (`gsp_image_entry_NN`, docs/17);
 - the raw-data check: in the code files and, since M5d (docs/17), the island and `data.asm`
   (000000-012F06, 020000-060000) every `dc`/`dcb` statement is one of the kinds explained
   bytes take: `dc.l` in a vector or pointer table, `dc.w a-b` in a switch table, `dc.b` of
   quoted strings and zeros in text, a `dcb.b N,0` fill, the three colour components of a
   palette of data/palettes (`dc.b r,g,b` inside its range), and the statements of a table of
-  data/68k/tables.json in its format (a proven pointer table: `dc.l` of labels or 0;
+  data/68k/tables.json in its format, under the label the registry names at its start (a
+  proven pointer table: `dc.l` of labels or 0;
   `audio_test_list`'s records: the command word as a symbol, the name, zeros). A `dc.b` wall in
   place of an `incbin` slice of unknown or data bytes fails (decision C3), and so does a string
   that starts with a record field (a count or an item byte, `record_field`) or ends with one
@@ -52,10 +54,16 @@ CODE_FILES = [(0x000000, 0x012F06), (0x020000, 0x046AEE)]
 RAW_FILES = [(0x000000, 0x012F06), (0x020000, 0x060000)]
 REPO = Path(__file__).resolve().parents[2]
 TABLE_FORMATS = ("pointers", "pointer_or_count", "records", "audio_test_list")
-# the images files: a reference into them as label + offset (decision C10) is an error since
-# M5d, when every image table entry got its label (docs/17 section 3)
-FOREIGN = {"dat_60000": (0x060000, 0x0BFE00), "tbl_BFE00": (0x0BFE00, 0x0C0000)}
-FOREIGN_REF = re.compile(r"(?<![\w.])(" + "|".join(FOREIGN) + r")\+")
+# the images files (images.asm, image_table.asm and what they include from build/gsp-images):
+# a reference into them as label + offset (decision C10) is an error since M5d, when every image
+# table entry got its label (docs/17 section 3); any label the listing defines in this range
+# counts, not only the files' first labels
+FOREIGN = (0x060000, ROM_END)
+# a symbol with an offset after it (`sym+x`, `sym-<number>`) or before it (`<number>+sym`); a
+# difference of two symbols (`a-b`, a length) is no offset
+_NUM = r"(?:\$[0-9A-Fa-f]+|%[01]+|@[0-7]+|[0-9]+)"
+OFFSET_REF = re.compile(r"(?<![\w.$@%])(?:([A-Za-z_]\w*)\s*(?:\+|-\s*" + _NUM + r"(?!\w))"
+                        r"|" + _NUM + r"\s*[+-]\s*([A-Za-z_]\w*))")
 STRING = re.compile(r"^(?:'(?:[^']|'')*'|\"[^\"]*\"|0|\$0)$")
 FILL = re.compile(r"^dcb\.b\s+(?:\$?[0-9A-Fa-f]+|\$[0-9A-Fa-f]+-\*)\s*,\s*0$", re.I)
 
@@ -315,6 +323,11 @@ def raw_data(lst: ls.Listing, c: cl.Classification, binary: bytes,
         out.append(f"{s.address:06X}: {s.text}: not an explained dc statement in a {k} range "
                    f"(an unexplained blob stays an incbin slice, decision C3)")
     for tb in ex.tables:
+        if lst.symbols.get(tb.label) != tb.start:
+            at = lst.symbols.get(tb.label)
+            out.append(f"{tb.start:06X}: table {tb.label} (data/68k/tables.json): the listing "
+                       + ("defines no such label" if at is None
+                          else f"defines that label at {at:06X}, not at the table's start"))
         if tb.format == "audio_test_list":
             out += audio_test_records(lst, tb)
         else:
@@ -342,10 +355,17 @@ def pointer_coverage(lst: ls.Listing, tb: Table) -> list[str]:
 
 
 def foreign_refs(lst: ls.Listing) -> list[str]:
-    """Operands that reach into images.asm or image_table.asm as label + offset."""
+    """Operands that reach into images.asm or image_table.asm as label + offset: through any
+    label the listing defines in 060000-0C0000 (the files' own labels, `gsp_image_NN`, the 70
+    `gsp_image_entry_NN`, the sums), not equates."""
+    lo, hi = FOREIGN
+    names = {n for n, v in lst.symbols.items() if lo <= v < hi and n not in lst.equates}
     out = []
     for s in lst.statements:
-        if s.kind in ("instr", "data") and FOREIGN_REF.search(s.text):
+        if s.kind not in ("instr", "data"):
+            continue
+        code = re.sub(r"'(?:[^']|'')*'|\"[^\"]*\"", "", s.text)
+        if any((m[1] or m[2]) in names for m in OFFSET_REF.finditer(code)):
             out.append(f"{s.address:06X}: {s.text}")
     return out
 
