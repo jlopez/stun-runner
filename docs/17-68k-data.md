@@ -249,12 +249,31 @@ layout: 04D610 in the reference's, inside the first list 04D5EC). A2 is odd and 
 whole data region 046AEE-05CF86 (in pairs U-W), so it is not a record pointer plus an offset: it
 is the long that `movea.l (a1),a2` at 03198E read through the cursor FFDC70 (`movea.l (a0),a1`,
 `addq.l #4,(a0)` 03198A-03198C), and the cursor itself, 000C08 after that `addq`, points into
-the boot program. FFDC70 is loaded at 031926 (`move.l (a1),$ffdc70.l`, after `movea.l (a2),a1`,
-`addq.l #4,(a2)` 031922-031924) from the stream FFDC6C points at, the 04D628 entry's list. HYP:
-the stream is out of step because the records it names are read at their reference addresses
-(the record's flags, `movea.l ($E,a3),a1` at 0318CC and 0318E2, decide whether the stream jumps,
-`move.l (a0),(a2)` at 0318DE, or loads FFDC70, 031922-031926), so the long loaded at 031926 is
-not a record pointer. Not fixed
+the boot program. Where the cursor came from, observed (2026-11-17, `make MOVED_FRAMES=416
+MOVED_DETAIL=410-416 build/mame/moved-moved-attract.txt` and `make MOVED_FRAMES=422
+MOVED_DETAIL=410-422 build/mame/moved-ref-attract.txt`: with `MOVED_DETAIL` the script also logs
+every write to FFDC6C-FFDC73 with the PC after the writing instruction, the `cur` lines of the
+`.detail` file; PCs below are the reference's, the moved ones 4 more; FFDC6C's values are given
+in the reference layout, 4 less than the moved run logs, since 04D628 names its lists by label
+now). Moved run, frame 413: `sub_31ABE` sets FFDC6C to the list 04D5EC (031B64) and the
+`addq.l #4,(a2)` at 031898 steps it past the record pointers up to 04D5FC; the record named
+before that (a numeric pointer, so read 4 bytes before where the record now lies) has a flag
+in 80020h at +0E (0318E2-0318F0), so 031922-031926 take the next long of the stream, at 04D5FC,
+as FFDC70's value: 04CB96, an address inside the data (in the reference run that long is the
+next record pointer, stepped over at 031898). `addq.l #4,(a0)` at 03198C steps FFDC70 to
+04CB9A, then 04CB9E (numeric, so the FFDC70 stream is read 4 bytes off as well). Frame 414: the
+record that FFDC70's own stream names (`movea.l (a1),a2` 03198E) has flag 1000h at +0E
+(`movea.l ($E,a2),a1`, `andi.l #$1000` 0319C6-0319D4), so `move.l (a0),$ffdc70.l` at 0319DC,
+the jump of the FFDC70 stream, replaces the cursor by the long it points at, 000C00; 03198C
+steps it to 000C04 and 000C08, and the address error follows in frame 415. Reference run: FFDC70
+is never written in frames 410-422; FFDC6C goes 04D5EC-04D614 (frames 418-420) through 031898
+and the bit-31 step at 0318C0, jumps at 0318DE to 04FF4C and goes on from there, so the 80020h
+branch is taken only in the moved build. The earlier HYP, that the long loaded at 031926 is not
+a record pointer, is refuted: it is the stream's next record pointer, and the bad cursor value
+comes from the jump at 0319DC. HYP: the flag words that send the moved walk down the 80020h and
+1000h branches are other bytes of records read 4 bytes off, because the streams' longs name the
+reference addresses.
+Not fixed
 here: the lists' record pointers, parameter longs (bit 31 set), jump longs and FFDC70 longs are
 read as section 4.2 says, but how a list ends and what each record is are not proven by this
 leg, so the lists stay blob.

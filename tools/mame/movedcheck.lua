@@ -13,7 +13,8 @@
 -- same run of the reference set and of the moved build (tools/m68k moved) gives equal lines until
 -- the moved program does something else; `tools/m68k moved-compare` reports the first frame per
 -- stream. MOVED_DETAIL=F1-F2 also writes every write of frames F1-F2 with the 68010's PC to
--- <MOVED_NAME>.detail (build output: the values are run-time data). Nothing of the ROM is
+-- <MOVED_NAME>.detail (build output: the values are run-time data), and with it the writes to
+-- the level object list cursors FFDC6C-FFDC73 as "cur" lines. Nothing of the ROM is
 -- recorded. MOVED_PLAY=1 starts a game (coin at 900, start at 960, the trigger every 20 frames
 -- from 1020, as tools/mame/gspimages.lua). A machine reset ends the run ("# reset_at_frame").
 -- A read tap on the game's bus and address error vectors (020008-02000F, VBR 020000 from the
@@ -83,6 +84,18 @@ end)
 MOVED_GSP = sp:install_write_tap(0xC00000, 0xC0000F, "moved_gsp", tap("gsp"))
 MOVED_ADSP = sp:install_write_tap(0x800000, 0x83FFFF, "moved_adsp", tap("adsp"))
 MOVED_SND = sp:install_write_tap(0x600000, 0x603FFF, "moved_snd", tap("snd"))
+-- With MOVED_DETAIL, the writes to the two level object list cursors FFDC6C-FFDC73 (sub_3186A)
+-- of frames F1-F2 too, as "cur" lines with the PC after the writing instruction (review of #38:
+-- which instruction set FFDC70 before the moved build's address error). Not hashed.
+if detail then
+  MOVED_CUR = sp:install_write_tap(0xFFDC6C, 0xFFDC73, "moved_cur", function(offset, data, mask)
+    local f = frame + 1
+    if f >= d1 and f <= d2 then
+      detail:write(string.format("%d cur pc %06X %06X %04X %04X\n", f, pc.value, offset,
+        data & 0xFFFF, mask & 0xFFFF))
+    end
+  end)
+end
 
 local function field(port, fname)
   local p = machine.ioport.ports[port]
