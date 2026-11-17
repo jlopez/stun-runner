@@ -874,6 +874,25 @@ def test_text_rule_record_fields() -> None:
     assert runs(b"\x83\x83HELLO WORLD\x83", frozenset({2})) == [(2, 13)]
 
 
+def test_text_rule_command_word_records() -> None:
+    """In a record table of TEXT_RECORDS (audio_test_list: a command word, then the name at +2,
+    043828, 043950-043954) the text starts at the name: a printable low byte of the word is no
+    character, whatever its case (made-up records, no ROM bytes); the table must end at its
+    FFFF word, as the loop at 0438A4 does."""
+    records = ((b"X", b"RAYONS"), (b"r", b"DOWNUP"), (b"\x15", b"MADEUP"), (b"A", b"CL"))
+    image = b"".join(b"\0" + w + n.ljust(20, b"\0") for w, n in records) + b"\xff\xff"
+    rec = [(0, 4 * 22, 22, 2, "made-up records")]
+    fields = cl.text_fields(rec)
+    assert fields[1] == 2 and fields[22] == 24 and 2 not in fields and 4 * 22 not in fields
+    runs = cl._text_runs(image, 0, len(image), set(), fields)
+    assert runs == [(2, 9), (24, 31), (46, 53)], runs
+    assert cl._text_runs(image, 0, len(image), set())[0][0] == 1  # without the record rule
+    assert cl.text_record_errors(image, rec) == []
+    assert cl.text_record_errors(image, [(0, 3 * 22, 22, 2, "short")]) != []
+    assert cl.text_record_errors(image[:-2] + b"\0\0", rec) != []
+    assert cl.TEXT_RECORDS[0][:4] == (0x05C63C, 0x05CF84, 0x16, 2)
+
+
 def test_validate_finds_bad_ranges() -> None:
     def c(*spans: tuple[int, int, str]) -> cl.Classification:
         return cl.Classification([cl.Span(a, b, k) for a, b, k in spans], {}, {}, {}, None, 0x20)

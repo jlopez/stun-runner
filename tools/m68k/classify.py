@@ -14,7 +14,8 @@ it adds, then classifies every byte that is not code:
 Then, for the bytes that are no instruction and no table: text (a run of at least six printable
 characters, mostly letters, digits and the punctuation of messages, with a word and not made of
 equal byte pairs, with its terminating zero; without one only a counted string or a run an
-operand references, and a count or item byte at its start left out: _text_runs),
+operand references, and a count or item byte at its start left out, and in a record table of
+TEXT_RECORDS only the bytes from the text field: _text_runs),
 fill (a run of at least 32 zero bytes that no operand references), data (from an address an
 operand references to the next boundary) and unknown (the rest; in a code range a note says when
 the bytes decode cleanly as instructions and whether IDA has a function there).
@@ -48,6 +49,39 @@ KNOWN = [
     (0x01907C, 0x01EFD4, "data", "the GSP program's section table, read by load_gsp_program "
                                  "02FDD0 (docs/06 section 3.2)"),
 ]
+# record tables whose records hold a word before their text (start, end, stride, offset of the
+# text, evidence); `end` is the FFFF word that ends the table, which `classify` checks against
+# the image (`text_record_errors`). A printable low byte of the word is no character:
+# audio_test reads the word at +0 as the sound command (`mulu.w #$16,d0`,
+# `move.w ($0,a4,d0.w),d1` 043950-043954, sent at 04395C) and the name at +2
+# (`lea ($2,a4),a3` 043828), both pointers advanced by 16h (043892-04389C) until
+# `cmpi.w #$FFFF,(a2)` at 0438A4 meets the end word: 108 records
+TEXT_RECORDS = [
+    (0x05C63C, 0x05CF84, 0x16, 2,
+     "audio_test_list: 22-byte records, the sound command word at +0 and the name at +2 "
+     "(043720, 043828, 043950-043954, 0438A4)"),
+]
+
+
+def text_fields(records: list[tuple[int, int, int, int, str]]) -> dict[int, int]:
+    """For every byte of a TEXT_RECORDS record before its text field, where the text starts."""
+    out: dict[int, int] = {}
+    for base, end, stride, off, _ in records:
+        for a in range(base, end, stride):
+            for x in range(a, a + off):
+                out[x] = a + off
+    return out
+
+
+def text_record_errors(image: bytes, records: list[tuple[int, int, int, int, str]]) -> list[str]:
+    """A TEXT_RECORDS table whose bounds the image does not bear out: the end word is not FFFF,
+    or an earlier record's word is (the loop at 0438A4 would stop there)."""
+    out = []
+    for base, end, stride, _, why in records:
+        words = [image[a:a + 2] for a in range(base, end + 1, stride)]
+        if words[-1] != b"\xff\xff" or b"\xff\xff" in words[:-1]:
+            out.append(f"{base:06X}: the record table ends at no FFFF word at {end:06X} ({why})")
+    return out
 
 
 @dataclass
@@ -59,6 +93,8 @@ class Layout:
     vector_tables: list[tuple[int, str]] = field(default_factory=lambda: list(VECTOR_TABLES))
     entries: list[int] = field(default_factory=lambda: list(GAME_ENTRIES))
     known: list[tuple[int, int, str, str]] = field(default_factory=lambda: list(KNOWN))
+    text_records: list[tuple[int, int, int, int, str]] = field(
+        default_factory=lambda: list(TEXT_RECORDS))
 
 
 KINDS = ("code", "switch", "pointers", "text", "data", "fill", "unknown")
@@ -280,7 +316,8 @@ def _counted(image: bytes, x: int, y: int) -> tuple[int, int] | None:
     return None
 
 
-def _text_runs(image: bytes, lo: int, hi: int, refs: set[int]) -> list[tuple[int, int]]:
+def _text_runs(image: bytes, lo: int, hi: int, refs: set[int],
+               fields: dict[int, int] | None = None) -> list[tuple[int, int]]:
     """Printable runs that read as text, cut where an operand points (a string starts there).
 
     A run that ends with a terminating zero is a C string; a lower-case first byte before
@@ -288,7 +325,10 @@ def _text_runs(image: bytes, lo: int, hi: int, refs: set[int]) -> list[tuple[int
     byte, 76h at 020FD5 and 0210FC as FDh, CCh, BBh, ... before the others). A run with no
     terminating zero is text only when it is a counted string (`_counted`, the count left
     out) or an operand references its start: the printable middle of a numeric table (045A79,
-    045AD6, 04659B in the island, values rising through and past the run) is neither."""
+    045AD6, 04659B in the island, values rising through and past the run) is neither. In a
+    record of TEXT_RECORDS the text starts at the record's text field (`fields`, from
+    `text_fields`): a printable low byte of audio_test_list's command word is no character
+    (43h before BOOSTC at 05C703, 65h before BRAKE at 05C719)."""
     out = []
     a = lo
     while a < hi:
@@ -300,6 +340,9 @@ def _text_runs(image: bytes, lo: int, hi: int, refs: set[int]) -> list[tuple[int
             b += 1
         cuts = [a] + sorted(r for r in refs if a < r < b) + [b]
         for x, y in zip(cuts, cuts[1:], strict=False):
+            x = (fields or {}).get(x, x)
+            if x >= y:
+                continue
             terminated = y == b and b < hi and image[b] == 0
             if terminated:
                 if x not in refs and ITEM_PREFIX.match(image[x:y]):
@@ -327,6 +370,10 @@ def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
              lay: Layout | None = None) -> Classification:
     lay = lay or Layout()
     END = lay.end  # noqa: N806
+    records = [t for t in lay.text_records if t[1] + 2 <= lay.end <= len(image)]
+    errs = text_record_errors(image, records)
+    if errs:
+        raise ValueError("; ".join(errs))
     d = run_descent(image, mame_pcs, seeds, untaken, lay)
     r = d.r
     kind = ["unknown"] * END
@@ -359,8 +406,9 @@ def classify(image: bytes, mame_pcs: set[int], seeds: list[tuple[int, str]],
     refs = _data_refs(r, END)
     # text, fill, data, unknown over what is left
     gaps = _runs(kind, "unknown")
+    fields = text_fields(records)
     for lo, hi in gaps:
-        for a, b in _text_runs(image, lo, hi, set(refs)):
+        for a, b in _text_runs(image, lo, hi, set(refs), fields):
             for x in range(a, b):
                 kind[x] = "text"
     for lo, hi in _runs(kind, "unknown"):

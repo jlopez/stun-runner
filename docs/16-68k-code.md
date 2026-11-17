@@ -16,9 +16,10 @@ instructions at the addresses given, **MAME** a run of `make pccov`, **HYP** a h
   `pccov-summary.json` unchanged (1,637 ranges, 163,638 bytes of code, 457 entries, every
   executed PC a classified instruction start). The unreferenced ranges that decode cleanly
   stay `unknown` (decision C8, docs/14 section 3). The review of the leg found the text rule
-  wrong in two ways, and the rule is fixed (section 3.1, `make classify` again: 1,635 ranges):
-  record fields had been read as the first characters of strings, and the printable middle of
-  three numeric tables in the island as text.
+  wrong in two ways, and the rule is fixed (section 3.1, `make classify` again: 1,635 ranges,
+  1,615 once the third review taught it `audio_test_list`'s command words): record fields
+  had been read as the first characters of strings, and the printable middle of three numeric
+  tables in the island as text.
 - The 32 long immediates docs/14 section 4 left undecided are decided, each with a written
   reason, in `data/68k/operands.json` (section 5).
 - `tools/m68k gen` ran once over each file of the layout below (one model of the whole image,
@@ -171,9 +172,22 @@ them out (`tools/m68k/classify.py`, `_text_runs` and `_counted`; tests `test_tex
   title (FDh, CCh, BBh, AAh, 99h, 88h; BBh at 020F51 is the one 042CE4 decodes, CLAUDE.md M4e).
   The one at 020FD5 and 0210FC is 76h, `v`, and was the first character of
   `CONTINUE ADVANCES TO NEXT LEVEL`. A lower-case first byte before upper-case text is now no
-  character (`dat_20FD5`, `str_20FD6`; the same reading drops six such bytes in `data.asm`'s
-  records at 05C719-05CDE3, where only the classification changes: at 05C719 what is left is
-  too short to be text).
+  character (`dat_20FD5`, `str_20FD6`).
+- **Command words.** `audio_test_list` (05C63C-05CF86, in `data.asm`) is 108 records of 22
+  bytes, the sound command word at +0 and the name at +2, then the FFFF word at 05CF84: CODE,
+  `audio_test` 043718 loads the base at 043720, points at the names with `lea ($2,a4),a3` at
+  043828, advances both pointers by 16h (043892-04389C) until `cmpi.w #$FFFF,(a2)` at 0438A4,
+  and sends the word of the chosen record (`mulu.w #$16,d0`, `move.w ($0,a4,d0.w),d1`
+  043950-043954, `send_sound_byte` at 04395C). A command of 20h-7Eh has a printable low byte,
+  which the text rule had read as the name's first character in 40 records: 34 upper-case
+  ones (43h before `BOOSTC` at 05C703, 44h before `CLEVEL` at 05C75B) and six lower-case ones
+  the item-byte reading had dropped by chance (05C719, 05CA05, 05CA1B, 05CC57, 05CD8B,
+  05CDE3; the first review fix called them item bytes, which they are not). The table is a
+  record format of the classifier now (`classify.TEXT_RECORDS`; `make classify` checks its
+  FFFF word against the image): its text starts at +2 in every record, 44 names are text and
+  ten more fall below six characters (`make classify` again: 1,615 ranges). Only the
+  classification changes: `data.asm`'s slice is one incbin, and the raw-data check refuses a
+  quoted `dc.b` there that starts in a command word (section 4.1).
 - **Numeric tables.** `str_45A79`, `str_45AD6` and `str_4659B` in the island were the printable
   middle of byte tables: no terminator, no reference, the table's values continuing in
   non-printable bytes past both ends of each run (045A79's run is eleven values three times
@@ -211,7 +225,9 @@ character is a lower-case item byte, fails.
   statement is an explained kind: `dc.l` in a vector or pointer table, `dc.w a-b` in a switch
   table, `dc.b` of quoted strings and zeros in text, a `dcb.b N,0` fill. A `dc.b` wall in place
   of an incbin slice fails (decision C3), as `tools/test_jsa_music.py` does for the 6502, and so
-  does a string that starts with a record field (a count or an item byte, section 3.1);
+  does a string that starts with a record field (a count or an item byte, section 3.1); in any
+  file, `data.asm` included, a quoted `dc.b` that starts in the command word of an
+  `audio_test_list` record fails (section 3.1);
 - the shift test: the tree copied to a temporary directory, its guards commented out, a
   two-byte pad after `org 0` (each `dcb.b $X-*` fill lengthened by the pad so that it does not
   absorb it), its incbin paths made absolute, assembled again; exactly the statements that name

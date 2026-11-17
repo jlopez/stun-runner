@@ -21,7 +21,8 @@ blob, as CI does), not on scratch output:
   `dcb.b N,0` fill. A `dc.b` wall in place of an `incbin` slice of unknown or data bytes fails
   (decision C3), and so does a string that starts with a record field (a count or an item
   byte, `record_field`) or ends with one (the next screen record's first header byte,
-  `trailing_field`);
+  `trailing_field`); in any file, a quoted `dc.b` that starts before the text field of a
+  record of `classify.TEXT_RECORDS` (audio_test_list's command word, `record_word`) fails too;
 - the shift test: the tree copied, its guards commented out, a two-byte pad after `org 0` (and
   every `dcb.b $X-*` fill kept at its length), assembled again: exactly the statements that name
   a ROM symbol other than PC-relatively or as a difference change, each by the pad;
@@ -106,6 +107,15 @@ def record_field(ops: list[str]) -> str:
     return ""
 
 
+def record_word(address: int) -> str:
+    """Which record of classify.TEXT_RECORDS a string at `address` would start inside."""
+    for base, end, stride, off, why in cl.TEXT_RECORDS:
+        if base <= address < end and (address - base) % stride < off:
+            return (f"byte {(address - base) % stride} of the record at "
+                    f"{address - (address - base) % stride:06X} is no character: {why}")
+    return ""
+
+
 def trailing_field(ops: list[str], address: int, binary: bytes) -> str:
     """Why an unterminated counted string's last character is the first byte of the next
     screen record's header (classify.trailing_header on the source and the image), or ""."""
@@ -127,13 +137,20 @@ def raw_data(lst: ls.Listing, c: cl.Classification, binary: bytes) -> list[str]:
         i = bisect.bisect_right(starts, a) - 1
         return c.spans[i].kind if i >= 0 and a < c.spans[i].end else "outside"
 
+    fields = cl.text_fields(cl.TEXT_RECORDS)
     out = []
     for s in lst.statements:
-        if s.kind != "data" or not in_code_files(s.address):
+        if s.kind != "data":
             continue
         parts = s.text.split(None, 1)
         mn = parts[0].lower()
         ops = ls._split_operands(parts[1]) if len(parts) > 1 else []
+        if mn == "dc.b" and s.address in fields and any(op[:1] in "'\"" for op in ops):
+            out.append(f"{s.address:06X}: {s.text}: {record_word(s.address)} (the text starts "
+                       f"at {fields[s.address]:06X}, docs/16 section 3.1)")
+            continue
+        if not in_code_files(s.address):
+            continue
         k = kind(s.address)
         if mn == "dcb.b" and FILL.match(s.text):
             continue

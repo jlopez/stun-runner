@@ -585,7 +585,9 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
     one of the generator's explained kinds: a dc.l wall in a data range, numeric dc.b in a text
     range, a dcb.b fill of a byte other than zero, a switch entry that is not a difference, and
     a string that starts with a record field (a count, an item byte) or ends with one (the
-    next screen record's first header byte)."""
+    next screen record's first header byte); and, in any file, a string that starts in the
+    command word of an audio_test_list record (made-up characters, the low byte of the word
+    at 05C703 written as the first)."""
     file = "boot/code_000212.asm"
     line, a, n = slice_of(file, "data", align=4)
     text = "GAME DIFFICULTY"
@@ -607,13 +609,18 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
          "\tincbin\t\"../../build/stunrun-68k.bin\",$7A7F,$4\n",
          "\tdc.b\t'INC*PM*DATA*0-7 '\ndat_7A80:\n"
          "\tincbin\t\"../../build/stunrun-68k.bin\",$7A80,$3\n"),
+        ("data.asm", "\tincbin\t\"../../build/stunrun-68k.bin\",$05C63C,$94A\n",
+         "\tincbin\t\"../../build/stunrun-68k.bin\",$05C63C,$C7\n\tdc.b\t'XMADEUP',0\n"
+         "\tincbin\t\"../../build/stunrun-68k.bin\",$05C70B,$87B\n"),
     )
     # the blob is random: the header bytes the check reads are written into it, made up but
     # for the counts, which are the strings' lengths (15 before the 16 characters, 18 for
     # CONTROL*LEFT/RIGHT, a non-printable byte after it)
     patch = {0x7A6F: bytes([15]), 0x7A80: bytes([0x01, 0x01, 18]), 0x7A95: b"\x01"}
     rep = tree_check(tmp_path, tree, shift=False, patch=patch)
-    assert len(rep.raw) == 7, rep.raw
+    assert len(rep.raw) == 8, rep.raw
+    assert any(e.startswith("05C703: dc.b") and "record at 05C702" in e
+               and "audio_test_list" in e for e in rep.raw), rep.raw
     assert any("'INC*PM*DATA*0-7 '" in e and "next record's 4-byte header" in e
                for e in rep.raw), rep.raw
     assert any("'%RROR" in e and "count of the 37 after it" in e for e in rep.raw), rep.raw
