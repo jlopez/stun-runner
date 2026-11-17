@@ -304,8 +304,9 @@ source; until then a moved build diverges, as it does in frame 414.
   of #38). `load_tables` refuses a table without its reader, of an unknown format or overlapping
   another.
 - **The address lint** refuses a label+offset reference into `images.asm`/`image_table.asm`
-  through any label the listing defines in 060000-0C0000 (`tbl_BFE00+$64`, `gsp_image_entry_24+4`,
-  `4+gsp_image_entry_24`, `gsp_image_NN-$10`; a difference of two labels is no offset).
+  through any symbol the listing defines in 060000-0C0000, equates included (`tbl_BFE00+$64`,
+  `gsp_image_entry_24+4`, `4+gsp_image_entry_24`, `gsp_image_NN-$10`, and an alias
+  `x equ tbl_BFE00` used as `x+$64`; a difference of two labels is no offset).
 - **The shift test**: 5,101 statements changed, 5,101 expected (4,589 before: the 512 new
   `dc.l` that name a label, the other 146 being 0 or a count; the references renamed to palette
   and entry labels count as before).

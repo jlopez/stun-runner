@@ -399,10 +399,11 @@ def pointer_coverage(lst: ls.Listing, tb: Table) -> list[str]:
 
 def foreign_refs(lst: ls.Listing) -> list[str]:
     """Operands that reach into images.asm or image_table.asm as label + offset: through any
-    label the listing defines in 060000-0C0000 (the files' own labels, `gsp_image_NN`, the 70
-    `gsp_image_entry_NN`, the sums), not equates."""
+    symbol the listing defines in 060000-0C0000 (the files' own labels, `gsp_image_NN`, the 70
+    `gsp_image_entry_NN`, the sums), equates included, so an alias (`x equ gsp_image_entry_25`)
+    plus an offset is caught as well (review of #38)."""
     lo, hi = FOREIGN
-    names = {n for n, v in lst.symbols.items() if lo <= v < hi and n not in lst.equates}
+    names = {n for n, v in lst.symbols.items() if lo <= v < hi}
     out = []
     for s in lst.statements:
         if s.kind not in ("instr", "data"):

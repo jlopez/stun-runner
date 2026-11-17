@@ -638,6 +638,14 @@ def test_tree_checks_fail(tmp_path: Path) -> None:
     rep = tree_check(tmp_path / "f", tree, shift=False)
     assert sorted(x.split(": ", 1)[1] for x in rep.foreign) == [
         "move.l\t4+gsp_image_entry_24,-(sp)", "move.l\tgsp_image_entry_24+4,-(sp)"], rep.foreign
+    # an alias equate of a table label plus an offset (review of #38: the lint read labels
+    # only, and the naming legs may alias the generated gsp_image_entry_NN names)
+    tree = planted(tmp_path / "g", "game/code_024306.asm", "\tmove.l\tgsp_image_entry_25,-(sp)",
+                   "\tmove.l\timage_table+$64,-(sp)")
+    ram = tree / "ram.asm"
+    ram.write_text(ram.read_text() + "image_table\tequ\ttbl_BFE00\n")
+    rep = tree_check(tmp_path / "g", tree, shift=False)
+    assert len(rep.foreign) == 1 and "image_table+$64" in rep.foreign[0], rep.foreign
     lst = ls.Listing()
     lst.symbols.update({"gsp_image_03": 0x061000, "sub_20430": 0x020430})
     lst.statements = [ls.Stmt(0x020000, "instr", "lea\t(gsp_image_03-$10,pc),a0"),
