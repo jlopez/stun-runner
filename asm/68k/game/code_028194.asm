@@ -1885,7 +1885,7 @@ loc_29C10:
 	tst.l	d2
 	beq.w	.l29CC0
 	move.l	#$FFE00000,GSP_HOST+$2
-	move.l	tbl_BFE00+$64,-(sp)
+	move.l	gsp_image_entry_25,-(sp)
 	jsr	unpack_gsp_image
 	move.l	#$FFED0000,GSP_HOST+$2
 	move.l	d2,d1
@@ -3292,7 +3292,7 @@ sub_2AF34:
 	tst.l	d2
 	beq.w	.l2B008
 	move.l	#$FFE00000,GSP_HOST+$2
-	move.l	tbl_BFE00+$64,-(sp)
+	move.l	gsp_image_entry_25,-(sp)
 	jsr	unpack_gsp_image
 	move.l	#$FFED0000,GSP_HOST+$2
 	move.l	d2,d1

@@ -710,7 +710,7 @@ sub_40550:
 	move.b	#$10,ram_FFDB46
 .l40576:
 	move.l	#$FFE00000,GSP_HOST+$2
-	move.l	tbl_BFE00+$74,-(sp)
+	move.l	gsp_image_entry_29,-(sp)
 	jsr	unpack_gsp_image
 	move.b	#$14,ram_FFDE78
 	clr.b	ram_FFDE7C
@@ -874,7 +874,7 @@ sub_4072A:
 sub_407A8:
 	link	a6,#$0
 	move.l	#$FFE30060,GSP_HOST+$2
-	move.l	tbl_BFE00+$104,-(sp)
+	move.l	gsp_image_entry_65,-(sp)
 	jsr	unpack_gsp_image
 	move.b	#$15,ram_FFDE78
 	clr.b	ram_FFDE7C
@@ -891,7 +891,7 @@ sub_407A8:
 sub_4080E:
 	link	a6,#$0
 	move.l	#$FFE30060,GSP_HOST+$2
-	move.l	tbl_BFE00+$108,-(sp)
+	move.l	gsp_image_entry_66,-(sp)
 	jsr	unpack_gsp_image
 	move.b	#$11,ram_FFDE78
 	clr.b	ram_FFDE7C

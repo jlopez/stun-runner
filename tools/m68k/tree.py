@@ -52,7 +52,8 @@ CODE_FILES = [(0x000000, 0x012F06), (0x020000, 0x046AEE)]
 RAW_FILES = [(0x000000, 0x012F06), (0x020000, 0x060000)]
 REPO = Path(__file__).resolve().parents[2]
 TABLE_FORMATS = ("pointers", "audio_test_list")
-# files this tree's code does not own: a reference into them is label + offset (decision C10)
+# the images files: a reference into them as label + offset (decision C10) is an error since
+# M5d, when every image table entry got its label (docs/17 section 3)
 FOREIGN = {"dat_60000": (0x060000, 0x0BFE00), "tbl_BFE00": (0x0BFE00, 0x0C0000)}
 FOREIGN_REF = re.compile(r"(?<![\w.])(" + "|".join(FOREIGN) + r")\+")
 STRING = re.compile(r"^(?:'(?:[^']|'')*'|\"[^\"]*\"|0|\$0)$")
@@ -76,6 +77,8 @@ class TreeReport:
                 f"in data/68k/seeds.json with an argument, or make it data)"
                 for x in self.descent.unreached]
         out += self.lint.errors + self.lint.undecided + self.raw
+        out += [f"{x}: a reference into images.asm/image_table.asm as label+offset (write the "
+                f"entry's label, gsp_image_entry_NN; docs/17 section 3)" for x in self.foreign]
         out += [f"{x:06X}: a classified instruction start that is no instruction statement"
                 for x in self.missing_code]
         out += [f"{x:06X}: an instruction statement that is no classified instruction start "

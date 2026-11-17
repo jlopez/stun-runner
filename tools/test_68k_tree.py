@@ -494,15 +494,15 @@ def tree_check(tmp: Path, tree: Path = TREE, seed: int = 16, shift: bool = True,
 @needs_vasm
 def test_tree_checks_pass(tmp_path: Path) -> None:
     """The committed tree: every instruction statement reached, no numeric ROM address, every dc
-    statement of the code files explained, the shift test exact; the references into the image
-    table are label + offset (decision C10)."""
+    statement of the code files and data.asm explained, the shift test exact; no reference into
+    the image table as label + offset (M5d: each entry has its label, docs/17 section 3)."""
     rep = tree_check(tmp_path)
     assert rep.errors() == []
     assert rep.descent.reached > 44_000 and rep.descent.unreached == []
     assert rep.missing_code == [] and rep.extra_code == []
     assert rep.lint.undecided == [] and rep.lint.allowed == 337
     assert rep.shift is not None and rep.shift.changed == rep.shift.expected > 4000
-    assert len(rep.foreign) == 15 and all("tbl_BFE00+$" in x for x in rep.foreign)
+    assert rep.foreign == []
 
 
 def test_docs16_label_counts_are_the_trees() -> None:
@@ -614,6 +614,13 @@ def test_tree_checks_fail(tmp_path: Path) -> None:
     ram.write_text(ram.read_text() + f"{m[1]}\tequ\t${m[2]}\n")
     rep = tree_check(tmp_path / "d", tree)
     assert rep.shift is not None and rep.shift.errors, rep.shift
+    # an image table entry read as the table plus an offset (decision C10's form, refused
+    # since M5d gave every entry its label)
+    tree = planted(tmp_path / "e", "game/code_024306.asm", "\tmove.l\tgsp_image_entry_25,-(sp)",
+                   "\tmove.l\ttbl_BFE00+$64,-(sp)")
+    rep = tree_check(tmp_path / "e", tree, shift=False)
+    assert len(rep.foreign) == 1 and "tbl_BFE00+$64" in rep.foreign[0], rep.foreign
+    assert any("as label+offset (write the entry's label" in e for e in rep.errors())
 
 
 @needs_vasm

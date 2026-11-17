@@ -181,6 +181,12 @@ class Manifest:
 LABEL = re.compile(r"[a-z][a-z0-9_]*\Z")
 
 
+def entry_label(entry: int) -> str:
+    """The label of an image table entry (M5d, docs/17 section 3): the code that reads one
+    entry names it (`move.l gsp_image_entry_25,-(sp)`), not the table plus an offset."""
+    return f"gsp_image_entry_{entry:02d}"
+
+
 def adjust_label(pair: str) -> str:
     return f"gsp_images_sum_{pair.lower()}"
 
@@ -693,6 +699,7 @@ def asm_sources(m: Manifest, images: Mapping[str, Image]) -> tuple[str, str]:
     ]
     for e, value in enumerate(tv):
         target = label_at[value] if value else "0"
+        tl.append(f"{entry_label(e)}:")
         tl.append(f"\tdc.l\t{target}\t; entry {e}")
     tl.append(f'\tassert\t*=${TABLE + 4 * TABLE_ENTRIES:06X},"the image table is not 70 longs"')
     return "\n".join(lines) + "\n", "\n".join(tl) + "\n"

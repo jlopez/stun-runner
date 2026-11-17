@@ -524,7 +524,7 @@ loc_24A80:
 	move.b	($0,a0,d1.l),d0
 	movea.l	d0,a3
 	move.l	#$FFE00000,GSP_HOST+$2
-	move.l	tbl_BFE00+$64,-(sp)
+	move.l	gsp_image_entry_25,-(sp)
 	jsr	unpack_gsp_image
 	move.l	#$FFED0000,GSP_HOST+$2
 	move.l	a3,d0

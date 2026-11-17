@@ -421,7 +421,7 @@ def cmd_check_tree(a: argparse.Namespace) -> int:
           f"instruction start")
     print(f"address lint: {len(rep.lint.errors)} errors, {rep.lint.allowed} listed constants, "
           f"{len(rep.lint.undecided)} undecided; {len(rep.foreign)} references into "
-          f"images.asm/image_table.asm as label+offset")
+          f"images.asm/image_table.asm as label+offset (each an error)")
     print(f"raw-data check: {len(rep.raw)} errors")
     if rep.shift is not None:
         print(f"shift test: {rep.shift.changed} statements changed, {rep.shift.expected} "
