@@ -449,17 +449,22 @@ def test_labels_on_the_tree(tmp_path: Path) -> None:
 # --- the checks on the tree's own listing (M5c, docs/16 section 4) ----------------------------
 
 
-def tree_check(tmp: Path, tree: Path = TREE, seed: int = 16, shift: bool = True
+def tree_check(tmp: Path, tree: Path = TREE, seed: int = 16, shift: bool = True,
+               runs: dict[str, set[int]] | None = None, patch: dict[int, bytes] | None = None
                ) -> tr.TreeReport:
-    """tools/m68k check-tree's checks on `tree` assembled against a random blob."""
-    image = random.Random(seed).randbytes(IMAGE_SIZE)
+    """tools/m68k check-tree's checks on `tree` assembled against a random blob (with `patch`
+    written into it), the output and listing left in tmp/build/68k.out and 68k.lst."""
+    blob = bytearray(random.Random(seed).randbytes(IMAGE_SIZE))
+    for a, b in (patch or {}).items():
+        blob[a : a + len(b)] = b
+    image = bytes(blob)
     out, listing, _ = assemble_68k(image, tmp, tree)
     seeds, untaken = load_seeds(REPO / "data/68k/seeds.json")
     return tr.check(
         listing, out, cl.load(REPO / "data/68k/classification.json"),
         opd.load(REPO / "data/68k/operands.json"), ls.macro_names(tree / "macros.asm"), seeds,
         untaken, set(load_unreached(REPO / "data/68k/seeds.json")),
-        tmp / "asm/68k" if shift else None, tmp / "build" if shift else None,
+        tmp / "asm/68k" if shift else None, tmp / "build" if shift else None, runs,
     )
 
 
@@ -471,24 +476,29 @@ def test_tree_checks_pass(tmp_path: Path) -> None:
     rep = tree_check(tmp_path)
     assert rep.errors() == []
     assert rep.descent.reached > 44_000 and rep.descent.unreached == []
-    assert rep.lint.undecided == [] and rep.lint.allowed > 300
+    assert rep.missing_code == [] and rep.extra_code == []
+    assert rep.lint.undecided == [] and rep.lint.allowed == 337
     assert rep.shift is not None and rep.shift.changed == rep.shift.expected > 4000
-    assert rep.foreign and all("tbl_BFE00+$" in x for x in rep.foreign)
+    assert len(rep.foreign) == 15 and all("tbl_BFE00+$" in x for x in rep.foreign)
 
 
-def planted(tmp: Path, file: str, old: str, new: str) -> Path:
+def planted(tmp: Path, file: str, old: str, new: str, *more: tuple[str, str, str]) -> Path:
+    """A copy of the tree with `old` replaced by `new` in `file` (and each further
+    (file, old, new) applied the same way)."""
     tree = tmp / "tree"
     shutil.copytree(TREE, tree)
-    path = tree / file
-    text = path.read_text()
-    assert text.count(old) >= 1, (file, old)
-    path.write_text(text.replace(old, new, 1))
+    for f, o, n in ((file, old, new), *more):
+        path = tree / f
+        text = path.read_text()
+        assert text.count(o) >= 1, (f, o)
+        path.write_text(text.replace(o, n, 1))
     return tree
 
 
-def slice_of(file: str, kind: str) -> tuple[str, int, int]:
+def slice_of(file: str, kind: str, align: int = 2) -> tuple[str, int, int]:
     """The first incbin line of `file` over one range of the classification's `kind` of at
-    least four even-aligned bytes: (the line, its address, its length)."""
+    least four bytes, its address and length multiples of `align`: (the line, its address,
+    its length)."""
     c = cl.load(REPO / "data/68k/classification.json")
     spans = {s.start: s for s in c.spans}
     for m in re.finditer(r'^\tincbin\t"\.\./\.\./build/stunrun-68k\.bin",\$([0-9A-F]+),\$([0-9A-F]+)$',
@@ -496,7 +506,7 @@ def slice_of(file: str, kind: str) -> tuple[str, int, int]:
         a, n = int(m[1], 16), int(m[2], 16)
         s = spans.get(a)
         if s is not None and s.kind == kind and s.end == a + n and n >= 4 and a % 2 == 0 \
-                and n % 2 == 0:
+                and n % align == 0:
             return m[0], a, n
     raise AssertionError(f"no {kind} slice in {file}")
 
@@ -530,3 +540,84 @@ def test_tree_checks_fail(tmp_path: Path) -> None:
     ram.write_text(ram.read_text() + f"{m[1]}\tequ\t${m[2]}\n")
     rep = tree_check(tmp_path / "d", tree)
     assert rep.shift is not None and rep.shift.errors, rep.shift
+
+
+@needs_vasm
+def test_raw_data_check_fails(tmp_path: Path) -> None:
+    """The raw-data check (decision C3) refuses every dc/dcb statement of a code file that is not
+    one of the generator's explained kinds: a dc.l wall in a data range, numeric dc.b in a text
+    range, a dcb.b fill of a byte other than zero, a switch entry that is not a difference."""
+    file = "boot/code_000212.asm"
+    line, a, n = slice_of(file, "data", align=4)
+    text = "GAME DIFFICULTY"
+    tree = planted(
+        tmp_path, file, line, "\tdc.l\t" + ",".join(["$0"] * (n // 4)) + "\n",
+        ("game/code_020430.asm", f"\tdc.b\t'{text}',0\n",
+         "\tdc.b\t" + ",".join(f"${ord(ch):02X}" for ch in text) + ",0\n"),
+        (file, "\tdcb.b\t40,0\n", "\tdcb.b\t40,$FF\n"),
+        ("game/code_02C0D2.asm", "\tdc.w\t.l2C4A8-.l2C48C\n", "\tdc.w\t$1C\n"),
+    )
+    rep = tree_check(tmp_path, tree, shift=False)
+    assert len(rep.raw) == 4, rep.raw
+    assert rep.raw[0].startswith(f"{a:06X}: dc.l") and "in a data range" in rep.raw[0], rep.raw
+    assert any("$47,$41,$4D,$45" in e and "in a text range" in e for e in rep.raw), rep.raw
+    assert any("dcb.b" in e and "$FF" in e for e in rep.raw), rep.raw
+    assert any("dc.w" in e and "$1C" in e and "in a switch range" in e for e in rep.raw), rep.raw
+
+
+@needs_vasm
+def test_code_turned_blob_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str],
+                                monkeypatch: pytest.MonkeyPatch) -> None:
+    """A routine's instruction written back as an incbin slice of the same bytes: the classified
+    instruction start without a statement fails check-tree (exit 1), and so does an executed PC
+    there, through tr.check's runs and through tools/m68k pccov --listing."""
+    from m68k import __main__ as cli
+
+    file = "boot/code_000212.asm"
+    m = re.search(r"^sub_([0-9A-F]+):\n(\tmoveq\t#-\$1,d5)\n", (TREE / file).read_text(), re.M)
+    assert m is not None
+    x = int(m[1], 16)
+    tree = planted(tmp_path, file, m[0],
+                   f'sub_{m[1]}:\n\tincbin\t"../../build/stunrun-68k.bin",${x:06X},$2\n')
+    # the blob carries the instruction's own encoding (moveq #-1,d5), so the image is unchanged
+    rep = tree_check(tmp_path, tree, shift=False, runs={"t": {x, 0x000216}},
+                     patch={x: bytes([0x7A, 0xFF])})
+    assert rep.missing_code == [x] and rep.extra_code == [], (rep.missing_code, rep.extra_code)
+    assert rep.pccov == {"t": [x]}
+    assert any(e.startswith(f"{x:06X}: a classified instruction start") for e in rep.errors())
+    build = tmp_path / "build"
+    cls = str(REPO / "data/68k/classification.json")
+    monkeypatch.setattr("sys.argv", [
+        "tools/m68k", "check-tree", "--listing", str(build / "68k.lst"), "--binary",
+        str(build / "68k.out"), "--no-shift", "--classification", cls])
+    assert cli.main() == 1
+    assert "1 classified instruction starts without a statement" in capsys.readouterr().out
+    run = tmp_path / "pccov-t.txt"
+    run.write_text(f"# run 1\n{x:06X}\n000216\n")
+    monkeypatch.setattr("sys.argv", [
+        "tools/m68k", "pccov", "--image", str(build / "68k.out"), "--classification", cls,
+        "--listing", str(build / "68k.lst"), "--summary", str(tmp_path / "s.json"), str(run)])
+    assert cli.main() == 1
+    out = capsys.readouterr().out
+    assert "t: 2 distinct PCs, 0 not a classified instruction start" in out, out
+    assert "t: 1 not an instruction statement" in out, out
+
+
+@needs_vasm
+def test_promoted_range_fails(tmp_path: Path) -> None:
+    """Decision C8: an unknown range written as instructions fails even when a `dc.l` in
+    data.asm names it and seeds the descent (the statements are reached): every instruction
+    statement must be a classified instruction start."""
+    file = "boot/code_000212.asm"
+    line, a, n = slice_of(file, "unknown")
+    long = re.search(r'^\tincbin\t"\.\./\.\./build/stunrun-68k\.bin",\$[0-9A-F]+,\$4$',
+                     (TREE / "data.asm").read_text(), re.M)
+    assert long is not None
+    tree = planted(tmp_path, file, line, f"promoted_{a:X}:\n" + "\tnop\n" * (n // 2),
+                   ("data.asm", long[0], f"\tdc.l\tpromoted_{a:X}"))
+    rep = tree_check(tmp_path, tree, shift=False)
+    nops = list(range(a, a + n, 2))
+    assert not set(nops) & set(rep.descent.unreached), rep.descent.unreached
+    assert rep.extra_code[: n // 2] == nops, rep.extra_code
+    assert any(e.startswith(f"{a:06X}: an instruction statement that is no classified")
+               for e in rep.errors())

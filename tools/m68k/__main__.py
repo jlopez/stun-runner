@@ -34,7 +34,8 @@ check-listing  the descent check and the address lint on any vasm listing and it
                only what lies in START-END (the descent itself runs over the whole listing)
 check-tree     the checks on the committed tree's listing (tree.py, docs/16): the descent check
                over the whole listing, the address lint, the raw-data check of the code files,
-               every classified instruction start an instruction statement, the shift test (a
+               every classified instruction start an instruction statement and every
+               instruction statement a classified instruction start, the shift test (a
                copy of the tree assembled with a pad; --no-shift skips it) and, given the run
                files of `make pccov`, every executed PC an instruction statement; exit 1 on any
                error
@@ -407,7 +408,8 @@ def cmd_check_tree(a: argparse.Namespace) -> int:
     d = rep.descent
     print(f"descent check: {d.reached} instruction statements reached, {len(d.unreached)} not, "
           f"{len(d.errors)} errors; {len(rep.missing_code)} classified instruction starts "
-          f"without a statement")
+          f"without a statement, {len(rep.extra_code)} instruction statements at no classified "
+          f"instruction start")
     print(f"address lint: {len(rep.lint.errors)} errors, {rep.lint.allowed} listed constants, "
           f"{len(rep.lint.undecided)} undecided; {len(rep.foreign)} references into "
           f"images.asm/image_table.asm as label+offset")

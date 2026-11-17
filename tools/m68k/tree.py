@@ -8,7 +8,10 @@ blob, as CI does), not on scratch output:
   `dc.l`/`dc.w a-b`, the vectors, `game_entries`, the classification's entries with evidence and
   the reviewed seeds; every instruction statement reached unless `unreached` of
   data/68k/seeds.json lists it; and every instruction start of the classification is an
-  instruction statement (code turned back into a blob or data fails);
+  instruction statement (code turned back into a blob or data fails), and, conversely, every
+  instruction statement is a classified instruction start, so a range the classification does
+  not call code cannot become instructions without a reviewed seed and `make classify`
+  (decision C8): a `dc.l` naming it, which seeds the descent, is not enough;
 - the address lint over 000000-0C0000 (docs/14 section 5.3); a reference into `images.asm` or
   `image_table.asm`, which this tree's code files do not own, is written as the label there plus
   an offset (`tbl_BFE00+$64`, decision C10) and counted;
@@ -50,6 +53,7 @@ class TreeReport:
     lint: ls.LintReport = field(default_factory=ls.LintReport)
     raw: list[str] = field(default_factory=list)
     missing_code: list[int] = field(default_factory=list)
+    extra_code: list[int] = field(default_factory=list)
     foreign: list[str] = field(default_factory=list)
     shift: ls.ShiftReport | None = None
     pccov: dict[str, list[int]] = field(default_factory=dict)
@@ -62,6 +66,9 @@ class TreeReport:
         out += self.lint.errors + self.lint.undecided + self.raw
         out += [f"{x:06X}: a classified instruction start that is no instruction statement"
                 for x in self.missing_code]
+        out += [f"{x:06X}: an instruction statement that is no classified instruction start "
+                f"(promoting a range to code needs a reviewed seed in data/68k/seeds.json and "
+                f"make classify, decision C8)" for x in self.extra_code]
         if self.shift is not None:
             out += self.shift.errors
         for run, bad in self.pccov.items():
@@ -148,7 +155,9 @@ def check(listing: str, binary: bytes, c: cl.Classification, decisions: dict[tup
     extra, outside = listed_seeds(c, binary, seeds, lambda x: x in instr)
     rep.descent = ls.descent_check(lst, binary, 0, extra, unreached, set(c.noreturn), untaken,
                                    outside)
-    rep.missing_code = sorted(x for x in c.code_starts(binary) if x not in instr)
+    starts = set(c.code_starts(binary))
+    rep.missing_code = sorted(x for x in starts if x not in instr)
+    rep.extra_code = sorted(x for x in instr if x not in starts)
     rep.lint = ls.address_lint(lst, decisions, 0, ROM_END, frozenset(macros), binary, 0,
                                switch_ranges(c), pointer_ranges(c))
     rep.raw = raw_data(lst, c)

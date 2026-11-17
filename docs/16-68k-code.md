@@ -147,7 +147,11 @@ images leg may give the entries labels and replace these operands.
 - the descent check of docs/14 section 5.3 over the whole listing (seeds: the source's own
   `dc.l` and `dc.w a-b`, the vectors, `game_entries`, the classification's entries with evidence,
   the reviewed seeds; the untaken branch at 004B74), and every classified instruction start is
-  an instruction statement (code turned back into a blob or data fails);
+  an instruction statement (code turned back into a blob or data fails); conversely, every
+  instruction statement is a classified instruction start, so a range the classification does
+  not call code cannot become instructions by hand: a `dc.l` naming it would seed the descent
+  and reach it, but promoting a range needs a reviewed seed in `data/68k/seeds.json` and
+  `make classify` (decision C8);
 - the address lint over 000000-0C0000; the references into `images.asm` and `image_table.asm`
   as label+offset are counted (section 2.4);
 - the raw-data check: in the code files (000000-012F06, 020000-046AEE) every `dc`/`dcb`
@@ -165,7 +169,7 @@ images leg may give the entries labels and replace these operands.
 
 ```
 labels: 223 snapshot names in ROM: 223 labels in the tree, 0 in blob, 0 failures; 31 outside ROM (I/O, ZRAM, RAM: not checked here)
-descent check: 44683 instruction statements reached, 0 not, 0 errors; 0 classified instruction starts without a statement
+descent check: 44683 instruction statements reached, 0 not, 0 errors; 0 classified instruction starts without a statement, 0 instruction statements at no classified instruction start
 address lint: 0 errors, 337 listed constants, 0 undecided; 15 references into images.asm/image_table.asm as label+offset
 raw-data check: 0 errors
 shift test: 4521 statements changed, 4521 expected, 0 errors
@@ -187,11 +191,19 @@ its address (wave 0: 11), none is left in a blob.
 
 `tools/test_68k_tree.py` assembles the committed tree against a random blob (vasm only, no ROM)
 and runs `check-tree`'s checks on that listing (`test_tree_checks_pass`: no error, every
-statement reached, no undecided operand, the shift test exact). `test_tree_checks_fail` plants
-one fault per copy of the tree and checks that the right check fails: an unknown slice written
-as `nop`s (the descent check: each `nop` unreached), the same slice as a `dc.b` wall (the
-raw-data check, at its address), a `jsr sub_X` written `jsr $X` (the lint), a label pinned by an
-`equ` (the shift test); `test_labels_on_the_tree` takes a label out of source and moves another,
+statement reached, every classified instruction start a statement and no other, no undecided
+operand, 337 listed constants, 15 label+offset references, the shift test exact).
+`test_tree_checks_fail` plants one fault per copy of the tree and checks that the right check
+fails: an unknown slice written as `nop`s (the descent check: each `nop` unreached), the same
+slice as a `dc.b` wall (the raw-data check, at its address), a `jsr sub_X` written `jsr $X` (the
+lint), a label pinned by an `equ` (the shift test). `test_raw_data_check_fails` plants the other
+raw-data faults in one copy (a `dc.l` wall in a data range, a text string as numeric `dc.b`, a
+`dcb.b 40,$FF`, a switch entry written as a number) and finds each. `test_code_turned_blob_fails`
+writes a routine's first instruction as an incbin slice of its own bytes: the classified start
+without a statement, an executed PC there (through `check-tree`'s runs and `tools/m68k pccov
+--listing`) and `check-tree`'s exit status 1 each fail. `test_promoted_range_fails` writes an
+unknown range as instructions under a label that a `dc.l` in `data.asm` names, so the descent
+reaches them, and the converse check fails on them (decision C8). `test_labels_on_the_tree` takes a label out of source and moves another,
 and `make labels` fails on each. `test_tree_assembles_a_random_blob` checks that every incbin
 slice of `build/stunrun-68k.bin` takes the blob's bytes from its own address, and the fills and
 the program table. `tools/test_build.py` builds the synthetic set (whose 68k image is now mostly
@@ -204,7 +216,9 @@ proof.
 
 ### 4.3 The generator, frozen
 
-`tools/m68k gen` refuses to write over a file of `asm/68k` (exit 2, `test_gen_is_frozen_over_the_tree`)
+`tools/m68k gen` refuses to write any of its outputs (`--out`, `--equates-out`,
+`--externals-out`) over a file of `asm/68k` (exit 2, before writing anything;
+`test_gen_is_frozen_over_the_tree` tries each)
 and its header says it is frozen (decision C12). It stays for `check-region`, which still
 regenerates a region in scratch and checks it against the image (`test_regions_reassemble`,
 local), and for scratch output. `make m68k-check` no longer runs `check-region`: the tree is the
