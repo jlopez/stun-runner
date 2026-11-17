@@ -4,7 +4,7 @@
 ; 03FEA6 crosses the S/T pair boundary 040000, which is therefore not a file boundary (docs/13
 ; section 2).
 ; 03FC22-04397E: 72 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
-; Owner: the game naming legs (M5a-M5f).
+; Owner: the game naming legs (N1-N6, docs/03).
 ;
 ; Generated once by tools/m68k gen 03FC22 04397E (M5c, issue #33, docs/16-68k-code.md):
 ; neutral labels (the IDA snapshot's names where it has one), operands as docs/14 decides,

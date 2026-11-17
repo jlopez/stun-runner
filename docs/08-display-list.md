@@ -243,7 +243,7 @@ the 16-bit word at FFF77F50 (FFF411D0-FFF41200): 440h bits, 44h words, in every 
 writes FFF77F50 is open, section 6). `read_list_header` (FFF4D940) reads three of its words: 11h
 -> FFF77E60 (flags: bit 3 every polygon as an outline, FFF45130; bit 4 no size limits for image
 quads, FFF49460; bit 5 outlines without right edges, FFF45B50; bit 2 a debug overlay, FFF44890),
-12h -> FFF77E80 (the display frames per list, 3), 13h -> FFF77E70. The rest of the header is M5d.
+12h -> FFF77E80 (the display frames per list, 3), 13h -> FFF77E70. The rest of the header is N4.
 
 `run_command_list` (FFF46E30) sets B4 = page - A000h, the window (0, 28h)-(1FFh, 117h) and
 CONTROL = C0h (window clipping, W = 3), then reads a command word, dispatches on its top nibble
@@ -271,12 +271,12 @@ commands the decoder walks to the end command with no word left over (MAME); the
 | 3 | FFF47900 `cmd_3_rectangle` | colour = low byte; (y, x) long, (dy, dx) long; FILL in the 2 bpp window | 5 | yes |
 | 4 | FFF48650 `cmd_4_text` | colour = low byte; font, x, y (FFFF: previous); NUL-terminated string padded to a word | 4 + ceil((len + 1) / 2) | yes |
 | 5 | FFF47AF0 `cmd_5_window` | x0 y0 x1 y1, clamped to x <= 1FFh, 28h <= y <= 117h | 5 | yes |
-| 6 | FFF477C0 `cmd_6` | low byte; words to an FFFF (FFF595B0 consumes them: M5d) | to FFFF | |
+| 6 | FFF477C0 `cmd_6` | low byte; words to an FFFF (FFF595B0 consumes them: N4) | to FFFF | |
 | 7 | FFF44BF0 `cmd_7_som_list` | the SOM list from its word 1 (section 1) | 1 + N | yes |
-| 8 | FFF489E0 `cmd_8_image` | three words, one long (FFF58950: M5d) | 6 | yes |
+| 8 | FFF489E0 `cmd_8_image` | three words, one long (FFF58950: N4) | 6 | yes |
 | 9 | FFF48C20 `cmd_9_palette` | start = low byte; count n; 3 words per two entries, 2 for an odd last | 2 + 3(n div 2) + 2(n mod 2) | yes |
 | A | FFF49AF0 `cmd_A_dissolve` | a step word | 2 | |
-| B | FFF4A040 `cmd_B` | none (FFF52060: M5d) | 1 | |
+| B | FFF4A040 `cmd_B` | none (FFF52060: N4) | 1 | |
 | C | FFF4A420 `cmd_C_colour_table` | quarter = low 2 bits; start; count; count words into FFF71D20 + quarter * 1000h bits | 3 + count | |
 | D | FFF4A5C0 `cmd_D_fb_entry` | entry = low 2 bits; two longs into FFF71C20 | 5 | yes |
 | E0 | FFF4A6F0 `cmd_E0_image_table` | start <= 3Fh; count; count longs into FFF78150 | 3 + 2 count | |
@@ -449,12 +449,12 @@ below 28h (`CMPI 28h,A2`, FFF49510) or above point 1's y (`SUB A0,A2` with A0 = 
 from FFF494E0, FFF49570; the height is p2.y - p1.y + 1), or (without FFF77E60 bit 4) the box is
 15Eh wide or C8h high or more (FFF49480, FFF495F0). The text panel of the attract
 mode's story screen is one such quad (attract-f3000); attract-f2700 has a small one, scaled down. The images are the 68k's
-packed images (pairs U-V, M5d); `somdump.lua` dumps them for the redrawing, never committed.
+packed images (pairs U-V, N4); `somdump.lua` dumps them for the redrawing, never committed.
 
 ### 4.5 What is not in the SOM list
 
 Everything 2D comes from the 68k's own commands in the same buffer (section 3.2): the sky and
-ground rectangles (3), backgrounds and the dashboard (8, D: images, M5d; an 8 after the list is
+ground rectangles (3), backgrounds and the dashboard (8, D: images, N4; an 8 after the list is
 drawn over the 3D scene, game-f1000), the window (5), palette
 loads (9), the dashboard text and digits (4). The SOM list carries only the ADSP's polygons and
 the image quads that are part of the 3D scene (sprites placed in the world, the text panel): the
@@ -538,7 +538,7 @@ the no-rotation rule is CODE plus the CI test only (the other five stippled skip
 and 5 (word 11h is 0000 or 0010 in every capture), colour byte 4 under fill 2 and commands 1, 2, 6, A, B, C and E0 do not
 occur in the captures: their description is CODE only (all but the commands have synthetic CI
 tests of the renderer, which pin the code reading, not MAME). The colour table, the palette and the images are
-inputs taken from MAME's memory; how they are loaded is M5d. "Changed" equals "drawn" in 14 of the 15
+inputs taken from MAME's memory; how they are loaded is N4. "Changed" equals "drawn" in 14 of the 15
 captures; in attract-f1800 the list writes 81 pixels with the value they already had (drawn and
 equal, not changed). A pixel written so is invisible to the "missed" test.
 
@@ -564,9 +564,9 @@ command-5 window run in CI on synthetic inputs (`tools/test_displaylist.py`).
 
 ## 6. Open questions
 
-1. Who writes FFF77F50 (440h in every capture) and what the rest of the 44h-word header holds (M5d).
+1. Who writes FFF77F50 (440h in every capture) and what the rest of the 44h-word header holds (N4).
 2. Commands 6, 8, B and D's targets (FFF595B0, FFF58950, FFF52060, the entries at FFF71C20) and
-   the palette packing of command 9 (M5d).
+   the palette packing of command 9 (N4).
 3. The meaning of the depth key's direction and of DM 0033 (the object's shift); docs/07 does not
    cover them either.
 4. The object handshake: 0047-004F raise /GINT mid-frame when an object entry has bit 14 set; the

@@ -3,7 +3,7 @@
 ; executed in MAME; docs/14 section 9) and 046A00-046AEE, the last 68k code (MAME's highest PC is
 ; 046AEC).
 ; 04397E-046AEE: 8 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
-; Owner: the game naming legs (M5a-M5f).
+; Owner: the game naming legs (N1-N6, docs/03).
 ;
 ; Generated once by tools/m68k gen 04397E 046AEE (M5c, issue #33, docs/16-68k-code.md):
 ; neutral labels (the IDA snapshot's names where it has one), operands as docs/14 decides,

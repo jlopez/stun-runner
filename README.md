@@ -30,16 +30,19 @@ board. Four instruction sets, no graphics ROMs. Details with MAME references in
 | [`docs/13-68k-source.md`](docs/13-68k-source.md) | the 68k source tree: region files and owners, conventions, the coverage gate and `make labels` |
 | [`docs/15-gsp-images.md`](docs/15-gsp-images.md) | the packed GSP images of pairs U-W: 140 indexed PNGs (`data/gsp-images`) and their palettes (`data/palettes`) as the source, `tools/gspimages` |
 | [`docs/16-68k-code.md`](docs/16-68k-code.md) | all the 68k code as neutral source: the code files, what stays blob, `make m68k-check` on the tree |
+| [`docs/17-68k-data.md`](docs/17-68k-data.md) | the 68k data as source: the palettes embedded, the sound command equates, text and proven pointer tables (`data/68k/tables.json`), the moved-build experiment (`make movedcheck`) |
 
-Status (2026-11-16): milestones 0-4 are done (`CLAUDE.md` section 4, `docs/03-plan.md`). The
+Status (2026-11-17): milestones 0-4 are done (`CLAUDE.md` section 4, `docs/03-plan.md`). The
 object ROMs, the 6502 sound program and the OKI samples (from 52 committed PCM WAVs under
 `data/oki`) are built from source and data, and the NVRAM images (all zero) are fills. M5's wave
 0 is done: the 68k tree is nine region files, one per owner, with its zero runs and program table
 as source (docs/13); the packed GSP images of pairs U-W are built from 140 committed indexed
 PNGs and their palettes (M5i, docs/15); since M5c all the 68k code (163,638 bytes, boot and game)
-is neutral source cut into files of about 16 KB (docs/16); the 68k data, the code files' unknown
-and unexplained-data slices and the GSP and ADSP programs are still blob, 12.2% of the set's
-bytes (185,094). Next: the other conversion legs and the naming waves. The listening check of M4 is done: Jesus ran `make listen` on 2026-11-05 and heard the
+is neutral source cut into files of about 16 KB (docs/16); since M5d the palettes, the data's
+text, `audio_test_list` and twelve pointer tables proven by their readers are source too
+(docs/17); the rest of the 68k data, the code files' unknown and unexplained-data slices and the
+GSP and ADSP programs are still blob, 10.9% of the set's bytes (165,345). Next: the naming waves
+N1-N6 (docs/03). The listening check of M4 is done: Jesus ran `make listen` on 2026-11-05 and heard the
 sound.
 
 ## ROMs

@@ -892,3 +892,25 @@ def test_moved_compare(tmp_path: Path) -> None:
     assert "moved reset at frame 3" in text and "adsp: equal in every frame" in text
     assert "gsp: first differs at frame 2 (writes, hash: reference 2 0000000A, moved 2 0000000C)" \
         in text
+
+
+def test_tables_registry_refuses_unproven_tables(tmp_path: Path) -> None:
+    """data/68k/tables.json (M5d, decision C18): every table has its reader; a table without
+    one, of an unknown format, a records table without its stride, or a table overlapping
+    another is refused."""
+    raw = json.loads((REPO / "data/68k/tables.json").read_text())
+    tables = tr.load_tables(REPO / "data/68k/tables.json")
+    assert len(tables) == 14 and all(t.reader.strip() for t in tables)
+    longs = sum((t.end - t.start) // 4 for t in tables if t.format in ("pointers",
+                                                                       "pointer_or_count"))
+    longs += sum((t.end - t.start) // t.stride * (t.pointers[1] - t.pointers[0]) // 4
+                 for t in tables if t.format == "records")
+    assert longs == 658
+    by_start = {t["start"]: k for k, t in enumerate(raw["tables"])}
+    for start, change in (("047406", {"reader": " "}), ("047406", {"format": "words"}),
+                          ("048180", {"stride": 0}), ("047F50", {"start": "047470"})):
+        bad = json.loads(json.dumps(raw))
+        bad["tables"][by_start[start]].update(change)
+        (tmp_path / "t.json").write_text(json.dumps(bad))
+        with pytest.raises(ValueError):
+            tr.load_tables(tmp_path / "t.json")

@@ -74,7 +74,9 @@ unknown bytes in the same range:
 Instructions, labels (vasm locals) in the committed files: boot 8,220 instructions in six files
 (2,154 labels, 777 locals), game 36,463 (9 of them the `moveb_ffff_*` macros) in nine files and
 the island (3,925 labels, 2,943 locals), the vectors 65 + 70 labels; 44,683 instructions, 6,214
-labels, 3,720 locals in all. The first generation (commit 0f28553) had 2,152, 3,929 and 6,216
+labels, 3,720 locals in all (since M5d, docs/17: the game's nine files and the island (3,960 labels, 2,943 locals),
+with the palette labels and four record labels at 021623-021664 in `code_020430.asm`; 6,249
+labels, 3,720 locals in all). The first generation (commit 0f28553) had 2,152, 3,929 and 6,216
 labels: the review fixes applied the generator's diff (the screen-record header slices in
 `code_0065E0.asm`, `dat_20FD5`/`str_20FD6` and `dat_210FC`/`str_210FD`, the island's three
 `str_` labels gone); `tools/test_68k_tree.py` checks these counts against the tree.
@@ -134,7 +136,9 @@ lint):
 | 02D78C | `tbl_BFE00+$80` | 02DB32 | `tbl_BFE00+$C` | 04081C | `tbl_BFE00+$108` |
 
 All are `move.l tbl_BFE00+$N,-(sp)`: an entry of the image table pushed as an argument. The
-images leg may give the entries labels and replace these operands.
+images leg may give the entries labels and replace these operands. (Done by M5d, docs/17 section
+3.1: every entry is `gsp_image_entry_NN`, the fifteen operands name it, and a label+offset
+reference into the images files is an error of the address lint.)
 
 ## 3. What stays blob, and why
 
@@ -223,11 +227,12 @@ character is a lower-case item byte, fails.
   and reach it, but promoting a range needs a reviewed seed in `data/68k/seeds.json` and
   `make classify` (decision C8);
 - the address lint over 000000-0C0000; the references into `images.asm` and `image_table.asm`
-  as label+offset are counted (section 2.4); a long immediate `data/68k/operands.json` decides
+  as label+offset are counted (section 2.4; an error since M5d, docs/17 section 3.1); a long immediate `data/68k/operands.json` decides
   is a constant fails when it is written as a ROM label (`#dat_100` for `#$100`: the shift test
   cannot see it, since the label moves with the pad, review fix 2);
-- the raw-data check: in the code files (000000-012F06, 020000-046AEE) every `dc`/`dcb`
-  statement is an explained kind: `dc.l` in a vector or pointer table, `dc.w a-b` in a switch
+- the raw-data check: in the code files (000000-012F06, 020000-046AEE; since M5d `data.asm` too,
+  with the palettes of `data/palettes` and the tables of `data/68k/tables.json` as explained
+  kinds, docs/17 section 6) every `dc`/`dcb` statement is an explained kind: `dc.l` in a vector or pointer table, `dc.w a-b` in a switch
   table, `dc.b` of quoted strings and zeros in text, a `dcb.b N,0` fill. A `dc.b` wall in place
   of an incbin slice fails (decision C3), as `tools/test_jsa_music.py` does for the 6502, and so
   does a string that starts with a record field (a count or an item byte, section 3.1); in any
@@ -273,7 +278,7 @@ its address (wave 0: 11), none is left in a blob.
 `tools/test_68k_tree.py` assembles the committed tree against a random blob (vasm only, no ROM)
 and runs `check-tree`'s checks on that listing (`test_tree_checks_pass`: no error, every
 statement reached, every classified instruction start a statement and no other, no undecided
-operand, 337 listed constants, 15 label+offset references, the shift test exact).
+operand, 337 listed constants, 15 label+offset references (0 since M5d), the shift test exact).
 `test_tree_checks_fail` plants one fault per copy of the tree and checks that the right check
 fails: an unknown slice written as `nop`s (the descent check: each `nop` unreached), the same
 slice as a `dc.b` wall (the raw-data check, at its address), a `jsr sub_X` written `jsr $X` (the

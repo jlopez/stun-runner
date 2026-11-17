@@ -3,7 +3,7 @@
 ; 48 bytes of data: 020400 is the base movea.l #$20400,a2 loads at 042356, 020418 the table read
 ; at 02079A, 020D30 and 02093E (docs/06 section 4.2). 020400-020418 is zero and stays a fill
 ; (docs/16).
-; Owner: the game naming legs (M5a-M5f).
+; Owner: the game naming legs (N1-N6, docs/03).
 ;
 ; Generated once by tools/m68k gen 020000 020430 (M5c, issue #33, docs/16-68k-code.md):
 ; neutral labels (the IDA snapshot's names where it has one), operands as docs/14 decides,
