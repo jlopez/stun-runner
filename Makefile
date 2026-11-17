@@ -636,10 +636,13 @@ pccov: $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt) $(BUILD)/$(SET)-68k.bin $(BUILD
 # tools/gspimages is a package run as `uv run python tools/gspimages <command>`; its CI tests are
 # tools/test_gspimages.py. The 68k tree's 060000-0C0000 comes from data/gsp-images alone:
 # tools/gspimages asm re-encodes every stream from the PNGs' pixel indices and writes the
-# includes of asm/68k/images.asm and image_table.asm (and the palettes of data/palettes as dc.b),
-# on every make (a fraction of a second; make 3.81 compares whole-second mtimes), rewriting a file
-# only when it changes. A PNG whose size differs from the manifest's fails the build.
-.PHONY: lint-gspimages images palcheck imgtrace
+# includes of asm/68k/images.asm and image_table.asm, and since M5d (docs/17) one include per
+# palette of data/palettes, build/gsp-images/palettes/<name>.asm, which game/island.asm includes
+# at the palette's address; on every make (a fraction of a second; make 3.81 compares
+# whole-second mtimes), rewriting a file only when it changes. A PNG whose size differs from the
+# manifest's fails the build. (M5i's `palcheck` is gone: the palettes are bytes of the tree now,
+# so `make check`'s byte comparison covers them.)
+.PHONY: lint-gspimages images imgtrace
 lint: lint-gspimages
 lint-gspimages:
 	uv run --frozen mypy -p gspimages
@@ -647,32 +650,17 @@ lint-gspimages:
 GSP_DIR := $(BUILD)/gsp-images
 GSP_ASM := $(GSP_DIR)/images.asm $(GSP_DIR)/table.asm
 GSP_TOOLS := $(wildcard tools/gspimages/*.py)
-GSP_PAL_BIN := $(GSP_DIR)/palettes.bin
 
-# two targets, one recipe: a pattern rule (stem "images"), as the object pages above
-$(BUILD)/gsp-%/images.asm $(BUILD)/gsp-%/table.asm $(BUILD)/gsp-%/palettes.asm: FORCE
+# two targets, one recipe: a pattern rule (stem "images"), as the object pages above; the same
+# run writes the palette includes
+$(BUILD)/gsp-%/images.asm $(BUILD)/gsp-%/table.asm: FORCE
 	$(PYTHON) tools/gspimages asm --data data/gsp-images --palettes data/palettes --out $(GSP_DIR)
 
-.SECONDARY: $(GSP_ASM) $(GSP_DIR)/palettes.asm
+.SECONDARY: $(GSP_ASM)
 # FORCE: the includes keep their mtime unless their text changes, and make 3.81's whole-second
 # mtimes would otherwise skip an assembly whose include changed in the second of the last one
-# (a stale image or palettes.bin would then pass or fail make check wrongly). Both take < 1 s.
+# (a stale image would then pass or fail make check wrongly). Both take < 1 s.
 EXTRA_stunrun-68k += $(GSP_ASM) FORCE
-
-# The palettes as dc.b, assembled alone (no image includes them yet: the data leg embeds them in
-# the tree, docs/15 section 7) and compared with the 68k image at each palette's address. Part of
-# `make check` (a prerequisite); skipped without the reference set, as check is.
-$(GSP_PAL_BIN): $(GSP_DIR)/palettes.asm FORCE
-	$(VASM) $(VASMFLAGS) -o $@ $<
-
-palcheck:
-	@$(PYTHON) tools/check-roms --set $(SET) >/dev/null; rc=$$?; \
-	if [ $$rc -eq 2 ]; then echo "palettes: reference set absent, skipped"; exit 0; fi; \
-	$(MAKE) --no-print-directory $(BUILD)/$(SET)-68k.bin $(GSP_PAL_BIN) || exit 1; \
-	$(PYTHON) tools/gspimages palcheck --palettes data/palettes --bin $(GSP_PAL_BIN) \
-		--image $(BUILD)/$(SET)-68k.bin
-
-check: palcheck
 
 # Re-decode the image into data/gsp-images (docs/15): the manifest and one PNG per distinct
 # image, names and palette specs kept; run after changing the decoder. `make test` fails while

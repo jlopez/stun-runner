@@ -721,7 +721,7 @@ sub_30778:
 	jsr	clear_gsp_screen
 .l307B0:
 	clr.w	WATCHDOG
-	pea	dat_44930
+	pea	pal_level_base_01
 	jsr	sub_2F524
 	clr.w	WATCHDOG
 	pea	dat_4A8DA

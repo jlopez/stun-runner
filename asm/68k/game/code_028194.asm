@@ -195,7 +195,7 @@ sub_28348:
 	jsr	(a2)
 	pea	$10.w
 	jsr	sub_2DA6E
-	move.l	#dat_44930,ram_FF9558
+	move.l	#pal_level_base_01,ram_FF9558
 	move.l	dat_480A8,ram_FF955C
 	move.w	#$10,ram_FF9560
 	move.w	#$FFFF,ram_FF9554
@@ -324,7 +324,7 @@ sub_286A6:
 	pea	$1A.w
 	jsr	sub_2DBB4
 	move.l	dat_480D0,ram_FF955C
-	move.l	#dat_44630,ram_FF9558
+	move.l	#pal_level_base_00,ram_FF9558
 	move.w	#$30,ram_FF9560
 	move.w	#$8,ram_FF9554
 	pea	$33.w
@@ -373,7 +373,7 @@ sub_287B2:
 	link	a6,#$0
 	jsr	sub_2B952
 	move.l	dat_480D4,ram_FF955C
-	move.l	#dat_44630,ram_FF9558
+	move.l	#pal_level_base_00,ram_FF9558
 	move.w	#$30,ram_FF9560
 	move.w	#$1,ram_FF9554
 	pea	$33.w
@@ -429,7 +429,7 @@ sub_288B8:
 	pea	$1F.w
 	jsr	sub_2DBB4
 	move.l	dat_480E4,ram_FF955C
-	move.l	#dat_44630,ram_FF9558
+	move.l	#pal_level_base_00,ram_FF9558
 	move.w	#$10,ram_FF9560
 	move.w	#$1,ram_FF9554
 	pea	$32.w
@@ -2831,7 +2831,7 @@ sub_2A8AC:
 	pea	$1A.w
 	jsr	sub_2DBB4
 	move.l	dat_480D0,ram_FF955C
-	move.l	#dat_44630,ram_FF9558
+	move.l	#pal_level_base_00,ram_FF9558
 	move.w	#$30,ram_FF9560
 	move.w	#$1,ram_FF9554
 	pea	$33.w
@@ -2930,7 +2930,7 @@ sub_2A924:
 	move.l	ram_FF955C,-(sp)
 	move.l	ram_FF9558,-(sp)
 	jsr	sub_296AA
-	move.l	#dat_44930,ram_FF9558
+	move.l	#pal_level_base_01,ram_FF9558
 	move.l	dat_480A8,ram_FF955C
 	move.w	#$10,ram_FF9560
 	move.w	#$1,ram_FF9554
@@ -3842,7 +3842,7 @@ sub_2B1CC:
 	clr.b	ram_FF9512
 	tst.w	ram_FF9578
 	bne.s	.l2B6B0
-	move.l	#dat_44630,ram_FFDB3C
+	move.l	#pal_level_base_00,ram_FFDB3C
 	move.w	#$F,ram_FF9550
 	bra.w	.l2B7BA
 .l2B6B0:

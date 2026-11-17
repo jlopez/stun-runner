@@ -1,0 +1,6 @@
+{
+  "format": "stunrun-68k-data-tables 1",
+  "comment": "The tables of the 68k data whose format the reading instructions prove (M5d, docs/17 section 4; decision C18): range, label, format and the reader cited. tools/m68k check-tree's raw-data check accepts the statements of a table only in its format: pointers, dc.l of labels or 0; audio_test_list, 22-byte records of a command word (an equate of build/68k/sound_commands.asm) and a name, ended by FFFF. Addresses and citations only, no byte of the image.",
+  "tables": [
+  ]
+}

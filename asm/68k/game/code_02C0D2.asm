@@ -107,7 +107,7 @@ init_coprocessors:
 	clr.b	ram_FF9C7C
 	jsr	sub_2F126
 	jsr	sub_2D706
-	pea	dat_44630
+	pea	pal_level_base_00
 	jsr	sub_2F6BE
 	pea	dat_4769A
 	pea	$100.w
@@ -319,11 +319,11 @@ sub_2C546:
 loc_2C596:
 	tst.b	ram_FF9BBE
 	beq.s	loc_2C5D0
-	pea	dat_44642
+	pea	pal_level_base_00+3*6	; its colour 6 (the 5 colours from index 6 that sub_2F610 is given)
 	pea	$5.w
 	pea	$6.w
 	jsr	sub_2F610
-	pea	dat_44651
+	pea	pal_level_base_00+3*11	; its colour 11 (5 colours from index 0Bh)
 	pea	$5.w
 	pea	$B.w
 	jsr	sub_2F610

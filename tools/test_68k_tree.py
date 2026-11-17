@@ -88,7 +88,7 @@ needs_vasm = pytest.mark.skipif(vasm() is None, reason="vasm not available")
 
 def assemble_68k(
     image: bytes, work: Path, tree: Path = TREE, expect_ok: bool = True,
-    generated: dict[str, str] | None = None,
+    generated: dict[str, str] | None = None, palettes: Path = REPO / "data/palettes",
 ) -> tuple[bytes, str, subprocess.CompletedProcess[str]]:
     """The 68k tree assembled against `image` as build/stunrun-68k.bin (and the two programs cut
     out of it, as tools/extract-programs does), with `generated` written under build/ (path ->
@@ -101,7 +101,8 @@ def assemble_68k(
     (build / "stunrun-68k.bin").write_bytes(image)
     (build / "adsp/program.bin").write_bytes(image[ADSP_START:GSP_START])
     (build / "gsp/program.bin").write_bytes(image[GSP_START:GSP_END])
-    write_includes(build / "gsp-images")  # pairs U-W come from data/gsp-images (docs/15)
+    # pairs U-W come from data/gsp-images (docs/15), the palettes from data/palettes (docs/17)
+    write_includes(build / "gsp-images", palettes=palettes)
     for path, text in (generated or {}).items():
         (build / path).parent.mkdir(parents=True, exist_ok=True)
         (build / path).write_text(text)
@@ -340,6 +341,31 @@ def test_tree_assembles_a_random_blob(tmp_path: Path) -> None:
     assert symbols["adsp_program"] == ("A", ADSP_START)
     assert symbols["gsp_program"] == ("A", GSP_START)
     assert symbols["copyright_text"] == ("A", 0x017010)
+
+
+@needs_vasm
+def test_palettes_come_from_data_palettes(tmp_path: Path) -> None:
+    """M5d (docs/17 section 2): the 32 palettes are bytes of the tree, from data/palettes alone,
+    whatever the blob; a planted colour component changes exactly that byte of the image, at
+    the palette's address plus three per colour."""
+    from gspimages import read_palettes
+
+    pals = read_palettes(REPO / "data/palettes")
+    assert len(pals) == 32
+    image = random.Random(5).randbytes(IMAGE_SIZE)
+    out, listing, _ = assemble_68k(image, tmp_path / "a")
+    symbols = vasm_symbols(listing)
+    for name, p in pals.items():
+        assert out[p.address : p.address + 3 * p.count] == p.bytes(), name
+        assert symbols[f"pal_{name}"] == ("A", p.address), name
+    planted = tmp_path / "palettes"
+    shutil.copytree(REPO / "data/palettes", planted)
+    raw = json.loads((planted / "title.json").read_text())
+    raw["colors"][7][1] ^= 1
+    (planted / "title.json").write_text(json.dumps(raw))
+    out2, _, _ = assemble_68k(image, tmp_path / "b", palettes=planted)
+    diff = [a for a in range(IMAGE_SIZE) if out[a] != out2[a]]
+    assert diff == [pals["title"].address + 3 * 7 + 1]
 
 
 @needs_vasm

@@ -372,6 +372,9 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
                  "build/gsp-images/table.asm": "asm/68k/image_table.asm"}
     files68k: dict[str, dict[str, int]] = {}
     for f, c in summary["files"].items():
+        # the palettes (M5d, docs/17): one include per palette, in game/island.asm
+        if f.startswith("build/gsp-images/palettes/"):
+            f = "asm/68k/game/island.asm"
         f = generated.get(f, f)
         if f.startswith("asm/68k/"):
             row = files68k.setdefault(f, dict.fromkeys(("instr", "data", "blob", "fill"), 0))
@@ -383,7 +386,8 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert summary["images"]["stunrun-68k"] == total
     assert total["instr"] == 163_638
     code = [c for f, c in files68k.items() if f.startswith(("asm/68k/boot/", "asm/68k/game/"))]
-    assert sum(c["blob"] for c in code) == 61_118
+    # 61,118 in M5c (docs/16); M5d made the 32 palettes of the island (6,768 bytes) data
+    assert sum(c["blob"] for c in code) == 61_118 - 6_768
     assert summary["images"]["stunrun-nvram"] == {"instr": 0, "data": 0, "blob": 0, "fill": 4096}
     assert {f: sum(c.values()) for f, c in files68k.items()} == {
         f"asm/68k/{f}": b - a for f, a, b in REGIONS}

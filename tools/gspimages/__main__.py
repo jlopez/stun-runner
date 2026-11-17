@@ -7,23 +7,21 @@ tools/gspimages is a package directory, run as `uv run python tools/gspimages <c
                              [--palettes data/palettes]
     tools/gspimages check    [--data data/gsp-images] [--palettes data/palettes]
                              [--image build/stunrun-68k.bin]
-    tools/gspimages palcheck [--palettes data/palettes] --bin FILE --image build/stunrun-68k.bin
     tools/gspimages trace    [--data data/gsp-images] [--image build/stunrun-68k.bin]
                              [--summary artifacts/gspimages-summary.json] TRACE ...
 
 asm      the build step (`make`): reads the manifest and the PNGs (pixel indices only; a PNG
          whose size differs from the manifest's fails), re-encodes every stream, computes the
          adjust words and writes <out>/images.asm and <out>/table.asm (the includes of
-         asm/68k/images.asm and asm/68k/image_table.asm) and <out>/palettes.asm (every palette
-         of data/palettes as dc.b, for palcheck). A file is rewritten only when it changes.
+         asm/68k/images.asm and asm/68k/image_table.asm) and <out>/palettes/<name>.asm (every
+         palette of data/palettes as dc.b, which game/island.asm includes at its address, M5d,
+         docs/17). A file is rewritten only when it changes.
 decode   `make images`: reads 060000-0C0000 of the 68k image as the format (fails on any byte it
          does not explain) and rewrites the manifest and one PNG per distinct image, keeping the
          names and palette specs of the existing manifest (matched by stream and position) and
          writing each PNG's PLTE from data/palettes; removes any other PNG in --data.
 check    the PNGs' PLTE against data/palettes, and with --image the region built from the data
          against the image (counts and addresses of differences only).
-palcheck compares the assembled palettes (--bin, from <out>/palettes.asm) with the image at each
-         palette's address: `make check` runs it; it fails on any difference.
 trace    checks MAME traces of tools/mame/gspimages.lua against the decoded images and writes
          their summary (entries, frames, destinations, counts; no bytes).
 
@@ -51,12 +49,12 @@ from gspimages import (  # noqa: E402
     entries_of,
     image_palette,
     manifest_json,
-    palettes_asm,
     png,
     png_path,
     read_images,
     read_manifest,
     read_palettes,
+    write_palettes,
     write_png,
 )
 
@@ -86,15 +84,10 @@ def cmd_asm(args: argparse.Namespace) -> int:
         for alias in spec.get("aliases", []):
             compose(alias, pals)
     images_src, table_src = asm_sources(m, images)
-    pal_src, spans = palettes_asm(pals)
     args.out.mkdir(parents=True, exist_ok=True)
     write_if_changed(args.out / "images.asm", images_src)
     write_if_changed(args.out / "table.asm", table_src)
-    write_if_changed(args.out / "palettes.asm", pal_src)
-    write_if_changed(
-        args.out / "palettes.map",
-        "".join(f"{n} {a:06X} {o} {k}\n" for n, a, o, k in spans),
-    )
+    write_palettes(args.out, pals)
     return 0
 
 
@@ -183,24 +176,6 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 1 if bad else 0
 
 
-def cmd_palcheck(args: argparse.Namespace) -> int:
-    image = load_image(args.image)
-    built = args.bin.read_bytes()
-    pals = read_palettes(args.palettes)
-    _, spans = palettes_asm(pals)
-    bad = 0
-    for name, addr, off, length in spans:
-        mine = built[off : off + length]
-        ref = image[addr : addr + length]
-        if mine != ref:
-            k = next(i for i in range(length) if i >= len(mine) or mine[i] != ref[i])
-            print(f"palette {name} ({addr:06X}, {length // 3} colours): differs from the 68k image "
-                  f"at colour {k // 3} (68k {addr + k:06X})")
-            bad += 1
-    print(f"palettes: {len(spans) - bad} of {len(spans)} equal to the 68k image at their address")
-    return 1 if bad else 0
-
-
 def cmd_trace(args: argparse.Namespace) -> int:
     from gspimages.trace import summary
 
@@ -242,12 +217,6 @@ def main() -> int:
     p.add_argument("--palettes", type=Path, default=pals)
     p.add_argument("--image", type=Path)
     p.set_defaults(func=cmd_check)
-
-    p = sub.add_parser("palcheck")
-    p.add_argument("--palettes", type=Path, default=pals)
-    p.add_argument("--bin", type=Path, required=True)
-    p.add_argument("--image", type=Path, default=img)
-    p.set_defaults(func=cmd_palcheck)
 
     p = sub.add_parser("trace")
     p.add_argument("--data", type=Path, default=data)
