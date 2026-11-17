@@ -32,7 +32,7 @@ No byte of the set changed: `make check` gives 25 files, 0 differences.
 | `game/vectors.asm` | 020000-020430 | 1,072 | since M5c: the vectors as `dc.l`, `game_entries` three `jmp`, fills 020112-020400 and 020400-020418 (`dat_20400`), incbin `dat_20418` (24) | game naming legs |
 | `game/code_020430.asm` ... `game/code_03FC22.asm` | 020430-04397E | 144,718 | since M5c: nine files of neutral source cut at routine starts (docs/16 section 2.1); wave 0 had one file, `game/code.asm`, all incbin | game naming legs |
 | `game/island.asm` | 04397E-046AEE | 12,656 | since M5c: the code at 0445F0-044630 and 046A00-046AEE as source, the text as `dc.b`, the rest as labelled incbin slices | game naming legs |
-| `data.asm` | 046AEE-060000 | 103,698 | incbin, cut by M5c into 430 labelled slices at the addresses the code references; fill 05CF86-060000 | data leg |
+| `data.asm` | 046AEE-060000 | 103,698 | incbin, cut by M5c into 429 labelled slices at the addresses the code references; fill 05CF86-060000 | data leg |
 | `images.asm` | 060000-0BFE00 | 392,704 | since M5i (docs/15): `dat_60000`, the include `build/gsp-images/images.asm` generated from `data/gsp-images` (54 streams, 3 computed adjust words, 332,011 bytes of data); fill 0B10EB-0BFE00 | images leg |
 | `image_table.asm` | 0BFE00-0C0000 | 512 | since M5i: `tbl_BFE00`, the include `build/gsp-images/table.asm` (70 `dc.l`, 280); fill 0BFF18-0C0000 | images leg |
 
