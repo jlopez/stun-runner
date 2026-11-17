@@ -710,3 +710,45 @@ $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt): $(BUILD)/mame/imgtrace-%.txt: tools/
 imgtrace: $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt) $(BUILD)/$(SET)-68k.bin
 	$(PYTHON) tools/gspimages trace --image $(BUILD)/$(SET)-68k.bin \
 		--summary artifacts/gspimages-summary.json $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt)
+
+# --- M5d: the moved-build experiment (docs/17 section 5) ------------------------------------
+# How relocatable is the 68k tree? tools/m68k moved assembles it with MOVED_PAD zero bytes before
+# the game code (020430; the fill at 05CF86 shorter by as much, so pairs U-W stay), its guards
+# off, into build/moved/stunrun-68k.out, and tools/split-roms cuts it with the other four images
+# into build/moved/roms/stunrun (never committed). tools/mame/movedcheck.lua logs per frame what
+# the 68010 writes to the GSP host port, the ADSP and the sound latch, headless, each run from
+# its own empty NVRAM and cfg: attract mode and a started game, for the reference set and for
+# the moved one; `tools/m68k moved-compare` prints the first frame each stream differs in. An
+# experiment, not a check: it reports and exits 0. MOVED_DETAIL=F1-F2 logs every write of those
+# frames with its PC (build/mame/moved-*.detail). `make -j4 movedcheck`. Needs MAME and the ROMs.
+.PHONY: movedcheck moved
+MOVED_PAD ?= 4
+MOVED_FRAMES ?= 4000
+MOVED_DIR := $(BUILD)/moved
+MOVED_RUNS := ref-attract moved-attract ref-game moved-game
+
+moved: all
+	$(PYTHON) tools/m68k moved --pad $(MOVED_PAD) --tree asm/68k --build $(BUILD) --out $(MOVED_DIR)
+	for i in stunrun-obj stunrun-oki stunrun-nvram stunrun-jsa; do \
+		cp $(BUILD)/$$i.out $(MOVED_DIR)/$$i.out || exit 1; done
+	$(PYTHON) tools/split-roms --set $(SET) --images $(MOVED_DIR) --suffix .out \
+		--out $(MOVED_DIR)/roms/$(SET)
+
+$(BUILD)/mame/moved-ref-%.txt: MOVED_ROMPATH = $(REF_ROMPATH)
+$(BUILD)/mame/moved-moved-%.txt: MOVED_ROMPATH = $(MOVED_DIR)/roms
+$(BUILD)/mame/moved-%-attract.txt: MOVED_ENV = MOVED_PLAY=0
+$(BUILD)/mame/moved-%-game.txt: MOVED_ENV = MOVED_PLAY=1
+
+$(MOVED_RUNS:%=$(BUILD)/mame/moved-%.txt): $(BUILD)/mame/moved-%.txt: tools/mame/movedcheck.lua moved
+	$(call TRACE_STATE,moved-$*)
+	rm -f $@
+	MOVED_DIR=$(BUILD)/mame/ MOVED_NAME=moved-$* MOVED_FRAMES=$(MOVED_FRAMES) $(MOVED_ENV) \
+		MOVED_DETAIL=$(MOVED_DETAIL) SDL_VIDEODRIVER=dummy $(MAME) stunrun $(MAME_FLAGS) \
+		-rompath $(MOVED_ROMPATH) $(call TRACE_DIRS,moved-$*) \
+		-autoboot_script tools/mame/movedcheck.lua
+	@grep -qx '# done' $@ || { echo "movedcheck: the $* run did not finish"; exit 1; }
+
+movedcheck: $(MOVED_RUNS:%=$(BUILD)/mame/moved-%.txt)
+	$(PYTHON) tools/m68k moved-compare $(BUILD)/mame/moved-ref-attract.txt \
+		$(BUILD)/mame/moved-moved-attract.txt $(BUILD)/mame/moved-ref-game.txt \
+		$(BUILD)/mame/moved-moved-game.txt

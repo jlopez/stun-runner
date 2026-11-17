@@ -3,6 +3,18 @@
   "comment": "The tables of the 68k data whose format the reading instructions prove (M5d, docs/17 section 4; decision C18): range, label, format and the reader cited. tools/m68k check-tree's raw-data check accepts the statements of a table only in its format: pointers, dc.l of labels or 0; audio_test_list, 22-byte records of a command word (an equate of build/68k/sound_commands.asm) and a name, ended by FFFF. Addresses and citations only, no byte of the image.",
   "tables": [
     {
+      "start": "021650",
+      "end": "02166E",
+      "label": "dat_21650",
+      "format": "records",
+      "stride": 10,
+      "pointers": [
+        0,
+        4
+      ],
+      "reader": "3 records of 10 bytes: sub_2166E (lea dat_21650,a0; mulu.w #$A,d0; adda.l d0,a0 at 02166E-021678) loads +0 as an address (movea.l (a0),a1 at 02167E) and reads 3-byte entries through it (move.b ($0,a1),d0 / ($1,a1) / ($2,a1), adda.w #$3,a1 at 021684-021698), +4 their count less one (move.w ($4,a0),d5, dbf d5), +6 the GSP address written to HSTADR (move.l ($6,a0),GSP_HOST+$2 at 0216A0). Found by the moved-build experiment (docs/17 section 5): with the pointers numeric, the moved build wrote other HSTDATA words at 0216A8 in frame 363"
+    },
+    {
       "start": "047406",
       "end": "04747E",
       "label": "dat_47406",

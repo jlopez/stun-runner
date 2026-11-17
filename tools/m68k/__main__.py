@@ -15,6 +15,9 @@
     tools/m68k pccov-read FIFO OUT
     tools/m68k pccov [--image ...] [--classification ...] [--listing L] --summary FILE RUN ...
     tools/m68k sound-equates [--commands data/sound/commands.json] --out FILE
+    tools/m68k moved --pad N [--tree asm/68k] [--build build] --out DIR
+    tools/m68k moved-compare REFERENCE_LOG MOVED_LOG ...
+    tools/m68k moved-candidates --listing L --binary B [--least 4]
 
 classify       runs the descent (with the MAME runs given as seeds) and rewrites the
                classification and the operand decisions (commit both when they change); without
@@ -49,6 +52,14 @@ pccov          fails unless every executed PC starts a code instruction (and, wi
 sound-equates  writes the sound command equates of data/sound/commands.json (sound.py, M5d,
                docs/17) as the vasm include the tree includes after ram.asm; rewrites the file
                only when its text changes
+moved          the moved-build experiment (moved.py, M5d, docs/17 section 5): the tree with N
+               zero bytes before the game code (020430), the fill at 05CF86 shorter by N, its
+               guards off, assembled into DIR/stunrun-68k.out
+moved-compare  per stream (GSP host port, ADSP, sound latch), the first frame where the
+               movedcheck.lua logs of the reference set and the moved build differ; pairs of
+               logs, one line of summary each; exit 0 whatever it finds (an experiment)
+moved-candidates  a worklist, not evidence: the runs of address-like longs still in incbin
+               slices of 020430-05CF86 (moved.py `candidates`), one line each and a total
 """
 
 from __future__ import annotations
@@ -526,6 +537,41 @@ def cmd_sound_equates(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_moved(a: argparse.Namespace) -> int:
+    from m68k import moved
+
+    a.out.mkdir(parents=True, exist_ok=True)
+    image = moved.build_moved(a.tree, a.build, a.out, a.pad)
+    print(f"{a.out / 'stunrun-68k.out'}: {len(image)} bytes, the game code moved by {a.pad}")
+    return 0
+
+
+def cmd_moved_compare(a: argparse.Namespace) -> int:
+    from m68k import moved
+
+    if len(a.logs) % 2:
+        print("moved-compare: give the logs in pairs, reference then moved")
+        return 2
+    for k in range(0, len(a.logs), 2):
+        ref, mov = a.logs[k], a.logs[k + 1]
+        print(moved.summary(ref.stem.replace("-ref", ""), moved.load(ref), moved.load(mov)))
+    return 0
+
+
+def cmd_moved_candidates(a: argparse.Namespace) -> int:
+    from m68k import moved
+
+    image = a.binary.read_bytes()
+    lst = ls.parse(a.listing.read_text(), ls.macro_names(a.macros))
+    ls.sizes(lst, len(image))
+    runs = moved.candidates(lst, image, a.least)
+    for x, e in runs:
+        print(f"{x:06X}-{e:06X} {(e - x) // 4}")
+    print(f"{len(runs)} runs of at least {a.least} address-like longs in blob, "
+          f"{sum(e - x for x, e in runs) // 4} longs")
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser(prog="tools/m68k", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -619,6 +665,24 @@ def main() -> int:
     q.add_argument("--commands", type=Path, default=REPO / "data/sound/commands.json")
     q.add_argument("--out", type=Path, required=True)
     q.set_defaults(func=cmd_sound_equates)
+
+    q = sub.add_parser("moved")
+    q.add_argument("--pad", type=int, required=True)
+    q.add_argument("--tree", type=Path, default=REPO / "asm/68k")
+    q.add_argument("--build", type=Path, default=REPO / "build")
+    q.add_argument("--out", type=Path, required=True)
+    q.set_defaults(func=cmd_moved)
+
+    q = sub.add_parser("moved-candidates")
+    q.add_argument("--listing", type=Path, required=True)
+    q.add_argument("--binary", type=Path, required=True)
+    q.add_argument("--macros", type=Path, default=MACROS)
+    q.add_argument("--least", type=int, default=4)
+    q.set_defaults(func=cmd_moved_candidates)
+
+    q = sub.add_parser("moved-compare")
+    q.add_argument("logs", type=Path, nargs="+")
+    q.set_defaults(func=cmd_moved_compare)
 
     a = p.parse_args()
     return int(a.func(a))

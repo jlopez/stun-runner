@@ -843,3 +843,52 @@ def test_data_asm_raw_data_check_fails(tmp_path: Path) -> None:
     assert any(e.startswith("04E3B4: table dat_4E3B4") and "9 longs missing" in e
                for e in rep.raw), rep.raw
     assert len(rep.raw) == 5, rep.raw
+
+
+@needs_vasm
+def test_moved_build(tmp_path: Path) -> None:
+    """The moved-build experiment's tree (M5d, docs/17 section 5): with a pad of 4 before the
+    game code, the boot program, the coprocessor programs, the game vectors' place and pairs
+    U-W stay where they are, every label of 020430-05CF86 moves by 4, the fill at 05CF86 is 4
+    shorter, and the game vector table names the moved handlers."""
+    from m68k import moved
+
+    image = random.Random(11).randbytes(IMAGE_SIZE)
+    out, listing, _ = assemble_68k(image, tmp_path / "a")
+    build = tmp_path / "a/build"
+    mov = moved.build_moved(tmp_path / "a/asm/68k", build, tmp_path / "moved", 4)
+    assert mov[:0x020000] == out[:0x020000]  # the boot program and the coprocessor programs
+    assert mov[0x060000:] == out[0x060000:]
+    a = vasm_symbols(listing)
+    b = vasm_symbols((tmp_path / "moved/stunrun-68k.lst").read_text(errors="replace"))
+    for name in ("sub_20430", "audio_test", "audio_test_list", "pal_title", "dat_47406"):
+        assert b[name][1] == a[name][1] + 4, name
+    for name in ("copyright_text", "gsp_image_entry_25", "game_entries"):
+        assert b[name][1] == a[name][1], name
+    vec = struct.unpack_from(">I", mov, 0x020000 + 4 * 3)[0]  # game_vec_address_error
+    assert vec == b["h_address_error"][1] == a["h_address_error"][1] + 4
+    with pytest.raises(ValueError, match="even"):
+        moved.moved_tree(tmp_path / "a/asm/68k", build, tmp_path / "m2", 3)
+
+
+def test_moved_compare(tmp_path: Path) -> None:
+    """tools/m68k moved-compare on made-up movedcheck.lua logs: the first frame per stream
+    whose count or hash differs, and the moved run's reset."""
+    from m68k import moved
+
+    def log(path: Path, rows: list[str], extra: str = "") -> Path:
+        path.write_text("# frames 3\n# play 0\n" + "".join(r + "\n" for r in rows) + extra
+                        + "# done\n")
+        return path
+
+    same = "gsp 2 0000000A adsp 0 811C9DC5 snd 1 0000000B"
+    ref = log(tmp_path / "r.txt", [f"f 1 {same}", f"f 2 {same}", f"f 3 {same}"])
+    mov = log(tmp_path / "m.txt", [f"f 1 {same}", "f 2 gsp 2 0000000C adsp 0 811C9DC5 snd 1 "
+                                   "0000000B", "f 3 gsp 2 0000000A adsp 0 811C9DC5 snd 0 811C9DC5"],
+              "# reset_at_frame 3\n")
+    r, m = moved.load(ref), moved.load(mov)
+    assert moved.compare(r, m) == {"gsp": 2, "adsp": None, "snd": 3}
+    text = moved.summary("t", r, m)
+    assert "moved reset at frame 3" in text and "adsp: equal in every frame" in text
+    assert "gsp: first differs at frame 2 (writes, hash: reference 2 0000000A, moved 2 0000000C)" \
+        in text
