@@ -398,7 +398,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     r = run(*make, "coverage", "MAX_BLOB=asm/68k/programs.asm=32688 asm/68k/data.asm=0", env=env)
     assert r.returncode != 0
     assert "OK asm/68k/programs.asm: 32688 blob bytes" in r.stdout
-    assert "asm/68k/data.asm has 91288 blob bytes, at most 0 allowed" in r.stderr
+    assert "asm/68k/data.asm has 78319 blob bytes, at most 0 allowed" in r.stderr
     # the snapshot's names in source are labels at their addresses
     r = run(*make, "labels", env=env)
     assert r.returncode == 0, r.stdout + r.stderr

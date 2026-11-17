@@ -815,3 +815,31 @@ def test_audio_test_list_is_source(tmp_path: Path) -> None:
         seen.append(value)
     assert out[base + 22 * 108 : base + 22 * 108 + 2] == b"\xff\xff"
     assert sorted(seen) == [v for v in range(0x6D) if v != 3]
+
+
+@needs_vasm
+def test_data_asm_raw_data_check_fails(tmp_path: Path) -> None:
+    """M5d (docs/17): the raw-data check covers data.asm. A dc.b wall in place of a data slice
+    fails at its address; so do a record field of 048180 written as dc.l (only +4-+40 are
+    pointers), a long of a proven pointer table written as a count, a number of 400h or more
+    in 047F50, and a table of data/68k/tables.json left an incbin slice."""
+    wall = "\tdc.b\t" + ",".join(["$00"] * 0x1E) + "\n"
+    tree = planted(
+        tmp_path, "data.asm", '\tincbin\t"../../build/stunrun-68k.bin",$04A88C,$1E\n', wall,
+        ("data.asm", '\tincbin\t"../../build/stunrun-68k.bin",$0481A8,$4\n', "\tdc.l\t0\n"),
+        ("data.asm", "\tdc.l\tstr_4A998\n", "\tdc.l\t$12\n"),
+        ("data.asm", "dat_47F58:\n\tdc.l\t$F0\n", "dat_47F58:\n\tdc.l\t$400\n"),
+        ("data.asm", "dat_4E3B4:\n", "dat_4E3B4:\n\tincbin\t\"../../build/stunrun-68k.bin\","
+         "$04E3B4,$24\n\tifne 0\n"),
+        ("data.asm", "dat_4E3D8:\n", "\tendif\ndat_4E3D8:\n"),
+    )
+    rep = tree_check(tmp_path, tree, shift=False)
+    assert any(e.startswith("04A88C: dc.b\t$00,") and "in a data range" in e
+               for e in rep.raw), rep.raw
+    assert any(e.startswith("0481A8: dc.l\t0:") and "+4-+28" in e for e in rep.raw), rep.raw
+    assert any(e.startswith("04A954: dc.l\t$12:") and "labels or 0 only" in e
+               for e in rep.raw), rep.raw
+    assert any(e.startswith("047F58: dc.l\t$400:") and "below 400h" in e for e in rep.raw), rep.raw
+    assert any(e.startswith("04E3B4: table dat_4E3B4") and "9 longs missing" in e
+               for e in rep.raw), rep.raw
+    assert len(rep.raw) == 5, rep.raw

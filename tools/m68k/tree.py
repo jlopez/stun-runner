@@ -51,7 +51,7 @@ CODE_FILES = [(0x000000, 0x012F06), (0x020000, 0x046AEE)]
 # the raw-data check's scope: the code files and, since M5d, data.asm (docs/17)
 RAW_FILES = [(0x000000, 0x012F06), (0x020000, 0x060000)]
 REPO = Path(__file__).resolve().parents[2]
-TABLE_FORMATS = ("pointers", "audio_test_list")
+TABLE_FORMATS = ("pointers", "pointer_or_count", "records", "audio_test_list")
 # the images files: a reference into them as label + offset (decision C10) is an error since
 # M5d, when every image table entry got its label (docs/17 section 3)
 FOREIGN = {"dat_60000": (0x060000, 0x0BFE00), "tbl_BFE00": (0x0BFE00, 0x0C0000)}
@@ -109,6 +109,9 @@ class Table:
     label: str
     format: str
     reader: str
+    below: int = 0  # pointer_or_count: a number below this is a count, not an address
+    stride: int = 0  # records: the record size
+    pointers: tuple[int, int] = (0, 0)  # records: the pointer field, offsets in a record
 
 
 @dataclass
@@ -148,9 +151,14 @@ def load_tables(path: Path) -> list[Table]:
     out = []
     for e in raw["tables"]:
         tb = Table(int(e["start"], 16), int(e["end"], 16), e["label"], e["format"],
-                   e.get("reader", ""))
+                   e.get("reader", ""), int(e.get("below", "0"), 16), int(e.get("stride", 0)),
+                   tuple(e.get("pointers", (0, 0))))
         if tb.format not in TABLE_FORMATS or not tb.reader.strip() or tb.end <= tb.start:
             raise ValueError(f"{path}: table {e['start']}: format, reader or range")
+        if (tb.format == "pointer_or_count") != (tb.below > 0) or (
+                tb.format == "records") != (tb.stride > 0) or (
+                tb.format == "records" and not 0 <= tb.pointers[0] < tb.pointers[1] <= tb.stride):
+            raise ValueError(f"{path}: table {e['start']}: below, stride or pointers")
         out.append(tb)
     out.sort(key=lambda x: x.start)
     for a, b in zip(out, out[1:], strict=False):
@@ -210,10 +218,22 @@ def trailing_field(ops: list[str], address: int, binary: bytes) -> str:
 
 def _table_statement(tb: Table, s: ls.Stmt, mn: str, ops: list[str]) -> str:
     """Why a dc statement inside a table of data/68k/tables.json is not of its format, or ""."""
+    pointer = mn == "dc.l" and ops and all(ls.names_symbol(op) or op in ("0", "$0") for op in ops)
     if tb.format == "pointers":
-        if mn == "dc.l" and ops and all(ls.names_symbol(op) or op in ("0", "$0") for op in ops):
+        return "" if pointer else "a proven pointer table holds dc.l of labels or 0 only"
+    if tb.format == "pointer_or_count":
+        nums = [ls._num(op) for op in ops]
+        if pointer or (mn == "dc.l" and ops and all(n is not None and n < tb.below
+                                                     for n in nums)):
             return ""
-        return "a proven pointer table holds dc.l of labels or 0 only"
+        return f"this table holds dc.l of labels or of counts below {tb.below:X}h only"
+    if tb.format == "records":
+        lo, hi = tb.pointers
+        at = (s.address - tb.start) % tb.stride
+        if pointer and lo <= at and at + 4 * len(ops) <= hi:
+            return ""
+        return (f"a record's bytes +{lo:X}-+{hi:X} are dc.l of labels or 0; its other fields "
+                f"stay incbin slices")
     # audio_test_list: per record dc.w <command equate>, dc.b '<name>',0, dcb.b N,0; FFFF last
     if mn == "dc.w" and len(ops) == 1 and (ls.names_symbol(ops[0])
                                             or (ops[0].upper() == "$FFFF"
@@ -297,7 +317,28 @@ def raw_data(lst: ls.Listing, c: cl.Classification, binary: bytes,
     for tb in ex.tables:
         if tb.format == "audio_test_list":
             out += audio_test_records(lst, tb)
+        else:
+            out += pointer_coverage(lst, tb)
     return out
+
+
+def pointer_coverage(lst: ls.Listing, tb: Table) -> list[str]:
+    """A pointer table of data/68k/tables.json is dc.l statements over its whole range (a
+    records table: over every record's pointer field), so the registry claims no more than the
+    source holds."""
+    longs = {s.address for s in lst.statements
+             if tb.start <= s.address < tb.end and s.kind == "data"
+             and s.text.split()[0].lower() == "dc.l" and s.size == 4}
+    if tb.format == "records":
+        lo, hi = tb.pointers
+        want = [r + k for r in range(tb.start, tb.end, tb.stride) for k in range(lo, hi, 4)]
+    else:
+        want = list(range(tb.start, tb.end, 4))
+    missing = [a for a in want if a not in longs]
+    if missing:
+        return [f"{missing[0]:06X}: table {tb.label} (data/68k/tables.json) is not one dc.l per "
+                f"long there ({len(missing)} longs missing)"]
+    return []
 
 
 def foreign_refs(lst: ls.Listing) -> list[str]:

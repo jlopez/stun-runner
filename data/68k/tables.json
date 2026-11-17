@@ -3,6 +3,96 @@
   "comment": "The tables of the 68k data whose format the reading instructions prove (M5d, docs/17 section 4; decision C18): range, label, format and the reader cited. tools/m68k check-tree's raw-data check accepts the statements of a table only in its format: pointers, dc.l of labels or 0; audio_test_list, 22-byte records of a command word (an equate of build/68k/sound_commands.asm) and a name, ended by FFFF. Addresses and citations only, no byte of the image.",
   "tables": [
     {
+      "start": "047406",
+      "end": "04747E",
+      "label": "dat_47406",
+      "format": "pointers",
+      "reader": "the level base palettes, 30 longs indexed by the level word x 4: 029B20-029B2E (move.w ram_FF9578,d0; asl.w #2,d0; movea.l #dat_47406,a0; move.l ($0,a0,d0.w),-(sp)) passes the long to sub_296AA as its first argument, which reads the colours through it (movea.l ($8,a6),a2 at 0296B2, move.b (a2),(a5)+ at 0296EA); 029A84-029A8A the same into sub_297A6; 02531C and 02A5D8 store one into FF9558, the pointer variable of data/68k/operands.json (docs/15 section 7). The reader has no bound: entries 24-29 (past the 24 level records of 048180) are of the same run, every long a palette"
+    },
+    {
+      "start": "047F50",
+      "end": "048068",
+      "label": "dat_47F50",
+      "format": "pointer_or_count",
+      "below": "400",
+      "reader": "per image table entry (70 longs): 02DBC0-02DBCA, 029980 and 02DAF0 index it by the entry x 4 and compare the long with 400h (cmpi.l #$400,($0,a1,d0.w)); below it the long is a raw screen's row count, stored into FF9BAE; at or above it a pointer, stored into FF9BD8, which sub_2C686 reads back as an address (movea.l #ram_FF9BD8,a2; movea.l (a2),a0 at 02C6DC; move.w ($1E,a0),d0 at 02C6DE; move.w (a0),d0 at 02C6F8): dc.l of a label or a count below 400h (docs/15 sections 4.1 and 7)"
+    },
+    {
+      "start": "048068",
+      "end": "048180",
+      "label": "dat_48068",
+      "format": "pointers",
+      "reader": "the overlay palette per image table entry (70 longs): 02DACE-02DAD4 (movea.l #dat_48068,a0; move.l ($0,a0,d0.w),ram_FFDB40) after tst.l ($0,a0,d0.w) at 02DAC4, FFDB40 being the palette address of GSP command 9 (docs/15 section 7; data/68k/operands.json at 024FA8); 029B16-029B1C passes one to sub_296AA as its second argument, read through a3 (movea.l ($C,a6),a3 at 0296B6, the null test at 0296CA-0296CC, move.b (a3),(a4)+ at 029726); 02A5FA-02A600 into FF955C; 0 is no overlay"
+    },
+    {
+      "start": "048180",
+      "end": "048540",
+      "label": "dat_48180",
+      "format": "records",
+      "stride": 40,
+      "pointers": [
+        4,
+        40
+      ],
+      "reader": "24 level records of 40 bytes indexed by the level word x 40 (asl.l #3, x5): +0 the map's image table entry (move.b ($0,a0,d1.l),d0 at 029A70, 02A5F4 and 30 more), +2 a word into FF954E (029DE4), both kept incbin slices here; +4-+40 nine longs, string pointers or 0: sub_2DD1E (called with pea ($4,a0,d0.l) at 027902) walks them (movea.l (a2),a0 at 02DD38, move.b (a0)+,(a3)+ at 02DD4C, addq.l #4,a2 at 02DD78, tst.l (a2) at 02DD80), and 02B308, 02B3F4, 02B51C pass +4 to sub_30220 with a format string"
+    },
+    {
+      "start": "04A954",
+      "end": "04A998",
+      "label": "dat_4A954",
+      "format": "pointers",
+      "reader": "17 string pointers: 0307DC-0307E6 (asl.w #2,d0; movea.l #dat_4A954,a0; move.l ($0,a0,d0.w),-(sp)) passes one to sub_23898 as its fourth argument, which draws the string through it (movea.l ($10,sp),a0 at 0238D4, move.b (a0)+,d1 at 0238EA)"
+    },
+    {
+      "start": "04C712",
+      "end": "04C9EA",
+      "label": "dat_4C712",
+      "format": "pointers",
+      "reader": "182 longs, 0 or a pointer: 0311CC-0311D2 (movea.l #dat_4C712,a0; move.l ($0,a0,d0.l),d3, the index masked with 1FFh and 0 skipped at 0311B8-0311C4), then movea.l d3,a5 and movea.l (a5)+,a4 at 0311DA-0311DC (and 0317A2-0317A4); 0358B8 and 03A0A8 read it too. The run ends at the first long that points nowhere in the data (the 306 bytes after it stay blob)"
+    },
+    {
+      "start": "04D628",
+      "end": "04D68C",
+      "label": "dat_4D628",
+      "format": "pointers",
+      "reader": "25 longs indexed by the level word x 4 (0277BE-0277C4, 0277D8, 0279D0, 0279EA, 02B794), passed to sub_31ABE, which stores its argument into FFDC6C (move.l ($8,a6),d3; move.l d3,ram_FFDC6C at 031B64); sub_3186A reads it back as an address (movea.l #ram_FFDC6C,a2; movea.l (a2),a0 at 031872-031878, tst.l (a0))"
+    },
+    {
+      "start": "04E3B4",
+      "end": "04E3D8",
+      "label": "dat_4E3B4",
+      "format": "pointers",
+      "reader": "9 longs: 03D64A-03D650 (movea.l #dat_4E3B4,a0; move.l ($0,a0,d0.w),d4), then movea.l d4,a0 and tst.w (a0) at 03D7A8-03D7AA, d4 stepped by 2 (03D7A6)"
+    },
+    {
+      "start": "04E3D8",
+      "end": "04E408",
+      "label": "dat_4E3D8",
+      "format": "pointers",
+      "reader": "12 longs: 03D490-03D496 (movea.l #dat_4E3D8,a0; move.l ($0,a0,d0.w),d4), then movea.l d4,a0 and tst.b (a0) at 03D5EA-03D5EC, d4 stepped by 1 (03D5E8)"
+    },
+    {
+      "start": "04EA6A",
+      "end": "04EA9A",
+      "label": "dat_4EA6A",
+      "format": "pointers",
+      "reader": "12 string pointers: 04019C-0401A2 and 0401DA-0401E0 pass one to sub_2E4B4, a string copy (movea.l ($C,a6),a1 at 02E4BC, move.b (a1)+,(a0)+ at 02E4C2)"
+    },
+    {
+      "start": "05C3F6",
+      "end": "05C40E",
+      "label": "dat_5C3F6",
+      "format": "pointers",
+      "reader": "6 string pointers, indexed by the loop counter (-$C,a6) that also indexes the 6 longs of 05C47C (sub_42262): 04239C-0423A2 pass one to sub_41D92 as its second argument, which takes its length with sub_2E4E6 (move.l ($C,a6),d1 at 041D9E, jsr sub_2E4E6 at 041DBA; tst.b (a0)+ at 02E4F0). The sixth long's low byte is the first byte of the classification's text 05C40D-05C41D: the string starts at 05C40E, where the first long points"
+    },
+    {
+      "start": "05C47C",
+      "end": "05C494",
+      "label": "dat_5C47C",
+      "format": "pointers",
+      "reader": "6 longs, 0 or a pointer: sub_42262 (04226E-042278: move.w d4,d0; asl.w #2,d0; movea.l #dat_5C47C,a0; movea.l ($0,a0,d0.w),a3), the null test cmpa.w #$0,a3 at 04227C"
+    },
+    {
       "start": "05C63C",
       "end": "05CF86",
       "label": "audio_test_list",
