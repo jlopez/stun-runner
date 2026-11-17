@@ -579,3 +579,29 @@ def test_notebook_names_every_static_palette_mame_did_not_match() -> None:
         for text in (notebook, s8):
             assert f"`{name}`" in text and f"{got['best_equal']}" in text, name
 
+
+# Constants of the 68k code that follow from image sizes (section 6): every instruction that loads
+# one must be cited there, so that the leg that makes them symbolic finds them all.
+SIZE_CONSTANTS = ("ffe5cfe0", "ffeb9fc0", "ffed0000", "fff23f00", "fff2b760", "fff3fd80",
+                  "fff3fb20", "ffe30060")
+
+
+def test_doc_cites_every_size_dependent_constant(tmp_path: Path) -> None:
+    unidasm = shutil.which("unidasm")
+    if unidasm is None:
+        pytest.skip("unidasm not on PATH")
+    image = reference_68k()
+    code = tmp_path / "68k.bin"
+    code.write_bytes(image[: g.REGION])
+    out = subprocess.run([unidasm, str(code), "-arch", "m68010", "-basepc", "0"],
+                         capture_output=True, text=True, check=True).stdout
+    sites = sorted(int(line.split(":")[0], 16) for line in out.splitlines()
+                   if re.search(r"#\$(" + "|".join(SIZE_CONSTANTS) + r")\b", line))
+    assert sites
+    s6 = doc_section(6)
+    ranges = [(int(a, 16), int(b, 16)) for a, b in re.findall(r"\b([0-9A-F]{6})-([0-9A-F]{6})\b",
+                                                               s6)]
+    cited = {int(a, 16) for a in re.findall(r"\b([0-9A-F]{6})\b", s6)}
+    missing = [f"{a:06X}" for a in sites
+               if a not in cited and not any(lo <= a <= hi for lo, hi in ranges)]
+    assert missing == []

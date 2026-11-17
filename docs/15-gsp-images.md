@@ -96,9 +96,9 @@ pixels with each pair swapped. A PNG holds the pixels in row-major order, `width
 One indexed 8-bit PNG per distinct image (C15): 157 images in the 54 streams (165 counted per
 table entry, since 7 streams serve two entries), 140 distinct by content (149 headed images minus
 17 repeats among the figure streams 65, 66 and 68, plus the 8 raw screens); the repeats are one
-PNG each, named in every stream that holds them. Entries that share a stream (4/5, 6/7, 8/9, 10/11, 12/13, 14/15,
-18/19) are one stream with several entries. The 7 placeholder entries 58-64 point at 060000, the
-pair-U adjust word (section 5), not at a stream.
+PNG each, named in every stream that holds them. Entries that share a stream (4/5, 6/7, 8/9,
+10/11, 12/13, 14/15, 18/19) are one stream with several entries. The 7 placeholder entries 58-64
+point at 060000, the pair-U adjust word (section 5), not at a stream.
 
 `data/gsp-images/manifest.json` (format `stunrun-gsp-images 1`) holds the streams in entry order
 (their entries, kind and image names), the placeholders, the adjust words' places, the six
@@ -159,13 +159,19 @@ start level 23 up; it follows from the level-select poke, not from the images.
 ## 6. Image sizes in the 68k code (C17)
 
 The 68010 code places images by constant GSP addresses that depend on the sizes of the images before
-them: the maps at FFE00000, FFE5CFE0 and FFEB9FC0 (024EEA-024F98) and FFED0000 (024AB4, 029C4A), the
-HUD images at FFF23F00, FFF2B760, FFF3FD80, FFF3FB20 (02D770-02D7A6), screens at FFE00000 and
-FFDE0000 (02D7C6), the figures of entries 65 and 66 at FFE30060 (0407AC, 040812); the GSP program
-reads the headers it is given. Until that code is symbolic source, a size change must not build: the
-manifest records each image's width and height, and `tools/gspimages asm` fails, naming the PNG and
-both sizes, when they differ. Pixel edits are free (the streams re-encode and move; the table
-follows their labels).
+them: the maps at FFE00000, FFE5CFE0 and FFEB9FC0 (024EEA-024F98) and FFED0000 (024AB4, 029C4A,
+02AF94), the HUD images at FFF23F00, FFF2B760, FFF3FD80, FFF3FB20 (02D770-02D7A6), screens at
+FFE00000 and FFDE0000 (02D7C6), the figures of entries 65 and 66 at FFE30060 (0407AC, 040812).
+FFED0000 is FFE00000 plus `map_screen`'s 512x208 bytes (D0000h bits), so it moves with entry 25's
+size; 02AF7E-02AFAE is the third loader that uses it (entry 25 at FFE00000 through the table long at
+0BFE64, then at 02AF94 the map entry of the level's 048180 record, `addi.l` of 0BFE00 at 02AFA4).
+The drawing code takes the same addresses as constants: FFED0000 at 027836, 02A380 and 02AB0C and
+FFF3FB20 at 026DDC, each passed to 02F7D6, which writes it as the last long of a command 8000 to the
+GSP (C0000C); FFF23F00 at 02C310 and FFF2B760 at 02C332, passed to 02F742 (the second stepped by D3
+at 02C34C). The GSP program reads the headers it is given. Until that code is symbolic source, a
+size change must not build: the manifest records each image's width and height, and `tools/gspimages
+asm` fails, naming the PNG and both sizes, when they differ. Pixel edits are free (the streams
+re-encode and move; the table follows their labels).
 
 ## 7. Palettes (card A13, C13)
 
@@ -247,14 +253,14 @@ reached); `fbi_seal`'s spec (`level_base_00` + `overlay_03`) was never on screen
 ## 9. The images and their names
 
 Names are provisional (C15): evidence-based where a MAME picture or the code shows the role
-(`title`: the picture and the palette pairing; `story_text`: the picture, "Sometime in the
-future: S.T.U.N. Running, the Ultimate Challenge ..."; `map_screen`: 024A9E loads it with the
-level map, whose frame and legend it draws; `level_map_NN`: the level whose record of table
-048180 selects it, the first if two do, 21 and 23 both select entry 54), otherwise descriptive of
-the picture: `fbi_seal` (the FBI anti-piracy seal), `horizon_*` (512-wide panoramas), `frame_*`
-(screen borders), `pilot_*`, `emblem_*`, `figure_*`, `tree`, `tuft_*`, `dot_*`, `strip_67`,
-`screen_01`, `screen_24`. Jesus may rename any of them (the manifest and the PNG file names; the
-build ignores names). To look at in real colours: `title.png`, `story_text.png`,
+(`title`: the picture and the palette pairing; `story_text`: the picture, "Sometime in the future:
+S.T.U.N. Running, the Ultimate Challenge ..."; `map_screen`: 024A9E, 029C34 and 02AF7E load it with
+the level map at FFED0000 (section 6), whose frame and legend it draws; `level_map_NN`: the level
+whose record of table 048180 selects it, the first if two do, 21 and 23 both select entry 54),
+otherwise descriptive of the picture: `fbi_seal` (the FBI anti-piracy seal), `horizon_*` (512-wide
+panoramas), `frame_*` (screen borders), `pilot_*`, `emblem_*`, `figure_*`, `tree`, `tuft_*`,
+`dot_*`, `strip_67`, `screen_01`, `screen_24`. Jesus may rename any of them (the manifest and the
+PNG file names; the build ignores names). To look at in real colours: `title.png`, `story_text.png`,
 `level_map_00.png`, `map_screen.png`, `horizon_16_00.png`, `fbi_seal.png`.
 
 | Entries | Stream | Packed | Kind | Images | Palette | MAME (`make imgtrace`) |
@@ -344,9 +350,11 @@ colour (synthetic image); this document's stream and image counts (sections 4.2 
 manifest's, and every `full` spec that no MAME dump matched but for colour 1D is named, with its
 best count, here (section 8) and in `CLAUDE.md`'s `make imgtrace` bullet. With the reference set:
 the committed data is what the image decodes to and builds back to it; every palette equals the
-image. With `make imgtrace`'s runs: the trace
-check passes. `tools/test_68k_tree.py` and `tools/test_build.py` generate the includes and expect
-pairs U-W from the data.
+image; with `unidasm` too, every instruction of 000000-05FFFF that loads one of section 6's
+size-dependent constants (FFE5CFE0, FFEB9FC0, FFED0000, FFF23F00, FFF2B760, FFF3FD80, FFF3FB20,
+FFE30060) is cited in section 6. With `make imgtrace`'s runs: the trace check passes.
+`tools/test_68k_tree.py` and `tools/test_build.py` generate the includes and expect pairs U-W from
+the data.
 
 ## 12. Open points
 
