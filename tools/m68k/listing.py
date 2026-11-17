@@ -72,8 +72,22 @@ class Listing:
         return {s.address: s for s in self.statements}
 
 
+def _uncomment(src: str) -> str:
+    """The line without its `;` comment; a `;` inside a quoted string is not one."""
+    quote = ""
+    for i, ch in enumerate(src):
+        if quote:
+            if ch == quote:
+                quote = ""
+        elif ch in "'\"":
+            quote = ch
+        elif ch == ";":
+            return src[:i]
+    return src
+
+
 def _strip(src: str) -> str:
-    code = src.split(";", 1)[0].rstrip()
+    code = _uncomment(src).rstrip()
     m = LABEL.match(code)
     if m and not code[:1].isspace():
         code = code[m.end():]

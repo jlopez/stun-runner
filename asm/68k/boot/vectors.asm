@@ -1,7 +1,7 @@
-; boot/vectors.asm, 000000-000212: the boot program's vector table, vectors 0-63 as dc.l (docs/05 section 3: the reset PC,
-; 000216, lies in the user-vector area, so vectors 64-255 are not a table), then 000100-000212,
-; 274 bytes the classification leaves unknown (a jmp abs.l table no decided code reaches,
-; docs/14 section 3) as one incbin slice.
+; boot/vectors.asm, 000000-000212: the boot program's vector table, vectors 0-63 as dc.l (docs/05
+; section 3: the reset PC, 000216, lies in the user-vector area, so vectors 64-255 are not a
+; table), then 000100-000212, 274 bytes the classification leaves unknown (a jmp abs.l table no
+; decided code reaches, docs/14 section 3) as one incbin slice.
 ; Owner: the boot naming legs (M5a, M5c-e for the boot program's tests and menus).
 ;
 ; Generated once by tools/m68k gen 000000 000212 (M5c, issue #33, docs/16-68k-code.md):

@@ -18,10 +18,11 @@ samples, and a phrase renamed with its WAV must build the same bytes.
 The 6502 image is built from asm/jsa alone (docs/09-sound-program.md), so the synthetic set
 carries the image the source assembles to, and an operand edited in the copy must change 10c.
 
-The 68k image is the tree of asm/68k (docs/13-68k-source.md): region files whose blobs are
-incbins of build/stunrun-68k.bin and whose source (the zero fills, the program table) the tree
-itself computes, so the synthetic set carries what the tree assembles from a random blob (with a
-valid program table and programs for tools/extract-programs); `make labels` must pass on it, and
+The 68k image is the tree of asm/68k (docs/13-68k-source.md, docs/16-68k-code.md): region files
+whose blobs are incbins of build/stunrun-68k.bin and whose source (the code since M5c, the zero
+fills, the program table) the tree itself computes, so the synthetic set carries what the tree
+assembles from a random blob (with a valid program table and programs for
+tools/extract-programs); `make labels` must pass on it, and
 an edit of a 68k region file must reach the right file at the right 68k address. The NVRAM
 images are two zero fills, so the synthetic set's are zero.
 """
@@ -31,6 +32,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -42,7 +44,7 @@ from adpcm import pcm_wav, read_wav
 from adpcm.__main__ import encode_all
 from objects import checksum_address, encode, place, read_data
 from romset import IMAGES, compare, layout, load_snapshot, merge, split
-from test_68k_tree import assemble_68k
+from test_68k_tree import REGIONS, assemble_68k
 from test_programs import plant_programs
 
 TOOLS = Path(__file__).resolve().parent
@@ -212,6 +214,13 @@ def test_bytecheck_cli(tmp_path: Path) -> None:
     assert r.returncode == 2
 
 
+def blob_share(out: str) -> float:
+    """The set's blob share tools/coverage prints (`blob: 34.2% of 1511424 bytes ...`)."""
+    m = re.search(r"blob: (\d+\.\d)% of 1511424 bytes", out)
+    assert m is not None, out
+    return float(m[1])
+
+
 def tool(env: str, default: str) -> str | None:
     return shutil.which(os.path.expanduser(os.environ.get(env, default)))
 
@@ -341,7 +350,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 23.8% of 1511424 bytes" in r.stdout
+    share = blob_share(r.stdout)
     blobs = {line.split()[0]: line.split() for line in r.stdout.splitlines() if line.strip()}
     assert blobs["adsp_program"][1:4] == ["1702E", "8270", "../../build/adsp/program.bin"]
     assert blobs["gsp_program"][1:4] == ["1907C", "24408", "../../build/gsp/program.bin"]
@@ -355,30 +364,20 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     # nor has the 6502 image a blob: all instructions, data and fills
     assert summary["images"]["stunrun-jsa"]["blob"] == 0
     assert summary["images"]["stunrun-jsa"]["instr"] > 0
-    # the 68k image: the six zero runs are fill, the program table's pointers and text data, the
-    # packed GSP images and their table data generated from data/gsp-images (docs/15), one row
-    # per region file and per generated include; the NVRAM image is two fills
-    assert summary["images"]["stunrun-68k"] == {
-        "instr": 0, "data": 36 + 332291, "blob": 359222, "fill": 94883}
+    # the 68k image, one row per region file: since M5c (docs/16) all the code is instructions,
+    # the code files' blob is their unknown and unexplained-data slices; the NVRAM image is two
+    # fills
+    files68k = {f: c for f, c in summary["files"].items() if f.startswith("asm/68k/")}
+    total = {k: sum(c[k] for c in files68k.values()) for k in ("instr", "data", "blob", "fill")}
+    assert summary["images"]["stunrun-68k"] == total
+    assert total["instr"] == 163_638
+    code = [c for f, c in files68k.items() if f.startswith(("asm/68k/boot/", "asm/68k/game/"))]
+    assert sum(c["blob"] for c in code) == 60_999
     assert summary["images"]["stunrun-nvram"] == {"instr": 0, "data": 0, "blob": 0, "fill": 4096}
-    regions = {
-        "boot/vectors.asm": 0x212, "boot/boot.asm": 0x12F06 - 0x212,
-        "programs.asm": 0x20000 - 0x12F06, "game/vectors.asm": 0x430,
-        "game/code.asm": 0x4397E - 0x20430, "game/island.asm": 0x46AEE - 0x4397E,
-        "data.asm": 0x60000 - 0x46AEE, "images.asm": 0xBFE00 - 0x60000,
-        "image_table.asm": 0x200,
-    }
-    generated = {"build/gsp-images/images.asm": "asm/68k/images.asm",
-                 "build/gsp-images/table.asm": "asm/68k/image_table.asm"}
-    per_region: dict[str, int] = {}
-    for f, c in summary["files"].items():
-        f = generated.get(f, f)
-        if f.startswith("asm/68k/"):
-            per_region[f] = per_region.get(f, 0) + sum(c.values())
-    assert per_region == {f"asm/68k/{f}": n for f, n in regions.items()}
-    assert summary["files"]["asm/68k/images.asm"]["blob"] == 0
-    assert summary["files"]["asm/68k/image_table.asm"]["blob"] == 0
-    assert summary["blob"] == 359222
+    assert {f: sum(c.values()) for f, c in files68k.items()} == {
+        f"asm/68k/{f}": b - a for f, a, b in REGIONS}
+    assert summary["blob"] == sum(i["blob"] for i in summary["images"].values())
+    assert share == round(100 * summary["blob"] / 1511424, 1)
     # the per-file blob gate a leg sets on its region file
     r = run(*make, "coverage", "MAX_BLOB=asm/68k/programs.asm=32688 asm/68k/data.asm=0", env=env)
     assert r.returncode != 0
@@ -400,7 +399,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
         (work / f"build/{name}.lst").unlink()
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 23.8% of 1511424 bytes" in r.stdout
+    assert blob_share(r.stdout) == share
     assert (work / "build/stunrun-obj.lst").exists() and (work / "build/stunrun-jsa.lst").exists()
     # the object image needs nothing from the set: rebuilt with build/stunrun-obj.bin gone (and
     # its generated sources and output removed), it is still the same and the blob stays absent

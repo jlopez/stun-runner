@@ -582,15 +582,19 @@ classify: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
 	$(PYTHON) tools/m68k classify --image $< --out $(CLASSIFICATION) \
 		$(if $(filter 1,$(NO_MAME)),--no-mame,$(PCCOV_FILES))
 
-# Point 6 of issue #29 (docs/14 section 6): the generator's source for each code region,
-# assembled alone in build/m68k/, is the image (0 differences) and passes the descent check, the
-# address lint and the shift test; every instruction boundary equals unidasm's. Needs the
-# reference set and unidasm.
-M68K_CODE_REGIONS := 000212:012F06 020430:04397E 04397E:046AEE
-
-m68k-check: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
-	@for r in $(M68K_CODE_REGIONS); do \
-		$(PYTHON) tools/m68k check-region $${r%:*} $${r#*:} --work $(BUILD)/m68k || exit 1; done
+# The checks on the committed tree (M5c, docs/16-68k-code.md section 4): on the tree's own
+# listing, the descent check, the address lint, the raw-data check of the code files and the
+# shift test (tools/m68k check-tree), every executed PC of the `make pccov` runs present in
+# build/mame an instruction statement, `make labels`, and every instruction boundary of the
+# classification equal to unidasm's. Needs the reference set and unidasm; CI runs the same
+# checks on the tree assembled against a random blob (tools/test_68k_tree.py). Every later leg
+# runs it after each change. (The generator is frozen: `tools/m68k check-region` still checks
+# it against the image, docs/14 section 6, but no make target runs it over the tree.)
+m68k-check: $(BUILD)/$(SET)-68k.lst $(M68K_TOOLS) labels
+	@test -n "$(wildcard $(PCCOV_FILES))" || \
+		echo "m68k-check: no build/mame/pccov-*.txt: run make -j5 pccov for the MAME check"
+	$(PYTHON) tools/m68k check-tree --listing $(BUILD)/$(SET)-68k.lst \
+		--binary $(BUILD)/$(SET)-68k.out $(wildcard $(PCCOV_FILES))
 	$(PYTHON) tools/m68k check-unidasm --unidasm $(UNIDASM)
 
 # Which 68010 instructions MAME executes (docs/14 section 7): tools/mame/pccov.lua traces the
@@ -623,8 +627,9 @@ $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt): $(BUILD)/mame/pccov-%.txt: tools/mame
 	test $$rrc -eq 0 || { echo "pccov: the $* run traced no PC"; exit 1; }; \
 	{ printf '# run '; cat $(BUILD)/mame/pccov-$*done; } >> $@.tmp && mv $@.tmp $@
 
-pccov: $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt) $(BUILD)/$(SET)-68k.bin
+pccov: $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt) $(BUILD)/$(SET)-68k.bin $(BUILD)/$(SET)-68k.lst
 	$(PYTHON) tools/m68k pccov --image $(BUILD)/$(SET)-68k.bin --classification $(CLASSIFICATION) \
+		--listing $(BUILD)/$(SET)-68k.lst \
 		--summary artifacts/pccov-summary.json $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt)
 
 # --- M5i: the packed GSP images and their palettes (docs/15-gsp-images.md) --------------------

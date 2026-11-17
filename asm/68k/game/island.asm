@@ -1,6 +1,8 @@
-; game/island.asm, 04397E-046AEE: the island after the rts at 04397C: text, data and unknown slices around
-; two code ranges, 0445F0-044630 (reached by the computed call at 0223E0-0223EC, executed in
-; MAME; docs/14 section 9) and 046A00-046AEE, the last 68k code (MAME's highest PC is 046AEC).
+; game/island.asm, 04397E-046AEE: the island after the rts at 04397C: text, data and unknown
+; slices around two code ranges, 0445F0-044630 (reached by the computed call at 0223E0-0223EC,
+; executed in MAME; docs/14 section 9) and 046A00-046AEE, the last 68k code (MAME's highest PC is
+; 046AEC).
+; 04397E-046AEE: 8 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
 ; Owner: the game naming legs (M5a-M5f).
 ;
 ; Generated once by tools/m68k gen 04397E 046AEE (M5c, issue #33, docs/16-68k-code.md):

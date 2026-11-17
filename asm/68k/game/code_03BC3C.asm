@@ -1,6 +1,7 @@
-; game/code_03BC3C.asm, 03BC3C-03FC22: game program code (pair S) with the data,
-; text and tables that lie between its routines; the first routine is sub_3BC3C. Cut at
-; routine starts into files of about 16 KB named by their first address (decision C11).
+; game/code_03BC3C.asm, 03BC3C-03FC22: game program code (pair S) with the data, text and tables
+; that lie between its routines; the first routine is sub_3BC3C (03BC3C). Cut at routine starts
+; into files of about 16 KB named by their first address (decision C11).
+; 03BC3C-03FC22: 66 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
 ; Owner: the game naming legs (M5a-M5f).
 ;
 ; Generated once by tools/m68k gen 03BC3C 03FC22 (M5c, issue #33, docs/16-68k-code.md):

@@ -1,10 +1,13 @@
-"""The 68k tree's partition (docs/13-68k-source.md): region files, guards, fills, the program
-table, the hardware equates and `make labels`, on random bytes, never ROM data.
+"""The 68k tree (docs/13-68k-source.md, docs/16-68k-code.md): region files, guards, fills, the
+program table, the hardware and RAM equates, `make labels` and the checks on the tree's own
+listing (tools/m68k check-tree), on random bytes, never ROM data.
 
 The structural tests read asm/68k only; the assembled ones (vasm on PATH or in $VASM, as in CI)
 assemble the committed tree against a random blob laid out like build/ (the image, the ADSP and
-GSP programs cut out of it) and check what the tree itself contributes: zero fills, the program
-table's pointers and text, and every other byte from the blob at its own address.
+GSP programs cut out of it) and check what the tree itself contributes: every incbin slice takes
+the blob's bytes at its own address, the zero fills, the program table; the code is source since
+M5c, so the descent check, the address lint, the raw-data check and the shift test run on that
+listing, and each fails on the fault it exists for.
 """
 
 from __future__ import annotations
@@ -27,25 +30,39 @@ from programs import ADSP_START, GSP_END, GSP_START, PROGRAM_TABLE
 
 from ida.memory_map import IO_68K
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from m68k import classify as cl  # noqa: E402
+from m68k import listing as ls  # noqa: E402
+from m68k import operands as opd  # noqa: E402
+from m68k import tree as tr  # noqa: E402
+from m68k.__main__ import load_seeds, load_unreached  # noqa: E402
+
 TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
 TREE = REPO / "asm/68k"
 IMAGE_SIZE = 0xC0000
 
-# The partition (docs/13 section 2, docs/06 section 4): file, start, end.
-REGIONS = [
-    ("boot/vectors.asm", 0x000000, 0x000212),
-    ("boot/boot.asm", 0x000212, 0x012F06),
-    ("programs.asm", 0x012F06, 0x020000),
-    ("game/vectors.asm", 0x020000, 0x020430),
-    ("game/code.asm", 0x020430, 0x04397E),
-    ("game/island.asm", 0x04397E, 0x046AEE),
-    ("data.asm", 0x046AEE, 0x060000),
-    ("images.asm", 0x060000, 0x0BFE00),
-    ("image_table.asm", 0x0BFE00, 0x0C0000),
-]
+# The partition (docs/13 section 2, docs/06 section 4): file, start, end. M5c (docs/16) cut the
+# boot and game code into files of about 16 KB at routine starts, named by their first address.
+BOOT_CUTS = [0x000212, 0x00394E, 0x0065E0, 0x009E80, 0x00DDF2, 0x0109D4, 0x012F06]
+GAME_CUTS = [0x020430, 0x024306, 0x028194, 0x02C0D2, 0x030012, 0x034010, 0x037C52, 0x03BC3C,
+             0x03FC22, 0x04397E]
+REGIONS = (
+    [("boot/vectors.asm", 0x000000, 0x000212)]
+    + [(f"boot/code_{a:06X}.asm", a, b) for a, b in zip(BOOT_CUTS, BOOT_CUTS[1:], strict=False)]
+    + [("programs.asm", 0x012F06, 0x020000), ("game/vectors.asm", 0x020000, 0x020430)]
+    + [(f"game/code_{a:06X}.asm", a, b) for a, b in zip(GAME_CUTS, GAME_CUTS[1:], strict=False)]
+    + [
+        ("game/island.asm", 0x04397E, 0x046AEE),
+        ("data.asm", 0x046AEE, 0x060000),
+        ("images.asm", 0x060000, 0x0BFE00),
+        ("image_table.asm", 0x0BFE00, 0x0C0000),
+    ]
+)
+CODE_FILES = [f for f, _, _ in REGIONS if f.startswith(("boot/", "game/"))]
 
-# The six zero runs that are dcb.b source (94,883 bytes).
+# The six zero runs of wave 0 that are dcb.b source (94,883 bytes); since M5c the one at
+# 020112-020418 is two statements (020400 is a base the code loads, dat_20400).
 FILLS = [
     (0x012F06, 0x017000),
     (0x01EFD4, 0x020000),
@@ -54,6 +71,8 @@ FILLS = [
     (0x0B10EB, 0x0BFE00),
     (0x0BFF18, 0x0C0000),
 ]
+INCBIN = re.compile(r'^\s+incbin\s+"\.\./\.\./build/stunrun-68k\.bin",\$([0-9A-Fa-f]+),'
+                    r"\$?([0-9A-Fa-f$\-]+)", re.M)
 
 COPYRIGHT = b"Copyright 1989 ATARI GAMES\0\0"
 
@@ -108,6 +127,11 @@ def expected_68k(image: bytes) -> bytes:
     struct.pack_into(">II", out, PROGRAM_TABLE, ADSP_START, GSP_START)
     out[0x017010 : 0x017010 + len(COPYRIGHT)] = COPYRIGHT
     return bytes(out)
+def blob_slices(listing: str) -> list[tuple[int, int, str]]:
+    """(address, size, source) of every incbin statement of the listing."""
+    lst = ls.parse(listing, ls.macro_names(TREE / "macros.asm"))
+    ls.sizes(lst, IMAGE_SIZE)
+    return [(s.address, s.size, s.text) for s in lst.statements if s.kind == "blob"]
 
 
 _GSP_REGION: list[bytes] = []
@@ -125,8 +149,12 @@ def gsp_region() -> bytes:
 def test_regions_tile_the_image_in_address_order() -> None:
     main = (TREE / "stunrun.asm").read_text()
     includes = INCLUDE.findall(main)
-    assert includes[0] == "hardware.asm"
-    assert includes[1:] == [f for f, _, _ in REGIONS]
+    assert includes[:3] == ["hardware.asm", "ram.asm", "macros.asm"]
+    assert includes[3:] == [f for f, _, _ in REGIONS]
+    # no file under boot/ or game/ is left out (a stale boot/boot.asm or game/code.asm)
+    assert sorted(
+        str(p.relative_to(TREE)) for d in ("boot", "game") for p in (TREE / d).rglob("*.asm")
+    ) == sorted(CODE_FILES)
     assert ASSERT.findall(main) == ["0C0000"]
     for (name, start, end), nxt in zip(REGIONS, REGIONS[1:] + [("", IMAGE_SIZE, 0)], strict=True):
         assert end == nxt[1]
@@ -270,11 +298,47 @@ def test_image_table_sites_are_docs06s() -> None:
     assert found == sites
 
 
+def test_ram_equates() -> None:
+    """asm/68k/ram.asm (decision C9): one shared file of 24-bit equates, none in the ROM or in
+    hardware.asm, each defined once, every one used by the source."""
+    text = (TREE / "ram.asm").read_text()
+    equates = re.findall(r"^([A-Za-z_]\w*)\s+equ\s+\$([0-9A-F]{6})$", text, re.M)
+    assert len(equates) == len(re.findall(r"\bequ\b", text)) > 500
+    names = [n for n, _ in equates]
+    assert len(set(names)) == len(names)
+    hardware = {n for n, _, _ in IO_68K}
+    source = "\n".join((TREE / f).read_text() for f in CODE_FILES)
+    for name, value in equates:
+        assert int(value, 16) >= IMAGE_SIZE and name not in hardware, name
+        assert re.search(rf"(?<![\w.]){name}(?![\w])", source), f"{name} unused"
+        neutral = re.fullmatch(r"(ram|io)_([0-9A-F]+)", name)
+        assert neutral is None or int(neutral[2], 16) == int(value, 16), name
+
+
 @needs_vasm
 def test_tree_assembles_a_random_blob(tmp_path: Path) -> None:
     image = random.Random(68010).randbytes(IMAGE_SIZE)
     out, listing, _ = assemble_68k(image, tmp_path)
-    assert out == expected_68k(image)
+    assert len(out) == IMAGE_SIZE
+    # every slice of build/stunrun-68k.bin takes the blob's bytes at its own address, and every
+    # incbin of the sources is one of the listing's slices
+    slices = blob_slices(listing)
+    assert len(slices) > 900
+    for a, size, text in slices:
+        m = re.search(r'stunrun-68k\.bin",\$([0-9A-Fa-f]+)', text)
+        if m is None:
+            assert a in (ADSP_START, GSP_START), f"{a:06X}: {text}"
+            continue
+        assert int(m[1], 16) == a, f"{a:06X}: {text}"
+        assert out[a : a + size] == image[a : a + size], f"{a:06X}"
+    starts = {a for a, _, _ in slices}
+    for f, _, _ in REGIONS:
+        for offset, _ in INCBIN.findall((TREE / f).read_text()):
+            assert int(offset, 16) in starts, (f, offset)
+    for start, end in FILLS:
+        assert out[start:end] == bytes(end - start)
+    assert struct.unpack_from(">II", out, PROGRAM_TABLE) == (ADSP_START, GSP_START)
+    assert out[0x017010 : 0x017010 + len(COPYRIGHT)] == COPYRIGHT
     symbols = vasm_symbols(listing)
     assert symbols["adsp_program_ptr"] == ("A", PROGRAM_TABLE)
     assert symbols["gsp_program_ptr"] == ("A", PROGRAM_TABLE + 4)
@@ -287,13 +351,13 @@ def test_tree_assembles_a_random_blob(tmp_path: Path) -> None:
 def test_a_moved_region_fails_its_guard(tmp_path: Path) -> None:
     tree = tmp_path / "tree"
     shutil.copytree(TREE, tree)
-    code = tree / "game/code.asm"
+    code = tree / "game/code_020430.asm"
     text = code.read_text()
     code.write_text(text.replace("sub_20430:\n", "sub_20430:\n\tdc.b\t0\n", 1))
     image = random.Random(1).randbytes(IMAGE_SIZE)
     _, _, r = assemble_68k(image, tmp_path / "work", tree, expect_ok=False)
     assert r.returncode != 0
-    assert "game/code.asm does not end at 04397E" in r.stdout + r.stderr
+    assert "game/code_020430.asm does not end at 024306" in r.stdout + r.stderr
 
 
 def labels_tool() -> types.ModuleType:
@@ -358,23 +422,113 @@ def test_labels_on_the_tree(tmp_path: Path) -> None:
     assert report.failures == []
     for name, ea in (("adsp_program_ptr", 0x017000), ("copyright_text", 0x017010)):
         assert f"{name} at {ea:06X}" in report.labelled
-    assert report.in_blob and report.outside
+    # since M5c every snapshot name in ROM is a label of the tree (docs/16)
+    assert report.in_blob == [] and report.outside
     tree = tmp_path / "tree"
     shutil.copytree(TREE, tree)
     programs = tree / "programs.asm"
-    programs.write_text(programs.read_text().replace("gsp_program_ptr:\n", "", 1))
+    programs.write_text(programs.read_text().replace("copyright_text:\n", "", 1))
     _, listing, _ = assemble_68k(image, tmp_path / "b", tree)
     report = labels.check(listing, names)
     assert report.failures == [
-        "gsp_program_ptr at 017004: asm/68k/programs.asm has it as source (data) without the label"
+        "copyright_text at 017010: asm/68k/programs.asm has it as source (data) without the label"
     ]
-    # vec_reset_pc is 000004 in the snapshot, inside boot/vectors.asm's incbin
+    # vec_trapv (00001C in the snapshot) moved from boot/vectors.asm to 017010
     tree = tmp_path / "tree2"
     shutil.copytree(TREE, tree)
+    vectors = tree / "boot/vectors.asm"
+    assert vectors.read_text().count("vec_trapv:\n") == 1
+    vectors.write_text(vectors.read_text().replace("vec_trapv:\n", "", 1))
     programs = tree / "programs.asm"
     text = programs.read_text()
     assert text.count("copyright_text:\n") == 1
-    programs.write_text(text.replace("copyright_text:\n", "vec_reset_pc:\ncopyright_text:\n"))
+    programs.write_text(text.replace("copyright_text:\n", "vec_trapv:\ncopyright_text:\n"))
     _, listing, _ = assemble_68k(image, tmp_path / "c", tree)
     report = labels.check(listing, names)
-    assert report.failures == ["vec_reset_pc at 000004: the tree has this label at 017010"]
+    assert report.failures == ["vec_trapv at 00001C: the tree has this label at 017010"]
+
+
+# --- the checks on the tree's own listing (M5c, docs/16 section 4) ----------------------------
+
+
+def tree_check(tmp: Path, tree: Path = TREE, seed: int = 16, shift: bool = True
+               ) -> tr.TreeReport:
+    """tools/m68k check-tree's checks on `tree` assembled against a random blob."""
+    image = random.Random(seed).randbytes(IMAGE_SIZE)
+    out, listing, _ = assemble_68k(image, tmp, tree)
+    seeds, untaken = load_seeds(REPO / "data/68k/seeds.json")
+    return tr.check(
+        listing, out, cl.load(REPO / "data/68k/classification.json"),
+        opd.load(REPO / "data/68k/operands.json"), ls.macro_names(tree / "macros.asm"), seeds,
+        untaken, set(load_unreached(REPO / "data/68k/seeds.json")),
+        tmp / "asm/68k" if shift else None, tmp / "build" if shift else None,
+    )
+
+
+@needs_vasm
+def test_tree_checks_pass(tmp_path: Path) -> None:
+    """The committed tree: every instruction statement reached, no numeric ROM address, every dc
+    statement of the code files explained, the shift test exact; the references into the image
+    table are label + offset (decision C10)."""
+    rep = tree_check(tmp_path)
+    assert rep.errors() == []
+    assert rep.descent.reached > 44_000 and rep.descent.unreached == []
+    assert rep.lint.undecided == [] and rep.lint.allowed > 300
+    assert rep.shift is not None and rep.shift.changed == rep.shift.expected > 4000
+    assert rep.foreign and all("tbl_BFE00+$" in x for x in rep.foreign)
+
+
+def planted(tmp: Path, file: str, old: str, new: str) -> Path:
+    tree = tmp / "tree"
+    shutil.copytree(TREE, tree)
+    path = tree / file
+    text = path.read_text()
+    assert text.count(old) >= 1, (file, old)
+    path.write_text(text.replace(old, new, 1))
+    return tree
+
+
+def slice_of(file: str, kind: str) -> tuple[str, int, int]:
+    """The first incbin line of `file` over one range of the classification's `kind` of at
+    least four even-aligned bytes: (the line, its address, its length)."""
+    c = cl.load(REPO / "data/68k/classification.json")
+    spans = {s.start: s for s in c.spans}
+    for m in re.finditer(r'^\tincbin\t"\.\./\.\./build/stunrun-68k\.bin",\$([0-9A-F]+),\$([0-9A-F]+)$',
+                         (TREE / file).read_text(), re.M):
+        a, n = int(m[1], 16), int(m[2], 16)
+        s = spans.get(a)
+        if s is not None and s.kind == kind and s.end == a + n and n >= 4 and a % 2 == 0 \
+                and n % 2 == 0:
+            return m[0], a, n
+    raise AssertionError(f"no {kind} slice in {file}")
+
+
+@needs_vasm
+def test_tree_checks_fail(tmp_path: Path) -> None:
+    """Each check fails on the fault it exists for (issue #33): an instruction nothing reaches,
+    a ROM address written as a number, a dc.b wall in place of an incbin slice, a label pinned
+    by an equ; the image is the same bytes in the first three."""
+    file = "boot/code_000212.asm"
+    line, a, n = slice_of(file, "unknown")
+    # unreached: the unknown slice written as nops
+    rep = tree_check(tmp_path / "a", planted(tmp_path / "a", file, line, "\tnop\n" * (n // 2)),
+                     shift=False)
+    assert rep.descent.unreached[: n // 2] == list(range(a, a + n, 2)), rep.descent.unreached
+    # a dc.b wall: the same slice as bytes
+    wall = "\tdc.b\t" + ",".join(["$00"] * n) + "\n"
+    rep = tree_check(tmp_path / "b", planted(tmp_path / "b", file, line, wall), shift=False)
+    assert [e.split(":")[0] for e in rep.raw] == [f"{a:06X}"], rep.raw
+    # a ROM address left numeric: the first jsr to a routine of the file written as a number
+    m = re.search(r"^\tjsr\t(sub_([0-9A-F]+))$", (TREE / file).read_text(), re.M)
+    assert m is not None
+    tree = planted(tmp_path / "c", file, m[0], f"\tjsr\t${m[2]}")
+    rep = tree_check(tmp_path / "c", tree)
+    assert any(f"jsr\t${m[2]}: the absolute operand" in e for e in rep.lint.errors), rep.lint
+    # a label pinned by an equ: the shift test sees it
+    m = re.search(r"^(sub_([0-9A-F]+)):$", (TREE / file).read_text(), re.M)
+    assert m is not None
+    tree = planted(tmp_path / "d", file, m[0] + "\n", f"{m[1]}_\n")
+    ram = tree / "ram.asm"
+    ram.write_text(ram.read_text() + f"{m[1]}\tequ\t${m[2]}\n")
+    rep = tree_check(tmp_path / "d", tree)
+    assert rep.shift is not None and rep.shift.errors, rep.shift

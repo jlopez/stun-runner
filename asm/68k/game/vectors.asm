@@ -1,7 +1,8 @@
-; game/vectors.asm, 020000-020430: the game program's vector table (64 longs, installed by movec at 000294) as dc.l,
-; game_entries (three jmp, docs/06 section 1.1), the zero fill to 020400 and 48 bytes of data:
-; 020400 is the base movea.l #$20400,a2 loads at 042356, 020418 the table read at 02079A, 020D30
-; and 02093E (docs/06 section 4.2). 020400-020418 is zero and stays a fill (docs/16).
+; game/vectors.asm, 020000-020430: the game program's vector table (64 longs, installed by movec
+; at 000294) as dc.l, game_entries (three jmp, docs/06 section 1.1), the zero fill to 020400 and
+; 48 bytes of data: 020400 is the base movea.l #$20400,a2 loads at 042356, 020418 the table read
+; at 02079A, 020D30 and 02093E (docs/06 section 4.2). 020400-020418 is zero and stays a fill
+; (docs/16).
 ; Owner: the game naming legs (M5a-M5f).
 ;
 ; Generated once by tools/m68k gen 020000 020430 (M5c, issue #33, docs/16-68k-code.md):

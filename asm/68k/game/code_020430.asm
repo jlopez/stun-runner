@@ -1,6 +1,7 @@
-; game/code_020430.asm, 020430-024306: game program code (pair S) with the data,
-; text and tables that lie between its routines; the first routine is sub_20430. Cut at
-; routine starts into files of about 16 KB named by their first address (decision C11).
+; game/code_020430.asm, 020430-024306: game program code (pair S) with the data, text and tables
+; that lie between its routines; the first routine is sub_20430 (020430). Cut at routine starts
+; into files of about 16 KB named by their first address (decision C11).
+; 020430-024306: 86 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
 ; Owner: the game naming legs (M5a-M5f).
 ;
 ; Generated once by tools/m68k gen 020430 024306 (M5c, issue #33, docs/16-68k-code.md):

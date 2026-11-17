@@ -1,6 +1,7 @@
-; boot/code_000212.asm, 000212-00394E: boot program code (pair R) with the data,
-; text and tables that lie between its routines; the first routine is boot_line_a_etc. Cut at
-; routine starts into files of about 16 KB named by their first address (decision C11).
+; boot/code_000212.asm, 000212-00394E: boot program code (pair R) with the data, text and tables
+; that lie between its routines; the first routine is boot_line_a_etc (000212). Cut at routine
+; starts into files of about 16 KB named by their first address (decision C11).
+; 000212-00394E: 41 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
 ; Owner: the boot naming legs (M5a, M5c-e for the boot program's tests and menus).
 ;
 ; Generated once by tools/m68k gen 000212 00394E (M5c, issue #33, docs/16-68k-code.md):

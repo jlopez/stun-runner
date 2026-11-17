@@ -1,6 +1,7 @@
-; game/code_034010.asm, 034010-037C52: game program code (pair S) with the data,
-; text and tables that lie between its routines; the first routine is sub_34010. Cut at
-; routine starts into files of about 16 KB named by their first address (decision C11).
+; game/code_034010.asm, 034010-037C52: game program code (pair S) with the data, text and tables
+; that lie between its routines; the first routine is sub_34010. Cut at routine starts into files
+; of about 16 KB named by their first address (decision C11).
+; 034010-037C52: 28 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
 ; Owner: the game naming legs (M5a-M5f).
 ;
 ; Generated once by tools/m68k gen 034010 037C52 (M5c, issue #33, docs/16-68k-code.md):
