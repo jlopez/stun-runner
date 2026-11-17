@@ -3,7 +3,7 @@
 ; executed in MAME; docs/14 section 9) and 046A00-046AEE, the last 68k code (MAME's highest PC is
 ; 046AEC).
 ; 04397E-046AEE: 8 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
-; Owner: the game naming legs (M5a-M5f).
+; Owner: the game naming legs (N1-N6, docs/03).
 ;
 ; Generated once by tools/m68k gen 04397E 046AEE (M5c, issue #33, docs/16-68k-code.md):
 ; neutral labels (the IDA snapshot's names where it has one), operands as docs/14 decides,
@@ -40,20 +40,86 @@ sub_445F0:
 	move.l	#$26088350,(a1)
 	move.l	#$2000000,(a1)
 	rts
-dat_44630:
-	incbin	"../../build/stunrun-68k.bin",$44630,$12
-dat_44642:
-	incbin	"../../build/stunrun-68k.bin",$44642,$F
-dat_44651:
-	incbin	"../../build/stunrun-68k.bin",$44651,$2DF
-dat_44930:
-	incbin	"../../build/stunrun-68k.bin",$44930,$F00
+; 044630-046A00: colour tables. The 32 palettes of data/palettes are generated includes
+; (tools/gspimages asm writes ../../build/gsp-images/palettes/<name>.asm, an assert at both
+; ends; M5d, docs/17 section 2), each under its label pal_<name>; the bytes between them
+; (other colour tables no image pairs with, docs/17) stay incbin slices.
+pal_level_base_00:
+	include	"../../build/gsp-images/palettes/level_base_00.asm"
+pal_level_base_01:
+	include	"../../build/gsp-images/palettes/level_base_01.asm"
+pal_level_base_02:
+	include	"../../build/gsp-images/palettes/level_base_02.asm"
+pal_level_base_03:
+	include	"../../build/gsp-images/palettes/level_base_03.asm"
+pal_level_base_05:
+	include	"../../build/gsp-images/palettes/level_base_05.asm"
+pal_level_base_04:
+	include	"../../build/gsp-images/palettes/level_base_04.asm"
 dat_45830:
-	incbin	"../../build/stunrun-68k.bin",$45830,$9C0
-dat_461F0:
-	incbin	"../../build/stunrun-68k.bin",$461F0,$4B0
-dat_466A0:
-	incbin	"../../build/stunrun-68k.bin",$466A0,$360
+	incbin	"../../build/stunrun-68k.bin",$45830,$300
+pal_overlay_03:
+	include	"../../build/gsp-images/palettes/overlay_03.asm"
+dat_45B60:
+	incbin	"../../build/stunrun-68k.bin",$45B60,$300
+pal_overlay_26:
+	include	"../../build/gsp-images/palettes/overlay_26.asm"
+pal_overlay_65:
+	include	"../../build/gsp-images/palettes/overlay_65.asm"
+dat_45F20:
+	incbin	"../../build/stunrun-68k.bin",$45F20,$2D0
+pal_title:
+	include	"../../build/gsp-images/palettes/title.asm"
+pal_overlay_16:
+	include	"../../build/gsp-images/palettes/overlay_16.asm"
+pal_overlay_17:
+	include	"../../build/gsp-images/palettes/overlay_17.asm"
+pal_overlay_20:
+	include	"../../build/gsp-images/palettes/overlay_20.asm"
+pal_overlay_18:
+	include	"../../build/gsp-images/palettes/overlay_18.asm"
+pal_overlay_19:
+	include	"../../build/gsp-images/palettes/overlay_19.asm"
+pal_overlay_21:
+	include	"../../build/gsp-images/palettes/overlay_21.asm"
+pal_overlay_22:
+	include	"../../build/gsp-images/palettes/overlay_22.asm"
+pal_overlay_23:
+	include	"../../build/gsp-images/palettes/overlay_23.asm"
+pal_overlay_29:
+	include	"../../build/gsp-images/palettes/overlay_29.asm"
+pal_overlay_25:
+	include	"../../build/gsp-images/palettes/overlay_25.asm"
+pal_overlay_37:
+	include	"../../build/gsp-images/palettes/overlay_37.asm"
+pal_overlay_04:
+	include	"../../build/gsp-images/palettes/overlay_04.asm"
+dat_46790:
+	incbin	"../../build/stunrun-68k.bin",$46790,$30
+pal_overlay_05:
+	include	"../../build/gsp-images/palettes/overlay_05.asm"
+pal_overlay_08:
+	include	"../../build/gsp-images/palettes/overlay_08.asm"
+dat_46820:
+	incbin	"../../build/stunrun-68k.bin",$46820,$30
+pal_overlay_09:
+	include	"../../build/gsp-images/palettes/overlay_09.asm"
+dat_46880:
+	incbin	"../../build/stunrun-68k.bin",$46880,$30
+pal_overlay_10:
+	include	"../../build/gsp-images/palettes/overlay_10.asm"
+pal_overlay_11:
+	include	"../../build/gsp-images/palettes/overlay_11.asm"
+pal_overlay_12:
+	include	"../../build/gsp-images/palettes/overlay_12.asm"
+pal_overlay_13:
+	include	"../../build/gsp-images/palettes/overlay_13.asm"
+pal_overlay_14:
+	include	"../../build/gsp-images/palettes/overlay_14.asm"
+pal_overlay_15:
+	include	"../../build/gsp-images/palettes/overlay_15.asm"
+pal_overlay_31:
+	include	"../../build/gsp-images/palettes/overlay_31.asm"
 sub_46A00:
 	btst	#$5,BUTTONS
 	beq.w	.l46A1E

@@ -2,7 +2,7 @@
 ; that lie between its routines; the first routine is sub_37C52 (037C52). Cut at routine starts
 ; into files of about 16 KB named by their first address (decision C11).
 ; 037C52-03BC3C: 26 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
-; Owner: the game naming legs (M5a-M5f).
+; Owner: the game naming legs (N1-N6, docs/03).
 ;
 ; Generated once by tools/m68k gen 037C52 03BC3C (M5c, issue #33, docs/16-68k-code.md):
 ; neutral labels (the IDA snapshot's names where it has one), operands as docs/14 decides,

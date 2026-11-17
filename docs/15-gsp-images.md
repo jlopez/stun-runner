@@ -17,7 +17,7 @@ test of the chip hashes without the ROMs.
 | Source | `data/gsp-images/manifest.json` and 140 PNGs (263 KB), `data/palettes/*.json` (32 files) |
 | Tool | `tools/gspimages` (package: `__init__.py` format and build, `stream.py` codec, `png.py`, `trace.py`, `__main__.py` CLI) |
 | Build | `tools/gspimages asm` on every `make` writes `build/gsp-images/images.asm` and `table.asm`, which the two region files include |
-| Checks | `make check` (25 files, 0 differences; the palettes against the image, `palcheck`), `make coverage` (both region files 0 blob), `tools/test_gspimages.py` (CI), `make imgtrace` (MAME) |
+| Checks | `make check` (25 files, 0 differences; since M5d the palettes are bytes of the tree, docs/17 section 2), `make coverage` (both region files 0 blob), `tools/test_gspimages.py` (CI), `make imgtrace` (MAME) |
 | Coverage | the 68k blob falls by 332,291 bytes, from 691,513 to 359,222; the set's blob share from 45.8% to 23.8% |
 | Re-decode | `make images` (as `make objects` and `make samples`) |
 
@@ -208,17 +208,15 @@ Each image's manifest `palette` spec says how its PNG's PLTE is composed (`tools
   entries that share a stream list their own overlay under `aliases`;
 - `grey` (a 0-255 ramp) where 048068 is 0 (entries 1, 24, 30, 32, 33, 34).
 
-`tools/test_gspimages.py` fails when a PNG's PLTE differs from its spec. **`make check` compares
-every palette with the image**: `tools/gspimages asm` also writes `build/gsp-images/palettes.asm`
-(each palette as `dc.b`), vasm assembles it and `tools/gspimages palcheck` compares each slice
-with `build/stunrun-68k.bin` at the palette's address (`check: palcheck` in the Makefile; skipped
-without the reference set). A planted change (one red component of `title` colour 6) failed it:
-`palette title (0461F0, 256 colours): differs from the 68k image at colour 6 (68k 046202)`.
-Embedding the palettes in the 68k tree in place of their blob slices is a follow-up for the data
-leg (wave 2, C13). All 32 lie in 044630-0469FF (`level_base_00` to `overlay_31`), that is in
-`game/island.asm` (04397E-046AEE, the game leg's file in docs/13), none in `data.asm` (C13 named
-both); `palettes.asm` is one block in address order with gaps between palettes, so it cannot be
-included in place as it is (section 12).
+`tools/test_gspimages.py` fails when a PNG's PLTE differs from its spec. **The palettes are bytes
+of the 68k tree since M5d** (docs/17 section 2): `tools/gspimages asm` writes one include per
+palette, `build/gsp-images/palettes/<name>.asm` (`dc.b` per colour, an assert at both ends), and
+`game/island.asm` includes each at its address under `pal_<name>`, so `make check` compares them
+with the reference set as it compares every byte. (In M5i, `palettes.asm` held them as one block
+and `tools/gspimages palcheck` compared each with the image, a prerequisite of `make check`; M5d
+removed both.) A planted change (one red component of `title` colour 6) now fails `make check` at
+`68k $046202`. All 32 lie in 044630-0469FF (`level_base_00` to `overlay_31`), that is in
+`game/island.asm` (04397E-046AEE), none in `data.asm` (C13 named both).
 
 ## 8. MAME: `make imgtrace`
 
@@ -345,8 +343,8 @@ round trip; the headed image layout (a 5x5 image's size field, padding, the pair
 reader on filters 1-4 and a 4-bit file; a one-pixel edit (a value outside the stream's table)
 re-encodes and decodes to the edit with the chip sums still right; a size change fails with the
 message of section 6; a broken manifest fails; every PNG's PLTE is its spec; every palette is
-used; the PNGs are the only images under `data/`; `palcheck` passes and fails on a planted
-colour (synthetic image); this document's stream and image counts (sections 4.2 and 5) are the
+used; the PNGs are the only images under `data/`; each palette include assembles to its colours
+and fails one byte away from its address (M5d; `palcheck`'s test before); this document's stream and image counts (sections 4.2 and 5) are the
 manifest's, and every `full` spec that no MAME dump matched but for colour 1D is named, with its
 best count, here (section 8) and in `CLAUDE.md`'s `make imgtrace` bullet. With the reference set:
 the committed data is what the image decodes to and builds back to it; every palette equals the
@@ -365,9 +363,7 @@ the data.
 - `frame_28`'s and the `figure_*` and `strip_67` streams' palettes rest on table 048068 alone; no
   code pairing them with a base was found. The figure screen's loaders (0407A8, 04080E, section 9)
   were found but never ran in MAME.
-- Question for the coordinator (review of PR #36): the palettes lie in `game/island.asm` (section
-  7), the game leg's file, while C13 gives their embedding to the data leg; which leg embeds them,
-  and should `tools/gspimages` emit one include per palette (or per contiguous run) so that the
-  embedding leg can include them in place without editing this leg's tool?
+- (Answered by issue #37: the data leg, M5d, embedded them, one include per palette written by
+  `tools/gspimages`; docs/17 section 2.)
 - The adjust words' places (before entries 1, 35, 65) are kept as the ROM has them; why there is
   HYP (section 5).

@@ -2,7 +2,7 @@
 ; that lie between its routines; the first routine is sub_DDF2. Cut at routine starts into files
 ; of about 16 KB named by their first address (decision C11).
 ; 00DDF2-0109D4: 40 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
-; Owner: the boot naming legs (M5a, M5c-e for the boot program's tests and menus).
+; Owner: the boot naming legs (N1, N3-N5 for the boot program's tests and menus; docs/03).
 ;
 ; Generated once by tools/m68k gen 00DDF2 0109D4 (M5c, issue #33, docs/16-68k-code.md):
 ; neutral labels (the IDA snapshot's names where it has one), operands as docs/14 decides,

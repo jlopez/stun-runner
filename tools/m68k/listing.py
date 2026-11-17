@@ -476,12 +476,16 @@ def shift_check(lst: Listing, plain: bytes, padded: bytes, origin: int, pad: int
     its first statement (so everything moved by pad)."""
     rep = ShiftReport()
     moved = padded[pad:]
+    # an equate below 100h is a small constant, not an address (the sound commands, M5d,
+    # docs/17; 000000-0000FF is the vector table): it does not move with the pad. An equate in
+    # the ROM above it still counts (a label pinned by an equ must fail)
+    labels = {n: v for n, v in lst.symbols.items() if n not in lst.equates or v >= 0x100}
     if len(moved) != len(plain):
         rep.errors.append(f"the padded image is {len(padded)} bytes, expected {len(plain) + pad}")
         return rep
     for s in lst.statements:
         a, b = s.address - origin, s.address - origin + s.size
-        want = symbolic_moving(s, lst.symbols, lo, hi)
+        want = symbolic_moving(s, labels, lo, hi)
         got = plain[a:b] != moved[a:b]
         rep.expected += want
         rep.changed += got

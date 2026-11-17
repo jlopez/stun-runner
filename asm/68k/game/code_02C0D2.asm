@@ -2,7 +2,7 @@
 ; that lie between its routines; the first routine is init_coprocessors (02C0D2). Cut at routine
 ; starts into files of about 16 KB named by their first address (decision C11).
 ; 02C0D2-030012: 97 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
-; Owner: the game naming legs (M5a-M5f).
+; Owner: the game naming legs (N1-N6, docs/03).
 ;
 ; Generated once by tools/m68k gen 02C0D2 030012 (M5c, issue #33, docs/16-68k-code.md):
 ; neutral labels (the IDA snapshot's names where it has one), operands as docs/14 decides,
@@ -107,7 +107,7 @@ init_coprocessors:
 	clr.b	ram_FF9C7C
 	jsr	sub_2F126
 	jsr	sub_2D706
-	pea	dat_44630
+	pea	pal_level_base_00
 	jsr	sub_2F6BE
 	pea	dat_4769A
 	pea	$100.w
@@ -319,11 +319,11 @@ sub_2C546:
 loc_2C596:
 	tst.b	ram_FF9BBE
 	beq.s	loc_2C5D0
-	pea	dat_44642
+	pea	pal_level_base_00+3*6	; its colour 6 (the 5 colours from index 6 that sub_2F610 is given)
 	pea	$5.w
 	pea	$6.w
 	jsr	sub_2F610
-	pea	dat_44651
+	pea	pal_level_base_00+3*11	; its colour 11 (5 colours from index 0Bh)
 	pea	$5.w
 	pea	$B.w
 	jsr	sub_2F610
@@ -1325,16 +1325,16 @@ sub_2D762:
 	movem.l	a2,-(sp)
 	movea.l	#unpack_gsp_image,a2
 	move.l	#$FFF23F00,GSP_HOST+$2
-	move.l	tbl_BFE00+$78,-(sp)
+	move.l	gsp_image_entry_30,-(sp)
 	jsr	(a2)
 	move.l	#$FFF2B760,GSP_HOST+$2
-	move.l	tbl_BFE00+$80,-(sp)
+	move.l	gsp_image_entry_32,-(sp)
 	jsr	(a2)
 	move.l	#$FFF3FD80,GSP_HOST+$2
-	move.l	tbl_BFE00+$84,-(sp)
+	move.l	gsp_image_entry_33,-(sp)
 	jsr	(a2)
 	move.l	#$FFF3FB20,GSP_HOST+$2
-	move.l	tbl_BFE00+$88,-(sp)
+	move.l	gsp_image_entry_34,-(sp)
 	jsr	(a2)
 	movem.l	(-$4,a6),a2
 	unlk	a6
@@ -1342,11 +1342,11 @@ sub_2D762:
 sub_2D7C2:
 	link	a6,#$0
 	move.l	#$FFDE0000,GSP_HOST+$2
-	move.l	tbl_BFE00+$4,-(sp)
+	move.l	gsp_image_entry_01,-(sp)
 	jsr	unpack_gsp_image
 	jsr	sub_2D762
 	move.l	#$FFE00000,GSP_HOST+$2
-	move.l	tbl_BFE00+$8,-(sp)
+	move.l	gsp_image_entry_02,-(sp)
 	jsr	unpack_gsp_image
 	move.l	dat_47F58,ram_FF9BAE
 	move.w	#$2,ram_FF9BCE
@@ -1411,7 +1411,7 @@ sub_2DA6E:
 sub_2DB24:
 	link	a6,#$0
 	move.l	#$FFE00000,GSP_HOST+$2
-	move.l	tbl_BFE00+$C,-(sp)
+	move.l	gsp_image_entry_03,-(sp)
 	jsr	unpack_gsp_image
 	move.l	dat_47F5C,ram_FF9BAE
 	move.w	#$3,ram_FF9BCE
@@ -1420,7 +1420,7 @@ sub_2DB24:
 sub_2DB54:
 	link	a6,#$0
 	move.l	#$FFE00000,GSP_HOST+$2
-	move.l	tbl_BFE00+$114,-(sp)
+	move.l	gsp_image_entry_69,-(sp)
 	jsr	unpack_gsp_image
 	move.l	dat_48064,ram_FF9BAE
 	move.w	#$45,ram_FF9BCE
@@ -1429,7 +1429,7 @@ sub_2DB54:
 sub_2DB84:
 	link	a6,#$0
 	move.l	#$FFE00000,GSP_HOST+$2
-	move.l	tbl_BFE00+$8,-(sp)
+	move.l	gsp_image_entry_02,-(sp)
 	jsr	unpack_gsp_image
 	move.l	dat_47F58,ram_FF9BAE
 	move.w	#$2,ram_FF9BCE

@@ -268,14 +268,18 @@ def test_assembled_region_is_the_six_chips(tmp_path: Path) -> None:
     roms = {r["name"]: r for r in load_snapshot(SET)["roms"]}
     for name, data in g.chips(region).items():
         assert hashes(data) == (roms[name]["crc"], roms[name]["sha1"]), name
-    # the palettes as dc.b assemble too (make check compares them with the image)
-    pal = tmp_path / "build/gsp-images/palettes.asm"
-    r = subprocess.run([vasm(), "-quiet", "-Fbin", "-no-opt", "-m68010", "-o", "pal.bin", pal],
-                       cwd=tmp_path, capture_output=True, text=True, check=False)
-    assert r.returncode == 0, r.stdout + r.stderr
+    # the palettes as dc.b, one include per palette (game/island.asm includes them, M5d)
     pals = g.read_palettes(PALETTES)
-    assert (tmp_path / "pal.bin").read_bytes() == b"".join(
-        pals[n].bytes() for n in sorted(pals, key=lambda n: (pals[n].address, n)))
+    for name, p in pals.items():
+        src = tmp_path / "build/gsp-images/palettes" / f"{name}.asm"
+        wrap = tmp_path / f"pal_{name}.asm"
+        wrap.write_text(f'\torg\t${p.address:06X}\n\tinclude\t"{src}"\n')
+        r = subprocess.run([vasm(), "-quiet", "-Fbin", "-no-opt", "-m68010", "-o", "pal.bin",
+                            wrap.name], cwd=tmp_path, capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert (tmp_path / "pal.bin").read_bytes() == p.bytes(), name
+    assert sorted(f.name for f in (tmp_path / "build/gsp-images/palettes").iterdir()) == sorted(
+        f"{n}.asm" for n in pals)
 
 
 def test_every_committed_stream_decodes_to_its_images() -> None:
@@ -406,40 +410,60 @@ def test_pngs_are_the_only_images_under_data() -> None:
     assert sorted(tracked) == sorted(found + ["data/gsp-images/manifest.json"])
 
 
-def test_palcheck_fails_on_a_planted_colour(tmp_path: Path) -> None:
-    """The make check palette comparison, on a synthetic image (CI): equal passes, one changed
-    colour component fails and names the palette."""
-    pals = g.read_palettes(PALETTES)
-    image = bytearray(0xC0000)
-    for p in pals.values():
-        image[p.address : p.address + 3 * p.count] = p.bytes()
-    src, _ = g.palettes_asm(pals)
-    built = b"".join(pals[n].bytes() for n in sorted(pals, key=lambda n: (pals[n].address, n)))
-    (tmp_path / "img.bin").write_bytes(bytes(image))
-    (tmp_path / "pal.bin").write_bytes(built)
-    cmd: list[str | Path] = [sys.executable, TOOLS / "gspimages", "palcheck", "--palettes", PALETTES, "--bin",
-           tmp_path / "pal.bin", "--image", tmp_path / "img.bin"]
-    r = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    assert r.returncode == 0, r.stdout
-    title = pals["title"]
-    image[title.address + 3 * 7 + 1] ^= 1
-    (tmp_path / "img.bin").write_bytes(bytes(image))
-    r = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    assert r.returncode == 1
-    assert "palette title" in r.stdout and "colour 7" in r.stdout
+@pytest.mark.skipif(not vasm(), reason="vasm not available")
+def test_palette_include_asserts_its_place(tmp_path: Path) -> None:
+    """A palette include asserts its address and its end: included one byte late it fails with
+    its name (vasm), so a palette never lands anywhere but at its data/palettes address."""
+    p = g.read_palettes(PALETTES)["title"]
+    (tmp_path / "title.asm").write_text(g.palette_source(p))
+    (tmp_path / "t.asm").write_text(f'\torg\t${p.address + 1:06X}\n\tinclude\t"title.asm"\n')
+    r = subprocess.run([vasm(), "-quiet", "-Fbin", "-no-opt", "-m68010", "-o", "t.bin", "t.asm"],
+                       cwd=tmp_path, capture_output=True, text=True, check=False)
+    assert r.returncode != 0 and "palette title misplaced" in r.stdout + r.stderr
 
 
-def test_palette_bin_is_rebuilt_on_every_make() -> None:
-    """make 3.81 compares whole-second mtimes: palettes.asm is rewritten only when its text
-    changes, so a palettes.bin that followed it by mtime could be compared stale by palcheck.
-    The palette binary and the 68k tree (which includes the image includes) depend on FORCE, so
-    they assemble on every make, whatever the mtimes (make's database, as -p prints it)."""
-    for target in ("build/gsp-images/palettes.bin", "build/stunrun-68k.out"):
-        r = subprocess.run(["make", "-n", "-p", "--no-print-directory", target], cwd=REPO,
-                           capture_output=True, text=True, check=False)
-        rule = [ln for ln in r.stdout.splitlines() if ln.startswith(f"{target}:")]
-        assert rule, f"make's database has no rule for {target}"
-        assert "FORCE" in rule[0].split(":", 1)[1].split(), f"{target} is rebuilt by mtime only"
+@pytest.mark.skipif(not vasm(), reason="vasm not available")
+def test_renamed_palette_removes_its_stale_include(tmp_path: Path) -> None:
+    """Review of #38: write_palettes removes the include of a palette data/palettes no longer
+    has, so a renamed palette fails at game/island.asm's include (vasm cannot open it) instead
+    of assembling the old bytes from a stale build/gsp-images/palettes/<name>.asm."""
+    pals = tmp_path / "palettes"
+    shutil.copytree(PALETTES, pals)
+    out = tmp_path / "build/gsp-images"
+    g.write_palettes(out, g.read_palettes(pals))
+    folder = out / "palettes"
+    assert (folder / "level_base_03.asm").exists()
+    spec = json.loads((pals / "level_base_03.json").read_text())
+    spec["name"] = "renamed_03"
+    (pals / "renamed_03.json").write_text(json.dumps(spec))
+    (pals / "level_base_03.json").unlink()
+    g.write_palettes(out, g.read_palettes(pals))
+    assert not (folder / "level_base_03.asm").exists()
+    assert (folder / "renamed_03.asm").exists()
+    assert sorted(f.name for f in folder.iterdir()) == sorted(
+        f"{p.stem}.asm" for p in pals.glob("*.json"))
+    # the island as the tree has it, with a made-up blob for its incbin slices
+    (tmp_path / "asm/68k/game").mkdir(parents=True)
+    shutil.copy(REPO / "asm/68k/game/island.asm", tmp_path / "asm/68k/game/island.asm")
+    (tmp_path / "build/stunrun-68k.bin").write_bytes(bytes(0xC0000))
+    (tmp_path / "asm/68k/w.asm").write_text('\torg\t$04397E\n\tinclude\t"game/island.asm"\n')
+    r = subprocess.run([vasm(), "-quiet", "-Fbin", "-no-opt", "-m68010", "-o", "w.bin", "w.asm"],
+                       cwd=tmp_path / "asm/68k", capture_output=True, text=True, check=False)
+    msg = r.stdout + r.stderr
+    assert r.returncode != 0
+    assert "could not open <../../build/gsp-images/palettes/level_base_03.asm>" in msg, msg
+
+
+def test_68k_tree_is_rebuilt_on_every_make() -> None:
+    """make 3.81 compares whole-second mtimes: the includes are rewritten only when their text
+    changes, so the 68k tree (which includes the image and palette includes) depends on FORCE
+    and assembles on every make, whatever the mtimes (make's database, as -p prints it)."""
+    target = "build/stunrun-68k.out"
+    r = subprocess.run(["make", "-n", "-p", "--no-print-directory", target], cwd=REPO,
+                       capture_output=True, text=True, check=False)
+    rule = [ln for ln in r.stdout.splitlines() if ln.startswith(f"{target}:")]
+    assert rule, f"make's database has no rule for {target}"
+    assert "FORCE" in rule[0].split(":", 1)[1].split(), f"{target} is rebuilt by mtime only"
 
 
 def test_trace_names_the_first_differing_word(tmp_path: Path) -> None:

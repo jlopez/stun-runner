@@ -80,9 +80,12 @@ pixel indices (never their colours; a PNG whose size differs from the manifest's
 every stream, computes the three checksum-adjust words from the self-test's expected sums and
 writes `build/gsp-images/images.asm` and `table.asm`, which `asm/68k/images.asm` and
 `image_table.asm` include (a label and an assert per stream, asserts at the pair boundaries,
-`dc.l` labels in the table). It also writes `build/gsp-images/palettes.asm`, the palettes of
-`data/palettes` as `dc.b`; `make check` has the prerequisite `palcheck`, which assembles them and
-compares each with `build/stunrun-68k.bin` at its address (skipped without the reference set).
+`dc.l` labels in the table). It also writes `build/gsp-images/palettes/<name>.asm`, each palette
+of `data/palettes` as `dc.b` with an assert at both ends, which `asm/68k/game/island.asm` includes
+at the palette's address (M5d, docs/17 section 2; M5i's `palcheck` is gone, the palettes being
+bytes of the tree that `make check` compares). Since M5d `tools/m68k sound-equates` writes
+`build/68k/sound_commands.asm` from `data/sound/commands.json` on every make too, which
+`asm/68k/stunrun.asm` includes after `ram.asm`.
 `make images` re-decodes the merged image into `data/gsp-images`; `make -j6 imgtrace` checks the
 unpackers in MAME (docs/15 section 8).
 Since M4a the 6502 image is not an incbin of `build/stunrun-jsa.bin` either: `asm/jsa/jsa.asm`

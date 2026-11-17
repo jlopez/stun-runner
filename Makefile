@@ -632,14 +632,30 @@ pccov: $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt) $(BUILD)/$(SET)-68k.bin $(BUILD
 		--listing $(BUILD)/$(SET)-68k.lst \
 		--summary artifacts/pccov-summary.json $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt)
 
+# --- M5d: the sound command equates (docs/17 section 3) ----------------------------------------
+# data/sound/commands.json names every sound command (docs/11 section 11); tools/m68k
+# sound-equates writes build/68k/sound_commands.asm (`snd_<name> equ $NN`), which
+# asm/68k/stunrun.asm includes after ram.asm. On every make (a fraction of a second, rewritten
+# only when its text changes), as the image includes below.
+SOUND_EQUATES := $(BUILD)/68k/sound_commands.asm
+
+$(SOUND_EQUATES): FORCE
+	$(PYTHON) tools/m68k sound-equates --commands data/sound/commands.json --out $@
+
+.SECONDARY: $(SOUND_EQUATES)
+EXTRA_stunrun-68k += $(SOUND_EQUATES)
+
 # --- M5i: the packed GSP images and their palettes (docs/15-gsp-images.md) --------------------
 # tools/gspimages is a package run as `uv run python tools/gspimages <command>`; its CI tests are
 # tools/test_gspimages.py. The 68k tree's 060000-0C0000 comes from data/gsp-images alone:
 # tools/gspimages asm re-encodes every stream from the PNGs' pixel indices and writes the
-# includes of asm/68k/images.asm and image_table.asm (and the palettes of data/palettes as dc.b),
-# on every make (a fraction of a second; make 3.81 compares whole-second mtimes), rewriting a file
-# only when it changes. A PNG whose size differs from the manifest's fails the build.
-.PHONY: lint-gspimages images palcheck imgtrace
+# includes of asm/68k/images.asm and image_table.asm, and since M5d (docs/17) one include per
+# palette of data/palettes, build/gsp-images/palettes/<name>.asm, which game/island.asm includes
+# at the palette's address; on every make (a fraction of a second; make 3.81 compares
+# whole-second mtimes), rewriting a file only when it changes. A PNG whose size differs from the
+# manifest's fails the build. (M5i's `palcheck` is gone: the palettes are bytes of the tree now,
+# so `make check`'s byte comparison covers them.)
+.PHONY: lint-gspimages images imgtrace
 lint: lint-gspimages
 lint-gspimages:
 	uv run --frozen mypy -p gspimages
@@ -647,32 +663,17 @@ lint-gspimages:
 GSP_DIR := $(BUILD)/gsp-images
 GSP_ASM := $(GSP_DIR)/images.asm $(GSP_DIR)/table.asm
 GSP_TOOLS := $(wildcard tools/gspimages/*.py)
-GSP_PAL_BIN := $(GSP_DIR)/palettes.bin
 
-# two targets, one recipe: a pattern rule (stem "images"), as the object pages above
-$(BUILD)/gsp-%/images.asm $(BUILD)/gsp-%/table.asm $(BUILD)/gsp-%/palettes.asm: FORCE
+# two targets, one recipe: a pattern rule (stem "images"), as the object pages above; the same
+# run writes the palette includes
+$(BUILD)/gsp-%/images.asm $(BUILD)/gsp-%/table.asm: FORCE
 	$(PYTHON) tools/gspimages asm --data data/gsp-images --palettes data/palettes --out $(GSP_DIR)
 
-.SECONDARY: $(GSP_ASM) $(GSP_DIR)/palettes.asm
+.SECONDARY: $(GSP_ASM)
 # FORCE: the includes keep their mtime unless their text changes, and make 3.81's whole-second
 # mtimes would otherwise skip an assembly whose include changed in the second of the last one
-# (a stale image or palettes.bin would then pass or fail make check wrongly). Both take < 1 s.
+# (a stale image would then pass or fail make check wrongly). Both take < 1 s.
 EXTRA_stunrun-68k += $(GSP_ASM) FORCE
-
-# The palettes as dc.b, assembled alone (no image includes them yet: the data leg embeds them in
-# the tree, docs/15 section 7) and compared with the 68k image at each palette's address. Part of
-# `make check` (a prerequisite); skipped without the reference set, as check is.
-$(GSP_PAL_BIN): $(GSP_DIR)/palettes.asm FORCE
-	$(VASM) $(VASMFLAGS) -o $@ $<
-
-palcheck:
-	@$(PYTHON) tools/check-roms --set $(SET) >/dev/null; rc=$$?; \
-	if [ $$rc -eq 2 ]; then echo "palettes: reference set absent, skipped"; exit 0; fi; \
-	$(MAKE) --no-print-directory $(BUILD)/$(SET)-68k.bin $(GSP_PAL_BIN) || exit 1; \
-	$(PYTHON) tools/gspimages palcheck --palettes data/palettes --bin $(GSP_PAL_BIN) \
-		--image $(BUILD)/$(SET)-68k.bin
-
-check: palcheck
 
 # Re-decode the image into data/gsp-images (docs/15): the manifest and one PNG per distinct
 # image, names and palette specs kept; run after changing the decoder. `make test` fails while
@@ -709,3 +710,45 @@ $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt): $(BUILD)/mame/imgtrace-%.txt: tools/
 imgtrace: $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt) $(BUILD)/$(SET)-68k.bin
 	$(PYTHON) tools/gspimages trace --image $(BUILD)/$(SET)-68k.bin \
 		--summary artifacts/gspimages-summary.json $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt)
+
+# --- M5d: the moved-build experiment (docs/17 section 5) ------------------------------------
+# How relocatable is the 68k tree? tools/m68k moved assembles it with MOVED_PAD zero bytes before
+# the game code (020430; the fill at 05CF86 shorter by as much, so pairs U-W stay), its guards
+# off, into build/moved/stunrun-68k.out, and tools/split-roms cuts it with the other four images
+# into build/moved/roms/stunrun (never committed). tools/mame/movedcheck.lua logs per frame what
+# the 68010 writes to the GSP host port, the ADSP and the sound latch, headless, each run from
+# its own empty NVRAM and cfg: attract mode and a started game, for the reference set and for
+# the moved one; `tools/m68k moved-compare` prints the first frame each stream differs in. An
+# experiment, not a check: it reports and exits 0. MOVED_DETAIL=F1-F2 logs every write of those
+# frames with its PC (build/mame/moved-*.detail). `make -j4 movedcheck`. Needs MAME and the ROMs.
+.PHONY: movedcheck moved
+MOVED_PAD ?= 4
+MOVED_FRAMES ?= 4000
+MOVED_DIR := $(BUILD)/moved
+MOVED_RUNS := ref-attract moved-attract ref-game moved-game
+
+moved: all
+	$(PYTHON) tools/m68k moved --pad $(MOVED_PAD) --tree asm/68k --build $(BUILD) --out $(MOVED_DIR)
+	for i in stunrun-obj stunrun-oki stunrun-nvram stunrun-jsa; do \
+		cp $(BUILD)/$$i.out $(MOVED_DIR)/$$i.out || exit 1; done
+	$(PYTHON) tools/split-roms --set $(SET) --images $(MOVED_DIR) --suffix .out \
+		--out $(MOVED_DIR)/roms/$(SET)
+
+$(BUILD)/mame/moved-ref-%.txt: MOVED_ROMPATH = $(REF_ROMPATH)
+$(BUILD)/mame/moved-moved-%.txt: MOVED_ROMPATH = $(MOVED_DIR)/roms
+$(BUILD)/mame/moved-%-attract.txt: MOVED_ENV = MOVED_PLAY=0
+$(BUILD)/mame/moved-%-game.txt: MOVED_ENV = MOVED_PLAY=1
+
+$(MOVED_RUNS:%=$(BUILD)/mame/moved-%.txt): $(BUILD)/mame/moved-%.txt: tools/mame/movedcheck.lua moved
+	$(call TRACE_STATE,moved-$*)
+	rm -f $@
+	MOVED_DIR=$(BUILD)/mame/ MOVED_NAME=moved-$* MOVED_FRAMES=$(MOVED_FRAMES) $(MOVED_ENV) \
+		MOVED_DETAIL=$(MOVED_DETAIL) SDL_VIDEODRIVER=dummy $(MAME) stunrun $(MAME_FLAGS) \
+		-rompath $(MOVED_ROMPATH) $(call TRACE_DIRS,moved-$*) \
+		-autoboot_script tools/mame/movedcheck.lua
+	@grep -qx '# done' $@ || { echo "movedcheck: the $* run did not finish"; exit 1; }
+
+movedcheck: $(MOVED_RUNS:%=$(BUILD)/mame/moved-%.txt)
+	$(PYTHON) tools/m68k moved-compare $(BUILD)/mame/moved-ref-attract.txt \
+		$(BUILD)/mame/moved-moved-attract.txt $(BUILD)/mame/moved-ref-game.txt \
+		$(BUILD)/mame/moved-moved-game.txt

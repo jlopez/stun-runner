@@ -2,7 +2,7 @@
 ; that lie between its routines; the first routine is sub_24306 (024306). Cut at routine starts
 ; into files of about 16 KB named by their first address (decision C11).
 ; 024306-028194: 29 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
-; Owner: the game naming legs (M5a-M5f).
+; Owner: the game naming legs (N1-N6, docs/03).
 ;
 ; Generated once by tools/m68k gen 024306 028194 (M5c, issue #33, docs/16-68k-code.md):
 ; neutral labels (the IDA snapshot's names where it has one), operands as docs/14 decides,
@@ -71,7 +71,7 @@ sub_24306:
 	clr.b	ram_FFDCF2
 	clr.b	ram_FFDBD0
 	jsr	sub_26EF2
-	move.l	#dat_461F0,ram_FF9558
+	move.l	#pal_title,ram_FF9558
 	clr.l	ram_FF955C
 	clr.w	ram_FF9560
 	move.w	#$1,ram_FF9554
@@ -203,7 +203,7 @@ sub_245D0:
 	jsr	(a2)
 	addq.l	#4,sp
 .l245F8:
-	move.l	#dat_461F0,ram_FF9558
+	move.l	#pal_title,ram_FF9558
 	clr.l	ram_FF955C
 	clr.w	ram_FF9560
 	move.w	#$1,ram_FF9554
@@ -524,7 +524,7 @@ loc_24A80:
 	move.b	($0,a0,d1.l),d0
 	movea.l	d0,a3
 	move.l	#$FFE00000,GSP_HOST+$2
-	move.l	tbl_BFE00+$64,-(sp)
+	move.l	gsp_image_entry_25,-(sp)
 	jsr	unpack_gsp_image
 	move.l	#$FFED0000,GSP_HOST+$2
 	move.l	a3,d0
@@ -682,7 +682,7 @@ sub_24CD8:
 	beq.s	.l24D70
 	jsr	sub_434F6
 	clr.l	ram_FF955C
-	move.l	#dat_44630,ram_FF9558
+	move.l	#pal_level_base_00,ram_FF9558
 	clr.w	ram_FF9560
 	clr.w	ram_FF9554
 	pea	$33.w
@@ -858,7 +858,7 @@ sub_24EE2:
 	move.l	(a0),-(sp)
 	jsr	unpack_gsp_image
 	move.l	dat_47406,ram_FFDB3C
-	move.l	#dat_466A0,ram_FFDB40
+	move.l	#pal_overlay_25,ram_FFDB40
 	move.b	#$E0,ram_FFDB44
 	move.b	#$20,ram_FFDB46
 	moveq	#$0,d0
@@ -3265,7 +3265,7 @@ sub_26EF2:
 	move.b	#$1,ram_FF9BC2
 	clr.b	ram_FF9BC0
 	move.w	#$78,ram_FF954E
-	move.l	#dat_461F0,ram_FFDB3C
+	move.l	#pal_title,ram_FFDB3C
 	jsr	sub_2DB84
 	unlk	a6
 	rts
@@ -3296,7 +3296,7 @@ sub_26F66:
 	move.b	#$5,ram_FF9B86
 	jsr	sub_2DB24
 	move.l	dat_48074,ram_FF955C
-	move.l	#dat_44630,ram_FF9558
+	move.l	#pal_level_base_00,ram_FF9558
 	move.w	#$10,ram_FF9560
 	clr.w	ram_FF9554
 	pea	$33.w
@@ -3402,7 +3402,7 @@ sub_2715C:
 	link	a6,#$0
 	movem.l	a2,-(sp)
 	movea.l	#ram_FF957E,a2
-	move.l	#dat_44630,ram_FFDB3C
+	move.l	#pal_level_base_00,ram_FFDB3C
 	pea	$2.w
 	jsr	queue_sound_command
 	clr.b	ram_FF9BC2
@@ -3730,7 +3730,7 @@ sub_27670:
 	asl.l	#2,d0
 	movea.l	#dat_48068,a0
 	move.l	($0,a0,d0.l),-(sp)
-	pea	dat_44630
+	pea	pal_level_base_00
 .l2773A:
 	jsr	sub_296AA
 	bra.s	.l2776C
@@ -4015,7 +4015,7 @@ loc_2797E:
 	asl.l	#2,d0
 	movea.l	#dat_48068,a0
 	move.l	($0,a0,d0.l),-(sp)
-	pea	dat_44630
+	pea	pal_level_base_00
 .l27AB6:
 	jsr	sub_296AA
 	bra.s	loc_27AF4

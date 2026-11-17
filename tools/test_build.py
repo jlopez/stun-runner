@@ -331,6 +331,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     shutil.copytree(REPO / "data/oki", work / "data/oki")
     shutil.copytree(REPO / "data/gsp-images", work / "data/gsp-images")  # pairs U-W (docs/15)
     shutil.copytree(REPO / "data/palettes", work / "data/palettes")
+    shutil.copytree(REPO / "data/sound", work / "data/sound")  # the sound equates (docs/17)
     (work / "data/ida").mkdir()
     shutil.copy(REPO / "data/ida/stunrun-68k.json", work / "data/ida")  # for `make labels`
     env = dict(os.environ, STUNRUN_ROMS=str(tmp_path / "archive"))
@@ -372,6 +373,9 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
                  "build/gsp-images/table.asm": "asm/68k/image_table.asm"}
     files68k: dict[str, dict[str, int]] = {}
     for f, c in summary["files"].items():
+        # the palettes (M5d, docs/17): one include per palette, in game/island.asm
+        if f.startswith("build/gsp-images/palettes/"):
+            f = "asm/68k/game/island.asm"
         f = generated.get(f, f)
         if f.startswith("asm/68k/"):
             row = files68k.setdefault(f, dict.fromkeys(("instr", "data", "blob", "fill"), 0))
@@ -383,7 +387,9 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert summary["images"]["stunrun-68k"] == total
     assert total["instr"] == 163_638
     code = [c for f, c in files68k.items() if f.startswith(("asm/68k/boot/", "asm/68k/game/"))]
-    assert sum(c["blob"] for c in code) == 61_118
+    # 61,118 in M5c (docs/16); M5d made the 32 palettes of the island (6,768 bytes) and the
+    # three pointers at 021650 (12) data (docs/17)
+    assert sum(c["blob"] for c in code) == 61_118 - 6_768 - 12
     assert summary["images"]["stunrun-nvram"] == {"instr": 0, "data": 0, "blob": 0, "fill": 4096}
     assert {f: sum(c.values()) for f, c in files68k.items()} == {
         f"asm/68k/{f}": b - a for f, a, b in REGIONS}
@@ -393,7 +399,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     r = run(*make, "coverage", "MAX_BLOB=asm/68k/programs.asm=32688 asm/68k/data.asm=0", env=env)
     assert r.returncode != 0
     assert "OK asm/68k/programs.asm: 32688 blob bytes" in r.stdout
-    assert "asm/68k/data.asm has 91288 blob bytes, at most 0 allowed" in r.stderr
+    assert "asm/68k/data.asm has 78319 blob bytes, at most 0 allowed" in r.stderr
     # the snapshot's names in source are labels at their addresses
     r = run(*make, "labels", env=env)
     assert r.returncode == 0, r.stdout + r.stderr

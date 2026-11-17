@@ -425,7 +425,7 @@ buffers through the host port, copying the SOM list verbatim as command 7000 amo
 commands (docs/08 section 2, MAME: in every `make somdump` capture the bank rebuilt from the
 ADSP's writes equals what the 68k reads at 810000, and the buffer's code-7 command equals it);
 the command set is docs/08 section 3. The rest of the buffer header and what sections 1 and 2
-hold are M5d/M6.
+hold are N4/M6.
 
 ## 7. Does 68k code run from RAM? No (MAME)
 
@@ -490,9 +490,9 @@ the CPUs (harddriv_m.cpp:595-601).
 3. GSP sections 1 and 2: confirm the `.cinit` reading of section 1 by decoding FFF59C70 (M6). The
    command-buffer format at FFF9FC10/FFFCFC10 and its writer (the 68k, through the host port) are
    answered by docs/08 sections 2 and 3; the header block, the writer of FFF77F50 and the targets
-   of codes 6, 8, B and D stay open there (docs/08 section 6, M5d).
+   of codes 6, 8, B and D stay open there (docs/08 section 6, N4).
 4. The packed image format of pairs U-V, and when the images of 0x09F1C5-0x0B10EB (table entries
-   47-68) are shown (M5d, M5f). Answered by M5i (docs/15): the format in sections 2-5, entries
+   47-68) are shown (the naming waves N4 and N6, docs/03, called M5d and M5f before the rename). Answered by M5i (docs/15): the format in sections 2-5, entries
    47-57 are level maps (`make imgtrace`); 65 and 66 are figure animations that 0407A8 and 04080E
    unpack at FFE30060 together with entry 67 at FFE00000 (02DBB4), loaders found but never run in
    MAME, so 65, 66 and 68 were not reached there (docs/15 section 9).

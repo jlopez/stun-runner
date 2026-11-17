@@ -12,6 +12,7 @@ listing, and each fails on the fault it exists for.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import random
@@ -31,6 +32,7 @@ from m68k import listing as ls
 from m68k import operands as opd
 from m68k import tree as tr
 from m68k.__main__ import load_seeds, load_unreached
+from m68k.sound import write_equates
 from programs import ADSP_START, GSP_END, GSP_START, PROGRAM_TABLE
 
 from ida.memory_map import IO_68K
@@ -88,7 +90,7 @@ needs_vasm = pytest.mark.skipif(vasm() is None, reason="vasm not available")
 
 def assemble_68k(
     image: bytes, work: Path, tree: Path = TREE, expect_ok: bool = True,
-    generated: dict[str, str] | None = None,
+    generated: dict[str, str] | None = None, palettes: Path = REPO / "data/palettes",
 ) -> tuple[bytes, str, subprocess.CompletedProcess[str]]:
     """The 68k tree assembled against `image` as build/stunrun-68k.bin (and the two programs cut
     out of it, as tools/extract-programs does), with `generated` written under build/ (path ->
@@ -101,7 +103,10 @@ def assemble_68k(
     (build / "stunrun-68k.bin").write_bytes(image)
     (build / "adsp/program.bin").write_bytes(image[ADSP_START:GSP_START])
     (build / "gsp/program.bin").write_bytes(image[GSP_START:GSP_END])
-    write_includes(build / "gsp-images")  # pairs U-W come from data/gsp-images (docs/15)
+    # pairs U-W come from data/gsp-images (docs/15), the palettes from data/palettes (docs/17)
+    write_includes(build / "gsp-images", palettes=palettes)
+    # the sound command equates (M5d, docs/17 section 3), from data/sound/commands.json
+    write_equates(REPO / "data/sound/commands.json", build / "68k/sound_commands.asm")
     for path, text in (generated or {}).items():
         (build / path).parent.mkdir(parents=True, exist_ok=True)
         (build / path).write_text(text)
@@ -142,8 +147,9 @@ def gsp_region() -> bytes:
 def test_regions_tile_the_image_in_address_order() -> None:
     main = (TREE / "stunrun.asm").read_text()
     includes = INCLUDE.findall(main)
-    assert includes[:3] == ["hardware.asm", "ram.asm", "macros.asm"]
-    assert includes[3:] == [f for f, _, _ in REGIONS]
+    assert includes[:4] == ["hardware.asm", "ram.asm", "../../build/68k/sound_commands.asm",
+                            "macros.asm"]
+    assert includes[4:] == [f for f, _, _ in REGIONS]
     # no file under boot/ or game/ is left out (a stale boot/boot.asm or game/code.asm)
     assert sorted(
         str(p.relative_to(TREE)) for d in ("boot", "game") for p in (TREE / d).rglob("*.asm")
@@ -343,6 +349,31 @@ def test_tree_assembles_a_random_blob(tmp_path: Path) -> None:
 
 
 @needs_vasm
+def test_palettes_come_from_data_palettes(tmp_path: Path) -> None:
+    """M5d (docs/17 section 2): the 32 palettes are bytes of the tree, from data/palettes alone,
+    whatever the blob; a planted colour component changes exactly that byte of the image, at
+    the palette's address plus three per colour."""
+    from gspimages import read_palettes
+
+    pals = read_palettes(REPO / "data/palettes")
+    assert len(pals) == 32
+    image = random.Random(5).randbytes(IMAGE_SIZE)
+    out, listing, _ = assemble_68k(image, tmp_path / "a")
+    symbols = vasm_symbols(listing)
+    for name, p in pals.items():
+        assert out[p.address : p.address + 3 * p.count] == p.bytes(), name
+        assert symbols[f"pal_{name}"] == ("A", p.address), name
+    planted = tmp_path / "palettes"
+    shutil.copytree(REPO / "data/palettes", planted)
+    raw = json.loads((planted / "title.json").read_text())
+    raw["colors"][7][1] ^= 1
+    (planted / "title.json").write_text(json.dumps(raw))
+    out2, _, _ = assemble_68k(image, tmp_path / "b", palettes=planted)
+    diff = [a for a in range(IMAGE_SIZE) if out[a] != out2[a]]
+    assert diff == [pals["title"].address + 3 * 7 + 1]
+
+
+@needs_vasm
 def test_a_moved_region_fails_its_guard(tmp_path: Path) -> None:
     tree = tmp_path / "tree"
     shutil.copytree(TREE, tree)
@@ -448,7 +479,8 @@ def test_labels_on_the_tree(tmp_path: Path) -> None:
 
 def tree_check(tmp: Path, tree: Path = TREE, seed: int = 16, shift: bool = True,
                runs: dict[str, set[int]] | None = None, patch: dict[int, bytes] | None = None,
-               generated: dict[str, str] | None = None) -> tr.TreeReport:
+               generated: dict[str, str] | None = None,
+               explained: tr.Explained | None = None) -> tr.TreeReport:
     """tools/m68k check-tree's checks on `tree` assembled against a random blob (with `patch`
     written into it), the output and listing left in tmp/build/68k.out and 68k.lst."""
     blob = bytearray(random.Random(seed).randbytes(IMAGE_SIZE))
@@ -462,21 +494,22 @@ def tree_check(tmp: Path, tree: Path = TREE, seed: int = 16, shift: bool = True,
         opd.load(REPO / "data/68k/operands.json"), ls.macro_names(tree / "macros.asm"), seeds,
         untaken, set(load_unreached(REPO / "data/68k/seeds.json")),
         tmp / "asm/68k" if shift else None, tmp / "build" if shift else None, runs,
+        explained=explained,
     )
 
 
 @needs_vasm
 def test_tree_checks_pass(tmp_path: Path) -> None:
     """The committed tree: every instruction statement reached, no numeric ROM address, every dc
-    statement of the code files explained, the shift test exact; the references into the image
-    table are label + offset (decision C10)."""
+    statement of the code files and data.asm explained, the shift test exact; no reference into
+    the image table as label + offset (M5d: each entry has its label, docs/17 section 3)."""
     rep = tree_check(tmp_path)
     assert rep.errors() == []
     assert rep.descent.reached > 44_000 and rep.descent.unreached == []
     assert rep.missing_code == [] and rep.extra_code == []
     assert rep.lint.undecided == [] and rep.lint.allowed == 337
     assert rep.shift is not None and rep.shift.changed == rep.shift.expected > 4000
-    assert len(rep.foreign) == 15 and all("tbl_BFE00+$" in x for x in rep.foreign)
+    assert rep.foreign == []
 
 
 def test_docs16_label_counts_are_the_trees() -> None:
@@ -588,6 +621,37 @@ def test_tree_checks_fail(tmp_path: Path) -> None:
     ram.write_text(ram.read_text() + f"{m[1]}\tequ\t${m[2]}\n")
     rep = tree_check(tmp_path / "d", tree)
     assert rep.shift is not None and rep.shift.errors, rep.shift
+    # an image table entry read as the table plus an offset (decision C10's form, refused
+    # since M5d gave every entry its label)
+    tree = planted(tmp_path / "e", "game/code_024306.asm", "\tmove.l\tgsp_image_entry_25,-(sp)",
+                   "\tmove.l\ttbl_BFE00+$64,-(sp)")
+    rep = tree_check(tmp_path / "e", tree, shift=False)
+    assert len(rep.foreign) == 1 and "tbl_BFE00+$64" in rep.foreign[0], rep.foreign
+    assert any("as label+offset (write the entry's label" in e for e in rep.errors())
+    # the same through the new labels: an entry label plus an offset (entry 25 as entry 24 + 4),
+    # an image label plus an offset, an offset before the label (review of #38: the lint had
+    # seen only tbl_BFE00+ and dat_60000+)
+    tree = planted(tmp_path / "f", "game/code_028194.asm", "\tmove.l\tgsp_image_entry_25,-(sp)",
+                   "\tmove.l\tgsp_image_entry_24+4,-(sp)",
+                   ("game/code_024306.asm", "\tmove.l\tgsp_image_entry_25,-(sp)",
+                    "\tmove.l\t4+gsp_image_entry_24,-(sp)"))
+    rep = tree_check(tmp_path / "f", tree, shift=False)
+    assert sorted(x.split(": ", 1)[1] for x in rep.foreign) == [
+        "move.l\t4+gsp_image_entry_24,-(sp)", "move.l\tgsp_image_entry_24+4,-(sp)"], rep.foreign
+    # an alias equate of a table label plus an offset (review of #38: the lint read labels
+    # only, and the naming legs may alias the generated gsp_image_entry_NN names)
+    tree = planted(tmp_path / "g", "game/code_024306.asm", "\tmove.l\tgsp_image_entry_25,-(sp)",
+                   "\tmove.l\timage_table+$64,-(sp)")
+    ram = tree / "ram.asm"
+    ram.write_text(ram.read_text() + "image_table\tequ\ttbl_BFE00\n")
+    rep = tree_check(tmp_path / "g", tree, shift=False)
+    assert len(rep.foreign) == 1 and "image_table+$64" in rep.foreign[0], rep.foreign
+    lst = ls.Listing()
+    lst.symbols.update({"gsp_image_03": 0x061000, "sub_20430": 0x020430})
+    lst.statements = [ls.Stmt(0x020000, "instr", "lea\t(gsp_image_03-$10,pc),a0"),
+                      ls.Stmt(0x020004, "instr", "lea\t(sub_20430+$10,pc),a0"),
+                      ls.Stmt(0x020008, "data", "dc.w\tgsp_image_03-sub_20430")]
+    assert tr.foreign_refs(lst) == ["020000: lea\t(gsp_image_03-$10,pc),a0"]
 
 
 @needs_vasm
@@ -652,16 +716,27 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
          "\tincbin\t\"../../build/stunrun-68k.bin\",$7A7F,$4\n",
          "\tdc.b\t'INC*PM*DATA*0-7 '\ndat_7A80:\n"
          "\tincbin\t\"../../build/stunrun-68k.bin\",$7A80,$3\n"),
-        ("data.asm", "\tincbin\t\"../../build/stunrun-68k.bin\",$05C63C,$94A\n",
-         "\tincbin\t\"../../build/stunrun-68k.bin\",$05C63C,$C7\n\tdc.b\t'XMADEUP',0\n"
-         "\tincbin\t\"../../build/stunrun-68k.bin\",$05C70B,$87B\n"),
+        # (since M5d the list is source: the record at 05C702 rewritten, same length)
+        ("data.asm", "\tdc.w\tsnd_boostc\n\tdc.b\t'BOOSTC',0\n\tdcb.b\t13,0\n",
+         "\tdc.b\t0\n\tdc.b\t'XMADEUP',0\n\tdcb.b\t13,0\n"),
+        # a command word written as a ROM label of the same value (vec_reset_pc, 000004 =
+        # snd_ytst): the bytes are equal, the statement names no sound-command equate (review
+        # of #38)
+        ("data.asm", "\tdc.w\tsnd_ytst\n", "\tdc.w\tvec_reset_pc\n"),
     )
     # the blob is random: the header bytes the check reads are written into it, made up but
     # for the counts, which are the strings' lengths (15 before the 16 characters, 18 for
     # CONTROL*LEFT/RIGHT, a non-printable byte after it)
     patch = {0x7A6F: bytes([15]), 0x7A80: bytes([0x01, 0x01, 18]), 0x7A95: b"\x01"}
     rep = tree_check(tmp_path, tree, shift=False, patch=patch)
-    assert len(rep.raw) == 8, rep.raw
+    # the rewritten record also breaks its format (a dc.b 0 where its command word was, so the
+    # record has no dc.w at 05C702): two more errors
+    assert len(rep.raw) == 11, rep.raw
+    assert any(e.startswith("05C702: dc.b\t0:") and "audio_test_list record" in e
+               for e in rep.raw), rep.raw
+    assert any("dc.w\tvec_reset_pc:" in e and "sound-command equate" in e
+               for e in rep.raw), rep.raw
+    assert any(e.startswith("05C702:") and "not 22 bytes" in e for e in rep.raw), rep.raw
     assert any(e.startswith("05C703: dc.b") and "record at 05C702" in e
                and "audio_test_list" in e for e in rep.raw), rep.raw
     assert any("'INC*PM*DATA*0-7 '" in e and "next record's 4-byte header" in e
@@ -730,3 +805,227 @@ def test_promoted_range_fails(tmp_path: Path) -> None:
     assert rep.extra_code[: n // 2] == nops, rep.extra_code
     assert any(e.startswith(f"{a:06X}: an instruction statement that is no classified")
                for e in rep.errors())
+
+
+def test_sound_equates_are_commands_json(tmp_path: Path) -> None:
+    """M5d (docs/17 section 3): build/68k/sound_commands.asm holds one equate per command of
+    data/sound/commands.json, its name and value, 00-6C; a doubled name is refused."""
+    from m68k import sound
+
+    out = tmp_path / "s.asm"
+    assert write_equates(REPO / "data/sound/commands.json", out)
+    assert not write_equates(REPO / "data/sound/commands.json", out)  # unchanged: not rewritten
+    got = re.findall(r"^(\w+)\tequ\t\$([0-9A-F]{2})\t;", out.read_text(), re.M)
+    data = json.loads((REPO / "data/sound/commands.json").read_text())["commands"]
+    assert got == [(c["name"], c["value"]) for c in sorted(data, key=lambda c: c["value"])]
+    assert [int(v, 16) for _, v in got] == list(range(0x6D))
+    bad = json.loads((REPO / "data/sound/commands.json").read_text())
+    bad["commands"][1]["name"] = bad["commands"][0]["name"]
+    (tmp_path / "bad.json").write_text(json.dumps(bad))
+    with pytest.raises(ValueError, match="occurs twice"):
+        sound.commands(tmp_path / "bad.json")
+
+
+@needs_vasm
+def test_audio_test_list_is_source(tmp_path: Path) -> None:
+    """M5d (docs/17 section 3): audio_test_list (05C63C) is 108 records of 22 bytes from source
+    whatever the blob: each the command word of an equate whose audio-test name is the
+    record's name, at the record commands.json gives (audio_test_entry), then FFFF."""
+    image = random.Random(9).randbytes(IMAGE_SIZE)
+    out, listing, _ = assemble_68k(image, tmp_path)
+    data = json.loads((REPO / "data/sound/commands.json").read_text())["commands"]
+    by_value = {int(c["value"], 16): c for c in data}
+    base = vasm_symbols(listing)["audio_test_list"][1]
+    assert base == 0x05C63C
+    seen = []
+    for k in range(108):
+        rec = out[base + 22 * k : base + 22 * k + 22]
+        value = int.from_bytes(rec[:2], "big")
+        name = rec[2 : rec.index(0, 2)].decode()
+        assert not any(rec[3 + len(name) :]), k
+        c = by_value[value]
+        assert c["audio_test"] == name and int(c["audio_test_entry"], 16) == base + 22 * k
+        seen.append(value)
+    assert out[base + 22 * 108 : base + 22 * 108 + 2] == b"\xff\xff"
+    assert sorted(seen) == [v for v in range(0x6D) if v != 3]
+
+
+@needs_vasm
+def test_data_asm_raw_data_check_fails(tmp_path: Path) -> None:
+    """M5d (docs/17): the raw-data check covers data.asm. A dc.b wall in place of a data slice
+    fails at its address; so do a record field of 048180 written as dc.l (only +4-+40 are
+    pointers), a long of a proven pointer table written as a count, a number of 400h or more
+    in 047F50, and a table of data/68k/tables.json left an incbin slice."""
+    wall = "\tdc.b\t" + ",".join(["$00"] * 0x1E) + "\n"
+    tree = planted(
+        tmp_path, "data.asm", '\tincbin\t"../../build/stunrun-68k.bin",$04A88C,$1E\n', wall,
+        ("data.asm", '\tincbin\t"../../build/stunrun-68k.bin",$0481A8,$4\n', "\tdc.l\t0\n"),
+        ("data.asm", "\tdc.l\tstr_4A998\n", "\tdc.l\t$12\n"),
+        ("data.asm", "dat_47F58:\n\tdc.l\t$F0\n", "dat_47F58:\n\tdc.l\t$400\n"),
+        ("data.asm", "dat_4E3B4:\n", "dat_4E3B4:\n\tincbin\t\"../../build/stunrun-68k.bin\","
+         "$04E3B4,$24\n\tifne 0\n"),
+        ("data.asm", "dat_4E3D8:\n", "\tendif\ndat_4E3D8:\n"),
+    )
+    rep = tree_check(tmp_path, tree, shift=False)
+    assert any(e.startswith("04A88C: dc.b\t$00,") and "in a data range" in e
+               for e in rep.raw), rep.raw
+    assert any(e.startswith("0481A8: dc.l\t0:") and "+4-+28" in e for e in rep.raw), rep.raw
+    assert any(e.startswith("04A954: dc.l\t$12:") and "labels or 0 only" in e
+               for e in rep.raw), rep.raw
+    assert any(e.startswith("047F58: dc.l\t$400:") and "below 400h" in e for e in rep.raw), rep.raw
+    assert any(e.startswith("04E3B4: table dat_4E3B4") and "9 longs missing" in e
+               for e in rep.raw), rep.raw
+    assert len(rep.raw) == 5, rep.raw
+    # a records table's pointer field left an incbin slice, and a field outside +lo-+hi
+    # written as dc.l (021650: +0 the pointer, +6 a GSP address; review of #38)
+    tree = planted(tmp_path / "r", "game/code_020430.asm", "dat_21650:\n\tdc.l\tdat_2160E\t",
+                   'dat_21650:\n\tincbin\t"../../build/stunrun-68k.bin",$21650,$4\t',
+                   ("game/code_020430.asm",
+                    'dat_2165A:\n\tdc.l\tdat_21623\n\tincbin\t"../../build/stunrun-68k.bin",'
+                    "$2165E,$6\n",
+                    'dat_2165A:\n\tdc.l\tdat_21623\n\tincbin\t"../../build/stunrun-68k.bin",'
+                    "$2165E,$2\n\tdc.l\tdat_2160E\n"))
+    rep = tree_check(tmp_path / "r", tree, shift=False)
+    raw = sorted(rep.raw)
+    assert len(raw) == 2, raw
+    assert raw[0].startswith("021650: table dat_21650") and "1 longs missing" in raw[0], raw
+    assert raw[1].startswith("021660: dc.l\tdat_2160E:") and "+0-+4" in raw[1], raw
+    # three numbers outside any palette: the dc.b r,g,b allowance holds only inside a palette
+    # of data/palettes (review of #38: no plant had three operands)
+    tree = planted(tmp_path / "p", "data.asm",
+                   '\tincbin\t"../../build/stunrun-68k.bin",$04A88C,$1E\n',
+                   '\tdc.b\t$01,$02,$03\n\tincbin\t"../../build/stunrun-68k.bin",$04A88F,$1B\n')
+    rep = tree_check(tmp_path / "p", tree, shift=False)
+    assert [e.split(":")[0] for e in rep.raw] == ["04A88C"], rep.raw
+    # constants written as symbols of the same value, so the bytes and the shift test do not
+    # see them (review of #38): an equate (snd_stop, 0) as a pointer, a ROM label of value 0
+    # (vec_reset_sp, 000000) as the null of 047F50, a ROM label below 400h (vec_reserved_60,
+    # 0000F0) as one of its counts
+    tree = planted(tmp_path / "s", "data.asm", "dat_4C712:\n\tdc.l\t0\n",
+                   "dat_4C712:\n\tdc.l\tsnd_stop\n",
+                   ("data.asm", "dat_47F50:\n\tdc.l\t0\n", "dat_47F50:\n\tdc.l\tvec_reset_sp\n"),
+                   ("data.asm", "dat_47F58:\n\tdc.l\t$F0\n",
+                    "dat_47F58:\n\tdc.l\tvec_reserved_60\n"))
+    rep = tree_check(tmp_path / "s", tree, shift=True)
+    assert len(rep.raw) == 3 and rep.errors() == rep.raw, rep.errors()
+    assert rep.raw[0].startswith("047F50: dc.l\tvec_reset_sp:") and "value 0" in rep.raw[0], rep.raw
+    assert rep.raw[1].startswith("047F58: dc.l\tvec_reserved_60:") and "below 400h" in rep.raw[1], \
+        rep.raw
+    assert rep.raw[2].startswith("04C712: dc.l\tsnd_stop:") and "an equate" in rep.raw[2], rep.raw
+    # a registry label the listing does not define at the table's start (review of #38)
+    ex = tr.load_explained()
+    ex.tables = [dataclasses.replace(t, label="dat_nonexistent") if t.start == 0x047406
+                 else dataclasses.replace(t, label="dat_47406") if t.start == 0x048068 else t
+                 for t in ex.tables]
+    rep = tree_check(tmp_path / "q", shift=False, explained=ex)
+    assert sorted(rep.raw) == [
+        "047406: table dat_nonexistent (data/68k/tables.json): the listing defines no such label",
+        "048068: table dat_47406 (data/68k/tables.json): the listing defines that label at "
+        "047406, not at the table's start"], rep.raw
+
+
+@needs_vasm
+def test_moved_build(tmp_path: Path) -> None:
+    """The moved-build experiment's tree (M5d, docs/17 section 5): with a pad of 4 before the
+    game code, the boot program, the coprocessor programs, the game vectors' place and pairs
+    U-W stay where they are, every label of 020430-05CF86 moves by 4, the fill at 05CF86 is 4
+    shorter, and the game vector table names the moved handlers."""
+    from m68k import moved
+
+    image = random.Random(11).randbytes(IMAGE_SIZE)
+    out, listing, _ = assemble_68k(image, tmp_path / "a")
+    build = tmp_path / "a/build"
+    mov = moved.build_moved(tmp_path / "a/asm/68k", build, tmp_path / "moved", 4)
+    assert mov[:0x020000] == out[:0x020000]  # the boot program and the coprocessor programs
+    assert mov[0x060000:] == out[0x060000:]
+    a = vasm_symbols(listing)
+    b = vasm_symbols((tmp_path / "moved/stunrun-68k.lst").read_text(errors="replace"))
+    for name in ("sub_20430", "audio_test", "audio_test_list", "pal_title", "dat_47406"):
+        assert b[name][1] == a[name][1] + 4, name
+    for name in ("copyright_text", "gsp_image_entry_25", "game_entries"):
+        assert b[name][1] == a[name][1], name
+    vec = struct.unpack_from(">I", mov, 0x020000 + 4 * 3)[0]  # game_vec_address_error
+    assert vec == b["h_address_error"][1] == a["h_address_error"][1] + 4
+    with pytest.raises(ValueError, match="even"):
+        moved.moved_tree(tmp_path / "a/asm/68k", build, tmp_path / "m2", 3)
+
+
+def test_moved_candidates_skip_flagged_longs() -> None:
+    """tools/m68k moved-candidates (moved.py `candidates`) on made-up longs: a long with bit 31
+    set is the level lists' parameter long (sub_3186A 0318A2-0318C0, its high word an index
+    into 04C712 in sub_30F9C 0311B8-0311D2), never a pointer candidate, even when its value
+    without bit 31 lies in the data."""
+    from m68k import moved
+
+    base = 0x050000
+    longs = [0x050100, 0x048000, 0x80050200, 0x050300, 0x021000, 0x046B00, 0x047000, 0x80000001,
+             0x049000, 0x04A000, 0x04B000, 0x04C000]
+    image = bytearray(IMAGE_SIZE)
+    for k, v in enumerate(longs):
+        struct.pack_into(">I", image, base + 4 * k, v)
+    lst = ls.Listing(statements=[ls.Stmt(base, "blob", "incbin", 4 * len(longs))])
+    # the flagged longs at +8 and +1C cut the runs: +0..+8 (2), +C..+1C (4), +20..+30 (4)
+    assert moved.candidates(lst, bytes(image), 4) == [(base + 0x0C, base + 0x1C),
+                                                      (base + 0x20, base + 0x30)]
+
+
+def test_moved_compare(tmp_path: Path) -> None:
+    """tools/m68k moved-compare on made-up movedcheck.lua logs: the first frame per stream
+    whose count or hash differs, and the moved run's reset."""
+    from m68k import moved
+
+    def log(path: Path, rows: list[str], extra: str = "") -> Path:
+        path.write_text("# frames 3\n# play 0\n" + "".join(r + "\n" for r in rows) + extra
+                        + "# done\n")
+        return path
+
+    same = "gsp 2 0000000A adsp 0 811C9DC5 snd 1 0000000B"
+    ref = log(tmp_path / "r.txt", [f"f 1 {same}", f"f 2 {same}", f"f 3 {same}"])
+    mov = log(tmp_path / "m.txt", [f"f 1 {same}", "f 2 gsp 2 0000000C adsp 0 811C9DC5 snd 1 "
+                                   "0000000B", "f 3 gsp 2 0000000A adsp 0 811C9DC5 snd 0 811C9DC5"],
+              "# reset_at_frame 3\n")
+    r, m = moved.load(ref), moved.load(mov)
+    assert moved.compare(r, m) == {"gsp": 2, "adsp": None, "snd": 3}
+    text = moved.summary("t", r, m)
+    assert "moved reset at frame 3" in text and "adsp: equal in every frame" in text
+    assert "gsp: first differs at frame 2 (writes, hash: reference 2 0000000A, moved 2 0000000C)" \
+        in text
+    # logs that hold nothing to compare are refused, never "equal in every frame" (review of
+    # #38): empty, unfinished (no '# done'), garbage, a frame twice, no frame in common
+    (tmp_path / "e.txt").write_text("")
+    (tmp_path / "u.txt").write_text(f"# frames 3\nf 1 {same}\n")
+    (tmp_path / "g.txt").write_text("garbage\n# done\n")
+    for bad, match in (("e.txt", "done"), ("u.txt", "done"), ("g.txt", "not a movedcheck"),
+                       ("d.txt", "twice"), ("n.txt", "no frame logged")):
+        if bad == "d.txt":
+            log(tmp_path / bad, [f"f 1 {same}", f"f 1 {same}"])
+        if bad == "n.txt":
+            log(tmp_path / bad, [])
+        with pytest.raises(ValueError, match=match):
+            moved.load(tmp_path / bad)
+    other = moved.load(log(tmp_path / "o.txt", [f"f 9 {same}"]))
+    with pytest.raises(ValueError, match="nothing compared"):
+        moved.summary("t", r, other)
+
+
+def test_tables_registry_refuses_unproven_tables(tmp_path: Path) -> None:
+    """data/68k/tables.json (M5d, decision C18): every table has its reader; a table without
+    one, of an unknown format, a records table without its stride, or a table overlapping
+    another is refused."""
+    raw = json.loads((REPO / "data/68k/tables.json").read_text())
+    tables = tr.load_tables(REPO / "data/68k/tables.json")
+    assert len(tables) == 14 and all(t.reader.strip() for t in tables)
+    longs = sum((t.end - t.start) // 4 for t in tables if t.format in ("pointers",
+                                                                       "pointer_or_count"))
+    longs += sum((t.end - t.start) // t.stride * (t.pointers[1] - t.pointers[0]) // 4
+                 for t in tables if t.format == "records")
+    assert longs == 658
+    by_start = {t["start"]: k for k, t in enumerate(raw["tables"])}
+    for start, change in (("047406", {"reader": " "}), ("047406", {"format": "words"}),
+                          ("048180", {"stride": 0}), ("048180", {"pointers": [4, 44]}),
+                          ("048180", {"pointers": [8, 4]}), ("047F50", {"start": "047470"})):
+        bad = json.loads(json.dumps(raw))
+        bad["tables"][by_start[start]].update(change)
+        (tmp_path / "t.json").write_text(json.dumps(bad))
+        with pytest.raises(ValueError):
+            tr.load_tables(tmp_path / "t.json")

@@ -2,7 +2,7 @@
 ; that lie between its routines; the first routine is sub_20430 (020430). Cut at routine starts
 ; into files of about 16 KB named by their first address (decision C11).
 ; 020430-024306: 86 IDA functions start in this file (data/ida/stunrun-68k.functions.jsonl).
-; Owner: the game naming legs (M5a-M5f).
+; Owner: the game naming legs (N1-N6, docs/03).
 ;
 ; Generated once by tools/m68k gen 020430 024306 (M5c, issue #33, docs/16-68k-code.md):
 ; neutral labels (the IDA snapshot's names where it has one), operands as docs/14 decides,
@@ -1209,9 +1209,20 @@ delay:
 dat_2160E:
 	incbin	"../../build/stunrun-68k.bin",$2160E,$F
 dat_2161D:
-	incbin	"../../build/stunrun-68k.bin",$2161D,$33
+	incbin	"../../build/stunrun-68k.bin",$2161D,$6
+dat_21623:
+	incbin	"../../build/stunrun-68k.bin",$21623,$18
+dat_2163B:
+	incbin	"../../build/stunrun-68k.bin",$2163B,$15
 dat_21650:
-	incbin	"../../build/stunrun-68k.bin",$21650,$1E
+	dc.l	dat_2160E	; 3 records of 10 bytes, read by sub_2166E: +0 the triplets, +4 their count - 1,
+	incbin	"../../build/stunrun-68k.bin",$21654,$6	; +6 a GSP address
+dat_2165A:
+	dc.l	dat_21623
+	incbin	"../../build/stunrun-68k.bin",$2165E,$6
+dat_21664:
+	dc.l	dat_2163B
+	incbin	"../../build/stunrun-68k.bin",$21668,$6
 sub_2166E:
 	lea	dat_21650,a0
 	mulu.w	#$A,d0

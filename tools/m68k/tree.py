@@ -13,16 +13,24 @@ blob, as CI does), not on scratch output:
   not call code cannot become instructions without a reviewed seed and `make classify`
   (decision C8): a `dc.l` naming it, which seeds the descent, is not enough;
 - the address lint over 000000-0C0000 (docs/14 section 5.3); a reference into `images.asm` or
-  `image_table.asm`, which this tree's code files do not own, is written as the label there plus
-  an offset (`tbl_BFE00+$64`, decision C10) and counted;
-- the raw-data check: in the code files (000000-012F06, 020000-046AEE) every `dc`/`dcb`
-  statement is one of the kinds the generator emits for explained bytes: `dc.l` in a vector or
-  pointer table, `dc.w a-b` in a switch table, `dc.b` of quoted strings and zeros in text, a
-  `dcb.b N,0` fill. A `dc.b` wall in place of an `incbin` slice of unknown or data bytes fails
-  (decision C3), and so does a string that starts with a record field (a count or an item
-  byte, `record_field`) or ends with one (the next screen record's first header byte,
-  `trailing_field`); in any file, a quoted `dc.b` that starts before the text field of a
-  record of `classify.TEXT_RECORDS` (audio_test_list's command word, `record_word`) fails too;
+  `image_table.asm` written as a label there plus an offset (`tbl_BFE00+$64`, decision C10, or
+  through any other label the listing defines in 060000-0C0000, `gsp_image_entry_24+4`) is an
+  error since M5d: every table entry has its label (`gsp_image_entry_NN`, docs/17);
+- the raw-data check: in the code files and, since M5d (docs/17), the island and `data.asm`
+  (000000-012F06, 020000-060000) every `dc`/`dcb` statement is one of the kinds explained
+  bytes take: `dc.l` in a vector or pointer table, `dc.w a-b` in a switch table, `dc.b` of
+  quoted strings and zeros in text, a `dcb.b N,0` fill, the three colour components of a
+  palette of data/palettes (`dc.b r,g,b` inside its range), and the statements of a table of
+  data/68k/tables.json in its format, under the label the registry names at its start (a
+  proven pointer table: `dc.l` of labels or 0, each symbol resolved so that an equate, a
+  symbol of value 0 or, in a `pointer_or_count` table, of a value below its count limit fails;
+  `audio_test_list`'s records: the command word as a sound-command equate of
+  build/68k/sound_commands.asm, the name, zeros). A `dc.b` wall in
+  place of an `incbin` slice of unknown or data bytes fails (decision C3), and so does a string
+  that starts with a record field (a count or an item byte, `record_field`) or ends with one
+  (the next screen record's first header byte, `trailing_field`); in any file, a quoted `dc.b`
+  that starts before the text field of a record of `classify.TEXT_RECORDS` (audio_test_list's
+  command word, `record_word`) fails too;
 - the shift test: the tree copied, its guards commented out, a two-byte pad after `org 0` (and
   every `dcb.b $X-*` fill kept at its length), assembled again: exactly the statements that name
   a ROM symbol other than PC-relatively or as a difference change, each by the pad;
@@ -31,6 +39,7 @@ blob, as CI does), not on scratch output:
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import tempfile
@@ -43,9 +52,20 @@ from . import pccov as pc
 
 ROM_END = 0x0C0000
 CODE_FILES = [(0x000000, 0x012F06), (0x020000, 0x046AEE)]
-# files this tree's code does not own: a reference into them is label + offset (decision C10)
-FOREIGN = {"dat_60000": (0x060000, 0x0BFE00), "tbl_BFE00": (0x0BFE00, 0x0C0000)}
-FOREIGN_REF = re.compile(r"(?<![\w.])(" + "|".join(FOREIGN) + r")\+")
+# the raw-data check's scope: the code files and, since M5d, data.asm (docs/17)
+RAW_FILES = [(0x000000, 0x012F06), (0x020000, 0x060000)]
+REPO = Path(__file__).resolve().parents[2]
+TABLE_FORMATS = ("pointers", "pointer_or_count", "records", "audio_test_list")
+# the images files (images.asm, image_table.asm and what they include from build/gsp-images):
+# a reference into them as label + offset (decision C10) is an error since M5d, when every image
+# table entry got its label (docs/17 section 3); any label the listing defines in this range
+# counts, not only the files' first labels
+FOREIGN = (0x060000, ROM_END)
+# a symbol with an offset after it (`sym+x`, `sym-<number>`) or before it (`<number>+sym`); a
+# difference of two symbols (`a-b`, a length) is no offset
+_NUM = r"(?:\$[0-9A-Fa-f]+|%[01]+|@[0-7]+|[0-9]+)"
+OFFSET_REF = re.compile(r"(?<![\w.$@%])(?:([A-Za-z_]\w*)\s*(?:\+|-\s*" + _NUM + r"(?!\w))"
+                        r"|" + _NUM + r"\s*[+-]\s*([A-Za-z_]\w*))")
 STRING = re.compile(r"^(?:'(?:[^']|'')*'|\"[^\"]*\"|0|\$0)$")
 FILL = re.compile(r"^dcb\.b\s+(?:\$?[0-9A-Fa-f]+|\$[0-9A-Fa-f]+-\*)\s*,\s*0$", re.I)
 
@@ -67,6 +87,8 @@ class TreeReport:
                 f"in data/68k/seeds.json with an argument, or make it data)"
                 for x in self.descent.unreached]
         out += self.lint.errors + self.lint.undecided + self.raw
+        out += [f"{x}: a reference into images.asm/image_table.asm as label+offset (write the "
+                f"entry's label, gsp_image_entry_NN; docs/17 section 3)" for x in self.foreign]
         out += [f"{x:06X}: a classified instruction start that is no instruction statement"
                 for x in self.missing_code]
         out += [f"{x:06X}: an instruction statement that is no classified instruction start "
@@ -82,6 +104,82 @@ class TreeReport:
 
 def in_code_files(a: int) -> bool:
     return any(lo <= a < hi for lo, hi in CODE_FILES)
+
+
+def in_raw_files(a: int) -> bool:
+    return any(lo <= a < hi for lo, hi in RAW_FILES)
+
+
+@dataclass(frozen=True)
+class Table:
+    """A table of data/68k/tables.json: its range, label, format and the reading instructions
+    that prove the format (docs/17 section 4)."""
+    start: int
+    end: int
+    label: str
+    format: str
+    reader: str
+    below: int = 0  # pointer_or_count: a number below this is a count, not an address
+    stride: int = 0  # records: the record size
+    pointers: tuple[int, int] = (0, 0)  # records: the pointer field, offsets in a record
+
+
+@dataclass
+class Explained:
+    """What the raw-data check accepts beyond the generator's kinds (M5d, docs/17)."""
+    palettes: list[tuple[int, int, str]] = field(default_factory=list)  # start, end, name
+    tables: list[Table] = field(default_factory=list)
+
+    def palette_at(self, a: int, size: int) -> str:
+        for lo, hi, name in self.palettes:
+            if lo <= a and a + size <= hi:
+                return name
+        return ""
+
+    def table_at(self, a: int) -> Table | None:
+        for tb in self.tables:
+            if tb.start <= a < tb.end:
+                return tb
+        return None
+
+
+def load_palettes(folder: Path) -> list[tuple[int, int, str]]:
+    out = []
+    for path in sorted(folder.glob("*.json")):
+        raw = json.loads(path.read_text())
+        a = int(raw["address"], 16)
+        out.append((a, a + 3 * int(raw["count"]), str(raw["name"])))
+    return sorted(out)
+
+
+def load_tables(path: Path) -> list[Table]:
+    """data/68k/tables.json; refuses a table without its reader, of an unknown format, or
+    overlapping another."""
+    raw = json.loads(path.read_text())
+    if raw.get("format") != "stunrun-68k-data-tables 1":
+        raise ValueError(f"{path}: not format stunrun-68k-data-tables 1")
+    out = []
+    for e in raw["tables"]:
+        tb = Table(int(e["start"], 16), int(e["end"], 16), e["label"], e["format"],
+                   e.get("reader", ""), int(e.get("below", "0"), 16), int(e.get("stride", 0)),
+                   tuple(e.get("pointers", (0, 0))))
+        if tb.format not in TABLE_FORMATS or not tb.reader.strip() or tb.end <= tb.start:
+            raise ValueError(f"{path}: table {e['start']}: format, reader or range")
+        if (tb.format == "pointer_or_count") != (tb.below > 0) or (
+                tb.format == "records") != (tb.stride > 0) or (
+                tb.format == "records" and not 0 <= tb.pointers[0] < tb.pointers[1] <= tb.stride):
+            raise ValueError(f"{path}: table {e['start']}: below, stride or pointers")
+        out.append(tb)
+    out.sort(key=lambda x: x.start)
+    for a, b in zip(out, out[1:], strict=False):
+        if b.start < a.end:
+            raise ValueError(f"{path}: tables {a.start:06X} and {b.start:06X} overlap")
+    return out
+
+
+def load_explained(repo: Path = REPO) -> Explained:
+    return Explained(load_palettes(repo / "data/palettes"),
+                     load_tables(repo / "data/68k/tables.json"))
 
 
 def _unquote(op: str) -> str:
@@ -128,8 +226,98 @@ def trailing_field(ops: list[str], address: int, binary: bytes) -> str:
     return ""
 
 
-def raw_data(lst: ls.Listing, c: cl.Classification, binary: bytes) -> list[str]:
-    """Every dc/dcb statement of the code files is an explained kind (module doc)."""
+def _names_equate(lst: ls.Listing, op: str) -> bool:
+    """Does an operand's text name one of the listing's equates (vasm's `E:` symbols)?"""
+    return any(m.group(1) in lst.equates for m in ls.IDENT.finditer(op.split(";", 1)[0]))
+
+
+def sound_equate(lst: ls.Listing, op: str) -> bool:
+    """Is an operand exactly one sound-command equate of build/68k/sound_commands.asm (`snd_`
+    and the 68010's audio-test name, or cmd_03_imm; tools/m68k/sound.py)?"""
+    return op in lst.equates and (op.startswith("snd_") or op == "cmd_03_imm")
+
+
+def _pointer_ops(lst: ls.Listing, tb: Table, s: ls.Stmt, ops: list[str],
+                 binary: bytes) -> str:
+    """Why the dc.l operands of a pointer table's statement are not labels or 0, or "": a
+    symbolic operand is resolved through the assembled bytes, so a constant written as a symbol
+    is refused: an equate (a sound command, say), a symbol whose value is 0 (the null is
+    written 0), and in a pointer_or_count table a symbol whose value is below the table's count
+    limit (a count is written as a number)."""
+    for k, op in enumerate(ops):
+        if op in ("0", "$0"):
+            continue
+        if not ls.names_symbol(op):
+            return f"{op} is a number, not a label"
+        if _names_equate(lst, op):
+            return f"{op} names an equate, not a label"
+        a = s.address + 4 * k
+        v = int.from_bytes(binary[a : a + 4], "big") if a + 4 <= len(binary) else None
+        if v == 0:
+            return f"{op} has the value 0: the null is written 0"
+        if tb.format == "pointer_or_count" and v is not None and v < tb.below:
+            return f"{op} has a value below {tb.below:X}h, a count: write it as a number"
+    return ""
+
+
+def _table_statement(tb: Table, s: ls.Stmt, mn: str, ops: list[str], lst: ls.Listing,
+                     binary: bytes) -> str:
+    """Why a dc statement inside a table of data/68k/tables.json is not of its format, or ""."""
+    pointer = mn == "dc.l" and ops and all(ls.names_symbol(op) or op in ("0", "$0") for op in ops)
+    why = _pointer_ops(lst, tb, s, ops, binary) if pointer else ""
+    if tb.format == "pointers":
+        if pointer and not why:
+            return ""
+        return f"a proven pointer table holds dc.l of labels or 0 only{': ' + why if why else ''}"
+    if tb.format == "pointer_or_count":
+        nums = [ls._num(op) for op in ops]
+        if pointer and not why:
+            return ""
+        if mn == "dc.l" and ops and all(n is not None and n < tb.below for n in nums):
+            return ""
+        return (f"this table holds dc.l of labels or of counts below {tb.below:X}h only"
+                f"{': ' + why if why else ''}")
+    if tb.format == "records":
+        lo, hi = tb.pointers
+        at = (s.address - tb.start) % tb.stride
+        if pointer and not why and lo <= at and at + 4 * len(ops) <= hi:
+            return ""
+        return (f"a record's bytes +{lo:X}-+{hi:X} are dc.l of labels or 0; its other fields "
+                f"stay incbin slices{': ' + why if why else ''}")
+    # audio_test_list: per record dc.w <command equate>, dc.b '<name>',0, dcb.b N,0; FFFF last
+    if mn == "dc.w" and len(ops) == 1 and (sound_equate(lst, ops[0])
+                                            or (ops[0].upper() == "$FFFF"
+                                                and s.address == tb.end - 2)):
+        return ""
+    if mn == "dc.b" and len(ops) == 2 and ops[0][:1] in "'\"" and STRING.match(ops[0]) \
+            and ops[1] in ("0", "$0"):
+        return ""
+    if mn == "dcb.b" and FILL.match(s.text):
+        return ""
+    return ("an audio_test_list record is dc.w <sound-command equate (snd_*, cmd_03_imm)>, "
+            "dc.b '<name>',0 and zeros; "
+            "the list ends with dc.w $FFFF")
+
+
+def audio_test_records(lst: ls.Listing, tb: Table) -> list[str]:
+    """Every 22-byte record of an audio_test_list table starts with its dc.w and holds one
+    name; the FFFF word ends the table."""
+    out = []
+    stmts = [s for s in lst.statements if tb.start <= s.address < tb.end]
+    words = [s.address for s in stmts if s.text.split()[0].lower() == "dc.w"]
+    want = list(range(tb.start, tb.end, 0x16))
+    if words != want:
+        bad = min(set(words) ^ set(want))
+        out.append(f"{bad:06X}: the audio_test_list records are not 22 bytes, each starting "
+                   f"with its command word (docs/17 section 3)")
+    return out
+
+
+def raw_data(lst: ls.Listing, c: cl.Classification, binary: bytes,
+             explained: Explained | None = None) -> list[str]:
+    """Every dc/dcb statement of the code files and data.asm is an explained kind (module
+    doc)."""
+    ex = explained if explained is not None else Explained()
     starts = [s.start for s in c.spans]
     import bisect
 
@@ -149,10 +337,20 @@ def raw_data(lst: ls.Listing, c: cl.Classification, binary: bytes) -> list[str]:
             out.append(f"{s.address:06X}: {s.text}: {record_word(s.address)} (the text starts "
                        f"at {fields[s.address]:06X}, docs/16 section 3.1)")
             continue
-        if not in_code_files(s.address):
+        if not in_raw_files(s.address):
+            continue
+        tb = ex.table_at(s.address)
+        if tb is not None:
+            why = _table_statement(tb, s, mn, ops, lst, binary)
+            if why:
+                out.append(f"{s.address:06X}: {s.text}: {why} (table {tb.label}, "
+                           f"data/68k/tables.json)")
             continue
         k = kind(s.address)
         if mn == "dcb.b" and FILL.match(s.text):
+            continue
+        if mn == "dc.b" and len(ops) == 3 and not any(op[:1] in "'\"" for op in ops) \
+                and ex.palette_at(s.address, 3):
             continue
         if mn == "dc.l" and k == "pointers":
             continue
@@ -167,14 +365,51 @@ def raw_data(lst: ls.Listing, c: cl.Classification, binary: bytes) -> list[str]:
             continue
         out.append(f"{s.address:06X}: {s.text}: not an explained dc statement in a {k} range "
                    f"(an unexplained blob stays an incbin slice, decision C3)")
+    for tb in ex.tables:
+        if lst.symbols.get(tb.label) != tb.start:
+            at = lst.symbols.get(tb.label)
+            out.append(f"{tb.start:06X}: table {tb.label} (data/68k/tables.json): the listing "
+                       + ("defines no such label" if at is None
+                          else f"defines that label at {at:06X}, not at the table's start"))
+        if tb.format == "audio_test_list":
+            out += audio_test_records(lst, tb)
+        else:
+            out += pointer_coverage(lst, tb)
     return out
 
 
+def pointer_coverage(lst: ls.Listing, tb: Table) -> list[str]:
+    """A pointer table of data/68k/tables.json is dc.l statements over its whole range (a
+    records table: over every record's pointer field), so the registry claims no more than the
+    source holds."""
+    longs = {s.address for s in lst.statements
+             if tb.start <= s.address < tb.end and s.kind == "data"
+             and s.text.split()[0].lower() == "dc.l" and s.size == 4}
+    if tb.format == "records":
+        lo, hi = tb.pointers
+        want = [r + k for r in range(tb.start, tb.end, tb.stride) for k in range(lo, hi, 4)]
+    else:
+        want = list(range(tb.start, tb.end, 4))
+    missing = [a for a in want if a not in longs]
+    if missing:
+        return [f"{missing[0]:06X}: table {tb.label} (data/68k/tables.json) is not one dc.l per "
+                f"long there ({len(missing)} longs missing)"]
+    return []
+
+
 def foreign_refs(lst: ls.Listing) -> list[str]:
-    """Operands that reach into images.asm or image_table.asm as label + offset."""
+    """Operands that reach into images.asm or image_table.asm as label + offset: through any
+    symbol the listing defines in 060000-0C0000 (the files' own labels, `gsp_image_NN`, the 70
+    `gsp_image_entry_NN`, the sums), equates included, so an alias (`x equ gsp_image_entry_25`)
+    plus an offset is caught as well (review of #38)."""
+    lo, hi = FOREIGN
+    names = {n for n, v in lst.symbols.items() if lo <= v < hi}
     out = []
     for s in lst.statements:
-        if s.kind in ("instr", "data") and FOREIGN_REF.search(s.text):
+        if s.kind not in ("instr", "data"):
+            continue
+        code = re.sub(r"'(?:[^']|'')*'|\"[^\"]*\"", "", s.text)
+        if any((m[1] or m[2]) in names for m in OFFSET_REF.finditer(code)):
             out.append(f"{s.address:06X}: {s.text}")
     return out
 
@@ -219,7 +454,8 @@ def shift(tree: Path, build: Path, lst: ls.Listing, binary: bytes, pad: int = 2,
 def check(listing: str, binary: bytes, c: cl.Classification, decisions: dict[tuple[int, int], str],
           macros: set[str], seeds: list[tuple[int, str]], untaken: dict[int, str],
           unreached: set[int], tree: Path | None = None, build: Path | None = None,
-          runs: dict[str, set[int]] | None = None, vasm: str = "vasmm68k_mot") -> TreeReport:
+          runs: dict[str, set[int]] | None = None, vasm: str = "vasmm68k_mot",
+          explained: Explained | None = None) -> TreeReport:
     """All the checks on the tree's listing and binary (binary[0] at 000000)."""
     from .__main__ import listed_seeds, pointer_ranges, switch_ranges
 
@@ -235,7 +471,7 @@ def check(listing: str, binary: bytes, c: cl.Classification, decisions: dict[tup
     rep.extra_code = sorted(x for x in instr if x not in starts)
     rep.lint = ls.address_lint(lst, decisions, 0, ROM_END, frozenset(macros), binary, 0,
                                switch_ranges(c), pointer_ranges(c))
-    rep.raw = raw_data(lst, c, binary)
+    rep.raw = raw_data(lst, c, binary, explained if explained is not None else load_explained())
     rep.foreign = foreign_refs(lst)
     if tree is not None and build is not None:
         rep.shift = shift(tree, build, lst, binary, vasm=vasm)
