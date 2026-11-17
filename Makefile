@@ -556,3 +556,73 @@ selftest:        ## the checker against a synthetic set
 
 clean:
 	rm -rf $(BUILD)
+
+# --- M5g: the 68k descent, classification and generator (docs/14-68k-descent.md) ------------
+# tools/m68k is a package run as `uv run python tools/m68k <command>`; its CI tests are
+# tools/test_m68k.py (part of `make test`). `make lint` also type-checks the package.
+.PHONY: lint-m68k classify pccov m68k-check
+lint: lint-m68k
+lint-m68k:
+	uv run --frozen mypy -p m68k
+
+M68K_TOOLS := $(wildcard tools/m68k/*.py)
+CLASSIFICATION := data/68k/classification.json
+
+# Re-run the descent over the image and rewrite data/68k/classification.json (commit it when it
+# changes): seeds from the image, data/68k/seeds.json and the five MAME runs of `make pccov`,
+# which must be present (run `make -j5 pccov` first): without them three MAME entries are lost
+# and executed code becomes data; `tools/m68k classify` also refuses a run file with no PCs or no
+# `# run` line (an empty trace). NO_MAME=1 classifies without them, into the same files: do not
+# commit that. Needs the reference set.
+PCCOV_FILES = $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt)
+classify: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
+	@if [ "$(NO_MAME)" != 1 ]; then for f in $(PCCOV_FILES); do test -f $$f || { \
+		echo "classify: $$f is missing: run make -j5 pccov first (or NO_MAME=1)"; exit 1; }; \
+		done; fi
+	$(PYTHON) tools/m68k classify --image $< --out $(CLASSIFICATION) \
+		$(if $(filter 1,$(NO_MAME)),--no-mame,$(PCCOV_FILES))
+
+# Point 6 of issue #29 (docs/14 section 6): the generator's source for each code region,
+# assembled alone in build/m68k/, is the image (0 differences) and passes the descent check, the
+# address lint and the shift test; every instruction boundary equals unidasm's. Needs the
+# reference set and unidasm.
+M68K_CODE_REGIONS := 000212:012F06 020430:04397E 04397E:046AEE
+
+m68k-check: $(BUILD)/$(SET)-68k.bin $(M68K_TOOLS)
+	@for r in $(M68K_CODE_REGIONS); do \
+		$(PYTHON) tools/m68k check-region $${r%:*} $${r#*:} --work $(BUILD)/m68k || exit 1; done
+	$(PYTHON) tools/m68k check-unidasm --unidasm $(UNIDASM)
+
+# Which 68010 instructions MAME executes (docs/14 section 7): tools/mame/pccov.lua traces the
+# 68010 under the debugger into a named pipe that `tools/m68k pccov-read` drains into the
+# distinct PCs (build/mame/pccov-<run>.txt; it fails on an empty trace), in five headless runs from empty private state
+# (attract, a game, the boot program's test menus to "SA SELF TEST" and to "PLAY SOUNDS" as
+# sndproto.lua drives them, and the power-on self-test left to run). Then `tools/m68k pccov`
+# fails unless every executed PC starts a code instruction of the classification and rewrites
+# artifacts/pccov-summary.json (ranges and counts; commit it when it changes). `make -j5 pccov`.
+# Needs MAME and the ROMs.
+PCCOV_RUNS := attract game selftest soundtest postest
+$(BUILD)/mame/pccov-attract.txt: PCCOV_ENV = PCCOV_FRAMES=7200 PCCOV_PLAY=0
+$(BUILD)/mame/pccov-game.txt: PCCOV_ENV = PCCOV_FRAMES=7200 PCCOV_PLAY=1
+$(BUILD)/mame/pccov-selftest.txt: PCCOV_ENV = PCCOV_FRAMES=2800 PCCOV_MENU=selftest
+$(BUILD)/mame/pccov-soundtest.txt: PCCOV_ENV = PCCOV_FRAMES=6400 PCCOV_MENU=soundtest
+$(BUILD)/mame/pccov-postest.txt: PCCOV_ENV = PCCOV_FRAMES=3600 PCCOV_MENU=postest
+
+$(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt): $(BUILD)/mame/pccov-%.txt: tools/mame/pccov.lua FORCE
+	$(call TRACE_STATE,pccov-$*)
+	rm -f $@ $(BUILD)/mame/pccov-$*.fifo $(BUILD)/mame/pccov-$*done
+	mkfifo $(BUILD)/mame/pccov-$*.fifo
+	$(PYTHON) tools/m68k pccov-read $(BUILD)/mame/pccov-$*.fifo $@.tmp & reader=$$!; \
+	PCCOV_FIFO=$(BUILD)/mame/pccov-$*.fifo PCCOV_DONE=$(BUILD)/mame/pccov-$*done $(PCCOV_ENV) \
+		SDL_VIDEODRIVER=dummy $(MAME) stunrun -debug -debugger none $(MAME_FLAGS) \
+		$(call TRACE_DIRS,pccov-$*) -autoboot_script tools/mame/pccov.lua; rc=$$?; \
+	kill -0 $$reader 2>/dev/null && : <> $(BUILD)/mame/pccov-$*.fifo; \
+	wait $$reader; rrc=$$?; rm -f $(BUILD)/mame/pccov-$*.fifo; \
+	test $$rc -eq 0 && test -f $(BUILD)/mame/pccov-$*done || \
+		{ echo "pccov: the $* run did not finish"; exit 1; }; \
+	test $$rrc -eq 0 || { echo "pccov: the $* run traced no PC"; exit 1; }; \
+	{ printf '# run '; cat $(BUILD)/mame/pccov-$*done; } >> $@.tmp && mv $@.tmp $@
+
+pccov: $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt) $(BUILD)/$(SET)-68k.bin
+	$(PYTHON) tools/m68k pccov --image $(BUILD)/$(SET)-68k.bin --classification $(CLASSIFICATION) \
+		--summary artifacts/pccov-summary.json $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt)

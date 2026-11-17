@@ -247,7 +247,7 @@ tables and of the region files' headers against the snapshot.
 | 0x020112 | 0x020418 | 774 | zero fill | |
 | 0x020418 | 0x020430 | 24 | game data | read by 0x02079A and 0x020D30 (`sub.b $20418.l`), 0x02093E (word 0x02041A); referenced from 0x0209AC, 0x020A88, 0x042324 |
 | 0x020430 | 0x04397E | 144,718 | game code | first function `sub_20430`; with the code row 0x046A00-0x046AEE, 429 functions in pair S and 77 in pair T; the last before the island is `audio_test` 0x043718-0x04397E (called by `game_entry_2` at 0x0213AA, and calls `reload_gsp` at 0x04373A); 0x0436FE-0x043718 is code IDA has not made a function (`link`, two `pea`, `jsr $2effe`, `unlk`, `rts`) |
-| 0x04397E | 0x046A00 | 12,418 | game data island | starts after the `rts` at 0x04397C; 32 references, e.g. 0x0439BC from 0x041F1C, 0x0461F0 from 0x02444E |
+| 0x04397E | 0x046A00 | 12,418 | game data island, with code at 0x0445F0-0x044630 | starts after the `rts` at 0x04397C; 32 references, e.g. 0x0439BC from 0x041F1C, 0x0461F0 from 0x02444E. **Corrected by M5g (docs/14 section 9)**: 0x0445F0-0x044630 is code, called by `lea $441EC,a0` / `adda.l #$404,a0` / `jsr (a0)` at 0x0223E0-0x0223EC and executed in every `make pccov` run |
 | 0x046A00 | 0x046AEE | 238 | game code | from `sub_46A00` 0x046A00-0x046A20 to the last function, `sub_46AC4` 0x046AC4-0x046AEE |
 | 0x046AEE | 0x05CF86 | 91,288 | game data (68k consumer) | 724 references from code, the first 0x046AEE from 0x046A0C, the last 0x05C63C from 0x043720 |
 | 0x05CF86 | 0x060000 | 12,410 | zero fill | |
@@ -256,6 +256,10 @@ tables and of the region files' headers against the snapshot.
 | 0x0B10EB | 0x0BFE00 | 60,693 | zero fill | |
 | 0x0BFE00 | 0x0BFF18 | 280 | image pointer table, 70 longs: entry 0 = 0, entries 1-68 point into 0x060000-0x0B10EB in non-decreasing order except 58-64 (0x060000), entry 69 = 0 ends it | indexed from its base: `lea $bfe00` at 0x022798 (`movea.l (A0,D0.w),A0`), `addi.l #$bfe00` at 0x024AC4, 0x024F16 (then `jsr unpack_gsp_image`), 0x024F52, 0x024F8E, 0x029960, 0x029C5A, 0x02AFA4, 0x02DA9A, 0x02DC06; entry 1 read at 0x02D7D0; read watch: 0x0227A2, 0x024F20, 0x029C44, 0x02D780-0x02D7F2, 0x02DAA4, 0x040586 |
 | 0x0BFF18 | 0x0C0000 | 232 | zero fill | |
+
+In the game code, 0x026CD2 is the `jmp (0x026CD6,pc,d0.w)` of a switch whose word table
+0x026CD6-0x026CEA follows it (cases 2-11), not the data word IDA made of it (M5g, docs/14 section
+9). docs/14 and `data/68k/classification.json` classify every byte of 0x000000-0x05CF86.
 
 Code ends at 0x046AEE: the last IDA function ends there, MAME's highest 68k PC is 0x046AEC
 (section 7), and the first data reference past it is to 0x046AEE itself. The zero runs inside

@@ -1,0 +1,9 @@
+{
+  "format": "stunrun-68k-seeds 1",
+  "comment": "Reviewed seeds of the 68k descent (docs/14-68k-descent.md section 2.4): code entries the image's own references do not reach, and static branch targets that are never taken, and instruction statements the listing descent check may leave unreached (`unreached`), each with its written argument. tools/m68k classify reads seeds and untaken; check-listing and check-region read untaken and unreached.",
+  "seeds": [],
+  "untaken": [
+    {"at": "004B74", "argument": "dbf d2 whose target is 0080D8, inside the boot program's menu text, where no instruction decodes (0080DE). The same loop at 004B82 branches back to the move.l d0,(a0) at 004B80. D2 is FF947E >> 1, then dbf: the branch is taken only when that count is not 0. MAME executed 004B74 and 004B78 in the self-test runs of make pccov and never 0080D8 (HYP: a bad displacement in the ROM that the hardware never exercises)."}
+  ],
+  "unreached": []
+}
