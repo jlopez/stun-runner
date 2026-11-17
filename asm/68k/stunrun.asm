@@ -1,6 +1,7 @@
 ; S.T.U.N. Runner (rev 6), 68010 program space 000000-0BFFFF: the twelve 200x/210x files.
 ;
-; The main file: org 0, the equates, then the region files in address order (docs/13-68k-source.md).
+; The main file: org 0, the equates (hardware.asm, ram.asm) and the macros, then the region files
+; in address order (docs/13-68k-source.md); the code is neutral source since M5c (docs/16).
 ; Each region file is one contiguous range with an assert at both ends and one owner (the table
 ; below); a later leg may split its own file into several under its directory but never moves a
 ; boundary between owners. What is not source yet is an incbin of build/stunrun-68k.bin (offset
@@ -13,12 +14,12 @@
 ; directory, also in the files under boot/ and game/.
 ;
 ;   file                  range            owner
-;   boot/vectors.asm      000000-000212    boot leg
-;   boot/boot.asm         000212-012F06    boot leg
+;   boot/vectors.asm      000000-000212    boot naming legs
+;   boot/code_*.asm       000212-012F06    boot naming legs (six files, cut at routine starts)
 ;   programs.asm          012F06-020000    M5-0 (the table), M6 (the two programs)
-;   game/vectors.asm      020000-020430    game leg
+;   game/vectors.asm      020000-020430    game naming legs
 ;   game/code.asm         020430-04397E    game leg
-;   game/island.asm       04397E-046AEE    game leg
+;   game/island.asm       04397E-046AEE    game naming legs
 ;   data.asm              046AEE-060000    data leg
 ;   images.asm            060000-0BFE00    images leg
 ;   image_table.asm       0BFE00-0C0000    images leg
@@ -30,9 +31,16 @@
 	org	0
 
 	include	"hardware.asm"
+	include	"ram.asm"
+	include	"macros.asm"
 
 	include	"boot/vectors.asm"
-	include	"boot/boot.asm"
+	include	"boot/code_000212.asm"
+	include	"boot/code_00394E.asm"
+	include	"boot/code_0065E0.asm"
+	include	"boot/code_009E80.asm"
+	include	"boot/code_00DDF2.asm"
+	include	"boot/code_0109D4.asm"
 	include	"programs.asm"
 	include	"game/vectors.asm"
 	include	"game/code.asm"
