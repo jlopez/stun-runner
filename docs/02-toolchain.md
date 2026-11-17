@@ -10,7 +10,7 @@
 | `unidasm` | **not in the brew bottle** | the only TMS34010 and ADSP-2100 disassembler around; build from MAME source (section 4) |
 | IDA Professional 9.1 | installed, `/Applications/IDA Professional 9.1.app`; processor modules `mc68k`, `m65`, `ad218x`; idalib headless works (Spindizzy `ida/headless`) | annotation database for the 68010 and the 6502; ADSP-2100 to be tried with `ad218x`; **no TMS34010 module** |
 | 64tass 1.60.3243 | installed (`brew install tass64`); CI uses Ubuntu's `64tass` package | 6502 assembler |
-| vasm 2.0f | built from source (`make CPU=m68k SYNTAX=mot`), `~/.local/bin/vasmm68k_mot`; pinned tarball `http://phoenix.owl.de/tags/vasm2_0f.tar.gz` (sha256 in docs/04 section 6), which CI builds and caches | 68000 assembler, and the assembler of the data-ROM trees |
+| vasm 2.0f | built from source (`make CPU=m68k SYNTAX=mot`), `~/.local/bin/vasmm68k_mot`; pinned tarball `https://github.com/jlopez/stun-runner/releases/download/toolchain/vasm2_0f.tar.gz` (upstream's `phoenix.owl.de/tags/vasm2_0f.tar.gz` until it was removed) (sha256 in docs/04 section 6), which CI builds and caches | 68000 assembler, and the assembler of the data-ROM trees |
 | Ghidra | installed (brew) | fallback disassembler; has no TMS340x0 or ADSP-21xx either |
 | uv, Python 3.13 | installed | tools, tests, converters, headless IDA |
 
