@@ -626,3 +626,48 @@ $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt): $(BUILD)/mame/pccov-%.txt: tools/mame
 pccov: $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt) $(BUILD)/$(SET)-68k.bin
 	$(PYTHON) tools/m68k pccov --image $(BUILD)/$(SET)-68k.bin --classification $(CLASSIFICATION) \
 		--summary artifacts/pccov-summary.json $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt)
+
+# --- M5i: the packed GSP images and their palettes (docs/15-gsp-images.md) --------------------
+# tools/gspimages is a package run as `uv run python tools/gspimages <command>`; its CI tests are
+# tools/test_gspimages.py. The 68k tree's 060000-0C0000 comes from data/gsp-images alone:
+# tools/gspimages asm re-encodes every stream from the PNGs' pixel indices and writes the
+# includes of asm/68k/images.asm and image_table.asm (and the palettes of data/palettes as dc.b),
+# on every make (a fraction of a second; make 3.81 compares whole-second mtimes), rewriting a file
+# only when it changes. A PNG whose size differs from the manifest's fails the build.
+.PHONY: lint-gspimages images palcheck imgtrace
+lint: lint-gspimages
+lint-gspimages:
+	uv run --frozen mypy -p gspimages
+
+GSP_DIR := $(BUILD)/gsp-images
+GSP_ASM := $(GSP_DIR)/images.asm $(GSP_DIR)/table.asm
+GSP_TOOLS := $(wildcard tools/gspimages/*.py)
+GSP_PAL_BIN := $(GSP_DIR)/palettes.bin
+
+# two targets, one recipe: a pattern rule (stem "images"), as the object pages above
+$(BUILD)/gsp-%/images.asm $(BUILD)/gsp-%/table.asm $(BUILD)/gsp-%/palettes.asm: FORCE
+	$(PYTHON) tools/gspimages asm --data data/gsp-images --palettes data/palettes --out $(GSP_DIR)
+
+.SECONDARY: $(GSP_ASM) $(GSP_DIR)/palettes.asm
+EXTRA_stunrun-68k += $(GSP_ASM)
+
+# The palettes as dc.b, assembled alone (no image includes them yet: the data leg embeds them in
+# the tree, docs/15 section 7) and compared with the 68k image at each palette's address. Part of
+# `make check` (a prerequisite); skipped without the reference set, as check is.
+$(GSP_PAL_BIN): $(GSP_DIR)/palettes.asm
+	$(VASM) $(VASMFLAGS) -o $@ $<
+
+palcheck:
+	@$(PYTHON) tools/check-roms --set $(SET) >/dev/null; rc=$$?; \
+	if [ $$rc -eq 2 ]; then echo "palettes: reference set absent, skipped"; exit 0; fi; \
+	$(MAKE) --no-print-directory $(BUILD)/$(SET)-68k.bin $(GSP_PAL_BIN) || exit 1; \
+	$(PYTHON) tools/gspimages palcheck --palettes data/palettes --bin $(GSP_PAL_BIN) \
+		--image $(BUILD)/$(SET)-68k.bin
+
+check: palcheck
+
+# Re-decode the image into data/gsp-images (docs/15): the manifest and one PNG per distinct
+# image, names and palette specs kept; run after changing the decoder. `make test` fails while
+# the committed data and the image disagree.
+images: $(BUILD)/$(SET)-68k.bin $(GSP_TOOLS)
+	$(PYTHON) tools/gspimages decode --image $< --data data/gsp-images --palettes data/palettes
