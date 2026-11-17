@@ -1123,6 +1123,22 @@ def test_operand_rule_table_base(tmp_path: Path) -> None:
                    ("001010", "R6", "constant"), ("001018", "R6", "constant"),
                    ("001020", "R6", "constant")], got
     assert [e["rule"] for e in opd.build(insns, set(), set())] == ["R6"] * 5
+    # a reviewed decision replaces its rule's and survives a rewrite of the file (make classify)
+    why = "a reviewed decision with its written reason, long enough to pass"
+    rev = {(0x1010, 0): {"at": "001010", "operand": 0, "decision": "address",
+                         "rule": "reviewed", "reason": why}}
+    path = tmp_path / "op.json"
+    path.write_text(opd.dump(opd.build(insns, set(), set(), [(0x2000, 0x2010)], rev)))
+    assert opd.load(path)[(0x1010, 0)] == "address"
+    kept = opd.load_reviewed(path)
+    assert list(kept) == [(0x1010, 0)] and kept[(0x1010, 0)]["reason"] == why
+    path.write_text(opd.dump(opd.build(insns, set(), set(), [(0x2000, 0x2010)], kept)))
+    assert opd.load_reviewed(path) == kept
+    # a reviewed entry without its reason, or undecided, is refused
+    for bad in ({"reason": "short"}, {"decision": "undecided"}):
+        path.write_text(opd.dump([{**rev[(0x1010, 0)], **bad}]))
+        with pytest.raises(ValueError, match="reviewed decision"):
+            opd.load(path)
 
 
 def test_pccov_rejects_empty_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str],
@@ -1192,7 +1208,11 @@ def test_committed_operands_and_seeds() -> None:
     assert d
     for (a, i), decision in d.items():
         assert any(lo <= a < hi for lo, hi in code), f"{a:06X}"
-        assert decision in ("address", "constant", "undecided") and 0 <= i < 2
+        assert decision in ("address", "constant") and 0 <= i < 2, f"{a:06X}"
+    # M5c decided the 32 operands rule R7 left undecided (docs/16), each with its reason
+    reviewed = opd.load_reviewed(REPO / "data/68k/operands.json")
+    assert len(reviewed) == 32
+    assert [k for k, e in reviewed.items() if e["decision"] == "constant"] == [(0x02FC76, 0)]
     j = json.loads((REPO / "data/68k/seeds.json").read_text())
     assert j["format"] == "stunrun-68k-seeds 1"
     assert set(j) == {"format", "comment", "seeds", "untaken", "unreached"}

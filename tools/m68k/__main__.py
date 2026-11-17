@@ -151,7 +151,8 @@ def cmd_classify(a: argparse.Namespace) -> int:
                                                            insn.mnemonic != "pea"):
                 addresses.add(o.value)
     tables = [(s.start, s.end) for s in c.spans if s.kind in TABLE_KINDS]
-    a.operands.write_text(opd.dump(opd.build(r.insns, starts, addresses, tables)))
+    reviewed = opd.load_reviewed(a.operands)
+    a.operands.write_text(opd.dump(opd.build(r.insns, starts, addresses, tables, reviewed)))
     st = cl.stats(c, REGIONS)
     code = sum(v["code"] for v in st.values())
     print(f"{a.out}: {len(c.spans)} ranges, {code} bytes of code, {len(c.entries)} entries with "
