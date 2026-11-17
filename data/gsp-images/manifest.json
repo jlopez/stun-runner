@@ -9,77 +9,77 @@
     {
       "entries": [2],
       "kind": "raw",
-      "images": ["screen_02"]
+      "images": ["title"]
     },
     {
       "entries": [3],
       "kind": "raw",
-      "images": ["screen_03"]
+      "images": ["fbi_seal"]
     },
     {
       "entries": [4, 5],
       "kind": "headed",
-      "images": ["image_04"]
+      "images": ["horizon_04"]
     },
     {
       "entries": [6, 7],
       "kind": "headed",
-      "images": ["image_06"]
+      "images": ["horizon_06"]
     },
     {
       "entries": [8, 9],
       "kind": "headed",
-      "images": ["image_08"]
+      "images": ["horizon_08"]
     },
     {
       "entries": [10, 11],
       "kind": "headed",
-      "images": ["image_10"]
+      "images": ["horizon_10"]
     },
     {
       "entries": [12, 13],
       "kind": "headed",
-      "images": ["image_12"]
+      "images": ["horizon_12"]
     },
     {
       "entries": [14, 15],
       "kind": "headed",
-      "images": ["image_14"]
+      "images": ["horizon_14"]
     },
     {
       "entries": [16],
       "kind": "headed",
-      "images": ["image_16_00", "image_16_01"]
+      "images": ["horizon_16_00", "horizon_16_01"]
     },
     {
       "entries": [17],
       "kind": "headed",
-      "images": ["image_17_00", "image_17_01"]
+      "images": ["horizon_17_00", "horizon_17_01"]
     },
     {
       "entries": [18, 19],
       "kind": "headed",
-      "images": ["image_18_00", "image_18_01"]
+      "images": ["horizon_18_00", "horizon_18_01"]
     },
     {
       "entries": [20],
       "kind": "headed",
-      "images": ["image_20_00", "image_20_01"]
+      "images": ["horizon_20_00", "horizon_20_01"]
     },
     {
       "entries": [21],
       "kind": "headed",
-      "images": ["image_21"]
+      "images": ["horizon_21"]
     },
     {
       "entries": [22],
       "kind": "headed",
-      "images": ["image_22"]
+      "images": ["horizon_22"]
     },
     {
       "entries": [23],
       "kind": "headed",
-      "images": ["image_23_00", "image_23_01", "image_23_02"]
+      "images": ["horizon_23_00", "horizon_23_01", "horizon_23_02"]
     },
     {
       "entries": [24],
@@ -89,187 +89,187 @@
     {
       "entries": [25],
       "kind": "raw",
-      "images": ["screen_25"]
+      "images": ["map_screen"]
     },
     {
       "entries": [26],
       "kind": "raw",
-      "images": ["screen_26"]
+      "images": ["frame_26"]
     },
     {
       "entries": [27],
       "kind": "raw",
-      "images": ["screen_27"]
+      "images": ["frame_27"]
     },
     {
       "entries": [28],
       "kind": "raw",
-      "images": ["screen_28"]
+      "images": ["frame_28"]
     },
     {
       "entries": [29],
       "kind": "headed",
-      "images": ["image_29_00", "image_29_01", "image_29_02", "image_29_03", "image_29_04", "image_29_05", "image_29_06", "image_29_07", "image_29_08", "image_29_09", "image_29_10", "image_29_11", "image_29_12", "image_29_13", "image_29_14", "image_29_15", "image_29_16", "image_29_17", "image_29_18", "image_29_19", "image_29_20", "image_29_21", "image_29_22", "image_29_23"]
+      "images": ["pilot_29_00", "pilot_29_01", "pilot_29_02", "pilot_29_03", "pilot_29_04", "pilot_29_05", "pilot_29_06", "pilot_29_07", "pilot_29_08", "pilot_29_09", "pilot_29_10", "pilot_29_11", "pilot_29_12", "pilot_29_13", "pilot_29_14", "pilot_29_15", "pilot_29_16", "pilot_29_17", "pilot_29_18", "pilot_29_19", "emblem_29_20", "emblem_29_21", "emblem_29_22", "emblem_29_23"]
     },
     {
       "entries": [30],
       "kind": "headed",
-      "images": ["image_30"]
+      "images": ["tree"]
     },
     {
       "entries": [31],
       "kind": "headed",
-      "images": ["image_31"]
+      "images": ["story_text"]
     },
     {
       "entries": [32],
       "kind": "headed",
-      "images": ["image_32_00", "image_32_01", "image_32_02", "image_32_03", "image_32_04", "image_32_05", "image_32_06", "image_32_07", "image_32_08", "image_32_09"]
+      "images": ["tuft_32_00", "tuft_32_01", "tuft_32_02", "tuft_32_03", "tuft_32_04", "tuft_32_05", "tuft_32_06", "tuft_32_07", "tuft_32_08", "tuft_32_09"]
     },
     {
       "entries": [33],
       "kind": "headed",
-      "images": ["image_33_00", "image_33_01"]
+      "images": ["dot_33_00", "dot_33_01"]
     },
     {
       "entries": [34],
       "kind": "headed",
-      "images": ["image_34"]
+      "images": ["dot_34"]
     },
     {
       "entries": [35],
       "kind": "headed",
-      "images": ["image_35"]
+      "images": ["level_map_00"]
     },
     {
       "entries": [36],
       "kind": "headed",
-      "images": ["image_36"]
+      "images": ["level_map_01"]
     },
     {
       "entries": [37],
       "kind": "headed",
-      "images": ["image_37"]
+      "images": ["level_map_14"]
     },
     {
       "entries": [38],
       "kind": "headed",
-      "images": ["image_38"]
+      "images": ["level_map_15"]
     },
     {
       "entries": [39],
       "kind": "headed",
-      "images": ["image_39"]
+      "images": ["level_map_05"]
     },
     {
       "entries": [40],
       "kind": "headed",
-      "images": ["image_40"]
+      "images": ["level_map_12"]
     },
     {
       "entries": [41],
       "kind": "headed",
-      "images": ["image_41"]
+      "images": ["level_map_07"]
     },
     {
       "entries": [42],
       "kind": "headed",
-      "images": ["image_42"]
+      "images": ["level_map_11"]
     },
     {
       "entries": [43],
       "kind": "headed",
-      "images": ["image_43"]
+      "images": ["level_map_08"]
     },
     {
       "entries": [44],
       "kind": "headed",
-      "images": ["image_44"]
+      "images": ["level_map_02"]
     },
     {
       "entries": [45],
       "kind": "headed",
-      "images": ["image_45"]
+      "images": ["level_map_16"]
     },
     {
       "entries": [46],
       "kind": "headed",
-      "images": ["image_46"]
+      "images": ["level_map_10"]
     },
     {
       "entries": [47],
       "kind": "headed",
-      "images": ["image_47"]
+      "images": ["level_map_13"]
     },
     {
       "entries": [48],
       "kind": "headed",
-      "images": ["image_48"]
+      "images": ["level_map_17"]
     },
     {
       "entries": [49],
       "kind": "headed",
-      "images": ["image_49"]
+      "images": ["level_map_18"]
     },
     {
       "entries": [50],
       "kind": "headed",
-      "images": ["image_50"]
+      "images": ["level_map_03"]
     },
     {
       "entries": [51],
       "kind": "headed",
-      "images": ["image_51"]
+      "images": ["level_map_19"]
     },
     {
       "entries": [52],
       "kind": "headed",
-      "images": ["image_52"]
+      "images": ["level_map_06"]
     },
     {
       "entries": [53],
       "kind": "headed",
-      "images": ["image_53"]
+      "images": ["level_map_20"]
     },
     {
       "entries": [54],
       "kind": "headed",
-      "images": ["image_54"]
+      "images": ["level_map_21"]
     },
     {
       "entries": [55],
       "kind": "headed",
-      "images": ["image_55"]
+      "images": ["level_map_22"]
     },
     {
       "entries": [56],
       "kind": "headed",
-      "images": ["image_56"]
+      "images": ["level_map_09"]
     },
     {
       "entries": [57],
       "kind": "headed",
-      "images": ["image_57"]
+      "images": ["level_map_04"]
     },
     {
       "entries": [65],
       "kind": "headed",
-      "images": ["image_65_00", "image_65_01", "image_65_02", "image_65_03", "image_65_04", "image_65_05", "image_65_06", "image_65_07", "image_65_08", "image_65_09", "image_65_10", "image_65_11", "image_65_12", "image_65_13", "image_65_14", "image_65_15", "image_65_16", "image_65_17", "image_65_18", "image_65_19", "image_65_20", "image_65_21", "image_65_22", "image_65_23", "image_65_24"]
+      "images": ["figure_65_00", "figure_65_01", "figure_65_02", "figure_65_03", "figure_65_04", "figure_65_05", "figure_65_06", "figure_65_07", "figure_65_08", "figure_65_09", "figure_65_10", "figure_65_11", "figure_65_12", "figure_65_13", "figure_65_14", "figure_65_15", "figure_65_16", "figure_65_17", "figure_65_18", "figure_65_19", "figure_65_20", "figure_65_21", "figure_65_22", "figure_65_23", "figure_65_24"]
     },
     {
       "entries": [66],
       "kind": "headed",
-      "images": ["image_65_00", "image_65_01", "image_65_02", "image_65_03", "image_65_04", "image_66_05", "image_65_06", "image_65_07", "image_66_08", "image_66_09", "image_66_10", "image_66_11", "image_66_12", "image_66_13", "image_66_14", "image_66_15", "image_65_20", "image_65_21", "image_65_22", "image_65_23", "image_65_24"]
+      "images": ["figure_65_00", "figure_65_01", "figure_65_02", "figure_65_03", "figure_65_04", "figure_66_05", "figure_65_06", "figure_65_07", "figure_66_08", "figure_66_09", "figure_66_10", "figure_66_11", "figure_66_12", "figure_66_13", "figure_66_14", "figure_66_15", "figure_65_20", "figure_65_21", "figure_65_22", "figure_65_23", "figure_65_24"]
     },
     {
       "entries": [67],
       "kind": "headed",
-      "images": ["image_67"]
+      "images": ["strip_67"]
     },
     {
       "entries": [68],
       "kind": "headed",
-      "images": ["image_68_00", "image_68_01", "image_68_02", "image_68_03", "image_68_04", "image_68_05", "image_68_06", "image_68_07", "image_68_08", "image_68_09", "image_68_10", "image_68_11", "image_68_12", "image_68_13", "image_68_14", "image_68_15", "image_65_20", "image_65_21", "image_65_22", "image_65_23", "image_65_24"]
+      "images": ["figure_68_00", "figure_68_01", "figure_68_02", "figure_68_03", "figure_68_04", "figure_68_05", "figure_68_06", "figure_68_07", "figure_68_08", "figure_68_09", "figure_68_10", "figure_68_11", "figure_68_12", "figure_68_13", "figure_68_14", "figure_68_15", "figure_65_20", "figure_65_21", "figure_65_22", "figure_65_23", "figure_65_24"]
     }
   ],
   "placeholders": {
@@ -337,563 +337,2245 @@
   "images": {
     "screen_01": {
       "width": 512,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 1 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "screen_02": {
+    "title": {
       "width": 512,
-      "height": 240
+      "height": 240,
+      "palette": {
+        "kind": "full",
+        "base": "title",
+        "overlays": [],
+        "evidence": "0245D0 loads entry 2 (02DB84), 0245F8-024642 fades to title alone (n = 0)"
+      }
     },
-    "screen_03": {
+    "fbi_seal": {
       "width": 512,
-      "height": 240
+      "height": 240,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_00",
+        "overlays": [
+          {
+            "name": "overlay_03",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "026F88 loads entry 3 (02DB24), 026F8E-026FCE fades to level_base_00 + table 048068 entry 3 (n = 10h)"
+      }
     },
-    "image_04": {
+    "horizon_04": {
       "width": 512,
-      "height": 96
+      "height": 96,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_04",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 4; the rest of the palette depends on the level or the screen before (grey here)",
+        "aliases": [
+          {
+            "entry": 5,
+            "overlays": [
+              {
+                "name": "overlay_05",
+                "at": "F0",
+                "count": 16
+              }
+            ],
+            "evidence": "table 048068 entry 5: the same stream shown with another overlay"
+          }
+        ]
+      }
     },
-    "image_06": {
+    "horizon_06": {
       "width": 512,
-      "height": 96
+      "height": 96,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_04",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 6; the rest of the palette depends on the level or the screen before (grey here)",
+        "aliases": [
+          {
+            "entry": 7,
+            "overlays": [
+              {
+                "name": "overlay_05",
+                "at": "F0",
+                "count": 16
+              }
+            ],
+            "evidence": "table 048068 entry 7: the same stream shown with another overlay"
+          }
+        ]
+      }
     },
-    "image_08": {
+    "horizon_08": {
       "width": 512,
-      "height": 96
+      "height": 96,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_08",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 8; the rest of the palette depends on the level or the screen before (grey here)",
+        "aliases": [
+          {
+            "entry": 9,
+            "overlays": [
+              {
+                "name": "overlay_09",
+                "at": "F0",
+                "count": 16
+              }
+            ],
+            "evidence": "table 048068 entry 9: the same stream shown with another overlay"
+          }
+        ]
+      }
     },
-    "image_10": {
+    "horizon_10": {
       "width": 512,
-      "height": 96
+      "height": 96,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_10",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 10; the rest of the palette depends on the level or the screen before (grey here)",
+        "aliases": [
+          {
+            "entry": 11,
+            "overlays": [
+              {
+                "name": "overlay_11",
+                "at": "F0",
+                "count": 16
+              }
+            ],
+            "evidence": "table 048068 entry 11: the same stream shown with another overlay"
+          }
+        ]
+      }
     },
-    "image_12": {
+    "horizon_12": {
       "width": 512,
-      "height": 96
+      "height": 96,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_12",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 12; the rest of the palette depends on the level or the screen before (grey here)",
+        "aliases": [
+          {
+            "entry": 13,
+            "overlays": [
+              {
+                "name": "overlay_13",
+                "at": "F0",
+                "count": 16
+              }
+            ],
+            "evidence": "table 048068 entry 13: the same stream shown with another overlay"
+          }
+        ]
+      }
     },
-    "image_14": {
+    "horizon_14": {
       "width": 512,
-      "height": 96
+      "height": 96,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_14",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 14; the rest of the palette depends on the level or the screen before (grey here)",
+        "aliases": [
+          {
+            "entry": 15,
+            "overlays": [
+              {
+                "name": "overlay_15",
+                "at": "F0",
+                "count": 16
+              }
+            ],
+            "evidence": "table 048068 entry 15: the same stream shown with another overlay"
+          }
+        ]
+      }
     },
-    "image_16_00": {
+    "horizon_16_00": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_01",
+        "overlays": [
+          {
+            "name": "overlay_16",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "02849E loads entry 16 (02DA6E), 0284A4-0284E0 fades to level_base_01 + table 048068 entry 16 (n = 10h)"
+      }
     },
-    "image_16_01": {
+    "horizon_16_01": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_01",
+        "overlays": [
+          {
+            "name": "overlay_16",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "02849E loads entry 16 (02DA6E), 0284A4-0284E0 fades to level_base_01 + table 048068 entry 16 (n = 10h)"
+      }
     },
-    "image_17_00": {
+    "horizon_17_00": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_17",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 17; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_17_01": {
+    "horizon_17_01": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_17",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 17; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_18_00": {
+    "horizon_18_00": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_18",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 18; the rest of the palette depends on the level or the screen before (grey here)",
+        "aliases": [
+          {
+            "entry": 19,
+            "overlays": [
+              {
+                "name": "overlay_19",
+                "at": "F0",
+                "count": 16
+              }
+            ],
+            "evidence": "table 048068 entry 19: the same stream shown with another overlay"
+          }
+        ]
+      }
     },
-    "image_18_01": {
+    "horizon_18_01": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_18",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 18; the rest of the palette depends on the level or the screen before (grey here)",
+        "aliases": [
+          {
+            "entry": 19,
+            "overlays": [
+              {
+                "name": "overlay_19",
+                "at": "F0",
+                "count": 16
+              }
+            ],
+            "evidence": "table 048068 entry 19: the same stream shown with another overlay"
+          }
+        ]
+      }
     },
-    "image_20_00": {
+    "horizon_20_00": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_20",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 20; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_20_01": {
+    "horizon_20_01": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_20",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 20; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_21": {
+    "horizon_21": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_21",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 21; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_22": {
+    "horizon_22": {
       "width": 512,
-      "height": 64
+      "height": 64,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_22",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 22; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_23_00": {
+    "horizon_23_00": {
       "width": 512,
-      "height": 96
+      "height": 96,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_23",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 23; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_23_01": {
+    "horizon_23_01": {
       "width": 512,
-      "height": 96
+      "height": 96,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_23",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 23; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_23_02": {
+    "horizon_23_02": {
       "width": 512,
-      "height": 96
+      "height": 96,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_23",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 23; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
     "screen_24": {
       "width": 512,
-      "height": 208
+      "height": 208,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 24 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "screen_25": {
+    "map_screen": {
       "width": 512,
-      "height": 208
+      "height": 208,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "table 048068 entry 25; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "screen_26": {
+    "frame_26": {
       "width": 512,
-      "height": 240
+      "height": 240,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_00",
+        "overlays": [
+          {
+            "name": "overlay_26",
+            "at": "D0",
+            "count": 48
+          }
+        ],
+        "evidence": "0286CC (and 02A8B4) loads entry 26 (02DBB4), 0286D2-028714 fades to level_base_00 + table 048068 entry 26 (n = 30h)"
+      }
     },
-    "screen_27": {
+    "frame_27": {
       "width": 512,
-      "height": 240
+      "height": 240,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_26",
+            "at": "D0",
+            "count": 48
+          }
+        ],
+        "evidence": "table 048068 entry 27; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "screen_28": {
+    "frame_28": {
       "width": 512,
-      "height": 240
+      "height": 240,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_26",
+            "at": "D0",
+            "count": 48
+          }
+        ],
+        "evidence": "table 048068 entry 28; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_00": {
+    "pilot_29_00": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_01": {
+    "pilot_29_01": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_02": {
+    "pilot_29_02": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_03": {
+    "pilot_29_03": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_04": {
+    "pilot_29_04": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_05": {
+    "pilot_29_05": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_06": {
+    "pilot_29_06": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_07": {
+    "pilot_29_07": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_08": {
+    "pilot_29_08": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_09": {
+    "pilot_29_09": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_10": {
+    "pilot_29_10": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_11": {
+    "pilot_29_11": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_12": {
+    "pilot_29_12": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_13": {
+    "pilot_29_13": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_14": {
+    "pilot_29_14": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_15": {
+    "pilot_29_15": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_16": {
+    "pilot_29_16": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_17": {
+    "pilot_29_17": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_18": {
+    "pilot_29_18": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_19": {
+    "pilot_29_19": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_20": {
+    "emblem_29_20": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_21": {
+    "emblem_29_21": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_22": {
+    "emblem_29_22": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_29_23": {
+    "emblem_29_23": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_29",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 29; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_30": {
+    "tree": {
       "width": 48,
-      "height": 80
+      "height": 80,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 30 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_31": {
+    "story_text": {
       "width": 360,
-      "height": 168
+      "height": 168,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_00",
+        "overlays": [
+          {
+            "name": "overlay_31",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "0288C0 loads entry 31 (02DBB4), 0288C6-028908 fades to level_base_00 + table 048068 entry 31 (n = 10h)"
+      }
     },
-    "image_32_00": {
+    "tuft_32_00": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_32_01": {
+    "tuft_32_01": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_32_02": {
+    "tuft_32_02": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_32_03": {
+    "tuft_32_03": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_32_04": {
+    "tuft_32_04": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_32_05": {
+    "tuft_32_05": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_32_06": {
+    "tuft_32_06": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_32_07": {
+    "tuft_32_07": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_32_08": {
+    "tuft_32_08": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_32_09": {
+    "tuft_32_09": {
       "width": 32,
-      "height": 32
+      "height": 32,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 32 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_33_00": {
+    "dot_33_00": {
       "width": 5,
-      "height": 5
+      "height": 5,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 33 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_33_01": {
+    "dot_33_01": {
       "width": 5,
-      "height": 5
+      "height": 5,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 33 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_34": {
+    "dot_34": {
       "width": 8,
-      "height": 8
+      "height": 8,
+      "palette": {
+        "kind": "grey",
+        "base": null,
+        "overlays": [],
+        "evidence": "table 048068 entry 34 is 0: no palette goes with this entry (grey ramp)"
+      }
     },
-    "image_35": {
+    "level_map_00": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_00",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 0 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 35 at E0 (n = 20h)"
+      }
     },
-    "image_36": {
+    "level_map_01": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_01",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 1 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 36 at E0 (n = 20h)"
+      }
     },
-    "image_37": {
+    "level_map_14": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_02",
+        "overlays": [
+          {
+            "name": "overlay_37",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 14 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 37 at E0 (n = 20h)"
+      }
     },
-    "image_38": {
+    "level_map_15": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_00",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 15 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 38 at E0 (n = 20h)"
+      }
     },
-    "image_39": {
+    "level_map_05": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_05",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 5 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 39 at E0 (n = 20h)"
+      }
     },
-    "image_40": {
+    "level_map_12": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_00",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 12 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 40 at E0 (n = 20h)"
+      }
     },
-    "image_41": {
+    "level_map_07": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_01",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 7 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 41 at E0 (n = 20h)"
+      }
     },
-    "image_42": {
+    "level_map_11": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_05",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 11 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 42 at E0 (n = 20h)"
+      }
     },
-    "image_43": {
+    "level_map_08": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_02",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 8 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 43 at E0 (n = 20h)"
+      }
     },
-    "image_44": {
+    "level_map_02": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_02",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 2 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 44 at E0 (n = 20h)"
+      }
     },
-    "image_45": {
+    "level_map_16": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_01",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 16 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 45 at E0 (n = 20h)"
+      }
     },
-    "image_46": {
+    "level_map_10": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_04",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 10 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 46 at E0 (n = 20h)"
+      }
     },
-    "image_47": {
+    "level_map_13": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_01",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 13 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 47 at E0 (n = 20h)"
+      }
     },
-    "image_48": {
+    "level_map_17": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_02",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 17 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 48 at E0 (n = 20h)"
+      }
     },
-    "image_49": {
+    "level_map_18": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_03",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 18 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 49 at E0 (n = 20h)"
+      }
     },
-    "image_50": {
+    "level_map_03": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_03",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 3 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 50 at E0 (n = 20h)"
+      }
     },
-    "image_51": {
+    "level_map_19": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_04",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 19 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 51 at E0 (n = 20h)"
+      }
     },
-    "image_52": {
+    "level_map_06": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_00",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 6 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 52 at E0 (n = 20h)"
+      }
     },
-    "image_53": {
+    "level_map_20": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_05",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 20 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 53 at E0 (n = 20h)"
+      }
     },
-    "image_54": {
+    "level_map_21": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_00",
+        "overlays": [
+          {
+            "name": "overlay_25",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 21 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 54 at E0 (n = 20h)"
+      }
     },
-    "image_55": {
+    "level_map_22": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_01",
+        "overlays": [
+          {
+            "name": "overlay_37",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 22 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 55 at E0 (n = 20h)"
+      }
     },
-    "image_56": {
+    "level_map_09": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_03",
+        "overlays": [
+          {
+            "name": "overlay_37",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 9 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 56 at E0 (n = 20h)"
+      }
     },
-    "image_57": {
+    "level_map_04": {
       "width": 340,
-      "height": 140
+      "height": 140,
+      "palette": {
+        "kind": "full",
+        "base": "level_base_04",
+        "overlays": [
+          {
+            "name": "overlay_37",
+            "at": "E0",
+            "count": 32
+          }
+        ],
+        "evidence": "level 4 selects this map (record table 048180); 024A9E-024B3A loads it and fades to the level base (047406) + table 048068 entry 57 at E0 (n = 20h)"
+      }
     },
-    "image_65_00": {
+    "figure_65_00": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_01": {
+    "figure_65_01": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_02": {
+    "figure_65_02": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_03": {
+    "figure_65_03": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_04": {
+    "figure_65_04": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_05": {
+    "figure_65_05": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_06": {
+    "figure_65_06": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_07": {
+    "figure_65_07": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_08": {
+    "figure_65_08": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_09": {
+    "figure_65_09": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_10": {
+    "figure_65_10": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_11": {
+    "figure_65_11": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_12": {
+    "figure_65_12": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_13": {
+    "figure_65_13": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_14": {
+    "figure_65_14": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_15": {
+    "figure_65_15": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_16": {
+    "figure_65_16": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_17": {
+    "figure_65_17": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_18": {
+    "figure_65_18": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_19": {
+    "figure_65_19": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 65; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_20": {
+    "figure_65_20": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_21": {
+    "figure_65_21": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_22": {
+    "figure_65_22": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_23": {
+    "figure_65_23": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_65_24": {
+    "figure_65_24": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_66_05": {
+    "figure_66_05": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_66_08": {
+    "figure_66_08": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_66_09": {
+    "figure_66_09": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_66_10": {
+    "figure_66_10": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_66_11": {
+    "figure_66_11": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_66_12": {
+    "figure_66_12": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_66_13": {
+    "figure_66_13": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_66_14": {
+    "figure_66_14": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_66_15": {
+    "figure_66_15": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 66; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_67": {
+    "strip_67": {
       "width": 512,
-      "height": 48
+      "height": 48,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 67; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_00": {
+    "figure_68_00": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_01": {
+    "figure_68_01": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_02": {
+    "figure_68_02": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_03": {
+    "figure_68_03": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_04": {
+    "figure_68_04": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_05": {
+    "figure_68_05": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_06": {
+    "figure_68_06": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_07": {
+    "figure_68_07": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_08": {
+    "figure_68_08": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_09": {
+    "figure_68_09": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_10": {
+    "figure_68_10": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_11": {
+    "figure_68_11": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_12": {
+    "figure_68_12": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_13": {
+    "figure_68_13": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_14": {
+    "figure_68_14": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     },
-    "image_68_15": {
+    "figure_68_15": {
       "width": 72,
-      "height": 72
+      "height": 72,
+      "palette": {
+        "kind": "overlay",
+        "base": null,
+        "overlays": [
+          {
+            "name": "overlay_65",
+            "at": "F0",
+            "count": 16
+          }
+        ],
+        "evidence": "table 048068 entry 68; the rest of the palette depends on the level or the screen before (grey here)"
+      }
     }
   }
 }

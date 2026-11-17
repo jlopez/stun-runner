@@ -46,6 +46,7 @@ from gspimages import (  # noqa: E402
     Stream,
     asm_sources,
     build,
+    compose,
     decode,
     entries_of,
     image_palette,
@@ -78,8 +79,12 @@ def cmd_asm(args: argparse.Namespace) -> int:
     m = read_manifest(args.data / MANIFEST)
     images = read_images(args.data, m)
     pals = read_palettes(args.palettes)
-    for name in m.images:
-        image_palette(m, name, pals)  # every palette spec resolves
+    for name, info in m.images.items():
+        image_palette(m, name, pals)  # every palette spec resolves, the aliases' too
+        spec = info.get("palette", {})
+        assert isinstance(spec, dict)
+        for alias in spec.get("aliases", []):
+            compose(alias, pals)
     images_src, table_src = asm_sources(m, images)
     pal_src, spans = palettes_asm(pals)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -98,7 +103,7 @@ def _keep(old: Manifest | None, new: Manifest) -> dict[str, str]:
     if old is None:
         return {}
     pos = {(s.entries[0], k): n for s in old.streams for k, n in enumerate(s.images)}
-    out = {}
+    out: dict[str, str] = {}
     for s in new.streams:
         for k, n in enumerate(s.images):
             if (s.entries[0], k) in pos:
@@ -205,8 +210,10 @@ def cmd_trace(args: argparse.Namespace) -> int:
     for p in problems:
         print(p)
     args.summary.write_text(json.dumps(doc, indent=1) + "\n")
-    names = entries_of(m)
-    print(f"{args.summary}: {len(doc['entries'])} entries seen; {len(names)} images in the manifest")
+    seen = doc["entries"]
+    assert isinstance(seen, dict)
+    print(f"{args.summary}: {len(seen)} streams seen of {len(m.streams)}; "
+          f"{len(entries_of(m))} images in the manifest")
     return 1 if problems else 0
 
 

@@ -671,3 +671,33 @@ check: palcheck
 # the committed data and the image disagree.
 images: $(BUILD)/$(SET)-68k.bin $(GSP_TOOLS)
 	$(PYTHON) tools/gspimages decode --image $< --data data/gsp-images --palettes data/palettes
+
+# The unpackers in MAME (docs/15 section 8): tools/mame/gspimages.lua records every HSTDATA word
+# the 68010's unpackers write (0225E4-022954) with its GSP destination, the stream bytes they
+# read, the image-table reads, the GSP words read back one frame later and MAME's palette every
+# 50 frames (every 20 in the level runs), headless, each run from its own empty NVRAM and cfg: attract mode, a game, and a
+# game per start level 1-23 (objlevels.lua's level select, card A4) to reach every level map.
+# Into build/mame/imgtrace-<run>.{txt,words,vram,pal} (the words and palettes are image data:
+# build output only); then tools/gspimages trace checks every unpacking against the decoder and
+# rewrites artifacts/gspimages-summary.json (entries, frames, destinations, counts; commit it
+# when it changes). `make -j6 imgtrace`. Needs MAME and the ROMs.
+IMG_LEVELS := $(shell seq -w 1 23)
+IMG_RUNS := attract game $(IMG_LEVELS:%=level%)
+$(BUILD)/mame/imgtrace-attract.txt: IMG_ENV = IMG_FRAMES=10800 IMG_PLAY=0 IMG_LEVEL=0 \
+	IMG_PAL=$(shell seq -s, 50 50 10800)
+$(BUILD)/mame/imgtrace-game.txt: IMG_ENV = IMG_FRAMES=7200 IMG_PLAY=1 IMG_LEVEL=0 \
+	IMG_PAL=$(shell seq -s, 50 50 7200)
+$(BUILD)/mame/imgtrace-level%.txt: IMG_ENV = IMG_FRAMES=3000 IMG_PLAY=1 \
+	IMG_LEVEL=$(patsubst 0%,%,$(patsubst level%,%,$*)) IMG_PAL=$(shell seq -s, 20 20 3000)
+
+$(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt): $(BUILD)/mame/imgtrace-%.txt: tools/mame/gspimages.lua
+	$(call TRACE_STATE,imgtrace-$*)
+	rm -f $@
+	IMG_DIR=$(BUILD)/mame/ IMG_NAME=imgtrace-$* $(IMG_ENV) SDL_VIDEODRIVER=dummy \
+		$(MAME) stunrun $(MAME_FLAGS) $(call TRACE_DIRS,imgtrace-$*) \
+		-autoboot_script tools/mame/gspimages.lua
+	@grep -qx '# done' $@ || { echo "imgtrace: the $* run did not finish"; rm -f $@; exit 1; }
+
+imgtrace: $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt) $(BUILD)/$(SET)-68k.bin
+	$(PYTHON) tools/gspimages trace --image $(BUILD)/$(SET)-68k.bin \
+		--summary artifacts/gspimages-summary.json $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt)
