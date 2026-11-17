@@ -7,8 +7,8 @@ command loop a few commands per call, with its state in RAM FF9BCC-FF9BD4 and FF
 
 Stream (docs/15-gsp-images.md section 2):
 
-- byte 0 must be 00 (02260A, `bne 0225CE` = soft_reset otherwise); it is the new-table command,
-  so the twin reads it as a command (02280E) and `unpack_gsp_image` checks it at 022600.
+- byte 0 must be 00 (022600-022602, `bne 0225CE` = soft_reset otherwise); it is the new-table
+  command, so the twin reads it as a command (02280E).
 - command byte c, n = c & 3F, taken apart by `bclr #7` (02260C) then `bclr #6` (022614/0226CA):
   - 00: a new 16-byte table follows (bsr 0225B0 at 022604);
   - 01-3F: n literal bytes (02261E-022670);
