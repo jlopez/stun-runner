@@ -35,10 +35,11 @@ Status (2026-11-16): milestones 0-4 are done (`CLAUDE.md` section 4, `docs/03-pl
 object ROMs, the 6502 sound program and the OKI samples (from 52 committed PCM WAVs under
 `data/oki`) are built from source and data, and the NVRAM images (all zero) are fills. M5's wave
 0 is done: the 68k tree is nine region files, one per owner, with its zero runs and program table
-as source (docs/13); since M5c all the 68k code (163,638 bytes, boot and game) is neutral
-source cut into files of about 16 KB (docs/16); the 68k data, the images and the GSP and ADSP
-programs are still blob, 34.2% of the set's bytes (517,385). Next: the other conversion legs and
-the naming waves. The listening check of M4 is done: Jesus ran `make listen` on 2026-11-05 and heard the
+as source (docs/13); the packed GSP images of pairs U-W are built from 140 committed indexed
+PNGs and their palettes (M5i, docs/15); since M5c all the 68k code (163,638 bytes, boot and game)
+is neutral source cut into files of about 16 KB (docs/16); the 68k data, the code files' unknown
+and unexplained-data slices and the GSP and ADSP programs are still blob, 12.2% of the set's
+bytes (185,094). Next: the other conversion legs and the naming waves. The listening check of M4 is done: Jesus ran `make listen` on 2026-11-05 and heard the
 sound.
 
 ## ROMs

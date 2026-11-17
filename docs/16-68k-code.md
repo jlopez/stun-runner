@@ -90,8 +90,10 @@ The 68k image: instr 163,638, data 9,884, blob 517,385, fill 95,525 (wave 0: 0, 
 94,883). The blob fell by 174,128 bytes, exactly the bytes that became instructions (163,638),
 data (9,848) and fills (642). (Before the review's text fixes, section 3.1: data 10,003 and blob
 517,266; the 119 bytes of record fields and island tables went back to blob.) The set: `blob: 34.2% of 1511424 bytes come from incbin/.binary`
-(45.8% before). `data.asm`, `programs.asm`, `images.asm` and `image_table.asm` keep their
-blobs (91,288, 32,688, 332,011, 280).
+(45.8% before). `data.asm` and `programs.asm` keep their blobs (91,288, 32,688).
+`images.asm` and `image_table.asm` (332,011 and 280 bytes of blob in wave 0) are data since M5i
+(docs/15, merged before this leg): with them the 68k image is instr 163,638, data 342,175, blob
+185,094, fill 95,525, and the set `blob: 12.2% of 1511424 bytes come from incbin/.binary`.
 
 ### 2.2 `ram.asm`
 
@@ -242,14 +244,16 @@ character is a lower-case item byte, fails.
   pccov`, so that none goes unchecked).
 
 `make m68k-check` runs `make labels`, `check-tree` with the run files present in `build/mame`
-(it says so when there are none) and `check-unidasm`. On the reference build, 2026-11-16:
+(it says so when there are none) and `check-unidasm`. On the reference build, 2026-11-16, after the rebase onto
+M5i (the shift test counts 68 statements more than before it: the 68 `dc.l gsp_image_NN` entries
+of the generated image table, which name ROM labels since M5i):
 
 ```
 labels: 223 snapshot names in ROM: 223 labels in the tree, 0 in blob, 0 failures; 31 outside ROM (I/O, ZRAM, RAM: not checked here)
 descent check: 44683 instruction statements reached, 0 not, 0 errors; 0 classified instruction starts without a statement, 0 instruction statements at no classified instruction start
 address lint: 0 errors, 337 listed constants, 0 undecided; 15 references into images.asm/image_table.asm as label+offset
 raw-data check: 0 errors
-shift test: 4521 statements changed, 4521 expected, 0 errors
+shift test: 4589 statements changed, 4589 expected, 0 errors
 pccov attract: 17056 distinct PCs, 0 not an instruction statement
 pccov game: 16299 distinct PCs, 0 not an instruction statement
 pccov selftest: 5371 distinct PCs, 0 not an instruction statement
@@ -372,8 +376,8 @@ countdown) and no undecided operand.
 - `asm/68k/hardware.asm`'s header and docs/13 still named `boot/ram.asm` and `game/ram.asm`
   (wave 0's plan); both now name `ram.asm` (decision C9). docs/13's coverage gate example named
   `game/code.asm`; it now names a file of this layout. docs/04 section 1 and the usage of
-  `tools/coverage` still name wave 0's `boot/boot.asm` and `game/code.asm`; neither file is this
-  leg's (section 8).
+  `tools/coverage` named wave 0's `boot/boot.asm` and `game/code.asm`; both were brought up to
+  this layout when the leg was rebased onto M5i.
 - The boot program's screen records (4-byte header column, row, attribute, count; no terminator)
   and the game's option records (an item byte before each title) are record formats the text
   rule had not known; the leg's first tree committed the counts, attributes and item bytes of
@@ -385,9 +389,8 @@ countdown) and no undecided operand.
    (section 7): the naming legs'.
 2. ZRAM equates are named `io_FF4XXX` by the generator's rule; a later leg may prefer `zram_X`
    (a rename in `ram.asm` and its uses).
-3. docs/04 section 1 and `tools/coverage`'s usage still name wave 0's `boot/boot.asm` and
-   `game/code.asm` (`make coverage MAX_BLOB="asm/68k/game/code.asm=0"`, the usage's example,
-   fails with "no listing has the file"); neither file is in issue #33's list.
+3. (Closed at the rebase onto M5i: docs/04 section 1 and `tools/coverage`'s usage name files
+   of this layout.)
 4. The 24 zero bytes at 020400 are a fill under `dat_20400` although the classification says
    data (section 2.1): the alternative is an incbin slice (24 more blob bytes, the fill count of
    wave 0 changed).

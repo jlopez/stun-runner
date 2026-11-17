@@ -120,16 +120,6 @@ def assemble_68k(
     return data, text, r
 
 
-def expected_68k(image: bytes) -> bytes:
-    """What the tree contributes over a blob: the fills zero, the table's pointers and text, and
-    pairs U-W as data/gsp-images builds them (docs/15)."""
-    out = bytearray(image)
-    out[REGION:REGION_END] = gsp_region()
-    for start, end in FILLS:
-        out[start:end] = bytes(end - start)
-    struct.pack_into(">II", out, PROGRAM_TABLE, ADSP_START, GSP_START)
-    out[0x017010 : 0x017010 + len(COPYRIGHT)] = COPYRIGHT
-    return bytes(out)
 def blob_slices(listing: str) -> list[tuple[int, int, str]]:
     """(address, size, source) of every incbin statement of the listing."""
     lst = ls.parse(listing, ls.macro_names(TREE / "macros.asm"))
@@ -340,6 +330,8 @@ def test_tree_assembles_a_random_blob(tmp_path: Path) -> None:
             assert int(offset, 16) in starts, (f, offset)
     for start, end in FILLS:
         assert out[start:end] == bytes(end - start)
+    # pairs U-W as data/gsp-images builds them (docs/15), whatever the blob
+    assert out[REGION:REGION_END] == gsp_region()
     assert struct.unpack_from(">II", out, PROGRAM_TABLE) == (ADSP_START, GSP_START)
     assert out[0x017010 : 0x017010 + len(COPYRIGHT)] == COPYRIGHT
     symbols = vasm_symbols(listing)

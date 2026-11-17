@@ -12,10 +12,10 @@ share and, last, one JSON line. Fails unless the total equals the set's size
 The blob share only goes down (CLAUDE.md section 2).
 
 vasm names an included file as the include statement wrote it, relative to the main source's
-directory; the rows give it relative to the repository (asm/68k/boot/boot.asm,
+directory; the rows give it relative to the repository (asm/68k/boot/code_000212.asm,
 build/obj/page0.asm), as 64tass does.
 
-    --max-blob asm/68k/game/code.asm=0      (repeatable; `make coverage MAX_BLOB="FILE=N ..."`)
+    --max-blob asm/68k/data.asm=0      (repeatable; `make coverage MAX_BLOB="FILE=N ..."`)
 
 fails when that source file's blob bytes exceed N, or when no listing has the file: the gate a
 leg sets on the region file it converts (docs/13-68k-source.md section 6).

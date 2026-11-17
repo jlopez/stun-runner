@@ -215,7 +215,7 @@ def test_bytecheck_cli(tmp_path: Path) -> None:
 
 
 def blob_share(out: str) -> float:
-    """The set's blob share tools/coverage prints (`blob: 34.2% of 1511424 bytes ...`)."""
+    """The set's blob share tools/coverage prints (`blob: 12.2% of 1511424 bytes ...`)."""
     m = re.search(r"blob: (\d+\.\d)% of 1511424 bytes", out)
     assert m is not None, out
     return float(m[1])
@@ -364,10 +364,21 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     # nor has the 6502 image a blob: all instructions, data and fills
     assert summary["images"]["stunrun-jsa"]["blob"] == 0
     assert summary["images"]["stunrun-jsa"]["instr"] > 0
-    # the 68k image, one row per region file: since M5c (docs/16) all the code is instructions,
-    # the code files' blob is their unknown and unexplained-data slices; the NVRAM image is two
-    # fills
-    files68k = {f: c for f, c in summary["files"].items() if f.startswith("asm/68k/")}
+    # the 68k image, one row per region file (the generated includes of M5i, docs/15, counted
+    # under the region file that includes them): since M5c (docs/16) all the code is
+    # instructions, the code files' blob is their unknown and unexplained-data slices; pairs U-W
+    # are data generated from data/gsp-images, no blob; the NVRAM image is two fills
+    generated = {"build/gsp-images/images.asm": "asm/68k/images.asm",
+                 "build/gsp-images/table.asm": "asm/68k/image_table.asm"}
+    files68k: dict[str, dict[str, int]] = {}
+    for f, c in summary["files"].items():
+        f = generated.get(f, f)
+        if f.startswith("asm/68k/"):
+            row = files68k.setdefault(f, dict.fromkeys(("instr", "data", "blob", "fill"), 0))
+            for k in row:
+                row[k] += c[k]
+    assert files68k["asm/68k/images.asm"]["blob"] == 0
+    assert files68k["asm/68k/image_table.asm"]["blob"] == 0
     total = {k: sum(c[k] for c in files68k.values()) for k in ("instr", "data", "blob", "fill")}
     assert summary["images"]["stunrun-68k"] == total
     assert total["instr"] == 163_638
@@ -420,10 +431,11 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert not (work / "build/stunrun-obj.bin").exists()
     assert not (work / "build/stunrun-oki.bin").exists()
     # a planted difference in a blob reaches the built files and the report names the address
-    # (pair S: pair U is data/gsp-images since M5i, docs/15)
+    # (pair T, inside data.asm's incbin slice 04F918-051934: pair S is source since M5c, docs/16,
+    # and pair U is data/gsp-images since M5i, docs/15)
     image = work / "build/stunrun-68k.bin"
     data = bytearray(image.read_bytes())
-    data[0x3FFFF] ^= 0x01
+    data[0x4FFFF] ^= 0x01
     image.write_bytes(bytes(data))
     later = image.stat().st_mtime + 5  # make 3.81 (macOS) compares whole seconds
     os.utime(image, (later, later))
@@ -432,10 +444,10 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     r = run(sys.executable, work / "tools/bytecheck", env=env)
     assert r.returncode == 1
     assert (
-        "136070-6103.210s: 1 differing bytes, first at file offset $0FFFF = 68k $03FFFF" in r.stdout
+        "136070-6105.210t: 1 differing bytes, first at file offset $07FFF = 68k $04FFFF" in r.stdout
     )
     # undo the plant, so that the WAV, mesh and operand edits below are the only differences
-    data[0x3FFFF] ^= 0x01
+    data[0x4FFFF] ^= 0x01
     image.write_bytes(bytes(data))
     later = image.stat().st_mtime + 5
     os.utime(image, (later, later))

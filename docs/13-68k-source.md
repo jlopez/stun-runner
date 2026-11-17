@@ -130,7 +130,7 @@ word the format does not explain is not committed as a number without Jesus's sa
 ## 6. Coverage
 
 Since M5c the code files are source and the numbers below are wave 0's; docs/16 section 2.1 has
-the current ones (68k blob 517,385 bytes, set blob share 34.2%), and `make labels` gives 223 labels,
+the current ones (with M5i's images, docs/15: 68k blob 185,094 bytes, set blob share 12.2%), and `make labels` gives 223 labels,
 0 in blob.
 
 `make coverage` (2026-11-16, after this leg). vasm names an included file as the `include`

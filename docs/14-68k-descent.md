@@ -440,8 +440,9 @@ name order, so a re-run with the same PCs rewrites the same file.
    classify` refuses to run without the runs (section 3).
 2. `tools/m68k gen START END --out asm/68k/<file> --equates asm/68k/hardware.asm --equates-out
    <ram equates>` once, into the leg's region file (decision C6; the region files of docs/13
-   section 2: `boot/boot.asm` 000212-012F06, `game/code.asm` 020430-04397E, `game/island.asm`
-   04397E-046AEE, the three regions of section 6), with `asm/68k/macros.asm` included before it
+   section 2: wave 0's `boot/boot.asm` 000212-012F06, `game/code.asm` 020430-04397E and
+   `game/island.asm` 04397E-046AEE, the three regions of section 6; M5c has done this for all
+   three, into the `boot/code_*.asm` and `game/code_*.asm` files of docs/16 section 2.1), with `asm/68k/macros.asm` included before it
    (`stunrun.asm` already includes `hardware.asm`, whose 17 equates are the generator's default
    names, `ida/memory_map.py`'s `IO_68K`); the RAM equates go to the one shared `asm/68k/ram.asm`
    (issue #33); `make check` must stay 0 differences. The incbin path is resolved by vasm
