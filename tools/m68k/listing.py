@@ -35,7 +35,7 @@ from .descent import Descent, _abs
 STATEMENT = re.compile(r"^([0-9A-F]{2}):([0-9A-F]{8}) ([0-9A-F ]*)\t\s*(\d+)(M?)[: ] ?(.*)$")
 CONTINUATION = re.compile(r"^[0-9A-F]{2}:[0-9A-F]{8} [0-9A-F ]*$")
 PLAIN = re.compile(r"^\s{20,}\t\s*(\d+)(M?)[: ] ?(.*)$")
-SYMBOL = re.compile(r"^(\S+)\s+(?:[0-9A-F]{2}|[A-Z]):([0-9A-F]{8})$")
+SYMBOL = re.compile(r"^(\S+)\s+([0-9A-F]{2}|[A-Z]):([0-9A-F]{8})$")
 DATA = re.compile(r"^\s*(?:[\w.]+:?\s+)?(dc|dcb|ds|blk)(\.[bwl])?\s", re.I)
 INCBIN = re.compile(r"^\s*(?:[\w.]+:?\s+)?incbin\s", re.I)
 LABEL = re.compile(r"^([A-Za-z_.][\w.]*):?(?=\s|$)")
@@ -67,6 +67,7 @@ class Stmt:
 class Listing:
     statements: list[Stmt] = field(default_factory=list)
     symbols: dict[str, int] = field(default_factory=dict)
+    equates: set[str] = field(default_factory=set)  # vasm's `E:` symbols: not labels
 
     def by_address(self) -> dict[int, Stmt]:
         return {s.address: s for s in self.statements}
@@ -111,7 +112,9 @@ def parse(text: str, macros: set[str]) -> Listing:
         if in_symbols:
             m = SYMBOL.match(line.strip())
             if m:
-                lst.symbols.setdefault(m.group(1), int(m.group(2), 16))
+                lst.symbols.setdefault(m.group(1), int(m.group(3), 16))
+                if m.group(2) == "E":
+                    lst.equates.add(m.group(1))
             continue
         m = STATEMENT.match(line)
         if m:
@@ -319,6 +322,7 @@ def address_lint(lst: Listing, decisions: dict[tuple[int, int], str],
     `dc.l` (a pointer written as two `dc.w` words or as bytes would escape the dc.l rule)."""
     rep = LintReport()
     full = bytes(origin) + image if image is not None else None
+    labels = {n for n, v in lst.symbols.items() if n not in lst.equates and lo <= v < hi}
     for s in lst.statements:
         if not lo <= s.address < hi or s.kind == "blob":
             continue
@@ -347,9 +351,22 @@ def address_lint(lst: Listing, decisions: dict[tuple[int, int], str],
         insn = decode(full, s.address) if full is not None and mn not in macros else None
         if insn is not None and len(insn.operands) == len(ops):
             _lint_decoded(s, insn, ops, decisions, rep)
-            continue
-        _lint_text(s, ops, mn, decisions, macros, rep)
+        else:
+            _lint_text(s, ops, mn, decisions, macros, rep)
+        for i, op in enumerate(ops):
+            if decisions.get((s.address, i)) == "constant" and names_label(op, labels):
+                rep.errors.append(f"{s.address:06X}: {s.text}: the operand {op} is a constant "
+                                  f"(data/68k/operands.json) written as a ROM label")
     return rep
+
+
+def names_label(op: str, labels: set[str]) -> bool:
+    """Does an operand's text name one of the labels (a size suffix allowed: sub_7000.w)?"""
+    for m in IDENT.finditer(op.split(";", 1)[0]):
+        name = m.group(1)
+        if name in labels or (name[-2:].lower() in (".w", ".l") and name[:-2] in labels):
+            return True
+    return False
 
 
 def _lint_decoded(s: Stmt, insn: Insn, ops: list[str],

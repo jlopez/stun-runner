@@ -87,10 +87,12 @@ needs_vasm = pytest.mark.skipif(vasm() is None, reason="vasm not available")
 
 
 def assemble_68k(
-    image: bytes, work: Path, tree: Path = TREE, expect_ok: bool = True
+    image: bytes, work: Path, tree: Path = TREE, expect_ok: bool = True,
+    generated: dict[str, str] | None = None,
 ) -> tuple[bytes, str, subprocess.CompletedProcess[str]]:
     """The 68k tree assembled against `image` as build/stunrun-68k.bin (and the two programs cut
-    out of it, as tools/extract-programs does): the output, the listing and vasm's result."""
+    out of it, as tools/extract-programs does), with `generated` written under build/ (path ->
+    source, as a generator writes there): the output, the listing and vasm's result."""
     assert len(image) == IMAGE_SIZE
     shutil.copytree(tree, work / "asm/68k")
     build = work / "build"
@@ -100,6 +102,9 @@ def assemble_68k(
     (build / "adsp/program.bin").write_bytes(image[ADSP_START:GSP_START])
     (build / "gsp/program.bin").write_bytes(image[GSP_START:GSP_END])
     write_includes(build / "gsp-images")  # pairs U-W come from data/gsp-images (docs/15)
+    for path, text in (generated or {}).items():
+        (build / path).parent.mkdir(parents=True, exist_ok=True)
+        (build / path).write_text(text)
     out, lst = build / "68k.out", build / "68k.lst"
     tool = vasm()
     assert tool is not None
@@ -450,15 +455,15 @@ def test_labels_on_the_tree(tmp_path: Path) -> None:
 
 
 def tree_check(tmp: Path, tree: Path = TREE, seed: int = 16, shift: bool = True,
-               runs: dict[str, set[int]] | None = None, patch: dict[int, bytes] | None = None
-               ) -> tr.TreeReport:
+               runs: dict[str, set[int]] | None = None, patch: dict[int, bytes] | None = None,
+               generated: dict[str, str] | None = None) -> tr.TreeReport:
     """tools/m68k check-tree's checks on `tree` assembled against a random blob (with `patch`
     written into it), the output and listing left in tmp/build/68k.out and 68k.lst."""
     blob = bytearray(random.Random(seed).randbytes(IMAGE_SIZE))
     for a, b in (patch or {}).items():
         blob[a : a + len(b)] = b
     image = bytes(blob)
-    out, listing, _ = assemble_68k(image, tmp, tree)
+    out, listing, _ = assemble_68k(image, tmp, tree, generated=generated)
     seeds, untaken = load_seeds(REPO / "data/68k/seeds.json")
     return tr.check(
         listing, out, cl.load(REPO / "data/68k/classification.json"),
@@ -543,6 +548,38 @@ def test_tree_checks_fail(tmp_path: Path) -> None:
 
 
 @needs_vasm
+def test_constant_written_as_a_label_fails(tmp_path: Path) -> None:
+    """A long immediate data/68k/operands.json decides is a constant, written as a ROM label of
+    the same value (the image unchanged): the address lint refuses it, whatever the shift test
+    says (the label moves with the pad, so the statement changes as expected). A listed constant
+    (R6 at 020CB4, `addi.l #$100,d0`) and a reviewed one (the countdown at 02FC76)."""
+    tree = planted(tmp_path, "game/code_020430.asm", "\taddi.l\t#$100,d0\n",
+                   "\taddi.l\t#dat_100,d0\n",
+                   ("game/code_02C0D2.asm", "\tmove.l\t#$80000,d5\n",
+                    "\tmove.l\t#dat_60000+$20000,d5\n"))
+    rep = tree_check(tmp_path, tree, shift=False)
+    bad = [e for e in rep.lint.errors if "is a constant (data/68k/operands.json) written as a "
+           "ROM label" in e]
+    assert len(bad) == 2 and len(rep.lint.errors) == 2, rep.lint.errors
+    assert any("#dat_100,d0" in e for e in bad) and any(e.startswith("02FC76:") for e in bad), bad
+    assert any(e.startswith("020CB4:") for e in bad), bad
+
+
+@needs_vasm
+def test_shift_test_pads_generated_includes(tmp_path: Path) -> None:
+    """A source file the tree includes from build/ (a generator's output, as the GSP images'
+    build/gsp-images/*.asm of issue #34) keeps its asserts in the build but loses them in the
+    padded copy, like the tree's own files, and its `$X-*` fill keeps its length: the shift
+    test passes."""
+    tree = planted(tmp_path, "game/vectors.asm", "dat_20400:\n\tdcb.b\t24,0",
+                   'dat_20400:\n\tinclude\t"../../build/gen/zeros.asm"')
+    gen = '\tassert\t*=$020400,"build/gen/zeros.asm misplaced"\n\tdcb.b\t$020418-*,0\n'
+    rep = tree_check(tmp_path, tree, generated={"gen/zeros.asm": gen})
+    assert rep.shift is not None and rep.shift.errors == [], rep.shift
+    assert rep.shift.changed == rep.shift.expected > 4000
+
+
+@needs_vasm
 def test_raw_data_check_fails(tmp_path: Path) -> None:
     """The raw-data check (decision C3) refuses every dc/dcb statement of a code file that is not
     one of the generator's explained kinds: a dc.l wall in a data range, numeric dc.b in a text
@@ -571,7 +608,11 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
          "\tdc.b\t'INC*PM*DATA*0-7 '\ndat_7A80:\n"
          "\tincbin\t\"../../build/stunrun-68k.bin\",$7A80,$3\n"),
     )
-    rep = tree_check(tmp_path, tree, shift=False)
+    # the blob is random: the header bytes the check reads are written into it, made up but
+    # for the counts, which are the strings' lengths (15 before the 16 characters, 18 for
+    # CONTROL*LEFT/RIGHT, a non-printable byte after it)
+    patch = {0x7A6F: bytes([15]), 0x7A80: bytes([0x01, 0x01, 18]), 0x7A95: b"\x01"}
+    rep = tree_check(tmp_path, tree, shift=False, patch=patch)
     assert len(rep.raw) == 7, rep.raw
     assert any("'INC*PM*DATA*0-7 '" in e and "next record's 4-byte header" in e
                for e in rep.raw), rep.raw

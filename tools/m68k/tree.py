@@ -165,15 +165,32 @@ def foreign_refs(lst: ls.Listing) -> list[str]:
 def shift(tree: Path, build: Path, lst: ls.Listing, binary: bytes, pad: int = 2,
           vasm: str = "vasmm68k_mot") -> ls.ShiftReport:
     """The tree copied with a pad after `org 0`, its guards commented out, its `$X-*` fills
-    kept at their length and its incbin paths absolute; assembled and compared."""
+    kept at their length and its incbin paths absolute; assembled and compared. A source file
+    the tree includes from the build directory (a generated one, as tools/objects asm and
+    tools/adpcm asm write, with an assert per structure) is copied and padded the same way."""
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp) / "68k"
+        generated = Path(tmp) / "build"
         shutil.copytree(tree, work)
-        for f in work.rglob("*.asm"):
-            text = f.read_text()
+        built = build.resolve()
+
+        def pad_source(text: str) -> str:
             text = re.sub(r"^(\s+)assert\b", r"\1; assert", text, flags=re.M)
             text = re.sub(r"(dcb\.b\s+\$[0-9A-Fa-f]+-\*)", rf"\1+{pad}", text)
-            text = text.replace('"../../build/', f'"{build.resolve()}/')
+
+            def include(m: re.Match[str]) -> str:
+                dst = generated / m[2]
+                if not dst.exists():
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    dst.write_text(pad_source((built / m[2]).read_text()))
+                return f'{m[1]}"{dst}"'
+
+            text = re.sub(r'^(\s+include\s+)"\.\./\.\./build/([^"]+)"', include, text,
+                          flags=re.M | re.I)
+            return text.replace('"../../build/', f'"{built}/')
+
+        for f in work.rglob("*.asm"):
+            text = pad_source(f.read_text())
             if f.name == "stunrun.asm":
                 text = re.sub(r"^(\s+org\s+0)$", rf"\1\n\tdcb.b\t{pad},0", text, count=1,
                               flags=re.M)

@@ -204,7 +204,9 @@ character is a lower-case item byte, fails.
   and reach it, but promoting a range needs a reviewed seed in `data/68k/seeds.json` and
   `make classify` (decision C8);
 - the address lint over 000000-0C0000; the references into `images.asm` and `image_table.asm`
-  as label+offset are counted (section 2.4);
+  as label+offset are counted (section 2.4); a long immediate `data/68k/operands.json` decides
+  is a constant fails when it is written as a ROM label (`#dat_100` for `#$100`: the shift test
+  cannot see it, since the label moves with the pad, review fix 2);
 - the raw-data check: in the code files (000000-012F06, 020000-046AEE) every `dc`/`dcb`
   statement is an explained kind: `dc.l` in a vector or pointer table, `dc.w a-b` in a switch
   table, `dc.b` of quoted strings and zeros in text, a `dcb.b N,0` fill. A `dc.b` wall in place
@@ -213,8 +215,12 @@ character is a lower-case item byte, fails.
 - the shift test: the tree copied to a temporary directory, its guards commented out, a
   two-byte pad after `org 0` (each `dcb.b $X-*` fill lengthened by the pad so that it does not
   absorb it), its incbin paths made absolute, assembled again; exactly the statements that name
-  a ROM symbol other than PC-relatively or as a difference change, each word by the pad;
-- with the run files of `make pccov`: every executed PC starts an instruction statement.
+  a ROM symbol other than PC-relatively or as a difference change, each word by the pad; a
+  source file the tree includes from `build/` (a generator's output, such as issue #34's
+  `build/gsp-images/*.asm`) is copied and padded the same way, its asserts commented out;
+- with the run files of `make pccov`: every executed PC starts an instruction statement (two
+  run files with one name, `pccov-game.txt` from two directories, fail, here and in `tools/m68k
+  pccov`, so that none goes unchecked).
 
 `make m68k-check` runs `make labels`, `check-tree` with the run files present in `build/mame`
 (it says so when there are none) and `check-unidasm`. On the reference build, 2026-11-16:
@@ -251,7 +257,12 @@ slice as a `dc.b` wall (the raw-data check, at its address), a `jsr sub_X` writt
 lint), a label pinned by an `equ` (the shift test). `test_raw_data_check_fails` plants the other
 raw-data faults in one copy (a `dc.l` wall in a data range, a text string as numeric `dc.b`, a
 `dcb.b 40,$FF`, a switch entry written as a number, a count written back as the first
-character of `str_7161`, an item byte as the first of `str_20FD6`) and finds each. `test_code_turned_blob_fails`
+character of `str_7161`, an item byte as the first of `str_20FD6`, the next record's column 20h written back as the last
+character of `str_7A70`) and finds each. `test_constant_written_as_a_label_fails` writes a listed
+constant (020CB4) and a reviewed one (02FC76) as ROM labels of the same value and the lint
+refuses both. `test_shift_test_pads_generated_includes` moves a fill of `game/vectors.asm` into
+a file under `build/` with an assert, and the shift test still passes. `test_runs_need_distinct_names`
+(`tools/test_m68k.py`) gives `pccov` and `check-tree` two run files with one name. `test_code_turned_blob_fails`
 writes a routine's first instruction as an incbin slice of its own bytes: the classified start
 without a statement, an executed PC there (through `check-tree`'s runs and `tools/m68k pccov
 --listing`) and `check-tree`'s exit status 1 each fail. `test_promoted_range_fails` writes an
