@@ -388,6 +388,11 @@ def cmd_check_listing(a: argparse.Namespace) -> int:
     return 1 if rep.errors or rep.unreached or lint.errors else 0
 
 
+def run_name(p: Path) -> str:
+    """The name a run file is reported under: its stem without `pccov-`."""
+    return p.stem.removeprefix("pccov-")
+
+
 def cmd_check_tree(a: argparse.Namespace) -> int:
     from m68k import tree as tr
 
@@ -401,7 +406,11 @@ def cmd_check_tree(a: argparse.Namespace) -> int:
         if why:
             print(f"{p}: {why}")
             return 1
-        runs[p.stem.removeprefix("pccov-")] = pcs
+        name = run_name(p)
+        if name in runs:
+            print(f"{p}: a second run named {name!r}; every run file needs its own name")
+            return 1
+        runs[name] = pcs
     rep = tr.check(a.listing.read_text(), binary, c, opd.load(a.operands),
                    ls.macro_names(a.macros), seeds, untaken, set(load_unreached(a.seeds)),
                    None if a.no_shift else a.tree, a.build, runs)
@@ -467,7 +476,11 @@ def cmd_pccov(a: argparse.Namespace) -> int:
         if why:
             print(f"{p}: {why}; {a.summary} not written")
             return 1
-        loaded[p.stem.removeprefix("pccov-")] = (header, pcs)
+        name = run_name(p)
+        if name in loaded:
+            print(f"{p}: a second run named {name!r}; {a.summary} not written")
+            return 1
+        loaded[name] = (header, pcs)
     image = a.image.read_bytes()
     c = cl.load(a.classification)
     starts = c.code_starts(image)
