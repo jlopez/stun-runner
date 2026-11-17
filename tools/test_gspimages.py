@@ -422,6 +422,38 @@ def test_palette_include_asserts_its_place(tmp_path: Path) -> None:
     assert r.returncode != 0 and "palette title misplaced" in r.stdout + r.stderr
 
 
+@pytest.mark.skipif(not vasm(), reason="vasm not available")
+def test_renamed_palette_removes_its_stale_include(tmp_path: Path) -> None:
+    """Review of #38: write_palettes removes the include of a palette data/palettes no longer
+    has, so a renamed palette fails at game/island.asm's include (vasm cannot open it) instead
+    of assembling the old bytes from a stale build/gsp-images/palettes/<name>.asm."""
+    pals = tmp_path / "palettes"
+    shutil.copytree(PALETTES, pals)
+    out = tmp_path / "build/gsp-images"
+    g.write_palettes(out, g.read_palettes(pals))
+    folder = out / "palettes"
+    assert (folder / "level_base_03.asm").exists()
+    spec = json.loads((pals / "level_base_03.json").read_text())
+    spec["name"] = "renamed_03"
+    (pals / "renamed_03.json").write_text(json.dumps(spec))
+    (pals / "level_base_03.json").unlink()
+    g.write_palettes(out, g.read_palettes(pals))
+    assert not (folder / "level_base_03.asm").exists()
+    assert (folder / "renamed_03.asm").exists()
+    assert sorted(f.name for f in folder.iterdir()) == sorted(
+        f"{p.stem}.asm" for p in pals.glob("*.json"))
+    # the island as the tree has it, with a made-up blob for its incbin slices
+    (tmp_path / "asm/68k/game").mkdir(parents=True)
+    shutil.copy(REPO / "asm/68k/game/island.asm", tmp_path / "asm/68k/game/island.asm")
+    (tmp_path / "build/stunrun-68k.bin").write_bytes(bytes(0xC0000))
+    (tmp_path / "asm/68k/w.asm").write_text('\torg\t$04397E\n\tinclude\t"game/island.asm"\n')
+    r = subprocess.run([vasm(), "-quiet", "-Fbin", "-no-opt", "-m68010", "-o", "w.bin", "w.asm"],
+                       cwd=tmp_path / "asm/68k", capture_output=True, text=True, check=False)
+    msg = r.stdout + r.stderr
+    assert r.returncode != 0
+    assert "could not open <../../build/gsp-images/palettes/level_base_03.asm>" in msg, msg
+
+
 def test_68k_tree_is_rebuilt_on_every_make() -> None:
     """make 3.81 compares whole-second mtimes: the includes are rewritten only when their text
     changes, so the 68k tree (which includes the image and palette includes) depends on FORCE
