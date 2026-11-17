@@ -16,85 +16,99 @@ dat_46B08:
 dat_46B15:
 	incbin	"../../build/stunrun-68k.bin",$046B15,$29
 str_46B3E:
-	incbin	"../../build/stunrun-68k.bin",$046B3E,$14
+	dc.b	'PRESS START BUTTON',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46B52:
-	incbin	"../../build/stunrun-68k.bin",$046B52,$10
+	dc.b	'INSERT %d COINS',0
 str_46B62:
-	incbin	"../../build/stunrun-68k.bin",$046B62,$E
+	dc.b	'INSERT 1 COIN',0
 str_46B70:
-	incbin	"../../build/stunrun-68k.bin",$046B70,$10
+	dc.b	'INSERT %d COINS',0
 str_46B80:
-	incbin	"../../build/stunrun-68k.bin",$046B80,$E
+	dc.b	'INSERT 1 COIN',0
 str_46B8E:
-	incbin	"../../build/stunrun-68k.bin",$046B8E,$1C
+	dc.b	'Copyright 1989 ATARI GAMES',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46BAA:
-	incbin	"../../build/stunrun-68k.bin",$046BAA,$10
+	dc.b	'Credits: %s %s',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46BBA:
-	incbin	"../../build/stunrun-68k.bin",$046BBA,$A
+	dc.b	'GAME OVER',0
 str_46BC4:
-	incbin	"../../build/stunrun-68k.bin",$046BC4,$C
+	dc.b	'OUT OF TIME',0
 str_46BD0:
-	incbin	"../../build/stunrun-68k.bin",$046BD0,$12
+	dc.b	'MORE TO COME SOON',0
 str_46BE2:
-	incbin	"../../build/stunrun-68k.bin",$046BE2,$E
+	dc.b	'DAMAGE REPORT',0
 str_46BF0:
-	incbin	"../../build/stunrun-68k.bin",$046BF0,$A
+	dc.b	'NO DAMAGE',0
 str_46BFA:
-	incbin	"../../build/stunrun-68k.bin",$046BFA,$12
+	dc.b	'STUN RUNNER TEAM',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46C0C:
-	incbin	"../../build/stunrun-68k.bin",$046C0C,$20
+	dc.b	'COMMISSIONER:        Ed Rotberg',0
 str_46C2C:
-	incbin	"../../build/stunrun-68k.bin",$046C2C,$24
+	dc.b	'TRANSIT AUTHORITY:   Andrew Burgess',0
 str_46C50:
-	incbin	"../../build/stunrun-68k.bin",$046C50,$22
+	dc.b	'TUNNEL ARCHITECT:    Sam Comstock',0
 str_46C72:
-	incbin	"../../build/stunrun-68k.bin",$046C72,$20
+	dc.b	'VEHICLE ENGINEER:    Will Noble',0
 str_46C92:
-	incbin	"../../build/stunrun-68k.bin",$046C92,$20
+	dc.b	'CITY PLANNING:       Kris Moser',0
 str_46CB2:
-	incbin	"../../build/stunrun-68k.bin",$046CB2,$24
+	dc.b	'COMMUNICATIONS:      Don Diekneite',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46CD6:
-	incbin	"../../build/stunrun-68k.bin",$046CD6,$22
+	dc.b	'ACOUSTICS:           Brad Fuller',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46CF8:
-	incbin	"../../build/stunrun-68k.bin",$046CF8,$22
+	dc.b	'PROPULSION ENGINEER: Jed Margolin',0
 str_46D1A:
-	incbin	"../../build/stunrun-68k.bin",$046D1A,$1E
+	dc.b	'PATRIARCH:           John Ray',0
 str_46D38:
-	incbin	"../../build/stunrun-68k.bin",$046D38,$22
+	dc.b	'PUBLIC RELATIONS:    Jerry Momoda',0
 str_46D5A:
-	incbin	"../../build/stunrun-68k.bin",$046D5A,$24
+	dc.b	'BLUE SKY:            Carole Cameron',0
 str_46D7E:
-	incbin	"../../build/stunrun-68k.bin",$046D7E,$24
+	dc.b	'DAMAGE CONTROL:      Glenn McNamara',0
 str_46DA2:
-	incbin	"../../build/stunrun-68k.bin",$046DA2,$22
+	dc.b	'PHYSICIST:           Max Behensky',0
 str_46DC4:
-	incbin	"../../build/stunrun-68k.bin",$046DC4,$24
+	dc.b	'OPTICS:              Stephanie Mott',0
 str_46DE8:
-	incbin	"../../build/stunrun-68k.bin",$046DE8,$24
+	dc.b	'AUXILIARY SYSTEMS:   Gary Stempler',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46E0C:
-	incbin	"../../build/stunrun-68k.bin",$046E0C,$20
+	dc.b	'MATHEMATICS:         Jim Morris',0
 str_46E2C:
-	incbin	"../../build/stunrun-68k.bin",$046E2C,$20
+	dc.b	'CHIEF MECHANIC:      Milt Loper',0
 str_46E4C:
-	incbin	"../../build/stunrun-68k.bin",$046E4C,$22
+	dc.b	'BACKHOE OPERATOR:    Erik Durfey',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46E6E:
-	incbin	"../../build/stunrun-68k.bin",$046E6E,$20
+	dc.b	'OVERLORD:            Mike Hally',0
 str_46E8E:
-	incbin	"../../build/stunrun-68k.bin",$046E8E,$22
+	dc.b	'CHAINSAW:            Ralph Perez',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46EB0:
-	incbin	"../../build/stunrun-68k.bin",$046EB0,$1E
+	dc.b	'BONDO MAN:           Ken Hata',0
 str_46ECE:
-	incbin	"../../build/stunrun-68k.bin",$046ECE,$26
+	dc.b	'XACTO BLADERUNNER:   Kyoko Dougherty',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46EF4:
-	incbin	"../../build/stunrun-68k.bin",$046EF4,$24
+	dc.b	'PUB RUNNER:          Andrea Dencker',0
 str_46F18:
-	incbin	"../../build/stunrun-68k.bin",$046F18,$22
+	dc.b	'WIDGET ARTIST:       Mary Sumner',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46F3A:
-	incbin	"../../build/stunrun-68k.bin",$046F3A,$24
+	dc.b	'THE ANCIENT ONE:     Rick Moncrief',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46F5E:
-	incbin	"../../build/stunrun-68k.bin",$046F5E,$1C
+	dc.b	'Copyright 1989 ATARI GAMES',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_46F7A:
-	incbin	"../../build/stunrun-68k.bin",$046F7A,$10
+	dc.b	'Credits: %s %s',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_46F8A:
 	incbin	"../../build/stunrun-68k.bin",$046F8A,$10
 dat_46F9A:
@@ -110,7 +124,8 @@ dat_46FB6:
 dat_46FBA:
 	incbin	"../../build/stunrun-68k.bin",$046FBA,$4
 str_46FBE:
-	incbin	"../../build/stunrun-68k.bin",$046FBE,$10
+	dc.b	'Credits: %s %s',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_46FCE:
 	incbin	"../../build/stunrun-68k.bin",$046FCE,$4
 dat_46FD2:
@@ -130,99 +145,141 @@ dat_46FEA:
 dat_46FEE:
 	incbin	"../../build/stunrun-68k.bin",$046FEE,$4
 str_46FF2:
-	incbin	"../../build/stunrun-68k.bin",$046FF2,$18
+	dc.b	"WINNERS DON'T USE DRUGS",0
 str_4700A:
-	incbin	"../../build/stunrun-68k.bin",$04700A,$18
+	dc.b	"WINNERS DON'T USE DRUGS",0
 str_47022:
-	incbin	"../../build/stunrun-68k.bin",$047022,$24
+	dc.b	'William S. Sessions, Director, FBI',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_47046:
-	incbin	"../../build/stunrun-68k.bin",$047046,$16
+	dc.b	' THE STUN RUNNER TEAM',0
 str_4705C:
-	incbin	"../../build/stunrun-68k.bin",$04705C,$14
+	dc.b	'NO MAP AT THIS TIME',0
 str_47070:
-	incbin	"../../build/stunrun-68k.bin",$047070,$2A
+	dc.b	'Get %d STARS & finish level for SHOCKWAVE',0
 str_4709A:
-	incbin	"../../build/stunrun-68k.bin",$04709A,$18
+	dc.b	'WARP BONUS: 20,000 PTS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_470B2:
-	incbin	"../../build/stunrun-68k.bin",$0470B2,$1A
+	dc.b	'NO SHOCKWAVE FOR %d STARS',0
 str_470CC:
-	incbin	"../../build/stunrun-68k.bin",$0470CC,$1A
+	dc.b	'1 SHOCKWAVE FOR %d STARS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_470E6:
-	incbin	"../../build/stunrun-68k.bin",$0470E6,$12
+	dc.b	'MAX 6 SHOCKWAVES',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_470F8:
-	incbin	"../../build/stunrun-68k.bin",$0470F8,$1E
+	dc.b	'%d SHIELDS REMAINING: %d PTS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_47116:
-	incbin	"../../build/stunrun-68k.bin",$047116,$1C
+	dc.b	'1 SHIELD REMAINING: %d PTS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_47132:
-	incbin	"../../build/stunrun-68k.bin",$047132,$10
+	dc.b	'NO SHIELD BONUS',0
 str_47142:
-	incbin	"../../build/stunrun-68k.bin",$047142,$1C
+	dc.b	'INTERMEDIATE BONUS: %d PTS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4715E:
-	incbin	"../../build/stunrun-68k.bin",$04715E,$18
+	dc.b	'ADVANCED BONUS: %d PTS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_47176:
-	incbin	"../../build/stunrun-68k.bin",$047176,$14
+	dc.b	'NO MAP AT THIS TIME',0
 dat_4718A:
 	incbin	"../../build/stunrun-68k.bin",$04718A,$4
 str_4718E:
-	incbin	"../../build/stunrun-68k.bin",$04718E,$10
+	dc.b	'Credits: %s %s',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4719E:
-	incbin	"../../build/stunrun-68k.bin",$04719E,$14
+	dc.b	'INSERT %d COINS %s',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_471B2:
-	incbin	"../../build/stunrun-68k.bin",$0471B2,$12
+	dc.b	'INSERT 1 COIN %s',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_471C4:
-	incbin	"../../build/stunrun-68k.bin",$0471C4,$14
+	dc.b	'INSERT %d COINS %s',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_471D8:
-	incbin	"../../build/stunrun-68k.bin",$0471D8,$12
+	dc.b	'INSERT 1 COIN %s',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_471EA:
-	incbin	"../../build/stunrun-68k.bin",$0471EA,$10
+	dc.b	'PRESS START %s',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_471FA:
-	incbin	"../../build/stunrun-68k.bin",$0471FA,$14
+	dc.b	'STUN RUNNER CONTEST',0
 str_4720E:
-	incbin	"../../build/stunrun-68k.bin",$04720E,$10
+	dc.b	'QUALIFY FOR THE',0
 str_4721E:
-	incbin	"../../build/stunrun-68k.bin",$04721E,$14
+	dc.b	'ULTIMATE CHALLENGE',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_47232:
-	incbin	"../../build/stunrun-68k.bin",$047232,$1A
+	dc.b	'CROSS THE CONTEST MARKER',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4724C:
-	incbin	"../../build/stunrun-68k.bin",$04724C,$10
+	dc.b	'AND WIN A FREE',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4725C:
-	incbin	"../../build/stunrun-68k.bin",$04725C,$14
+	dc.b	'STUN RUNNER T SHIRT',0
 str_47270:
-	incbin	"../../build/stunrun-68k.bin",$047270,$1C
+	dc.b	'Offer Expires April 1, 1990',0
 str_4728C:
-	incbin	"../../build/stunrun-68k.bin",$04728C,$32
+	dc.b	'Limit 1 per person.          Quantities Limited.',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_472BE:
-	incbin	"../../build/stunrun-68k.bin",$0472BE,$14
+	dc.b	'NO MAP AT THIS TIME',0
 str_472D2:
-	incbin	"../../build/stunrun-68k.bin",$0472D2,$2C
+	dc.b	'Highest: %6d.%1d feet   Your: %6d.%1d feet',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_472FE:
 	incbin	"../../build/stunrun-68k.bin",$0472FE,$4
 str_47302:
-	incbin	"../../build/stunrun-68k.bin",$047302,$1E
+	dc.b	'RAISE CONTROL TO SELECT LEVEL',0
 str_47320:
-	incbin	"../../build/stunrun-68k.bin",$047320,$18
+	dc.b	'PRESS TRIGGER TO BEGIN',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_47338:
-	incbin	"../../build/stunrun-68k.bin",$047338,$8
+	dc.b	'Novice',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_47340:
 	incbin	"../../build/stunrun-68k.bin",$047340,$4
 str_47344:
-	incbin	"../../build/stunrun-68k.bin",$047344,$A
+	dc.b	'Level %d',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4734E:
-	incbin	"../../build/stunrun-68k.bin",$04734E,$E
+	dc.b	'Intermediate',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4735C:
 	incbin	"../../build/stunrun-68k.bin",$04735C,$4
 str_47360:
-	incbin	"../../build/stunrun-68k.bin",$047360,$A
+	dc.b	'Level %d',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4736A:
-	incbin	"../../build/stunrun-68k.bin",$04736A,$A
+	dc.b	'%d Bonus',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_47374:
-	incbin	"../../build/stunrun-68k.bin",$047374,$A
+	dc.b	'Advanced',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4737E:
 	incbin	"../../build/stunrun-68k.bin",$04737E,$4
 str_47382:
-	incbin	"../../build/stunrun-68k.bin",$047382,$A
+	dc.b	'Level %d',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4738C:
-	incbin	"../../build/stunrun-68k.bin",$04738C,$3E
+	dc.b	'%d Bonus',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_47396:
+	dc.b	'LEGEND',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4739E:
+	dc.b	'TUNNEL',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_473A6:
+	dc.b	'CONSTRUCTION',0
+dat_473B3:
+	incbin	"../../build/stunrun-68k.bin",$0473B3,$D
+str_473C0:
+	dc.b	'BOOSTS',0
+dat_473C7:
+	incbin	"../../build/stunrun-68k.bin",$0473C7,$3
 dat_473CA:
 	incbin	"../../build/stunrun-68k.bin",$0473CA,$1
 dat_473CB:
@@ -246,13 +303,29 @@ dat_47406:
 dat_4747E:
 	incbin	"../../build/stunrun-68k.bin",$04747E,$1E
 dat_4749C:
-	incbin	"../../build/stunrun-68k.bin",$04749C,$2A
+	incbin	"../../build/stunrun-68k.bin",$04749C,$8
+str_474A4:
+	dc.b	'Shields Destroyed',0
+str_474B6:
+	dc.b	'Wings Destroyed',0
 dat_474C6:
 	incbin	"../../build/stunrun-68k.bin",$0474C6,$10
 dat_474D6:
 	incbin	"../../build/stunrun-68k.bin",$0474D6,$2
 dat_474D8:
-	incbin	"../../build/stunrun-68k.bin",$0474D8,$E2
+	incbin	"../../build/stunrun-68k.bin",$0474D8,$1C
+str_474F4:
+	dc.b	'Sorry STUN Runner, though you have the potential, it',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4752A:
+	dc.b	'looks like you need more practice. Try it again and',0
+str_4755E:
+	dc.b	'maybe next time you can qualify as a member of the',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_47592:
+	dc.b	'         STUN RUNNER CHAMPIONSHIP TEAM',0
+dat_475B9:
+	incbin	"../../build/stunrun-68k.bin",$0475B9,$1
 dat_475BA:
 	incbin	"../../build/stunrun-68k.bin",$0475BA,$8
 dat_475C2:
@@ -260,9 +333,10 @@ dat_475C2:
 dat_475C4:
 	incbin	"../../build/stunrun-68k.bin",$0475C4,$6
 str_475CA:
-	incbin	"../../build/stunrun-68k.bin",$0475CA,$18
+	dc.b	'TO TRY THIS LEVEL AGAIN',0
 str_475E2:
-	incbin	"../../build/stunrun-68k.bin",$0475E2,$1A
+	dc.b	'TO ADVANCE TO NEXT LEVEL',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_475FC:
 	incbin	"../../build/stunrun-68k.bin",$0475FC,$2
 dat_475FE:
@@ -276,19 +350,22 @@ dat_47604:
 dat_47606:
 	incbin	"../../build/stunrun-68k.bin",$047606,$28
 str_4762E:
-	incbin	"../../build/stunrun-68k.bin",$04762E,$C
+	dc.b	'STUN RUNNER',0
 str_4763A:
-	incbin	"../../build/stunrun-68k.bin",$04763A,$18
+	dc.b	'PROCESSING BACKGROUNDS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_47652:
-	incbin	"../../build/stunrun-68k.bin",$047652,$10
+	dc.b	'DOWNLOADING*GSP',0
 str_47662:
-	incbin	"../../build/stunrun-68k.bin",$047662,$12
+	dc.b	'DOWNLOADING*ADSP',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_47674:
 	incbin	"../../build/stunrun-68k.bin",$047674,$4
 str_47678:
-	incbin	"../../build/stunrun-68k.bin",$047678,$10
+	dc.b	'DOWNLOADING*GSP',0
 str_47688:
-	incbin	"../../build/stunrun-68k.bin",$047688,$12
+	dc.b	'OPERATOR SCREENS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4769A:
 	incbin	"../../build/stunrun-68k.bin",$04769A,$200
 dat_4789A:
@@ -342,7 +419,239 @@ dat_48170:
 dat_4817C:
 	incbin	"../../build/stunrun-68k.bin",$04817C,$4
 dat_48180:
-	incbin	"../../build/stunrun-68k.bin",$048180,$C64
+	incbin	"../../build/stunrun-68k.bin",$048180,$3C0
+str_48540:
+	dc.b	'CAKE-WALK:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4854C:
+	dc.b	'The RED STARS show the fastest path.',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48572:
+	dc.b	'Drive over stars for bonus points.',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48596:
+	dc.b	'BOOST BOULEVARD:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_485A8:
+	dc.b	'Touch BOOST PADS for HYPER speed.',0
+str_485CA:
+	dc.b	'Press triggers for LASERS.',0
+dat_485E5:
+	incbin	"../../build/stunrun-68k.bin",$0485E5,$5
+str_485EA:
+	dc.b	'3 levels to CHALLENGE LEVEL 1 !',0
+str_4860A:
+	dc.b	'BLOOD ALLEY:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48618:
+	dc.b	'Touch the GREEN STARS for bonus points.',0
+str_48640:
+	dc.b	'Beware of ARMORED DRONES.',0
+dat_4865A:
+	incbin	"../../build/stunrun-68k.bin",$04865A,$4
+str_4865E:
+	dc.b	'2 levels to CHALLENGE LEVEL 1 !',0
+str_4867E:
+	dc.b	'ROLLER-COASTER:',0
+str_4868E:
+	dc.b	'Look out for crazy MAG CYCLES.',0
+dat_486AD:
+	incbin	"../../build/stunrun-68k.bin",$0486AD,$7
+str_486B4:
+	dc.b	'Next level is CHALLENGE LEVEL 1 !',0
+str_486D6:
+	dc.b	'THE BOOST CHALLENGE:',0
+dat_486EB:
+	incbin	"../../build/stunrun-68k.bin",$0486EB,$3
+str_486EE:
+	dc.b	'Goal - Hit as many BOOST PADS',0
+str_4870C:
+	dc.b	'       as possible !',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48722:
+	dc.b	'OUTER DRIVE:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48730:
+	dc.b	'A universe of possibilities.',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4874E:
+	dc.b	'Pickup SHOCKWAVE Marker for ultra-weapon.',0
+dat_48778:
+	incbin	"../../build/stunrun-68k.bin",$048778,$4
+str_4877C:
+	dc.b	'4 levels to CHALLENGE LEVEL 2 !',0
+str_4879C:
+	dc.b	'RAMP-ALOT:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_487A8:
+	dc.b	'Catch mass air !',0
+dat_487B9:
+	incbin	"../../build/stunrun-68k.bin",$0487B9,$7
+str_487C0:
+	dc.b	'3 levels to CHALLENGE LEVEL 2 !',0
+str_487E0:
+	dc.b	'SPLIT DECISION:',0
+str_487F0:
+	dc.b	"Don't get lost S.T.U.N. RUNNER !",0
+dat_48811:
+	incbin	"../../build/stunrun-68k.bin",$048811,$7
+str_48818:
+	dc.b	'2 levels to CHALLENGE LEVEL 2 !',0
+str_48838:
+	dc.b	'CLOSE CALL:',0
+str_48844:
+	dc.b	"Show ATTACK DRONES who's boss.",0
+dat_48863:
+	incbin	"../../build/stunrun-68k.bin",$048863,$7
+str_4886A:
+	dc.b	'Next level is CHALLENGE LEVEL 2 !',0
+str_4888C:
+	dc.b	'THE BONUS STAR CHALLENGE:',0
+dat_488A6:
+	incbin	"../../build/stunrun-68k.bin",$0488A6,$2
+str_488A8:
+	dc.b	'Goal - Touch as many GREEN STARS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_488CA:
+	dc.b	'       as possible.',0
+str_488DE:
+	dc.b	'THE LABYRINTH:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_488EE:
+	dc.b	'Go where you wanna go !',0
+dat_48906:
+	incbin	"../../build/stunrun-68k.bin",$048906,$6
+str_4890C:
+	dc.b	'4 levels to CHALLENGE LEVEL 3 !',0
+str_4892C:
+	dc.b	'THE COAT-HANGER:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4893E:
+	dc.b	'Zoom through WIDE and NARROW tunnels.',0
+dat_48964:
+	incbin	"../../build/stunrun-68k.bin",$048964,$6
+str_4896A:
+	dc.b	'3 levels to CHALLENGE LEVEL 3 !',0
+str_4898A:
+	dc.b	'THE CLOVER-LEAF:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4899C:
+	dc.b	'Beware of lurking PROBOTS.',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_489B8:
+	dc.b	'CONSTRUCTION areas rob you of speed.',0
+dat_489DD:
+	incbin	"../../build/stunrun-68k.bin",$0489DD,$5
+str_489E2:
+	dc.b	'2 levels to CHALLENGE LEVEL 3 !',0
+str_48A02:
+	dc.b	"MCNAMARA'S REVENGE:",0
+str_48A16:
+	dc.b	'Deranged DRONES everywhere.',0
+str_48A32:
+	dc.b	'Enter at your own risk.',0
+dat_48A4A:
+	incbin	"../../build/stunrun-68k.bin",$048A4A,$4
+str_48A4E:
+	dc.b	'Next level is CHALLENGE LEVEL 3 !',0
+str_48A70:
+	dc.b	'THE KILL CHALLENGE:',0
+dat_48A84:
+	incbin	"../../build/stunrun-68k.bin",$048A84,$2
+str_48A86:
+	dc.b	'Goal - Destroy as many vehicles',0
+str_48AA6:
+	dc.b	'       as possible !',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48ABC:
+	dc.b	'KNEE JERK:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48AC8:
+	dc.b	'Endurance is the key.',0
+str_48ADE:
+	dc.b	'The end is in sight.',0
+dat_48AF3:
+	incbin	"../../build/stunrun-68k.bin",$048AF3,$5
+str_48AF8:
+	dc.b	'7 levels to the ULTIMATE CHALLENGE !',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48B1E:
+	dc.b	'3-RING-CIRCUS:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48B2E:
+	dc.b	'Hit BOOST PADS and leave em in your dust.',0
+dat_48B58:
+	incbin	"../../build/stunrun-68k.bin",$048B58,$6
+str_48B5E:
+	dc.b	'6 levels to the ULTIMATE CHALLENGE !',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48B84:
+	dc.b	'PROBOT HELL:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48B92:
+	dc.b	'Shoot first and ask questions later!',0
+dat_48BB7:
+	incbin	"../../build/stunrun-68k.bin",$048BB7,$7
+str_48BBE:
+	dc.b	'5 levels to the ULTIMATE CHALLENGE !',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48BE4:
+	dc.b	"SATAN'S SLALOM",0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48BF4:
+	dc.b	'Devilishly wicked !',0
+dat_48C08:
+	incbin	"../../build/stunrun-68k.bin",$048C08,$6
+str_48C0E:
+	dc.b	'4 levels to the ULTIMATE CHALLENGE !',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48C34:
+	dc.b	'THE DEATH SPIRAL:',0
+str_48C46:
+	dc.b	'Hang in there S.T.U.N. RUNNER ...',0
+dat_48C68:
+	incbin	"../../build/stunrun-68k.bin",$048C68,$6
+str_48C6E:
+	dc.b	'3 levels to the ULTIMATE CHALLENGE !',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48C94:
+	dc.b	'FIGURE 8:',0
+str_48C9E:
+	dc.b	'Figure this one out.',0
+dat_48CB3:
+	incbin	"../../build/stunrun-68k.bin",$048CB3,$7
+str_48CBA:
+	dc.b	'2 levels to the ULTIMATE CHALLENGE !',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48CE0:
+	dc.b	'THE JIGSAW:',0
+str_48CEC:
+	dc.b	'Cut a path to the finish.',0
+dat_48D06:
+	incbin	"../../build/stunrun-68k.bin",$048D06,$6
+str_48D0C:
+	dc.b	'Next level is the ULTIMATE CHALLENGE !',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48D34:
+	dc.b	'THE ULTIMATE CHALLENGE:',0
+str_48D4C:
+	dc.b	"YOU'VE MADE IT TO THE BIG TIME.",0
+str_48D6C:
+	dc.b	"IT'S TIME TO PROVE HOW GOOD YOU",0
+str_48D8C:
+	dc.b	'REALLY ARE...',0
+str_48D9A:
+	dc.b	'CAN YOU BEAT THE CURRENT',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48DB4:
+	dc.b	'CHAMPIONS?',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_48DC0:
+	dc.b	'TEST LEVEL:',0
+str_48DCC:
+	dc.b	'Test Track.',0
+dat_48DD8:
+	incbin	"../../build/stunrun-68k.bin",$048DD8,$C
 dat_48DE4:
 	incbin	"../../build/stunrun-68k.bin",$048DE4,$4
 dat_48DE8:
@@ -364,9 +673,11 @@ dat_4A82C:
 dat_4A82E:
 	incbin	"../../build/stunrun-68k.bin",$04A82E,$2
 str_4A830:
-	incbin	"../../build/stunrun-68k.bin",$04A830,$C
+	dc.b	'OUT OF SYNC',0
 str_4A83C:
-	incbin	"../../build/stunrun-68k.bin",$04A83C,$50
+	dc.b	'END GSP BUFFER',0
+dat_4A84B:
+	incbin	"../../build/stunrun-68k.bin",$04A84B,$41
 dat_4A88C:
 	incbin	"../../build/stunrun-68k.bin",$04A88C,$1E
 dat_4A8AA:
@@ -388,7 +699,51 @@ dat_4A932:
 dat_4A948:
 	incbin	"../../build/stunrun-68k.bin",$04A948,$C
 dat_4A954:
-	incbin	"../../build/stunrun-68k.bin",$04A954,$166
+	incbin	"../../build/stunrun-68k.bin",$04A954,$44
+str_4A998:
+	dc.b	'WATCH DOG RESET',0
+str_4A9A8:
+	dc.b	'BUSS ERROR',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4A9B4:
+	dc.b	'ADDRESS ERROR',0
+str_4A9C2:
+	dc.b	'ILLEGAL INST ERROR',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4A9D6:
+	dc.b	'DIVIDE BY ZERO ERR',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4A9EA:
+	dc.b	'CHK INST ERROR',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4A9FA:
+	dc.b	'TRAP ERROR',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4AA06:
+	dc.b	'PRIV VIOL ERR',0
+str_4AA14:
+	dc.b	'GSP HANDSHAKE ERROR',0
+str_4AA28:
+	dc.b	'BAD POLY BUFF ERROR',0
+str_4AA3C:
+	dc.b	'MSP TIME OUT ERROR',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4AA50:
+	dc.b	'ADSP TIME OUT ERROR',0
+str_4AA64:
+	dc.b	'GSP TIME OUT ERROR',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4AA78:
+	dc.b	'GENERIC ERROR',0
+str_4AA86:
+	dc.b	'NMI ERROR',0
+str_4AA90:
+	dc.b	'SPUR EXPTN ERROR',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4AAA2:
+	dc.b	'ILLEGAL ERROR CODE',0
+dat_4AAB5:
+	incbin	"../../build/stunrun-68k.bin",$04AAB5,$5
 dat_4AABA:
 	incbin	"../../build/stunrun-68k.bin",$04AABA,$202
 dat_4ACBC:
@@ -410,9 +765,11 @@ dat_4AF74:
 dat_4AF7E:
 	incbin	"../../build/stunrun-68k.bin",$04AF7E,$68
 str_4AFE6:
-	incbin	"../../build/stunrun-68k.bin",$04AFE6,$10
+	dc.b	'T SHIRT WINNER',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4AFF6:
-	incbin	"../../build/stunrun-68k.bin",$04AFF6,$18
+	dc.b	'YOU HAVE WON A T SHIRT',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4B00E:
 	incbin	"../../build/stunrun-68k.bin",$04B00E,$40
 dat_4B04E:
@@ -518,41 +875,50 @@ dat_4E3D8:
 dat_4E408:
 	incbin	"../../build/stunrun-68k.bin",$04E408,$2
 str_4E40A:
-	incbin	"../../build/stunrun-68k.bin",$04E40A,$1C
+	dc.b	'YOUR NAME HAS BEEN ENTERED',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E426:
-	incbin	"../../build/stunrun-68k.bin",$04E426,$14
+	dc.b	'TO THE HIGH SCORES',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E43A:
-	incbin	"../../build/stunrun-68k.bin",$04E43A,$1A
+	dc.b	'ENTER NAME TO HIGH SCORES',0
 str_4E454:
-	incbin	"../../build/stunrun-68k.bin",$04E454,$38
+	dc.b	'TURN CONTROL TO SELECT LETTER, PRESS TRIGGER TO CHOOSE',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4E48C:
 	incbin	"../../build/stunrun-68k.bin",$04E48C,$4
 str_4E490:
-	incbin	"../../build/stunrun-68k.bin",$04E490,$1C
+	dc.b	'YOUR NAME HAS BEEN ENTERED',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E4AC:
-	incbin	"../../build/stunrun-68k.bin",$04E4AC,$16
+	dc.b	'THE CHALLENGE WINNERS',0
 str_4E4C2:
-	incbin	"../../build/stunrun-68k.bin",$04E4C2,$20
+	dc.b	'ENTER NAME TO CHALLENGE WINNERS',0
 str_4E4E2:
-	incbin	"../../build/stunrun-68k.bin",$04E4E2,$38
+	dc.b	'TURN CONTROL TO SELECT LETTER, PRESS TRIGGER TO CHOOSE',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4E51A:
 	incbin	"../../build/stunrun-68k.bin",$04E51A,$4
 str_4E51E:
-	incbin	"../../build/stunrun-68k.bin",$04E51E,$1C
+	dc.b	'YOUR NAME HAS BEEN ENTERED',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E53A:
-	incbin	"../../build/stunrun-68k.bin",$04E53A,$12
+	dc.b	'THE STAR MASTERS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E54C:
-	incbin	"../../build/stunrun-68k.bin",$04E54C,$12
+	dc.b	'THE SHARPSHOOTERS',0
 str_4E55E:
-	incbin	"../../build/stunrun-68k.bin",$04E55E,$12
+	dc.b	'THE BOOST BUSTERS',0
 str_4E570:
-	incbin	"../../build/stunrun-68k.bin",$04E570,$1C
+	dc.b	'ENTER NAME TO STAR MASTERS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E58C:
-	incbin	"../../build/stunrun-68k.bin",$04E58C,$1C
+	dc.b	'ENTER NAME TO SHARPSHOOTERS',0
 str_4E5A8:
-	incbin	"../../build/stunrun-68k.bin",$04E5A8,$1C
+	dc.b	'ENTER NAME TO BOOSTER BUNCH',0
 str_4E5C4:
-	incbin	"../../build/stunrun-68k.bin",$04E5C4,$38
+	dc.b	'TURN CONTROL TO SELECT LETTER, PRESS TRIGGER TO CHOOSE',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4E5FC:
 	incbin	"../../build/stunrun-68k.bin",$04E5FC,$4
 dat_4E600:
@@ -582,7 +948,8 @@ dat_4E632:
 dat_4E638:
 	incbin	"../../build/stunrun-68k.bin",$04E638,$6
 str_4E63E:
-	incbin	"../../build/stunrun-68k.bin",$04E63E,$8
+	dc.b	'BOOSTS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4E646:
 	incbin	"../../build/stunrun-68k.bin",$04E646,$8
 dat_4E64E:
@@ -590,23 +957,27 @@ dat_4E64E:
 dat_4E652:
 	incbin	"../../build/stunrun-68k.bin",$04E652,$4
 str_4E656:
-	incbin	"../../build/stunrun-68k.bin",$04E656,$1A
+	dc.b	'WORLD CLASS STUN RUNNERS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E670:
-	incbin	"../../build/stunrun-68k.bin",$04E670,$14
+	dc.b	'PRESS START BUTTON',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E684:
-	incbin	"../../build/stunrun-68k.bin",$04E684,$E
+	dc.b	'INSERT COINS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E692:
-	incbin	"../../build/stunrun-68k.bin",$04E692,$14
+	dc.b	'YOU DID NOT QUALIFY',0
 str_4E6A6:
-	incbin	"../../build/stunrun-68k.bin",$04E6A6,$12
+	dc.b	'AS A STAR MASTER',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E6B8:
-	incbin	"../../build/stunrun-68k.bin",$04E6B8,$12
+	dc.b	'AS A SHARPSHOOTER',0
 str_4E6CA:
-	incbin	"../../build/stunrun-68k.bin",$04E6CA,$16
+	dc.b	'FOR THE BOOSTER BUNCH',0
 dat_4E6E0:
 	incbin	"../../build/stunrun-68k.bin",$04E6E0,$6
 str_4E6E6:
-	incbin	"../../build/stunrun-68k.bin",$04E6E6,$E
+	dc.b	'   YOUR TOTAL',0
 dat_4E6F4:
 	incbin	"../../build/stunrun-68k.bin",$04E6F4,$4
 dat_4E6F8:
@@ -624,63 +995,169 @@ dat_4E70E:
 dat_4E712:
 	incbin	"../../build/stunrun-68k.bin",$04E712,$4
 str_4E716:
-	incbin	"../../build/stunrun-68k.bin",$04E716,$1C
+	dc.b	'YOU HAVE WON A FREE T SHIRT',0
 str_4E732:
-	incbin	"../../build/stunrun-68k.bin",$04E732,$1C
+	dc.b	'Offer Expires April 1, 1990',0
 str_4E74E:
-	incbin	"../../build/stunrun-68k.bin",$04E74E,$32
+	dc.b	'Limit 1 per person.          Quantities Limited.',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E780:
-	incbin	"../../build/stunrun-68k.bin",$04E780,$1A
+	dc.b	'To get your secret code:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E79A:
-	incbin	"../../build/stunrun-68k.bin",$04E79A,$1C
+	dc.b	'Please enter your initials',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E7B6:
-	incbin	"../../build/stunrun-68k.bin",$04E7B6,$1A
+	dc.b	'To get your secret code:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E7D0:
-	incbin	"../../build/stunrun-68k.bin",$04E7D0,$26
+	dc.b	'Please select the month you were born',0
 str_4E7F6:
-	incbin	"../../build/stunrun-68k.bin",$04E7F6,$1A
+	dc.b	'To get your secret code:',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E810:
-	incbin	"../../build/stunrun-68k.bin",$04E810,$24
+	dc.b	'Please select the day you were born',0
 dat_4E834:
 	incbin	"../../build/stunrun-68k.bin",$04E834,$8
 dat_4E83C:
 	incbin	"../../build/stunrun-68k.bin",$04E83C,$4
 str_4E840:
-	incbin	"../../build/stunrun-68k.bin",$04E840,$32
+	dc.b	'Please send your CODE #, Name, Address, Phone #,',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_4E872:
-	incbin	"../../build/stunrun-68k.bin",$04E872,$32
+	dc.b	'Date of Birth, Age, Adult T-Shirt Size (S,M,L,XL)',0
 dat_4E8A4:
 	incbin	"../../build/stunrun-68k.bin",$04E8A4,$4
 str_4E8A8:
-	incbin	"../../build/stunrun-68k.bin",$04E8A8,$1A
+	dc.b	'  S.T.U.N. Runner T-Shirt',0
 dat_4E8C2:
 	incbin	"../../build/stunrun-68k.bin",$04E8C2,$12
 dat_4E8D4:
 	incbin	"../../build/stunrun-68k.bin",$04E8D4,$1A
 str_4E8EE:
-	incbin	"../../build/stunrun-68k.bin",$04E8EE,$1A
+	dc.b	'THIS IS YOUR SECRET CODE:',0
 dat_4E908:
 	incbin	"../../build/stunrun-68k.bin",$04E908,$C
 str_4E914:
-	incbin	"../../build/stunrun-68k.bin",$04E914,$26
+	dc.b	'Remember this code and write it down.',0
 str_4E93A:
-	incbin	"../../build/stunrun-68k.bin",$04E93A,$22
+	dc.b	'To Exit, Press START and TRIGGER',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4E95C:
-	incbin	"../../build/stunrun-68k.bin",$04E95C,$10E
+	incbin	"../../build/stunrun-68k.bin",$04E95C,$9E
+str_4E9FA:
+	dc.b	'MOTHERFUCKER',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4EA08:
+	dc.b	'BASTARD',0
+str_4EA10:
+	dc.b	'ASSHOLE',0
+str_4EA18:
+	dc.b	'NIGGER',0
+dat_4EA1F:
+	incbin	"../../build/stunrun-68k.bin",$04EA1F,$7
+str_4EA26:
+	dc.b	'VAGINA',0
+dat_4EA2D:
+	incbin	"../../build/stunrun-68k.bin",$04EA2D,$7
+str_4EA34:
+	dc.b	'EAT MY DICK',0
+dat_4EA40:
+	incbin	"../../build/stunrun-68k.bin",$04EA40,$10
+str_4EA50:
+	dc.b	'MY DICK',0
+str_4EA58:
+	dc.b	'EAT DICK',0
+dat_4EA61:
+	incbin	"../../build/stunrun-68k.bin",$04EA61,$9
 dat_4EA6A:
 	incbin	"../../build/stunrun-68k.bin",$04EA6A,$78
 dat_4EAE2:
-	incbin	"../../build/stunrun-68k.bin",$04EAE2,$8C
+	incbin	"../../build/stunrun-68k.bin",$04EAE2,$8
+str_4EAEA:
+	dc.b	'THE GONZ',0
+dat_4EAF3:
+	incbin	"../../build/stunrun-68k.bin",$04EAF3,$2F
+str_4EB22:
+	dc.b	'GUNNER GLENN',0
+dat_4EB2F:
+	incbin	"../../build/stunrun-68k.bin",$04EB2F,$F
+str_4EB3E:
+	dc.b	'BAD BABE',0
+dat_4EB47:
+	incbin	"../../build/stunrun-68k.bin",$04EB47,$13
+str_4EB5A:
+	dc.b	'THE POTATOE',0
+dat_4EB66:
+	incbin	"../../build/stunrun-68k.bin",$04EB66,$8
 dat_4EB6E:
-	incbin	"../../build/stunrun-68k.bin",$04EB6E,$6E
+	incbin	"../../build/stunrun-68k.bin",$04EB6E,$1
+str_4EB6F:
+	dc.b	'(SCOOTER',0
+dat_4EB78:
+	incbin	"../../build/stunrun-68k.bin",$04EB78,$D
+str_4EB85:
+	dc.b	'#THE HOOPLE',0
+dat_4EB91:
+	incbin	"../../build/stunrun-68k.bin",$04EB91,$B
+str_4EB9C:
+	dc.b	'RANGER RICK',0
+dat_4EBA8:
+	incbin	"../../build/stunrun-68k.bin",$04EBA8,$34
 dat_4EBDC:
-	incbin	"../../build/stunrun-68k.bin",$04EBDC,$6E
+	incbin	"../../build/stunrun-68k.bin",$04EBDC,$44
+str_4EC20:
+	dc.b	'ERIK NOT THE RED',0
+dat_4EC31:
+	incbin	"../../build/stunrun-68k.bin",$04EC31,$5
+str_4EC36:
+	dc.b	'UNCLE MILTY',0
+dat_4EC42:
+	incbin	"../../build/stunrun-68k.bin",$04EC42,$8
 dat_4EC4A:
-	incbin	"../../build/stunrun-68k.bin",$04EC4A,$6E
+	incbin	"../../build/stunrun-68k.bin",$04EC4A,$2
+str_4EC4C:
+	dc.b	'DIRTY DON',0
+dat_4EC56:
+	incbin	"../../build/stunrun-68k.bin",$04EC56,$C
+str_4EC62:
+	dc.b	'RIGHTEOUS RALPH',0
+dat_4EC72:
+	incbin	"../../build/stunrun-68k.bin",$04EC72,$6
+str_4EC78:
+	dc.b	'HAPPY HATA',0
+dat_4EC83:
+	incbin	"../../build/stunrun-68k.bin",$04EC83,$35
 dat_4ECB8:
-	incbin	"../../build/stunrun-68k.bin",$04ECB8,$F0
+	incbin	"../../build/stunrun-68k.bin",$04ECB8,$4
+str_4ECBC:
+	dc.b	'THE GONZ',0
+dat_4ECC5:
+	incbin	"../../build/stunrun-68k.bin",$04ECC5,$27
+str_4ECEC:
+	dc.b	'GUNNER GLENN',0
+dat_4ECF9:
+	incbin	"../../build/stunrun-68k.bin",$04ECF9,$22
+str_4ED1B:
+	dc.b	'XTHE POTATOE',0
+dat_4ED28:
+	incbin	"../../build/stunrun-68k.bin",$04ED28,$C
+str_4ED34:
+	dc.b	'SCOOTER',0
+dat_4ED3C:
+	incbin	"../../build/stunrun-68k.bin",$04ED3C,$10
+str_4ED4C:
+	dc.b	'THE HOOPLE',0
+dat_4ED57:
+	incbin	"../../build/stunrun-68k.bin",$04ED57,$D
+str_4ED64:
+	dc.b	'RANGER RICK',0
+dat_4ED70:
+	incbin	"../../build/stunrun-68k.bin",$04ED70,$38
 str_4EDA8:
-	incbin	"../../build/stunrun-68k.bin",$04EDA8,$3E
+	dc.b	'ABCDEFGHIJKLMNOPQRSTUVWXYZ '
+dat_4EDC3:
+	incbin	"../../build/stunrun-68k.bin",$04EDC3,$23
 dat_4EDE6:
 	incbin	"../../build/stunrun-68k.bin",$04EDE6,$68
 dat_4EE4E:
@@ -714,13 +1191,50 @@ dat_4EF04:
 dat_4EF0C:
 	incbin	"../../build/stunrun-68k.bin",$04EF0C,$4
 str_4EF10:
-	incbin	"../../build/stunrun-68k.bin",$04EF10,$10
+	dc.b	'indestructable',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4EF20:
-	incbin	"../../build/stunrun-68k.bin",$04EF20,$A6
+	incbin	"../../build/stunrun-68k.bin",$04EF20,$30
+str_4EF50:
+	dc.b	'STAY OFF INSIDE WALL OF TURNS',0
+str_4EF6E:
+	dc.b	'PRESS START TO FIRE SHOCKWAVE',0
+str_4EF8C:
+	dc.b	'BOOST PAD INCREASES SPEED',0
+str_4EFA6:
+	dc.b	'ARMORED DRONE IS INDESTRUCTIBLE',0
 dat_4EFC6:
 	incbin	"../../build/stunrun-68k.bin",$04EFC6,$90
 dat_4F056:
-	incbin	"../../build/stunrun-68k.bin",$04F056,$AE
+	incbin	"../../build/stunrun-68k.bin",$04F056,$30
+str_4F086:
+	dc.b	'Train Car',0
+dat_4F090:
+	incbin	"../../build/stunrun-68k.bin",$04F090,$6
+str_4F096:
+	dc.b	'Train Car',0
+str_4F0A0:
+	dc.b	'Mag Cycle',0
+str_4F0AA:
+	dc.b	'Lorrie',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4F0B2:
+	dc.b	'Attack Drone',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4F0C0:
+	dc.b	'Armored Drone',0
+str_4F0CE:
+	dc.b	'Proton Bot',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_4F0DA:
+	dc.b	'Radar Bot',0
+str_4F0E4:
+	dc.b	'Chopper Bot',0
+str_4F0F0:
+	dc.b	'Ornobot',0
+str_4F0F8:
+	dc.b	'Terrigible',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_4F104:
 	incbin	"../../build/stunrun-68k.bin",$04F104,$18
 dat_4F11C:
@@ -772,7 +1286,47 @@ dat_5A5B4:
 dat_5BDF4:
 	incbin	"../../build/stunrun-68k.bin",$05BDF4,$4
 dat_5BDF8:
-	incbin	"../../build/stunrun-68k.bin",$05BDF8,$1BE
+	incbin	"../../build/stunrun-68k.bin",$05BDF8,$C
+str_5BE04:
+	dc.b	'1 Coin 1 Credit',0
+str_5BE14:
+	dc.b	'2 Coins 1 Credit',0
+str_5BE25:
+	dc.b	'3 Coins 1 Credit',0
+str_5BE36:
+	dc.b	'4 Coins 1 Credit',0
+str_5BE47:
+	dc.b	'2Right Mech Multiplier',0
+str_5BE5E:
+	dc.b	'1 Coin Counts as 1 Coin',0
+str_5BE76:
+	dc.b	'1 Coin Counts as 4 Coins',0
+str_5BE8F:
+	dc.b	'1 Coin Counts as 5 Coins',0
+str_5BEA8:
+	dc.b	'1 Coin Counts as 6 Coins',0
+str_5BEC1:
+	dc.b	'DLeft Mech Multiplier',0
+str_5BED7:
+	dc.b	'1 Coin Counts as 1 Coin',0
+str_5BEEF:
+	dc.b	'1 Coin Counts as 2 Coins',0
+str_5BF08:
+	dc.b	'uBonus Adder',0
+str_5BF15:
+	dc.b	'No Bonus Adder',0
+str_5BF24:
+	dc.b	'2 Coins Give 1 Extra Coin',0
+str_5BF3E:
+	dc.b	'4 Coins Give 1 Extra Coin',0
+str_5BF58:
+	dc.b	'4 Coins Give 2 Extra Coins',0
+str_5BF73:
+	dc.b	'5 Coins Give 1 Extra Coin',0
+str_5BF8D:
+	dc.b	'3 Coins Give 1 Extra Coin',0
+dat_5BFA7:
+	incbin	"../../build/stunrun-68k.bin",$05BFA7,$F
 dat_5BFB6:
 	incbin	"../../build/stunrun-68k.bin",$05BFB6,$8
 dat_5BFBE:
@@ -780,11 +1334,12 @@ dat_5BFBE:
 dat_5C006:
 	incbin	"../../build/stunrun-68k.bin",$05C006,$2
 str_5C008:
-	incbin	"../../build/stunrun-68k.bin",$05C008,$10
+	dc.b	'for next screen',0
 str_5C018:
-	incbin	"../../build/stunrun-68k.bin",$05C018,$C
+	dc.b	'Histogram ',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C024:
-	incbin	"../../build/stunrun-68k.bin",$05C024,$18
+	dc.b	'Histogram of game times',0
 dat_5C03C:
 	incbin	"../../build/stunrun-68k.bin",$05C03C,$2
 dat_5C03E:
@@ -792,77 +1347,144 @@ dat_5C03E:
 dat_5C044:
 	incbin	"../../build/stunrun-68k.bin",$05C044,$2
 str_5C046:
-	incbin	"../../build/stunrun-68k.bin",$05C046,$A
+	dc.b	'to clear ',0
 str_5C050:
-	incbin	"../../build/stunrun-68k.bin",$05C050,$10
+	dc.b	'all histograms',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C060:
-	incbin	"../../build/stunrun-68k.bin",$05C060,$A
+	dc.b	'histogram',0
 dat_5C06A:
 	incbin	"../../build/stunrun-68k.bin",$05C06A,$2
 str_5C06C:
-	incbin	"../../build/stunrun-68k.bin",$05C06C,$10
+	dc.b	'for next level',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C07C:
-	incbin	"../../build/stunrun-68k.bin",$05C07C,$10
+	dc.b	'Total Credits: ',0
 str_5C08C:
-	incbin	"../../build/stunrun-68k.bin",$05C08C,$E
+	dc.b	'Total Coins: ',0
 dat_5C09A:
 	incbin	"../../build/stunrun-68k.bin",$05C09A,$10
 dat_5C0AA:
 	incbin	"../../build/stunrun-68k.bin",$05C0AA,$6
 str_5C0B0:
-	incbin	"../../build/stunrun-68k.bin",$05C0B0,$C
+	dc.b	'Statistics',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_5C0BC:
-	incbin	"../../build/stunrun-68k.bin",$05C0BC,$110
+	incbin	"../../build/stunrun-68k.bin",$05C0BC,$4E
+str_5C10A:
+	dc.b	'Left  Coins : ',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C11A:
+	dc.b	'Right Coins : ',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C12A:
+	dc.b	'Aux Coins   : ',0
+dat_5C139:
+	incbin	"../../build/stunrun-68k.bin",$05C139,$11
+str_5C14A:
+	dc.b	'Active Mins : ',0
+dat_5C159:
+	incbin	"../../build/stunrun-68k.bin",$05C159,$11
+str_5C16A:
+	dc.b	'Intermediate: ',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C17A:
+	dc.b	'Advanced    : ',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C18A:
+	dc.b	'New Games   : ',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C19A:
+	dc.b	'Continues   : ',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C1AA:
+	dc.b	'Finished All: ',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C1BA:
+	dc.b	'Error Count : ',0
+dat_5C1C9:
+	incbin	"../../build/stunrun-68k.bin",$05C1C9,$3
 str_5C1CC:
-	incbin	"../../build/stunrun-68k.bin",$05C1CC,$E
+	dc.b	'EEPROM ERROR',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C1DA:
-	incbin	"../../build/stunrun-68k.bin",$05C1DA,$18
+	dc.b	'%s to clear statistics',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C1F2:
-	incbin	"../../build/stunrun-68k.bin",$05C1F2,$12
+	dc.b	'%s for histograms',0
 str_5C204:
-	incbin	"../../build/stunrun-68k.bin",$05C204,$C
+	dc.b	'HIGH SCORES',0
 str_5C210:
-	incbin	"../../build/stunrun-68k.bin",$05C210,$22
+	dc.b	'BAD CHECKSUM, DATA MAY BE INVALID',0
 str_5C232:
-	incbin	"../../build/stunrun-68k.bin",$05C232,$18
+	dc.b	'%s to clear High Scores',0
 str_5C24A:
-	incbin	"../../build/stunrun-68k.bin",$05C24A,$12
+	dc.b	'%s for next menu',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C25C:
-	incbin	"../../build/stunrun-68k.bin",$05C25C,$E
+	dc.b	'ERROR COUNTS',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_5C26A:
 	incbin	"../../build/stunrun-68k.bin",$05C26A,$A
 str_5C274:
-	incbin	"../../build/stunrun-68k.bin",$05C274,$22
+	dc.b	'BAD CHECKSUM, DATA MAY BE INVALID',0
 str_5C296:
-	incbin	"../../build/stunrun-68k.bin",$05C296,$1A
+	dc.b	'%s to clear error counts',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C2B0:
-	incbin	"../../build/stunrun-68k.bin",$05C2B0,$12
+	dc.b	'%s for next menu',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C2C2:
-	incbin	"../../build/stunrun-68k.bin",$05C2C2,$28
+	dc.b	'Hit LEFT/RIGHT Triggers to move UP/DOWN',0
 str_5C2EA:
-	incbin	"../../build/stunrun-68k.bin",$05C2EA,$3E
+	dc.b	'Hold a Coin Switch and hit Triggers to cycle through choices',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C328:
-	incbin	"../../build/stunrun-68k.bin",$05C328,$40
+	dc.b	'Hold a Coin Switch and press START to restore original setting',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C368:
-	incbin	"../../build/stunrun-68k.bin",$05C368,$30
+	dc.b	'Just press START to save this setting and exit',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_5C398:
 	incbin	"../../build/stunrun-68k.bin",$05C398,$C
 str_5C3A4:
-	incbin	"../../build/stunrun-68k.bin",$05C3A4,$C
+	dc.b	'vv MORE vv',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C3B0:
-	incbin	"../../build/stunrun-68k.bin",$05C3B0,$E
+	dc.b	'Game Options',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C3BE:
-	incbin	"../../build/stunrun-68k.bin",$05C3BE,$E
+	dc.b	'Game Options',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C3CC:
-	incbin	"../../build/stunrun-68k.bin",$05C3CC,$E
+	dc.b	'Coin Options',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C3DA:
-	incbin	"../../build/stunrun-68k.bin",$05C3DA,$C
+	dc.b	'AUDIO TEST',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 str_5C3E6:
-	incbin	"../../build/stunrun-68k.bin",$05C3E6,$C
+	dc.b	'Audio Test',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_5C3F2:
 	incbin	"../../build/stunrun-68k.bin",$05C3F2,$4
 dat_5C3F6:
-	incbin	"../../build/stunrun-68k.bin",$05C3F6,$86
+	incbin	"../../build/stunrun-68k.bin",$05C3F6,$17
+str_5C40D:
+	dc.b	'bNew Game Times',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C41E:
+	dc.b	'Continuation Game Times',0
+str_5C436:
+	dc.b	'Level Died At',0
+str_5C444:
+	dc.b	'Level Continued From',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C45A:
+	dc.b	'Scores',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
+str_5C462:
+	dc.b	'Excess Time (1/10th sec)',0
+	dcb.b	1,0	; a zero byte after a string, to an even address (docs/17)
 dat_5C47C:
 	incbin	"../../build/stunrun-68k.bin",$05C47C,$1C0
 audio_test_list:
