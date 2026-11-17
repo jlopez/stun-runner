@@ -244,21 +244,39 @@ COUNT_MAX = 0x3F
 ITEM_PREFIX = re.compile(rb"[a-z][^a-z]*\Z")
 
 
-def _counted(image: bytes, x: int, y: int) -> int | None:
-    """Where the text of an unterminated run x-y starts when it is a counted string: the count
-    is the byte before the run, or the run's first byte, or its second byte after an attribute
-    byte (the boot program's screen records, 4-byte headers column, row, attribute, count, as
-    at 007154-007158: a count of 20h-3Fh is printable and was read as a character). The count
-    equals the characters after it, or one fewer (006D9C, 0088DC: the ROM's count is one short
-    of the text). None when the run is no counted string."""
+def trailing_header(image: bytes, x: int, y: int) -> bool:
+    """The last byte of the counted run x-y (its count the byte before x) is the first byte of
+    the next screen record's 4-byte header, not a character: the count is one fewer than the
+    run, and image[y-1:y+3] is a header (column, row, attribute, count) whose count is the
+    printable run after it, or one fewer (007A7F: column 20h before 06 3F 12 and the 18
+    characters of CONTROL*LEFT/RIGHT; also 007A95, 007B42, 007B53)."""
+    if x == 0 or y + 3 > len(image) or image[x - 1] != y - x - 1:
+        return False
+    z = y + 3
+    while z < len(image) and image[z] in TEXT_CHARS:
+        z += 1
+    k = image[y + 2]
+    return TEXT_MIN <= k <= COUNT_MAX and k in (z - y - 3, z - y - 4)
+
+
+def _counted(image: bytes, x: int, y: int) -> tuple[int, int] | None:
+    """Where the text of an unterminated run x-y starts and ends when it is a counted string:
+    the count is the byte before the run, or the run's first byte, or its second byte after an
+    attribute byte (the boot program's screen records, 4-byte headers column, row, attribute,
+    count, as at 007154-007158: a count of 20h-3Fh is printable and was read as a character).
+    The count equals the characters after it, or one fewer (006D9C, 007397, 0088DC, 008908:
+    the ROM's count is one short of the text), unless the run's last byte starts the next
+    record's header (`trailing_header`): then the text ends one byte earlier. None when the
+    run is no counted string."""
     if x > 0 and image[x - 1] in (y - x, y - x - 1):
-        return x
+        return x, y - 1 if trailing_header(image, x, y) else y
     for p in (0, 1):
         if x + p >= y:
             break
         c, n = image[x + p], y - (x + p + 1)
         if c <= COUNT_MAX and n >= TEXT_MIN and c in (n, n - 1):
-            return x + p + 1
+            start = x + p + 1
+            return start, y - 1 if trailing_header(image, start, y) else y
     return None
 
 
@@ -287,10 +305,10 @@ def _text_runs(image: bytes, lo: int, hi: int, refs: set[int]) -> list[tuple[int
                 if x not in refs and ITEM_PREFIX.match(image[x:y]):
                     x += 1
             elif x not in refs:
-                start = _counted(image, x, y)
-                if start is None:
+                counted = _counted(image, x, y)
+                if counted is None:
                     continue
-                x = start
+                x, y = counted
             if _is_text(image[x:y]):
                 out.append((x, y + 1 if terminated else y))
         a = b + 1 if b < hi and image[b] == 0 else b

@@ -547,7 +547,8 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
     """The raw-data check (decision C3) refuses every dc/dcb statement of a code file that is not
     one of the generator's explained kinds: a dc.l wall in a data range, numeric dc.b in a text
     range, a dcb.b fill of a byte other than zero, a switch entry that is not a difference, and
-    a string that starts with a record field (a count, an item byte)."""
+    a string that starts with a record field (a count, an item byte) or ends with one (the
+    next screen record's first header byte)."""
     file = "boot/code_000212.asm"
     line, a, n = slice_of(file, "data", align=4)
     text = "GAME DIFFICULTY"
@@ -563,9 +564,17 @@ def test_raw_data_check_fails(tmp_path: Path) -> None:
          "\tdc.b\t'%RROR*80**P1BAD**6502*PROGRAM*PROM*BAD'\n"),
         ("game/code_020430.asm", "\tdc.b\t'CONTINUE ADVANCES TO NEXT LEVEL',0\n",
          "\tdc.b\t'vONTINUE ADVANCES TO NEXT LEVEL',0\n"),
+        # the next record's first header byte (column 20h at 007A7F) written back as the
+        # string's last character
+        ("boot/code_0065E0.asm", "\tdc.b\t'INC*PM*DATA*0-7'\ndat_7A7F:\n"
+         "\tincbin\t\"../../build/stunrun-68k.bin\",$7A7F,$4\n",
+         "\tdc.b\t'INC*PM*DATA*0-7 '\ndat_7A80:\n"
+         "\tincbin\t\"../../build/stunrun-68k.bin\",$7A80,$3\n"),
     )
     rep = tree_check(tmp_path, tree, shift=False)
-    assert len(rep.raw) == 6, rep.raw
+    assert len(rep.raw) == 7, rep.raw
+    assert any("'INC*PM*DATA*0-7 '" in e and "next record's 4-byte header" in e
+               for e in rep.raw), rep.raw
     assert any("'%RROR" in e and "count of the 37 after it" in e for e in rep.raw), rep.raw
     assert any("'vONTINUE" in e and "item byte" in e for e in rep.raw), rep.raw
     assert rep.raw[0].startswith(f"{a:06X}: dc.l") and "in a data range" in rep.raw[0], rep.raw

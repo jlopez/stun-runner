@@ -20,7 +20,8 @@ blob, as CI does), not on scratch output:
   pointer table, `dc.w a-b` in a switch table, `dc.b` of quoted strings and zeros in text, a
   `dcb.b N,0` fill. A `dc.b` wall in place of an `incbin` slice of unknown or data bytes fails
   (decision C3), and so does a string that starts with a record field (a count or an item
-  byte, `record_field`);
+  byte, `record_field`) or ends with one (the next screen record's first header byte,
+  `trailing_field`);
 - the shift test: the tree copied, its guards commented out, a two-byte pad after `org 0` (and
   every `dcb.b $X-*` fill kept at its length), assembled again: exactly the statements that name
   a ROM symbol other than PC-relatively or as a difference change, each by the pad;
@@ -105,7 +106,19 @@ def record_field(ops: list[str]) -> str:
     return ""
 
 
-def raw_data(lst: ls.Listing, c: cl.Classification) -> list[str]:
+def trailing_field(ops: list[str], address: int, binary: bytes) -> str:
+    """Why an unterminated counted string's last character is the first byte of the next
+    screen record's header (classify.trailing_header on the source and the image), or ""."""
+    if len(ops) != 1 or not ops[0].startswith(("'", '"')) or not STRING.match(ops[0]):
+        return ""
+    n = len(_unquote(ops[0]).encode("latin-1"))
+    if cl.trailing_header(binary, address, address + n):
+        return (f"the last character is the first byte of the next record's 4-byte header "
+                f"(the count before the string is {n - 1})")
+    return ""
+
+
+def raw_data(lst: ls.Listing, c: cl.Classification, binary: bytes) -> list[str]:
     """Every dc/dcb statement of the code files is an explained kind (module doc)."""
     starts = [s.start for s in c.spans]
     import bisect
@@ -130,7 +143,7 @@ def raw_data(lst: ls.Listing, c: cl.Classification) -> list[str]:
                                                   for op in ops):
             continue
         if mn == "dc.b" and k == "text" and ops and all(STRING.match(op) for op in ops):
-            why = record_field(ops)
+            why = record_field(ops) or trailing_field(ops, s.address, binary)
             if why:
                 out.append(f"{s.address:06X}: {s.text}: {why} (a record field stays an incbin "
                            f"slice; the text starts after it, docs/16 section 3)")
@@ -188,7 +201,7 @@ def check(listing: str, binary: bytes, c: cl.Classification, decisions: dict[tup
     rep.extra_code = sorted(x for x in instr if x not in starts)
     rep.lint = ls.address_lint(lst, decisions, 0, ROM_END, frozenset(macros), binary, 0,
                                switch_ranges(c), pointer_ranges(c))
-    rep.raw = raw_data(lst, c)
+    rep.raw = raw_data(lst, c, binary)
     rep.foreign = foreign_refs(lst)
     if tree is not None and build is not None:
         rep.shift = shift(tree, build, lst, binary, vasm=vasm)

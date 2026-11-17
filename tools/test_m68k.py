@@ -851,6 +851,14 @@ def test_text_rule_record_fields() -> None:
     assert runs(b"\x01\x0b" + bytes([0x70, n]) + text + b"\x01") == [(4, 4 + n)]
     # a count that does not match the run (007660: 9 before 12 characters) is no counted string
     assert runs(pre + bytes([n]) + text[:-1] + b"\x01") == []
+    # the run's last byte is the next screen record's column (20h), its header 20 06 3F 12
+    # counting the 18 characters after it (007A7F); a one-short count before a byte that
+    # starts no such header keeps the byte (007398)
+    nxt = b"CONTROL*LEFT/RIGHT"
+    rec = pre + bytes([n]) + text + b" \x06\x3f" + bytes([len(nxt)]) + nxt + b"\x01"
+    assert runs(rec) == [(4, 4 + n), (8 + n, 8 + n + len(nxt))]
+    rec = pre + bytes([n]) + text + b" \x06\x3f" + bytes([len(nxt) + 2]) + nxt + b"\x01"
+    assert runs(rec)[0] == (4, 5 + n)
     assert runs(b"ENABLED\0vCONTINUE ADVANCES\0") == [(0, 8), (9, 27)]
     assert runs(b"\0Insert coin\0") == [(1, 13)]
     # made-up tables of the same shape as the island's (no ROM bytes): a non-printable prefix,
@@ -1272,6 +1280,10 @@ def test_committed_classification() -> None:
         assert span(a).kind != "text", f"{a:06X}"
     for a in (0x007161, 0x007E9D, 0x007FDE, 0x020FD6, 0x0210FD):
         assert span(a).kind == "text" and span(a).start == a, f"{a:06X}"
+    # the next screen record's first header byte (its column) ends no string: 007A7F, 007A95,
+    # 007B42, 007B53
+    for a in (0x007A7F, 0x007A95, 0x007B42, 0x007B53):
+        assert span(a).kind != "text" and span(a - 1).kind == "text", f"{a:06X}"
     assert not [s for s in by_kind["text"] if s.start < 0x046AEE and s.end > 0x044630]
     # addresses, kinds and evidence only: no byte values
     j = json.loads(CLASSIFICATION.read_text())

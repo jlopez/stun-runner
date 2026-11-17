@@ -53,7 +53,7 @@ unknown bytes in the same range:
 | `boot/vectors.asm` | 000000-000212 | 530 | 0 | 256 | 274 | 0 | 0 | 274 |
 | `boot/code_000212.asm` | 000212-00394E | 14,140 | 9,378 | 160 | 4,523 | 79 | 1,836 | 2,687 |
 | `boot/code_00394E.asm` | 00394E-0065E0 | 11,410 | 6,822 | 0 | 4,588 | 0 | 3,950 | 638 |
-| `boot/code_0065E0.asm` | 0065E0-009E80 | 14,496 | 4,270 | 7,449 | 2,777 | 0 | 138 | 2,639 |
+| `boot/code_0065E0.asm` | 0065E0-009E80 | 14,496 | 4,270 | 7,445 | 2,781 | 0 | 138 | 2,643 |
 | `boot/code_009E80.asm` | 009E80-00DDF2 | 16,242 | 9,800 | 244 | 6,198 | 0 | 1,610 | 4,588 |
 | `boot/code_00DDF2.asm` | 00DDF2-0109D4 | 11,234 | 4,992 | 0 | 6,242 | 0 | 5,950 | 292 |
 | `boot/code_0109D4.asm` | 0109D4-012F06 | 9,522 | 34 | 0 | 8,964 | 524 | 3,900 | 5,064 |
@@ -68,7 +68,7 @@ unknown bytes in the same range:
 | `game/code_03BC3C.asm` | 03BC3C-03FC22 | 16,358 | 16,108 | 70 | 180 | 0 | 0 | 180 |
 | `game/code_03FC22.asm` | 03FC22-04397E | 15,708 | 15,390 | 54 | 264 | 0 | 0 | 264 |
 | `game/island.asm` | 04397E-046AEE | 12,656 | 262 | 61 | 12,333 | 0 | 12,292 | 41 |
-| **code files** | | **236,020** | **163,638** | **9,852** | **61,114** | **1,416** | **30,581** | **30,557** |
+| **code files** | | **236,020** | **163,638** | **9,848** | **61,118** | **1,416** | **30,581** | **30,561** |
 
 Instructions, labels (vasm locals) per file as generated: boot 8,220 instructions in six files
 (2,152 labels, 777 locals), game 36,463 (9 of them the `moveb_ffff_*` macros) in nine files and
@@ -82,10 +82,10 @@ is a `dcb.b 24,0` under its label `dat_20400`, as wave 0 had it inside the fill 
 The six zero runs of wave 0 stay fills (94,883 bytes); the generator added the classification's
 fills inside the code (642 bytes: 603 in the boot program, 39 in the game).
 
-The 68k image: instr 163,638, data 9,888, blob 517,381, fill 95,525 (wave 0: 0, 36, 691,513,
-94,883). The blob fell by 174,132 bytes, exactly the bytes that became instructions (163,638),
-data (9,852) and fills (642). (Before the review's text fix, section 3.1: data 10,003 and blob
-517,266; the 115 bytes of record fields and island tables went back to blob.) The set: `blob: 34.2% of 1511424 bytes come from incbin/.binary`
+The 68k image: instr 163,638, data 9,884, blob 517,385, fill 95,525 (wave 0: 0, 36, 691,513,
+94,883). The blob fell by 174,128 bytes, exactly the bytes that became instructions (163,638),
+data (9,848) and fills (642). (Before the review's text fixes, section 3.1: data 10,003 and blob
+517,266; the 119 bytes of record fields and island tables went back to blob.) The set: `blob: 34.2% of 1511424 bytes come from incbin/.binary`
 (45.8% before). `data.asm`, `programs.asm`, `images.asm` and `image_table.asm` keep their
 blobs (91,288, 32,688, 332,011, 280).
 
@@ -132,7 +132,7 @@ images leg may give the entries labels and replace these operands.
 
 ## 3. What stays blob, and why
 
-- **unknown** (30,557 bytes in the code files): the routines no decided code reaches that
+- **unknown** (30,561 bytes in the code files): the routines no decided code reaches that
   decode cleanly (76 ranges, 11,169 bytes, docs/14 section 3) (decision C8: they stay `unknown` until a reviewed seed argues each, the naming
   legs' work; docs/14 sections 3 and 10), the dead bytes between code, the `jmp abs.l` table at
   000100-0001F0 and the rest of 000100-000212, and the boot program's screen records around
@@ -140,7 +140,7 @@ images leg may give the entries labels and replace these operands.
   record at 007660 whose count, 9, is not its 12 characters.
 - **data** (30,581 bytes, less the 24 zero bytes at 020400): bytes an operand references whose
   format no leg has explained yet (record tables, the 000E12 record table, the island's data at
-  0439BC-0445F0 and 044630-0466A0 (its numeric tables included, section 3.1), the option
+  0439BC-0445F0 and 044630-046A00 (its numeric tables included, section 3.1), the option
   records' item bytes, ...).
 
 ### 3.1 The text rule, corrected in review
@@ -159,8 +159,13 @@ them out (`tools/m68k/classify.py`, `_text_runs` and `_counted`; tests `test_tex
   count and 32 with attribute and count (`str_7FDC` was `"?'ROTATE*ONES..."`, 27h = 39 the
   characters after it). The count is now never text: an unterminated run is a counted string
   when the byte before it, its first byte or its second byte (up to 3Fh) equals the characters
-  after it, or one fewer (006D9D, 0088DD, 008909: the ROM's count is one short of the
-  characters, which all stay text). 007DB1 and 007E10 are
+  after it, or one fewer (006D9D, 007398, 0088DD, 008909: the ROM's count is one short of the
+  characters, which all stay text). One fewer only when the run's last byte does not start the
+  next record: at 007A7F, 007A95, 007B42 and 007B53 the run's last byte is 20h, the column of
+  a header whose count is the run after it (007A7F-007A82 before the 18 characters of
+  `CONTROL*LEFT/RIGHT`), and the count before the run is exact (0Fh for `INC*PM*DATA*0-7`), so
+  that byte ends the text and is the next header's first byte (`classify.trailing_header`;
+  found in the second review: the four strings had ended with a blank). 007DB1 and 007E10 are
   new text (attribute 3Fh and count 25h had kept the run from reading as text).
 - **Item bytes.** The game's option records (020ED0-021148) start with an item byte before the
   title (FDh, CCh, BBh, AAh, 99h, 88h; BBh at 020F51 is the one 042CE4 decodes, CLAUDE.md M4e).
@@ -256,7 +261,7 @@ and `make labels` fails on each. `test_tree_assembles_a_random_blob` checks that
 slice of `build/stunrun-68k.bin` takes the blob's bytes from its own address, and the fills and
 the program table. `tools/test_build.py` builds the synthetic set (whose 68k image is now mostly
 the tree's own code) and checks `make coverage`'s rows against the files' ranges, the code
-files' 61,114 blob bytes and 163,638 instruction bytes, and `make labels`.
+files' 61,118 blob bytes and 163,638 instruction bytes, and `make labels`.
 
 What CI cannot check: the bytes of the code against the ROM (no reference set), unidasm's
 boundaries and the MAME runs. `make check`, `make m68k-check` and `make pccov` are the local

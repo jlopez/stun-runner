@@ -752,13 +752,13 @@ str_7A5C:
 dat_7A6C:
 	incbin	"../../build/stunrun-68k.bin",$7A6C,$4
 str_7A70:
-	dc.b	'INC*PM*DATA*0-7 '
-dat_7A80:
-	incbin	"../../build/stunrun-68k.bin",$7A80,$3
+	dc.b	'INC*PM*DATA*0-7'
+dat_7A7F:
+	incbin	"../../build/stunrun-68k.bin",$7A7F,$4
 str_7A83:
-	dc.b	'CONTROL*LEFT/RIGHT '
-dat_7A96:
-	incbin	"../../build/stunrun-68k.bin",$7A96,$3
+	dc.b	'CONTROL*LEFT/RIGHT'
+dat_7A95:
+	incbin	"../../build/stunrun-68k.bin",$7A95,$4
 str_7A99:
 	dc.b	'CONTROL*UP/DOWN'
 dat_7AA8:
@@ -784,13 +784,13 @@ str_7B26:
 dat_7B32:
 	incbin	"../../build/stunrun-68k.bin",$7B32,$4
 str_7B36:
-	dc.b	'LEFT*TRIGGER '
-dat_7B43:
-	incbin	"../../build/stunrun-68k.bin",$7B43,$3
+	dc.b	'LEFT*TRIGGER'
+dat_7B42:
+	incbin	"../../build/stunrun-68k.bin",$7B42,$4
 str_7B46:
-	dc.b	'RIGHT*TRIGGER '
-dat_7B54:
-	incbin	"../../build/stunrun-68k.bin",$7B54,$3
+	dc.b	'RIGHT*TRIGGER'
+dat_7B53:
+	incbin	"../../build/stunrun-68k.bin",$7B53,$4
 str_7B57:
 	dc.b	'RIGHT*TRIGGER'
 dat_7B64:
