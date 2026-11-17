@@ -876,6 +876,20 @@ def test_data_asm_raw_data_check_fails(tmp_path: Path) -> None:
     assert any(e.startswith("04E3B4: table dat_4E3B4") and "9 longs missing" in e
                for e in rep.raw), rep.raw
     assert len(rep.raw) == 5, rep.raw
+    # a records table's pointer field left an incbin slice, and a field outside +lo-+hi
+    # written as dc.l (021650: +0 the pointer, +6 a GSP address; review of #38)
+    tree = planted(tmp_path / "r", "game/code_020430.asm", "dat_21650:\n\tdc.l\tdat_2160E\t",
+                   'dat_21650:\n\tincbin\t"../../build/stunrun-68k.bin",$21650,$4\t',
+                   ("game/code_020430.asm",
+                    'dat_2165A:\n\tdc.l\tdat_21623\n\tincbin\t"../../build/stunrun-68k.bin",'
+                    "$2165E,$6\n",
+                    'dat_2165A:\n\tdc.l\tdat_21623\n\tincbin\t"../../build/stunrun-68k.bin",'
+                    "$2165E,$2\n\tdc.l\tdat_2160E\n"))
+    rep = tree_check(tmp_path / "r", tree, shift=False)
+    raw = sorted(rep.raw)
+    assert len(raw) == 2, raw
+    assert raw[0].startswith("021650: table dat_21650") and "1 longs missing" in raw[0], raw
+    assert raw[1].startswith("021660: dc.l\tdat_2160E:") and "+0-+4" in raw[1], raw
     # three numbers outside any palette: the dc.b r,g,b allowance holds only inside a palette
     # of data/palettes (review of #38: no plant had three operands)
     tree = planted(tmp_path / "p", "data.asm",
@@ -1008,7 +1022,8 @@ def test_tables_registry_refuses_unproven_tables(tmp_path: Path) -> None:
     assert longs == 658
     by_start = {t["start"]: k for k, t in enumerate(raw["tables"])}
     for start, change in (("047406", {"reader": " "}), ("047406", {"format": "words"}),
-                          ("048180", {"stride": 0}), ("047F50", {"start": "047470"})):
+                          ("048180", {"stride": 0}), ("048180", {"pointers": [4, 44]}),
+                          ("048180", {"pointers": [8, 4]}), ("047F50", {"start": "047470"})):
         bad = json.loads(json.dumps(raw))
         bad["tables"][by_start[start]].update(change)
         (tmp_path / "t.json").write_text(json.dumps(bad))
