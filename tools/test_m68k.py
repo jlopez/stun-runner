@@ -1040,6 +1040,17 @@ def cli_files(tmp: Path, image: bytes, c: cl.Classification) -> list[str]:
             "--operands", str(tmp / "op.json"), "--seeds", str(tmp / "absent-seeds.json")]
 
 
+def test_gen_is_frozen_over_the_tree(capsys: pytest.CaptureFixture[str],
+                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    """Decision C12 (M5c): gen never writes over a file of asm/68k, whatever the range."""
+    target = REPO / "asm/68k/game/island.asm"
+    before = target.read_text()
+    monkeypatch.setattr("sys.argv", ["tools/m68k", "gen", "4397E", "46AEE", "--out", str(target)])
+    assert cli.main() == 2
+    assert "the generator is frozen" in capsys.readouterr().err
+    assert target.read_text() == before
+
+
 @needs_vasm
 def test_gen_reports_bad_cuts(tmp_path: Path, capsys: pytest.CaptureFixture[str],
                               monkeypatch: pytest.MonkeyPatch) -> None:

@@ -20,7 +20,8 @@ classify       runs the descent (with the MAME runs given as seeds) and rewrites
                the runs of `make pccov` it refuses unless --no-mame says so (the committed file
                is classified with them: three entries have MAME as their only evidence)
 stats          bytes per kind and region, the numbers of docs/14
-gen            the one-shot generator (gen.py): vasm source for START-END (0 <= START <= END <=
+gen            the one-shot generator (gen.py), frozen since M5c: it refuses to write over a
+               file of asm/68k (docs/16); vasm source for START-END (0 <= START <= END <=
                the classification's end, else exit 2; check-region likewise); START and END
                are global labels (routine or range starts): a cut inside an instruction or one
                that leaves a used vasm local outside the range exits 2 with the reason
@@ -200,7 +201,16 @@ def model(a: argparse.Namespace, forced: set[int]) -> gn.Model:
     return m
 
 
+TREE = REPO / "asm/68k"
+
+
 def cmd_gen(a: argparse.Namespace) -> int:
+    out = a.out.resolve()
+    if out.exists() and TREE.resolve() in out.parents:
+        print(f"gen: {a.out} is a file of the 68k tree: the generator is frozen since M5c "
+              f"(decision C12, docs/16) and never writes over the source; write to scratch",
+              file=sys.stderr)
+        return 2
     bad = check_range_args(a)
     if bad:
         print(f"gen: {bad}", file=sys.stderr)

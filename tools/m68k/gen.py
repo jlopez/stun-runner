@@ -5,6 +5,11 @@
                              [--equates asm/68k/hardware.asm] [--equates-out FILE]
                              [--externals-out FILE] [--incbin PATH] --out FILE
 
+FROZEN SINCE M5c (issue #33, decision C12, docs/16-68k-code.md): it generated the 68k code files
+of asm/68k once; those files are hand-maintained source now, and `gen` refuses to write over a
+file of asm/68k. It stays for `check-region` (the generator against the image, docs/14
+section 6) and for scratch output.
+
 ONE-SHOT SCAFFOLDING. It writes neutral, byte-identical source for a range of the image from the
 image, the classification, the operand decisions, the committed IDA snapshot (names and function
 starts only, decision C5) and the hardware equates, in the conventions of decision C2. A code leg

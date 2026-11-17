@@ -5,8 +5,8 @@
 ; are the IDA names of ida/memory_map.py (IO_68K): one spelling in both places, which
 ; tools/test_68k_tree.py checks in CI. Where the read and the write of an address are different
 ; devices, the name is the read's and the comment says what a write does (docs/05 section 2).
-; RAM (FF8000-FFFFFF) and ZRAM (FF4000-FF4FFF) variables are not here: the boot and game legs
-; own boot/ram.asm and game/ram.asm.
+; RAM (FF8000-FFFFFF) and ZRAM (FF4000-FF4FFF) variables are not here: they are the one shared
+; ram.asm (decision C9, M5c, docs/16-68k-code.md).
 
 ; MAINIO, 600000-60FFFF
 JSA_PORT	equ	$600000		; docs/01 row 600000-603FFF: JSA II, high byte; read the response, write a command

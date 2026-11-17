@@ -26,16 +26,14 @@ from pathlib import Path
 import pytest
 from gspimages import REGION, REGION_END, write_includes
 from listings import vasm_symbols
+from m68k import classify as cl
+from m68k import listing as ls
+from m68k import operands as opd
+from m68k import tree as tr
+from m68k.__main__ import load_seeds, load_unreached
 from programs import ADSP_START, GSP_END, GSP_START, PROGRAM_TABLE
 
 from ida.memory_map import IO_68K
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from m68k import classify as cl  # noqa: E402
-from m68k import listing as ls  # noqa: E402
-from m68k import operands as opd  # noqa: E402
-from m68k import tree as tr  # noqa: E402
-from m68k.__main__ import load_seeds, load_unreached  # noqa: E402
 
 TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
@@ -162,7 +160,7 @@ def test_regions_tile_the_image_in_address_order() -> None:
         assert guards[0] == start and guards[-1] == end, name
         assert guards == sorted(guards), name
     assert REGIONS[0][1] == 0
-    # the pair boundary inside game/code.asm: sub_3FEA6 runs across 040000 (docs/06 section 4.2)
+    # the pair boundary inside game/code_03FC22.asm: sub_3FEA6 runs across 040000 (docs/06 section 4.2)
     functions = REPO / "data/ida/stunrun-68k.functions.jsonl"
     crossing = [
         f["name"]

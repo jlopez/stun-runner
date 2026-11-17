@@ -26,13 +26,13 @@ No byte of the set changed: `make check` gives 25 files, 0 differences.
 
 | File | Range | Bytes | Today | Owner |
 |---|---|---|---|---|
-| `boot/vectors.asm` | 000000-000212 | 530 | incbin: the boot vector table (`vec_reset_sp`, 256) and the 274-byte block after it (`dat_100`) | boot leg |
-| `boot/boot.asm` | 000212-012F06 | 77,044 | incbin: boot code with data islands (`boot_line_a_etc`, 76,724) and the boot data (`dat_12DC6`, 320) | boot leg |
+| `boot/vectors.asm` | 000000-000212 | 530 | since M5c: the 64 vectors as `dc.l`, the 274-byte block after it an incbin (`dat_100`) | boot naming legs |
+| `boot/code_000212.asm` ... `boot/code_0109D4.asm` | 000212-012F06 | 77,044 | since M5c: six files of neutral source cut at routine starts (docs/16 section 2.1); wave 0 had one file, `boot/boot.asm`, all incbin | boot naming legs |
 | `programs.asm` | 012F06-020000 | 53,498 | fill to 017000; the program table (section 3); the ADSP and GSP programs as incbins of `build/adsp/program.bin` and `build/gsp/program.bin`; fill to 020000 | M5-0 (table, fills), M6 (the two programs) |
-| `game/vectors.asm` | 020000-020430 | 1,072 | incbin: the game vector table (`game_vec_reset_sp`, 256), `game_entries` (18); fill 020112-020418; incbin `dat_20418` (24) | game leg |
-| `game/code.asm` | 020430-04397E | 144,718 | incbin (`sub_20430`) | game leg |
-| `game/island.asm` | 04397E-046AEE | 12,656 | incbin: the data island (`dat_4397E`, 12,418) and the last code (`sub_46A00`, 238) | game leg |
-| `data.asm` | 046AEE-060000 | 103,698 | incbin (`dat_46AEE`, 91,288); fill 05CF86-060000 | data leg |
+| `game/vectors.asm` | 020000-020430 | 1,072 | since M5c: the vectors as `dc.l`, `game_entries` three `jmp`, fills 020112-020400 and 020400-020418 (`dat_20400`), incbin `dat_20418` (24) | game naming legs |
+| `game/code_020430.asm` ... `game/code_03FC22.asm` | 020430-04397E | 144,718 | since M5c: nine files of neutral source cut at routine starts (docs/16 section 2.1); wave 0 had one file, `game/code.asm`, all incbin | game naming legs |
+| `game/island.asm` | 04397E-046AEE | 12,656 | since M5c: the code at 0445F0-044630 and 046A00-046AEE as source, the text as `dc.b`, the rest as labelled incbin slices | game naming legs |
+| `data.asm` | 046AEE-060000 | 103,698 | incbin, cut by M5c into 430 labelled slices at the addresses the code references; fill 05CF86-060000 | data leg |
 | `images.asm` | 060000-0BFE00 | 392,704 | since M5i (docs/15): `dat_60000`, the include `build/gsp-images/images.asm` generated from `data/gsp-images` (54 streams, 3 computed adjust words, 332,011 bytes of data); fill 0B10EB-0BFE00 | images leg |
 | `image_table.asm` | 0BFE00-0C0000 | 512 | since M5i: `tbl_BFE00`, the include `build/gsp-images/table.asm` (70 `dc.l`, 280); fill 0BFF18-0C0000 | images leg |
 
@@ -43,7 +43,7 @@ and `incbin` are relative to the main file's directory (`asm/68k`), also in the 
 `game/code.asm` is written `"../../build/stunrun-68k.bin"` like one in `stunrun.asm` (verified on
 vasm 2.0f).
 
-The pair boundaries are not file boundaries: `game/code.asm` crosses 040000 (S/T) because
+The pair boundaries are not file boundaries: `game/code.asm` (since M5c `game/code_03FC22.asm`) crosses 040000 (S/T) because
 `sub_3FEA6` runs from 03FEA6 to 040488 (`data/ida/stunrun-68k.functions.jsonl`, checked by
 `tools/test_68k_tree.py`), and `images.asm` crosses 080000 and 0A0000 (U/V/W), which are not
 image boundaries.
@@ -107,8 +107,9 @@ word the format does not explain is not committed as a number without Jesus's sa
   (`vec_reset_sp`, `boot_line_a_etc`, `game_vec_reset_sp`, `game_entries`), otherwise a neutral
   one by the rule above (`dat_100`, `dat_12DC6`, `dat_20418`, `sub_20430`, `dat_4397E`,
   `sub_46A00`, `dat_46AEE`, `dat_60000`, `tbl_BFE00`); `make coverage` names blobs by it.
-- I/O addresses are the equates of `hardware.asm`; RAM equates go to `boot/ram.asm` and
-  `game/ram.asm` (the boot and game legs). Macros are `macros.asm` (leg M5g, docs/14).
+- I/O addresses are the equates of `hardware.asm`; RAM, ZRAM and the other non-ROM equates go to
+  the one shared `ram.asm` (decision C9, issue #33: boot and game share RAM names; M5c wrote it,
+  docs/16 section 2.2). Macros are `macros.asm` (leg M5g, docs/14).
 
 ## 5. How a leg converts its file
 
@@ -127,6 +128,10 @@ word the format does not explain is not committed as a number without Jesus's sa
    for the 68k is M7's, docs/03).
 
 ## 6. Coverage
+
+Since M5c the code files are source and the numbers below are wave 0's; docs/16 section 2.1 has
+the current ones (68k blob 517,266 bytes, set blob share 34.2%), and `make labels` gives 223 labels,
+0 in blob.
 
 `make coverage` (2026-11-16, after this leg). vasm names an included file as the `include`
 wrote it, relative to the main file's directory; `tools/coverage` now prints it relative to the
@@ -214,7 +219,8 @@ studied here; it belongs to the game leg (docs/03, M5).
   `ida/memory_map.py`'s `IO_68K`, same names, same addresses, same order, each citing a docs/01
   row that exists with that start address. With vasm (CI has it): the tree assembled against a
   random blob gives the blob with the fills zero and the table's pointers and text in place, the
-  labels at the table's addresses; a byte inserted into `game/code.asm` fails its end guard;
+  labels at the table's addresses; a byte inserted into `game/code.asm` (since M5c
+  `game/code_020430.asm`) fails its end guard;
   `tools/labels` passes on the tree and fails when `gsp_program_ptr:` is removed.
 - `tools/test_build.py` (CI): the synthetic set's 68k image is what the tree assembles from a
   random blob with a valid program table (the fills zero, the pointers as the tree computes
