@@ -493,7 +493,9 @@ the CPUs (harddriv_m.cpp:595-601).
    of codes 6, 8, B and D stay open there (docs/08 section 6, M5d).
 4. The packed image format of pairs U-V, and when the images of 0x09F1C5-0x0B10EB (table entries
    47-68) are shown (M5d, M5f). Answered by M5i (docs/15): the format in sections 2-5, entries
-   47-57 are level maps (`make imgtrace`), 65, 66 and 68 were not reached in MAME.
+   47-57 are level maps (`make imgtrace`); 65 and 66 are figure animations that 0407A8 and 04080E
+   unpack at FFE30060 together with entry 67 at FFE00000 (02DBB4), loaders found but never run in
+   MAME, so 65, 66 and 68 were not reached there (docs/15 section 9).
 5. The two longs at 0x017008, the word at 0x01702C, ADSP control lines 2 and 4, and 818040.
 6. Pair R against a Hard Drivin' set's 0x000000-0x01FFFF (section 4.4).
 7. What the self-test routines that enter the game through `game_entries` (0x0010D2, 0x0010FE,

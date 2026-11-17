@@ -14,7 +14,7 @@ test of the chip hashes without the ROMs.
 
 | | |
 |---|---|
-| Source | `data/gsp-images/manifest.json` and 140 PNGs (692 KB), `data/palettes/*.json` (32 files) |
+| Source | `data/gsp-images/manifest.json` and 140 PNGs (263 KB), `data/palettes/*.json` (32 files) |
 | Tool | `tools/gspimages` (package: `__init__.py` format and build, `stream.py` codec, `png.py`, `trace.py`, `__main__.py` CLI) |
 | Build | `tools/gspimages asm` on every `make` writes `build/gsp-images/images.asm` and `table.asm`, which the two region files include |
 | Checks | `make check` (25 files, 0 differences; the palettes against the image, `palcheck`), `make coverage` (both region files 0 blob), `tools/test_gspimages.py` (CI), `make imgtrace` (MAME) |
@@ -126,7 +126,7 @@ may save it; `make images` writes them canonically (8-bit, filter 0, 256-entry P
 
 Every byte of 060000-0B10EB is a stream byte but the three adjust words; the decoder fails on any
 other gap. Stream labels are `gsp_image_NN` (NN its first entry), each with an assert at its
-address; the includes assert the pair boundaries 080000 and 0A0000 inside streams 23 and 48.
+address; the includes assert the pair boundaries 080000 and 0A0000 inside streams 22 and 48.
 
 **The adjust words (C14).** Each pair's two chips sum to the value the boot self-test expects: the
 table at 005FF6 has 8 records of 18 bytes, record n for pair R+n (its +6 long is the pair's
@@ -158,13 +158,14 @@ start level 23 up; it follows from the level-select poke, not from the images.
 
 ## 6. Image sizes in the 68k code (C17)
 
-The 68010 code places images by constant GSP addresses that depend on the sizes of the images
-before them: the maps at FFE00000, FFE5CFE0 and FFEB9FC0 (024EEA-024F98) and FFED0000 (024AB4,
-029C4A), the HUD images at FFF23F00, FFF2B760, FFF3FD80, FFF3FB20 (02D770-02D7A6), screens at
-FFE00000 and FFDE0000 (02D7C6); the GSP program reads the headers it is given. Until that code is
-symbolic source, a size change must not build: the manifest records each image's width and
-height, and `tools/gspimages asm` fails, naming the PNG and both sizes, when they differ. Pixel
-edits are free (the streams re-encode and move; the table follows their labels).
+The 68010 code places images by constant GSP addresses that depend on the sizes of the images before
+them: the maps at FFE00000, FFE5CFE0 and FFEB9FC0 (024EEA-024F98) and FFED0000 (024AB4, 029C4A), the
+HUD images at FFF23F00, FFF2B760, FFF3FD80, FFF3FB20 (02D770-02D7A6), screens at FFE00000 and
+FFDE0000 (02D7C6), the figures of entries 65 and 66 at FFE30060 (0407AC, 040812); the GSP program
+reads the headers it is given. Until that code is symbolic source, a size change must not build: the
+manifest records each image's width and height, and `tools/gspimages asm` fails, naming the PNG and
+both sizes, when they differ. Pixel edits are free (the streams re-encode and move; the table
+follows their labels).
 
 ## 7. Palettes (card A13, C13)
 
@@ -173,7 +174,7 @@ The colours are not in the streams. The code pairs them with images in three way
 - **table 048068** (70 longs, per entry): a 16-colour overlay loaded at F0, 16 colours
   (`sub_2DA6E`, 02DAD4-02DAE4, sent later as GSP command 9: FFDB40 address, FFDB44 index F0,
   FFDB46 count 10h), or used by the fades with a larger count: 32 colours at E0 for the maps
-  (024AF4-024B3A, n = 20h) and 48 at D0 for entry 26 (0286E6, 02A8CE: n = 30h);
+  (024AF4-024B3A, n = 20h) and 48 at D0 for entries 26 and 27 (0286E6, 02A8CE, 0287D0: n = 30h);
 - **the fades** `sub_296AA` and `sub_297A6` (args: a 256-colour base, an overlay, n, the step
   count): the palette they fade (FF9584 the current colours, FF9884 the steps) is the base's first
   256-n colours followed by n overlay colours, or the base's 256 when the overlay is 0
@@ -191,11 +192,12 @@ Each image's manifest `palette` spec says how its PNG's PLTE is composed (`tools
 `compose`), with `kind` and `evidence`:
 
 - `full` where the code pairs a base with the screen statically: `title` (0245D0 loads entry 2,
-  0245F8 fades to 0461F0 alone), `fbi_seal` (026F88: entry 3, `level_base_00` + `overlay_03` at
-  F0), `horizon_16_*` (02849E: `level_base_01` + `overlay_16`), `frame_26` (0286CC:
-  `level_base_00` + `overlay_26` at D0, 48), `story_text` (0288C0: `level_base_00` + `overlay_31`),
-  and the 23 level maps (024A9E-024B3A: the base of the level whose record selects the map + its
-  048068 overlay at E0, 32);
+  0245F8 fades to 0461F0 alone), `fbi_seal` (026F88: entry 3, `level_base_00` + `overlay_03` at F0),
+  `horizon_16_*` (02849E: `level_base_01` + `overlay_16`), `frame_26` (0286CC: `level_base_00` +
+  `overlay_26` at D0, 48), `frame_27` (028830 loads entry 27 after 0287BC-0287FE fade to
+  `level_base_00` + 048068 entry 27, which is `overlay_26`, at D0, 48), `story_text` (0288C0:
+  `level_base_00` + `overlay_31`), and the 23 level maps (024A9E-024B3A: the base of the level whose
+  record selects the map + its 048068 overlay at E0, 32);
 - `overlay` (the 048068 colours, grey elsewhere) for the other entries 048068 gives a palette;
   entries that share a stream list their own overlay under `aliases`;
 - `grey` (a 0-255 ramp) where 048068 is 0 (entries 1, 24, 30, 32, 33, 34).
@@ -206,9 +208,11 @@ every palette with the image**: `tools/gspimages asm` also writes `build/gsp-ima
 with `build/stunrun-68k.bin` at the palette's address (`check: palcheck` in the Makefile; skipped
 without the reference set). A planted change (one red component of `title` colour 6) failed it:
 `palette title (0461F0, 256 colours): differs from the 68k image at colour 6 (68k 046202)`.
-Embedding the palettes in the 68k tree in place of their blob slices (they lie in
-`game/island.asm` and `data.asm`, which the code leg restructures in this wave) is a follow-up
-for the data leg (wave 2).
+Embedding the palettes in the 68k tree in place of their blob slices is a follow-up for the data
+leg (wave 2, C13). All 32 lie in 044630-0469FF (`level_base_00` to `overlay_31`), that is in
+`game/island.asm` (04397E-046AEE, the game leg's file in docs/13), none in `data.asm` (C13 named
+both); `palettes.asm` is one block in address order with gaps between palettes, so it cannot be
+included in place as it is (section 12).
 
 ## 8. MAME: `make imgtrace`
 
@@ -225,18 +229,20 @@ was read) and that its destination advances 16 bits per word, and writes
 best match; no bytes).
 
 Result (2026-11-16): no problem; 48 of the 54 streams unpacked, every unpacking complete and equal
-to the decoder's words; the read-back equals the written words for all but 10 of the 2,080 words
-of the dot images (entry 33). Not reached: entries 3 (`fbi_seal`), 26 and 28 (`frame_26`,
-`frame_28`) and 65, 66, 68 (the figures). All 23 level maps were reached, each at FFED0000 in the
-run of its level (and 35, 39, 46 also at FFE00000, FFE5CFE0, FFEB9FC0 in the attract map screen,
-the three levels named by the bytes at 0473CA-0473CC).
+to the decoder's words; the read-back equals the written words for all but 10 of the 2,080 words of
+the dot images (entry 33). Not reached: entries 3 (`fbi_seal`), 26 and 28 (`frame_26`, `frame_28`)
+and 65, 66, 68 (the figures). All 23 level maps were reached, each at FFED0000 in the run of its
+level (and 35, 39, 46 also at FFE00000, FFE5CFE0, FFEB9FC0 on the screen shown after Start,
+024EEA-024F98, the three levels named by the bytes at 0473CA-0473CC: only in the game runs, frames
+965-975 after the start press at 960, never in the attract run).
 
-Palettes (best dump of all runs): `title` 256 of 256 (attract, frame 450); every other `full`
-spec reached (story text, `horizon_16`, `frame_26`'s 48-colour overlay, the maps of every level
-base) 255 of 256, the one difference always colour 1D, which the game cycles (tables at 047C9A,
-read at 02C4C8 and 02C658); every `overlay` spec matched all its colours at some dump, the aliases'
-included, but `overlay_65` (1 of 16: the figures were not reached); `fbi_seal`'s spec
-(`level_base_00` + `overlay_03`) was never on screen: its best is 240 of 256 (the base alone).
+Palettes (best dump of all runs): `title` 256 of 256 (attract, frame 450); every other `full` spec
+reached (story text, `horizon_16`, `frame_27`, on screen at attract frame 4050 after its unpacking
+at 3969, the maps of every level base) 255 of 256, the one difference always colour 1D, which the
+game cycles (tables at 047C9A, read at 02C4C8 and 02C658); every `overlay` spec matched all its
+colours at some dump, the aliases' included, but `overlay_65` (1 of 16: the figures were not
+reached); `fbi_seal`'s spec (`level_base_00` + `overlay_03`) was never on screen: its best is 240 of
+256 (the base alone).
 
 ## 9. The images and their names
 
@@ -272,7 +278,7 @@ build ignores names). To look at in real colours: `title.png`, `story_text.png`,
 | 24 | 086B06 | 2,577 | raw | `screen_24` 512x208 | grey | 1 unpacking, FFE00000 |
 | 25 | 087517 | 31,162 | raw | `map_screen` 512x208 | overlay | 27 unpackings, FFE00000 |
 | 26 | 08EED1 | 3,662 | raw | `frame_26` 512x240 | full | not reached |
-| 27 | 08FD1F | 2,721 | raw | `frame_27` 512x240 | overlay | 2 unpackings, FFE00000 |
+| 27 | 08FD1F | 2,721 | raw | `frame_27` 512x240 | full | 2 unpackings, FFE00000 |
 | 28 | 0907C0 | 2,991 | raw | `frame_28` 512x240 | overlay | not reached |
 | 29 | 09136F | 14,746 | headed | 24: `pilot_29_00`-`_19`, `emblem_29_20`-`_23`, 72x72 | overlay | 1 unpacking, FFE00000 |
 | 30 | 094D09 | 1,238 | headed | `tree` 48x80 | grey | 52 unpackings, FFF23F00 |
@@ -281,14 +287,21 @@ build ignores names). To look at in real colours: `title.png`, `story_text.png`,
 | 33 | 09841C | 59 | headed | `dot_33_00`, `_01` 5x5 | grey | 52 unpackings, FFF3FD80 |
 | 34 | 098457 | 55 | headed | `dot_34` 8x8 | grey | 52 unpackings, FFF3FB20 |
 | 35-57 | 098490-0A51B1 | 1,471-3,499 each | headed | `level_map_NN` 340x140 (one per stream) | full | each reached, FFED0000 |
-| 65 | 0A5B68 | 17,087 | headed | 25: `figure_65_00`-`_24` 72x72 | overlay | not reached |
-| 66 | 0A9E27 | 13,159 | headed | 21 72x72, 12 shared with 65 | overlay | not reached |
-| 67 | 0AD18E | 3,314 | headed | `strip_67` 512x48 | overlay | 1 unpacking (past the last level, section 5) |
+| 65 | 0A5B68 | 17,087 | headed | 25: `figure_65_00`-`_24` 72x72 | overlay | not reached (loader 0407A8) |
+| 66 | 0A9E27 | 13,159 | headed | 21 72x72, 12 shared with 65 | overlay | not reached (loader 04080E) |
+| 67 | 0AD18E | 3,314 | headed | `strip_67` 512x48 | overlay | 1 unpacking (past the last level, section 5); loaders 0407A8, 04080E not reached |
 | 68 | 0ADE80 | 12,907 | headed | 21 72x72, 5 shared with 65 and 66 | overlay | not reached |
 
 The maps by entry: 35 `level_map_00`, 36 `_01`, 37 `_14`, 38 `_15`, 39 `_05`, 40 `_12`, 41 `_07`,
 42 `_11`, 43 `_08`, 44 `_02`, 45 `_16`, 46 `_10`, 47 `_13`, 48 `_17`, 49 `_18`, 50 `_03`, 51
 `_19`, 52 `_06`, 53 `_20`, 54 `_21` (and level 23), 55 `_22`, 56 `_09`, 57 `_04`.
+
+Entries 65-67: 0407A8 (`jsr` at 0273C6) and 04080E (`jsr` at 02725C) unpack entry 65 or 66
+at FFE30060 (HSTADR at 0407AC, 040812; the table read at 0407B6, 04081C; `unpack_gsp_image`
+0225E4) and then load entry 67 at FFE00000 (`pea $43.w` and `jsr 02DBB4` at 040800/040804,
+040866/04086A): `strip_67` is the figure animations' companion screen, with the same 048068
+overlay (045EF0, entries 65-68). Neither loader ran in any `make imgtrace` run; entry 67's one
+unpacking there is the past-the-last-level read of section 5.
 
 ## 10. Names proposed for the naming legs (C16)
 
@@ -338,7 +351,12 @@ pairs U-W from the data.
 - The palette specs of `overlay` images leave the colours outside the overlay grey: their real
   values depend on the level or the previous screen. The figure streams 65, 66, 68 use colours
   21-3F that their 048068 overlay (F0-FF) does not cover.
-- `frame_27`/`frame_28` and the `figure_*` streams' palettes rest on table 048068 alone; no code
-  pairing them with a base was found.
+- `frame_28`'s and the `figure_*` and `strip_67` streams' palettes rest on table 048068 alone; no
+  code pairing them with a base was found. The figure screen's loaders (0407A8, 04080E, section 9)
+  were found but never ran in MAME.
+- Question for the coordinator (review of PR #36): the palettes lie in `game/island.asm` (section
+  7), the game leg's file, while C13 gives their embedding to the data leg; which leg embeds them,
+  and should `tools/gspimages` emit one include per palette (or per contiguous run) so that the
+  embedding leg can include them in place without editing this leg's tool?
 - The adjust words' places (before entries 1, 35, 65) are kept as the ROM has them; why there is
   HYP (section 5).
