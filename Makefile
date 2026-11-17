@@ -649,12 +649,15 @@ $(BUILD)/gsp-%/images.asm $(BUILD)/gsp-%/table.asm $(BUILD)/gsp-%/palettes.asm: 
 	$(PYTHON) tools/gspimages asm --data data/gsp-images --palettes data/palettes --out $(GSP_DIR)
 
 .SECONDARY: $(GSP_ASM) $(GSP_DIR)/palettes.asm
-EXTRA_stunrun-68k += $(GSP_ASM)
+# FORCE: the includes keep their mtime unless their text changes, and make 3.81's whole-second
+# mtimes would otherwise skip an assembly whose include changed in the second of the last one
+# (a stale image or palettes.bin would then pass or fail make check wrongly). Both take < 1 s.
+EXTRA_stunrun-68k += $(GSP_ASM) FORCE
 
 # The palettes as dc.b, assembled alone (no image includes them yet: the data leg embeds them in
 # the tree, docs/15 section 7) and compared with the 68k image at each palette's address. Part of
 # `make check` (a prerequisite); skipped without the reference set, as check is.
-$(GSP_PAL_BIN): $(GSP_DIR)/palettes.asm
+$(GSP_PAL_BIN): $(GSP_DIR)/palettes.asm FORCE
 	$(VASM) $(VASMFLAGS) -o $@ $<
 
 palcheck:

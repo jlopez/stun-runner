@@ -416,6 +416,19 @@ def test_palcheck_fails_on_a_planted_colour(tmp_path: Path) -> None:
     assert "palette title" in r.stdout and "colour 7" in r.stdout
 
 
+def test_palette_bin_is_rebuilt_on_every_make() -> None:
+    """make 3.81 compares whole-second mtimes: palettes.asm is rewritten only when its text
+    changes, so a palettes.bin that followed it by mtime could be compared stale by palcheck.
+    The palette binary and the 68k tree (which includes the image includes) depend on FORCE, so
+    they assemble on every make, whatever the mtimes (make's database, as -p prints it)."""
+    for target in ("build/gsp-images/palettes.bin", "build/stunrun-68k.out"):
+        r = subprocess.run(["make", "-n", "-p", "--no-print-directory", target], cwd=REPO,
+                           capture_output=True, text=True, check=False)
+        rule = [ln for ln in r.stdout.splitlines() if ln.startswith(f"{target}:")]
+        assert rule, f"make's database has no rule for {target}"
+        assert "FORCE" in rule[0].split(":", 1)[1].split(), f"{target} is rebuilt by mtime only"
+
+
 # --- with the reference set ---------------------------------------------------------------------
 
 
