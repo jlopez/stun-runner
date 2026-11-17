@@ -380,7 +380,7 @@
     {"at": "031584", "operand": 0, "decision": "constant", "rule": "R6"},
     {"at": "03163E", "operand": 0, "decision": "address", "rule": "reviewed", "reason": "loads D4, which 0317CA moves into A5 (movea.l d4,a5): a pointer into the data range 04AABA-04AFE6"},
     {"at": "031644", "operand": 0, "decision": "address", "rule": "reviewed", "reason": "loads D5, which 031706 moves into A5 (movea.l d5,a5): a pointer into the data range 04AABA-04AFE6"},
-    {"at": "03164A", "operand": 0, "decision": "address", "rule": "reviewed", "reason": "stores into the local at -4(A6) the value 031644 loads into D5 and 03152A into D3, both moved into an address register (031706, 0315EE): the same data pointer (HYP: no read of the local was found)"},
+    {"at": "03164A", "operand": 0, "decision": "address", "rule": "reviewed", "reason": "stores into the local at -4(A6) of sub_30F9C (link at 030F9C) the value 031644 loads into D5 and 03152A into D3; the same routine reads the local back as a table base: 031800 movea.l -4(a6),a1, then 031806 move.w 0(a1,d0.w),d1 with D0 = (character - 41h) x 2 (0317F4-0317FE)"},
     {"at": "031734", "operand": 0, "decision": "constant", "rule": "R8"},
     {"at": "03178E", "operand": 0, "decision": "constant", "rule": "R6"},
     {"at": "0318D2", "operand": 0, "decision": "constant", "rule": "R5"},

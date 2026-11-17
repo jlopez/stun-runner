@@ -37,7 +37,7 @@ object ROMs, the 6502 sound program and the OKI samples (from 52 committed PCM W
 0 is done: the 68k tree is nine region files, one per owner, with its zero runs and program table
 as source (docs/13); since M5c all the 68k code (163,638 bytes, boot and game) is neutral
 source cut into files of about 16 KB (docs/16); the 68k data, the images and the GSP and ADSP
-programs are still blob, 34.2% of the set's bytes (517,266). Next: the other conversion legs and
+programs are still blob, 34.2% of the set's bytes (517,381). Next: the other conversion legs and
 the naming waves. The listening check of M4 is done: Jesus ran `make listen` on 2026-11-05 and heard the
 sound.
 

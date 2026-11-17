@@ -117,7 +117,9 @@ their kind (the program table's two pointers at 017000, the ADSP and GSP streams
   012B82, 012CC6 and 01286A in the boot tables, one byte sixteen times at 0022DC, which is
   001FBC + 50 x 16 in the 16-byte records `sub_22EC` indexes at 0022F0-0022FC, and 04D764, two
   distinct characters: 145 bytes that a looser rule made text, review round 4), cut where an
-  operand points (a string starts there), with its terminating zero;
+  operand points (a string starts there), with its terminating zero; since M5c's review (docs/16
+  section 3.1) a count byte or a lower-case item byte at the start of a run is no character, and
+  a run with no terminating zero is text only when it is a counted string or referenced;
 - **fill**: a run of at least 32 zero bytes, up to the first address an operand references (the
   game's 020112-020418 becomes fill to 020400 and data from there: `movea.l #$20400,a2` at 042356
   is a base, 020418 the table it indexes, HYP);

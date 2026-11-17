@@ -130,7 +130,7 @@ word the format does not explain is not committed as a number without Jesus's sa
 ## 6. Coverage
 
 Since M5c the code files are source and the numbers below are wave 0's; docs/16 section 2.1 has
-the current ones (68k blob 517,266 bytes, set blob share 34.2%), and `make labels` gives 223 labels,
+the current ones (68k blob 517,381 bytes, set blob share 34.2%), and `make labels` gives 223 labels,
 0 in blob.
 
 `make coverage` (2026-11-16, after this leg). vasm names an included file as the `include`
@@ -158,7 +158,7 @@ incbin/.binary` (691,513 blob bytes, all in the 68k image; 790,528 before this l
 with the NVRAM still an incbin). `programs.asm`'s blob is the two programs (8,270 + 24,408, M6's) and the 10 residue bytes.
 
 The gate: `tools/coverage --max-blob FILE=BYTES` (repeatable; through make,
-`make coverage MAX_BLOB="asm/68k/game/code.asm=0 asm/68k/data.asm=0"`) fails when the file has
+`make coverage MAX_BLOB="asm/68k/game/code_024306.asm=0 asm/68k/data.asm=91288"`; wave 0's `game/code.asm` is gone since M5c, docs/16 section 2.1) fails when the file has
 more blob bytes than BYTES, or when no listing has that file (a misspelt path never passes). It
 prints `OK FILE: N blob bytes, at most M` for each gate that holds. The Makefile sets no gate by
 default: parallel legs would otherwise edit the same Makefile line; each leg runs it with its own

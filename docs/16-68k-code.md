@@ -14,8 +14,11 @@ instructions at the addresses given, **MAME** a run of `make pccov`, **HYP** a h
 - The classification was checked first (docs/14 section 8 step 1): `make -j5 pccov` and `make
   classify` were re-run on the reference set and gave the committed `classification.json` and
   `pccov-summary.json` unchanged (1,637 ranges, 163,638 bytes of code, 457 entries, every
-  executed PC a classified instruction start). No range was found wrong with evidence; the
-  unreferenced ranges that decode cleanly stay `unknown` (decision C8, docs/14 section 3).
+  executed PC a classified instruction start). The unreferenced ranges that decode cleanly
+  stay `unknown` (decision C8, docs/14 section 3). The review of the leg found the text rule
+  wrong in two ways, and the rule is fixed (section 3.1, `make classify` again: 1,635 ranges):
+  record fields had been read as the first characters of strings, and the printable middle of
+  three numeric tables in the island as text.
 - The 32 long immediates docs/14 section 4 left undecided are decided, each with a written
   reason, in `data/68k/operands.json` (section 5).
 - `tools/m68k gen` ran once over each file of the layout below (one model of the whole image,
@@ -50,12 +53,12 @@ unknown bytes in the same range:
 | `boot/vectors.asm` | 000000-000212 | 530 | 0 | 256 | 274 | 0 | 0 | 274 |
 | `boot/code_000212.asm` | 000212-00394E | 14,140 | 9,378 | 160 | 4,523 | 79 | 1,836 | 2,687 |
 | `boot/code_00394E.asm` | 00394E-0065E0 | 11,410 | 6,822 | 0 | 4,588 | 0 | 3,950 | 638 |
-| `boot/code_0065E0.asm` | 0065E0-009E80 | 14,496 | 4,270 | 7,498 | 2,728 | 0 | 138 | 2,590 |
+| `boot/code_0065E0.asm` | 0065E0-009E80 | 14,496 | 4,270 | 7,449 | 2,777 | 0 | 138 | 2,639 |
 | `boot/code_009E80.asm` | 009E80-00DDF2 | 16,242 | 9,800 | 244 | 6,198 | 0 | 1,610 | 4,588 |
 | `boot/code_00DDF2.asm` | 00DDF2-0109D4 | 11,234 | 4,992 | 0 | 6,242 | 0 | 5,950 | 292 |
 | `boot/code_0109D4.asm` | 0109D4-012F06 | 9,522 | 34 | 0 | 8,964 | 524 | 3,900 | 5,064 |
 | `game/vectors.asm` | 020000-020430 | 1,072 | 18 | 256 | 24 | 774 | 48 | 0 |
-| `game/code_020430.asm` | 020430-024306 | 16,086 | 6,772 | 648 | 8,627 | 39 | 857 | 7,770 |
+| `game/code_020430.asm` | 020430-024306 | 16,086 | 6,772 | 646 | 8,629 | 39 | 857 | 7,772 |
 | `game/code_024306.asm` | 024306-028194 | 16,014 | 15,704 | 310 | 0 | 0 | 0 | 0 |
 | `game/code_028194.asm` | 028194-02C0D2 | 16,190 | 15,922 | 112 | 156 | 0 | 0 | 156 |
 | `game/code_02C0D2.asm` | 02C0D2-030012 | 16,192 | 11,560 | 52 | 4,580 | 0 | 0 | 4,580 |
@@ -64,8 +67,8 @@ unknown bytes in the same range:
 | `game/code_037C52.asm` | 037C52-03BC3C | 16,362 | 15,916 | 74 | 372 | 0 | 0 | 372 |
 | `game/code_03BC3C.asm` | 03BC3C-03FC22 | 16,358 | 16,108 | 70 | 180 | 0 | 0 | 180 |
 | `game/code_03FC22.asm` | 03FC22-04397E | 15,708 | 15,390 | 54 | 264 | 0 | 0 | 264 |
-| `game/island.asm` | 04397E-046AEE | 12,656 | 262 | 125 | 12,269 | 0 | 8,317 | 3,952 |
-| **code files** | | **236,020** | **163,638** | **9,967** | **60,999** | **1,416** | **26,606** | **34,417** |
+| `game/island.asm` | 04397E-046AEE | 12,656 | 262 | 61 | 12,333 | 0 | 12,292 | 41 |
+| **code files** | | **236,020** | **163,638** | **9,852** | **61,114** | **1,416** | **30,581** | **30,557** |
 
 Instructions, labels (vasm locals) per file as generated: boot 8,220 instructions in six files
 (2,152 labels, 777 locals), game 36,463 (9 of them the `moveb_ffff_*` macros) in nine files and
@@ -79,9 +82,10 @@ is a `dcb.b 24,0` under its label `dat_20400`, as wave 0 had it inside the fill 
 The six zero runs of wave 0 stay fills (94,883 bytes); the generator added the classification's
 fills inside the code (642 bytes: 603 in the boot program, 39 in the game).
 
-The 68k image: instr 163,638, data 10,003, blob 517,266, fill 95,525 (wave 0: 0, 36, 691,513,
-94,883). The blob fell by 174,247 bytes, exactly the bytes that became instructions (163,638),
-data (9,967) and fills (642). The set: `blob: 34.2% of 1511424 bytes come from incbin/.binary`
+The 68k image: instr 163,638, data 9,888, blob 517,381, fill 95,525 (wave 0: 0, 36, 691,513,
+94,883). The blob fell by 174,132 bytes, exactly the bytes that became instructions (163,638),
+data (9,852) and fills (642). (Before the review's text fix, section 3.1: data 10,003 and blob
+517,266; the 115 bytes of record fields and island tables went back to blob.) The set: `blob: 34.2% of 1511424 bytes come from incbin/.binary`
 (45.8% before). `data.asm`, `programs.asm`, `images.asm` and `image_table.asm` keep their
 blobs (91,288, 32,688, 332,011, 280).
 
@@ -128,14 +132,56 @@ images leg may give the entries labels and replace these operands.
 
 ## 3. What stays blob, and why
 
-- **unknown** (34,417 bytes in the code files): the routines no decided code reaches that
+- **unknown** (30,557 bytes in the code files): the routines no decided code reaches that
   decode cleanly (76 ranges, 11,169 bytes, docs/14 section 3) (decision C8: they stay `unknown` until a reviewed seed argues each, the naming
   legs' work; docs/14 sections 3 and 10), the dead bytes between code, the `jmp abs.l` table at
-  000100-0001F0 and the rest of 000100-000212, the boot program's menu records around their
-  strings, and the island's tables of no known format.
-- **data** (26,606 bytes, less the 24 zero bytes at 020400): bytes an operand references whose
+  000100-0001F0 and the rest of 000100-000212, and the boot program's screen records around
+  their strings: the header of each (column, row, attribute, count; section 3.1), and the
+  record at 007660 whose count, 9, is not its 12 characters.
+- **data** (30,581 bytes, less the 24 zero bytes at 020400): bytes an operand references whose
   format no leg has explained yet (record tables, the 000E12 record table, the island's data at
-  0439BC-0445F0 and 044630-045A79, ...).
+  0439BC-0445F0 and 044630-0466A0 (its numeric tables included, section 3.1), the option
+  records' item bytes, ...).
+
+### 3.1 The text rule, corrected in review
+
+The leg's first tree committed record fields and table bytes as characters of `dc.b` strings,
+because the text rule of docs/14 took every printable byte of a run. Three readings now keep
+them out (`tools/m68k/classify.py`, `_text_runs` and `_counted`; tests `test_text_rule_record_fields`,
+`test_committed_classification`):
+
+- **Counted strings.** The boot program's screen records are a 4-byte header, then the
+  characters, no terminator; the last header byte is the count of the characters (read off the
+  image: the 214 records whose count is a non-printable byte, such as 00714C-007150 `0600FF0D`
+  before the 13 characters of `SA*AUDIO*TEST`). HYP: the other three are column, row and an
+  attribute (the records of one line, 00766C and 007674, share the second byte). A count of
+  20h-3Fh is printable, and an attribute of 3Fh or 70h too, so 47 strings began with their
+  count and 32 with attribute and count (`str_7FDC` was `"?'ROTATE*ONES..."`, 27h = 39 the
+  characters after it). The count is now never text: an unterminated run is a counted string
+  when the byte before it, its first byte or its second byte (up to 3Fh) equals the characters
+  after it, or one fewer (006D9D, 0088DD, 008909: the ROM's count is one short of the
+  characters, which all stay text). 007DB1 and 007E10 are
+  new text (attribute 3Fh and count 25h had kept the run from reading as text).
+- **Item bytes.** The game's option records (020ED0-021148) start with an item byte before the
+  title (FDh, CCh, BBh, AAh, 99h, 88h; BBh at 020F51 is the one 042CE4 decodes, CLAUDE.md M4e).
+  The one at 020FD5 and 0210FC is 76h, `v`, and was the first character of
+  `CONTINUE ADVANCES TO NEXT LEVEL`. A lower-case first byte before upper-case text is now no
+  character (`dat_20FD5`, `str_20FD6`; the same reading drops six such bytes in `data.asm`'s
+  records at 05C719-05CDE3, where only the classification changes: at 05C719 what is left is
+  too short to be text).
+- **Numeric tables.** `str_45A79`, `str_45AD6` and `str_4659B` in the island were the printable
+  middle of byte tables: no terminator, no reference, the table's values continuing in
+  non-printable bytes past both ends of each run (045A79's run is eleven values three times
+  each, rising by 8 or 9, in a table that starts at 045A70 and goes on past 045A9A; 045AD6's
+  rises from 045AD0 to past 045AEA). An unterminated run is now text only
+  when it is counted or an operand references its start; the three are data again under the
+  references at 045830 and 0461F0, as incbin slices.
+
+`BAD*ZRAM*AT:` at 007660 (count 9 before 12 characters) is no counted string by this rule and is
+blob now; which of its bytes the screen shows is the boot naming leg's to find in MAME. The
+raw-data check (section 4.1) applies the same readings to the source: a quoted `dc.b` in a code
+file whose first or second character is a count of the characters after it, or whose first
+character is a lower-case item byte, fails.
 
 ## 4. The checks
 
@@ -157,7 +203,8 @@ images leg may give the entries labels and replace these operands.
 - the raw-data check: in the code files (000000-012F06, 020000-046AEE) every `dc`/`dcb`
   statement is an explained kind: `dc.l` in a vector or pointer table, `dc.w a-b` in a switch
   table, `dc.b` of quoted strings and zeros in text, a `dcb.b N,0` fill. A `dc.b` wall in place
-  of an incbin slice fails (decision C3), as `tools/test_jsa_music.py` does for the 6502;
+  of an incbin slice fails (decision C3), as `tools/test_jsa_music.py` does for the 6502, and so
+  does a string that starts with a record field (a count or an item byte, section 3.1);
 - the shift test: the tree copied to a temporary directory, its guards commented out, a
   two-byte pad after `org 0` (each `dcb.b $X-*` fill lengthened by the pad so that it does not
   absorb it), its incbin paths made absolute, assembled again; exactly the statements that name
@@ -198,7 +245,8 @@ fails: an unknown slice written as `nop`s (the descent check: each `nop` unreach
 slice as a `dc.b` wall (the raw-data check, at its address), a `jsr sub_X` written `jsr $X` (the
 lint), a label pinned by an `equ` (the shift test). `test_raw_data_check_fails` plants the other
 raw-data faults in one copy (a `dc.l` wall in a data range, a text string as numeric `dc.b`, a
-`dcb.b 40,$FF`, a switch entry written as a number) and finds each. `test_code_turned_blob_fails`
+`dcb.b 40,$FF`, a switch entry written as a number, a count written back as the first
+character of `str_7161`, an item byte as the first of `str_20FD6`) and finds each. `test_code_turned_blob_fails`
 writes a routine's first instruction as an incbin slice of its own bytes: the classified start
 without a statement, an executed PC there (through `check-tree`'s runs and `tools/m68k pccov
 --listing`) and `check-tree`'s exit status 1 each fail. `test_promoted_range_fails` writes an
@@ -208,7 +256,7 @@ and `make labels` fails on each. `test_tree_assembles_a_random_blob` checks that
 slice of `build/stunrun-68k.bin` takes the blob's bytes from its own address, and the fills and
 the program table. `tools/test_build.py` builds the synthetic set (whose 68k image is now mostly
 the tree's own code) and checks `make coverage`'s rows against the files' ranges, the code
-files' 60,999 blob bytes and 163,638 instruction bytes, and `make labels`.
+files' 61,114 blob bytes and 163,638 instruction bytes, and `make labels`.
 
 What CI cannot check: the bytes of the code against the ROM (no reference set), unidasm's
 boundaries and the MAME runs. `make check`, `make m68k-check` and `make pccov` are the local
@@ -242,7 +290,7 @@ refuses a reviewed entry without its reason. 31 are addresses, one a constant (C
 | 025E9C (D2) | address | 025F7E, 025F8E, 02601C, 02602A `movea.l d2,a5` |
 | 02A302, 02A30A, 02A31A, 02A322, 02A334, 02A33C (D3) | address | the starts of two strings of 0475CA-0475FB, picked by the switch at 02A2F6; D3 pushed next to a `pea` of text at 02A490, 02A49C, 02A4BC, 02A4C8, 02A4DC |
 | 03152A (D3), 03163E (D4), 031644 (D5) | address | moved into an address register at 0315EE, 0317CA, 031706 |
-| 03164A (into -4(A6)) | address | the same value as 031644 and 03152A load (HYP: no read of the local found) |
+| 03164A (into -4(A6)) | address | the same value as 031644 and 03152A load; sub_30F9C reads the local back as a table base: 031800 `movea.l (-$4,a6),a1`, then 031806 `move.w ($0,a1,d0.w),d1` with D0 = (character - 41h) x 2 |
 | 03F572, 03F5C6, 03F61A, 03F66C, 03F6BE (D5) | address | pushed as the source argument of `copy_to_zram` 022578 next to the ZRAM address in D4 |
 | 040F66 (D3) | address | 040F9E `movea.l d3,a1`, 040FCA, 040FDC, 041010 `movea.l d3,a5` |
 | 02FC76 (`#$80000` into D5) | constant | a countdown: 02FC8E-02FC92 `move.l d5,d0`, `subq.l #1,d5`, `tst.l d0` |
@@ -285,7 +333,14 @@ countdown) and no undecided operand.
   string holds one), which made that `dc.b` look like something else to the checks; it now
   ignores a `;` between quotes.
 - `asm/68k/hardware.asm`'s header and docs/13 still named `boot/ram.asm` and `game/ram.asm`
-  (wave 0's plan); both now name `ram.asm` (decision C9).
+  (wave 0's plan); both now name `ram.asm` (decision C9). docs/13's coverage gate example named
+  `game/code.asm`; it now names a file of this layout. docs/04 section 1 and the usage of
+  `tools/coverage` still name wave 0's `boot/boot.asm` and `game/code.asm`; neither file is this
+  leg's (section 8).
+- The boot program's screen records (4-byte header column, row, attribute, count; no terminator)
+  and the game's option records (an item byte before each title) are record formats the text
+  rule had not known; the leg's first tree committed the counts, attributes and item bytes of
+  81 strings and 64 bytes of three island tables as characters (section 3.1, found in review).
 
 ## 8. Open questions
 
@@ -293,6 +348,9 @@ countdown) and no undecided operand.
    (section 7): the naming legs'.
 2. ZRAM equates are named `io_FF4XXX` by the generator's rule; a later leg may prefer `zram_X`
    (a rename in `ram.asm` and its uses).
-3. The 24 zero bytes at 020400 are a fill under `dat_20400` although the classification says
+3. docs/04 section 1 and `tools/coverage`'s usage still name wave 0's `boot/boot.asm` and
+   `game/code.asm` (`make coverage MAX_BLOB="asm/68k/game/code.asm=0"`, the usage's example,
+   fails with "no listing has the file"); neither file is in issue #33's list.
+4. The 24 zero bytes at 020400 are a fill under `dat_20400` although the classification says
    data (section 2.1): the alternative is an incbin slice (24 more blob bytes, the fill count of
    wave 0 changed).
