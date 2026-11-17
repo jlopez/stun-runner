@@ -1,11 +1,16 @@
 ; data.asm, 046AEE-060000: the game program's data, then zero to the end of pair T.
-; Owner: the data leg. Not source yet but the zero fill (docs/13-68k-source.md section 4).
+; Owner: the data leg (M5d, issue #37, docs/17-68k-data.md); after it the naming legs, N6 for
+; the course data and tables (docs/03-plan.md), rename in place.
 ;
-; 046AEE-05CF86: data with a 68k consumer, as incbin slices of build/stunrun-68k.bin. M5c
-; (issue #33, docs/16-68k-code.md) cut the slices at every address the code references and at
-; every name of the IDA snapshot, each slice under its label (the snapshot's name, else dat_X,
-; tbl_X or str_X by the classification's kind); the bytes stay blob until the data leg explains
-; them.
+; 046AEE-05CF86: data with a 68k consumer. M5c (issue #33, docs/16-68k-code.md) cut it into
+; incbin slices of build/stunrun-68k.bin at every address the code references and at every name
+; of the IDA snapshot, each slice under its label (the snapshot's name, else dat_X, tbl_X or
+; str_X by the classification's kind). Source since M5d (docs/17 sections 3.3, 4): every text
+; range of the classification as dc.b strings, the zero pads after them, audio_test_list (dc.w
+; of the sound-command equates, the names) and the twelve pointer tables of
+; data/68k/tables.json as dc.l of labels, each with its reader cited there. Everything else
+; stays incbin: a table becomes source only with its reader cited from the code (issue #37,
+; C18), and a word no format explains stays blob (the residue rule). 05CF86-060000 is zero fill.
 
 	assert	*=$046AEE,"data.asm misplaced"
 
@@ -2727,7 +2732,7 @@ dat_5C5B2:
 	incbin	"../../build/stunrun-68k.bin",$05C5B2,$8A
 audio_test_list:
 ; 108 records of 22 bytes (audio_test 043718: base at 043720, the names at +2 by lea ($2,a4),a3
-; at 043828, both pointers stepped by 16h at 043892-04389C until cmpi.w #$FFFF,(a2) at 0438A4;
+; at 043828, both pointers stepped by 16h at 043896-04389C until cmpi.w #$FFFF,(a2) at 0438A4;
 ; the chosen record's word sent by send_sound_byte at 04395C after mulu.w #$16 and
 ; move.w ($0,a4,d0.w),d1 at 043950-043954): the sound command word, then the name, NUL-ended
 ; and zero to 22 bytes; sorted by name; the word FFFF at 05CF84 ends the list. The words are
