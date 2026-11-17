@@ -10,6 +10,15 @@ fills, the grand total, every blob by label with the file it includes and its si
 share and, last, one JSON line. Fails unless the total equals the set's size
 (tools/romsets/<set>.json, 1,511,424 bytes for stunrun) or --expect.
 The blob share only goes down (CLAUDE.md section 2).
+
+vasm names an included file as the include statement wrote it, relative to the main source's
+directory; the rows give it relative to the repository (asm/68k/boot/boot.asm,
+build/obj/page0.asm), as 64tass does.
+
+    --max-blob asm/68k/game/code.asm=0      (repeatable; `make coverage MAX_BLOB="FILE=N ..."`)
+
+fails when that source file's blob bytes exceed N, or when no listing has the file: the gate a
+leg sets on the region file it converts (docs/13-68k-source.md section 6).
 """
 
 from __future__ import annotations
@@ -20,14 +29,30 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from listings import CLASSES, Blob, Counts, tass, tass_blobs, vasm, vasm_blobs  # noqa: E402
+from listings import (  # noqa: E402
+    CLASSES,
+    Blob,
+    Counts,
+    repo_path,
+    tass,
+    tass_blobs,
+    vasm,
+    vasm_blobs,
+    vasm_main,
+)
 from romset import load_snapshot  # noqa: E402
 
 
 def tally(path: Path) -> tuple[Counts, list[Blob]]:
     text = path.read_text(errors="replace")
     if text.startswith("Sections:"):
-        return vasm(text), vasm_blobs(text)
+        main = vasm_main(text)
+        counts = {repo_path(main, f): c for f, c in vasm(text).items()}
+        blobs = [
+            Blob(repo_path(main, b.file), b.label, b.target, b.address, b.size)
+            for b in vasm_blobs(text)
+        ]
+        return counts, blobs
     size = path.with_suffix(".out").stat().st_size
     return tass(text, size), tass_blobs(text, size)
 
@@ -41,7 +66,20 @@ def main() -> int:
     ap.add_argument("listings", nargs="+", type=Path)
     ap.add_argument("--set", default="stunrun", help="MAME set whose size is the expected total")
     ap.add_argument("--expect", type=int, help="expected total bytes (default: the set's size)")
+    ap.add_argument(
+        "--max-blob",
+        action="append",
+        default=[],
+        metavar="FILE=BYTES",
+        help="fail when FILE's blob bytes exceed BYTES (repeatable)",
+    )
     args = ap.parse_args()
+    gates: dict[str, int] = {}
+    for gate in args.max_blob:
+        name, sep, value = gate.rpartition("=")
+        if not sep or not name or not value.isdigit():
+            ap.error(f"--max-blob {gate}: expected FILE=BYTES")
+        gates[name] = int(value)
     expect = args.expect
     if expect is None:
         expect = sum(r["size"] for r in load_snapshot(args.set)["roms"])
@@ -71,6 +109,19 @@ def main() -> int:
         print(f"{b.label or '-':<20}{b.address:>9X}{b.size:>9}  {b.target:<34}{b.file}")
     pct = 100.0 * grand["blob"] / n if n else 0.0
     print(f"blob: {pct:.1f}% of {n} bytes come from incbin/.binary")
+    failed = False
+    for name, limit in gates.items():
+        if name not in files:
+            print(f"FAIL: --max-blob {name}: no listing has this source file", file=sys.stderr)
+            failed = True
+        elif files[name]["blob"] > limit:
+            print(
+                f"FAIL: {name} has {files[name]['blob']} blob bytes, at most {limit} allowed",
+                file=sys.stderr,
+            )
+            failed = True
+        else:
+            print(f"OK {name}: {files[name]['blob']} blob bytes, at most {limit}")
     print(
         json.dumps(
             {
@@ -88,8 +139,8 @@ def main() -> int:
     )
     if n != expect:
         print(f"FAIL: the listings account for {n} bytes, expected {expect}", file=sys.stderr)
-        return 1
-    return 0
+        failed = True
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

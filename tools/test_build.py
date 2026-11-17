@@ -17,6 +17,13 @@ samples, and a phrase renamed with its WAV must build the same bytes.
 
 The 6502 image is built from asm/jsa alone (docs/09-sound-program.md), so the synthetic set
 carries the image the source assembles to, and an operand edited in the copy must change 10c.
+
+The 68k image is the tree of asm/68k (docs/13-68k-source.md): region files whose blobs are
+incbins of build/stunrun-68k.bin and whose source (the zero fills, the program table) the tree
+itself computes, so the synthetic set carries what the tree assembles from a random blob (with a
+valid program table and programs for tools/extract-programs); `make labels` must pass on it, and
+an edit of a 68k region file must reach the right file at the right 68k address. The NVRAM
+images are two zero fills, so the synthetic set's are zero.
 """
 
 from __future__ import annotations
@@ -35,6 +42,7 @@ from adpcm import pcm_wav, read_wav
 from adpcm.__main__ import encode_all
 from objects import checksum_address, encode, place, read_data
 from romset import IMAGES, compare, layout, load_snapshot, merge, split
+from test_68k_tree import assemble_68k
 from test_programs import plant_programs
 
 TOOLS = Path(__file__).resolve().parent
@@ -296,7 +304,10 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     # 0x017000-0x01EFD4, which tools/extract-programs parses
     snapshot = load_snapshot("stunrun")
     images = merge(snapshot, synthetic_set(42))
-    images["stunrun-68k"] = plant_programs(images["stunrun-68k"], 42)
+    images["stunrun-68k"], _, _ = assemble_68k(
+        plant_programs(images["stunrun-68k"], 42), tmp_path / "m68k"
+    )
+    images["stunrun-nvram"] = bytes(0x1000)
     images["stunrun-obj"] = plant_objects()
     images["stunrun-oki"] = plant_oki()
     images["stunrun-jsa"] = plant_jsa(tmp_path)
@@ -309,6 +320,8 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     shutil.copytree(TOOLS, work / "tools", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(REPO / "data/objects", work / "data/objects")
     shutil.copytree(REPO / "data/oki", work / "data/oki")
+    (work / "data/ida").mkdir()
+    shutil.copy(REPO / "data/ida/stunrun-68k.json", work / "data/ida")  # for `make labels`
     env = dict(os.environ, STUNRUN_ROMS=str(tmp_path / "archive"))
     make = [
         "make",
@@ -326,7 +339,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 52.3% of 1511424 bytes" in r.stdout
+    assert "blob: 45.8% of 1511424 bytes" in r.stdout
     blobs = {line.split()[0]: line.split() for line in r.stdout.splitlines() if line.strip()}
     assert blobs["adsp_program"][1:4] == ["1702E", "8270", "../../build/adsp/program.bin"]
     assert blobs["gsp_program"][1:4] == ["1907C", "24408", "../../build/gsp/program.bin"]
@@ -340,7 +353,31 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     # nor has the 6502 image a blob: all instructions, data and fills
     assert summary["images"]["stunrun-jsa"]["blob"] == 0
     assert summary["images"]["stunrun-jsa"]["instr"] > 0
-    assert summary["blob"] == 790528
+    # the 68k image: the six zero runs are fill, the program table's pointers and text data,
+    # one row per region file; the NVRAM image is two fills
+    assert summary["images"]["stunrun-68k"] == {
+        "instr": 0, "data": 36, "blob": 691513, "fill": 94883}
+    assert summary["images"]["stunrun-nvram"] == {"instr": 0, "data": 0, "blob": 0, "fill": 4096}
+    regions = {
+        "boot/vectors.asm": 0x212, "boot/boot.asm": 0x12F06 - 0x212,
+        "programs.asm": 0x20000 - 0x12F06, "game/vectors.asm": 0x430,
+        "game/code.asm": 0x4397E - 0x20430, "game/island.asm": 0x46AEE - 0x4397E,
+        "data.asm": 0x60000 - 0x46AEE, "images.asm": 0xBFE00 - 0x60000,
+        "image_table.asm": 0x200,
+    }
+    assert {
+        f: sum(c.values()) for f, c in summary["files"].items() if f.startswith("asm/68k/")
+    } == {f"asm/68k/{f}": n for f, n in regions.items()}
+    assert summary["blob"] == 691513
+    # the per-file blob gate a leg sets on its region file
+    r = run(*make, "coverage", "MAX_BLOB=asm/68k/programs.asm=32688 asm/68k/data.asm=0", env=env)
+    assert r.returncode != 0
+    assert "OK asm/68k/programs.asm: 32688 blob bytes" in r.stdout
+    assert "asm/68k/data.asm has 91288 blob bytes, at most 0 allowed" in r.stderr
+    # the snapshot's names in source are labels at their addresses
+    r = run(*make, "labels", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert " 0 failures" in r.stdout
     assert "build/stunrun-obj.bin" not in r.stdout
     assert "build/stunrun-oki.bin" not in r.stdout
     assert "build/stunrun-jsa.bin" not in r.stdout
@@ -353,7 +390,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
         (work / f"build/{name}.lst").unlink()
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 52.3% of 1511424 bytes" in r.stdout
+    assert "blob: 45.8% of 1511424 bytes" in r.stdout
     assert (work / "build/stunrun-obj.lst").exists() and (work / "build/stunrun-jsa.lst").exists()
     # the object image needs nothing from the set: rebuilt with build/stunrun-obj.bin gone (and
     # its generated sources and output removed), it is still the same and the blob stays absent
@@ -392,6 +429,26 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     image.write_bytes(bytes(data))
     later = image.stat().st_mtime + 5
     os.utime(image, (later, later))
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
+    # an edit of a 68k region file's source reaches the even file of pair R at its address:
+    # the C of copyright_text (017010) made lower case
+    programs = work / "asm/68k/programs.asm"
+    source = programs.read_text()
+    programs.write_text(source.replace('"Copyright 1989', '"copyright 1989', 1))
+    bump(programs, 40)
+    r = run(*make, "all", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run(sys.executable, work / "tools/bytecheck", env=env)
+    assert r.returncode == 1
+    assert "1 problems over 25 files" in r.stdout, r.stdout
+    assert (
+        "136070-2102.200r: 1 differing bytes, first at file offset $0B808 = 68k $017010" in r.stdout
+    ), r.stdout
+    programs.write_text(source)
+    bump(programs, 50)
     r = run(*make, "all", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
     r = run(sys.executable, work / "tools/bytecheck", env=env)

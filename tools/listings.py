@@ -16,6 +16,7 @@ includes, so that `make coverage` names the blobs (adsp_program, gsp_program, ..
 
 from __future__ import annotations
 
+import os
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -28,6 +29,7 @@ VASM_STATEMENT = re.compile(r"^([0-9A-F]{2}):([0-9A-F]{8}) [^\t]*\t\s*\d+: (.*)$
 VASM_CONTINUATION = re.compile(r"^[0-9A-F]{2}:[0-9A-F]{8} ")
 VASM_ANY = re.compile(r"^[^\t]*\t\s*\d+: (.*)$")
 VASM_LABEL = re.compile(r"^([A-Za-z_.][\w.]*):")
+VASM_SYMBOL = re.compile(r"^(\S+)\s+([A-Z0-9]+):([0-9A-F]+)$")
 VASM_INCBIN = re.compile(r'incbin\s+"([^"]+)"', re.I)
 TASS_BINARY = re.compile(r"^(?:([A-Za-z_][\w.]*)\s+)?\.binary\s+([^,;\s]+)")
 TASS_ADDRESS = re.compile(r"^[.>]([0-9a-f]{4,8})$")
@@ -120,6 +122,45 @@ def vasm(listing: str) -> Counts:
 def vasm_blobs(listing: str) -> list[Blob]:
     """The incbin statements of a vasm -L listing, with their labels, files and sizes."""
     return _blobs(*_vasm_parse(listing))
+
+
+def vasm_main(text: str) -> str:
+    """The main source of a vasm listing: its first Source block."""
+    for line in text.splitlines():
+        if line.startswith('Source: "'):
+            return line[len('Source: "') : -1]
+    return ""
+
+
+def repo_path(main: str, source: str) -> str:
+    """An included file's name relative to the repository (vasm gives it relative to the main
+    source's directory)."""
+    if source == main or os.path.isabs(source):
+        return source
+    return os.path.normpath(os.path.join(os.path.dirname(main), source))
+
+
+def vasm_statements(listing: str) -> list[tuple[Statement, int]]:
+    """Every statement of a vasm -L listing that emits bytes, with its size in bytes."""
+    return _spans(*_vasm_parse(listing))
+
+
+def vasm_symbols(listing: str) -> dict[str, tuple[str, int]]:
+    """The "Symbols by name" table of a vasm -L listing: every symbol vasm lists (the labels and
+    the equates the source uses; never a local), with its kind and value. The kind is "E" for an
+    equate and "A" (absolute, an org section) or the section number for a label."""
+    symbols: dict[str, tuple[str, int]] = {}
+    inside = False
+    for line in listing.splitlines():
+        if line == "Symbols by name:":
+            inside = True
+            continue
+        if inside:
+            m = VASM_SYMBOL.match(line)
+            if not m:
+                break
+            symbols[m.group(1)] = (m.group(2), int(m.group(3), 16))
+    return symbols
 
 
 def _vasm_parse(listing: str) -> tuple[list[Statement], dict[str, int]]:
