@@ -168,6 +168,18 @@ def test_headed_image_layout() -> None:
         g.split_headed(bytes(bad), "t")
 
 
+def test_raw_screen_layout() -> None:
+    """A raw screen is 512-pixel rows of decoded bytes with the low byte of each word the lower x,
+    as headed images (the 68010 writes HSTDATA words; the TMS34010's pixel at the lower bit
+    address is the word's low byte)."""
+    data = bytes([1, 2, 3, 4]) + bytes(g.RAW_WIDTH - 4)
+    img = g.split_raw(data, "t")
+    assert (img.width, img.height) == (g.RAW_WIDTH, 1)
+    assert img.pixels[:4] == bytes([2, 1, 4, 3])
+    assert g.raw_bytes(img) == data
+    assert g.stream_data("raw", [img]) == data
+
+
 def test_png_round_trip_and_editor_forms() -> None:
     rng = random.Random(7)
     pixels = bytes(rng.randrange(256) for _ in range(13 * 7))
