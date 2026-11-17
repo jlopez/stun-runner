@@ -168,9 +168,27 @@ check finds the `dc.l` in the table first), an open point for `make classify`'s 
 What stays blob in `data.asm` and why (78,319 bytes): every long no reader proves (decision C18,
 "counting longs that look like addresses is not evidence"), the record fields of 021650 and
 048180 outside their pointer fields, the bytes the classification calls data or unknown. The
-level object lists that 04D628 points at (04D5EC and the lists in 04F104-05BE04) hold pointers
-with a flag in bit 31 (`andi.l #$80000000` in `sub_3186A`, 0319A4) whose format no leg has
-written down; section 5 shows they are the next thing that breaks a moved build.
+level object lists that 04D628 points at (04D5EC and the lists in 04F104-05BE04) are streams
+that `sub_3186A` reads through a cursor (FFDC6C, and a second one in FFDC70), and which no leg
+has turned into source; section 5 shows they are the next thing that breaks a moved build. What
+the code shows of them (CODE, unidasm on `build/stunrun-68k.out`):
+
+- each step reads a record pointer (`movea.l (a2),a1`, `addq.l #4,(a2)`, `movea.l (a1),a3`,
+  031896-03189A; FFDC70's stream the same at 03198A-03198E);
+- the next long is an optional parameter, not a pointer: it is copied to (-4,a6); with bit 31
+  set it is masked with 7FFFFFFFh and the cursor steps past it (0318A2-0318C2), otherwise
+  (-4,a6) is cleared and the cursor does not move (0318C4-0318C8; FFDC70's stream
+  03199A-0319C2). It is passed as the 6th argument of `sub_30F9C` (031938, 0319E6), whose
+  `link a6,#-$34` puts it at ($1C,a6): the high word is stored at +18 of the object entry
+  (031196) and, masked with 1FFh, indexes 04C712 (0311B8-0311D2, 0 meaning none); a nonzero low
+  word goes to `sub_33480` (0311A2-0311B0). Bit 31 is the mark that the parameter is there,
+  so a long with bit 31 set is never an address;
+- when the record's flags (`movea.l ($E,a3),a1`, 0318CC) have 1000h, the next long is a jump:
+  it replaces the cursor (`move.l (a0),(a2)`, 0318DE; FFDC70's stream 0319DC); otherwise, when
+  they have 80020h (0318E2-0318F0), the next long is loaded into FFDC70 and the cursor steps
+  past it (031922-031926).
+
+How a list ends and what each record is are not proven here.
 
 ## 5. The moved-build experiment (report, not acceptance)
 
@@ -237,14 +255,16 @@ the stream is out of step because the records it names are read at their referen
 (the record's flags, `movea.l ($E,a3),a1` at 0318CC and 0318E2, decide whether the stream jumps,
 `move.l (a0),(a2)` at 0318DE, or loads FFDC70, 031922-031926), so the long loaded at 031926 is
 not a record pointer. Not fixed
-here: the lists' format (flags in bit 31, the list ends, what each record is) is not proven by
-this leg (section 4.2).
+here: the lists' record pointers, parameter longs (bit 31 set), jump longs and FFDC70 longs are
+read as section 4.2 says, but how a list ends and what each record is are not proven by this
+leg, so the lists stay blob.
 
 **The rest, for the naming legs (a worklist, not evidence).** `tools/m68k moved-candidates
 --listing build/stunrun-68k.lst --binary build/stunrun-68k.out` lists the runs of four or more
-longs still in incbin slices of 020430-05CF86 whose value (bit 31 ignored) lies in the data or is
-an even address of the game code: 691 runs, 4,581 longs, 15 runs (149 longs) in 046AEE-04F104 and
-676 runs (4,432 longs) in 04F104-05BE04, the level data the reviewed operands reach through FFDE82
+longs still in incbin slices of 020430-05CF86 whose value lies in the data or is an even address
+of the game code (a long with bit 31 set, the lists' parameter long of section 4.2, never counts):
+685 runs, 4,499 longs, 15 runs (149 longs) in 046AEE-04F104 and 670 runs (4,350 longs) in
+04F104-05BE04, the level data the reviewed operands reach through FFDE82
 (docs/16 section 5); none in the code files or the island. Each needs its reader before it becomes
 source; until then a moved build diverges, as it does in frame 414.
 

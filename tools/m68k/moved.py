@@ -134,16 +134,18 @@ DATA = (0x046AEE, 0x05CF86)
 
 def candidates(lst: ls.Listing, image: bytes, least: int = 4) -> list[tuple[int, int]]:
     """A worklist for the naming legs, not evidence (decision C18): the runs of at least `least`
-    consecutive longs at even addresses inside incbin slices of the moving range whose value
-    (bit 31 ignored, a flag in the level lists, docs/17 section 5) lies in the data, or is an
-    even address of the game code: (start, end) of each run."""
+    consecutive longs at even addresses inside incbin slices of the moving range whose value lies
+    in the data, or is an even address of the game code: (start, end) of each run. A long with bit
+    31 set is never a candidate: in the level object lists it marks the parameter long after a
+    record pointer, whose high word indexes 04C712 (sub_3186A 0318A2-0318C0, sub_30F9C
+    0311B8-0311D2; docs/17 section 4.2), not an address."""
     spans = [(s.address, s.address + s.size) for s in lst.statements
              if s.kind == "blob" and MOVING[0] <= s.address < MOVING[1]]
     runs: list[list[int]] = []
     for a, e in spans:
         x = a + (a & 1)
         while x + 4 <= e:
-            v = int.from_bytes(image[x : x + 4], "big") & 0x7FFFFFFF
+            v = int.from_bytes(image[x : x + 4], "big")
             if DATA[0] <= v < DATA[1] or (MOVING[0] <= v < DATA[0] and v % 2 == 0):
                 if runs and runs[-1][1] == x:
                     runs[-1][1] = x + 4

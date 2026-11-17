@@ -907,6 +907,25 @@ def test_moved_build(tmp_path: Path) -> None:
         moved.moved_tree(tmp_path / "a/asm/68k", build, tmp_path / "m2", 3)
 
 
+def test_moved_candidates_skip_flagged_longs() -> None:
+    """tools/m68k moved-candidates (moved.py `candidates`) on made-up longs: a long with bit 31
+    set is the level lists' parameter long (sub_3186A 0318A2-0318C0, its high word an index
+    into 04C712 in sub_30F9C 0311B8-0311D2), never a pointer candidate, even when its value
+    without bit 31 lies in the data."""
+    from m68k import moved
+
+    base = 0x050000
+    longs = [0x050100, 0x048000, 0x80050200, 0x050300, 0x021000, 0x046B00, 0x047000, 0x80000001,
+             0x049000, 0x04A000, 0x04B000, 0x04C000]
+    image = bytearray(IMAGE_SIZE)
+    for k, v in enumerate(longs):
+        struct.pack_into(">I", image, base + 4 * k, v)
+    lst = ls.Listing(statements=[ls.Stmt(base, "blob", "incbin", 4 * len(longs))])
+    # the flagged longs at +8 and +1C cut the runs: +0..+8 (2), +C..+1C (4), +20..+30 (4)
+    assert moved.candidates(lst, bytes(image), 4) == [(base + 0x0C, base + 0x1C),
+                                                      (base + 0x20, base + 0x30)]
+
+
 def test_moved_compare(tmp_path: Path) -> None:
     """tools/m68k moved-compare on made-up movedcheck.lua logs: the first frame per stream
     whose count or hash differs, and the moved run's reset."""
