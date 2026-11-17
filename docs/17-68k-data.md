@@ -136,7 +136,7 @@ field; the other fields stay incbin slices) and `audio_test_list` (3.3).
 | 047406 | 30 | pointers | the level base palettes: 029B20-029B2E index by the level word x 4, `sub_296AA` reads the colours through its first argument (`movea.l ($8,a6),a2` 0296B2, `move.b (a2),(a5)+` 0296EA); 02531C and 02A5D8 store one into FF9558. Entries 24-29 are past the 24 level records, the same run (every long a palette) |
 | 047F50 | 70 | pointer_or_count, 400h | per image entry: 02DBCA, 029980, 02DAF0 compare with 400h; below, a raw screen's rows (FF9BAE); at or above, FF9BD8, which `sub_2C686` dereferences (`movea.l (a2),a0` 02C6DC, `move.w ($1E,a0),d0` 02C6DE, `move.w (a0),d0` 02C6F8) |
 | 048068 | 70 | pointers | the overlay per image entry: 02DACE-02DAD4 into FFDB40 (GSP command 9's palette address), `sub_296AA`'s second argument (null test 0296CA, `move.b (a3),(a4)+` 029726), 02A5FA into FF955C |
-| 048180 (24 records of 40) | 216 | records, +4-+28h | `sub_2DD1E` (called with `pea ($4,a0,d0.l)` at 027902) walks nine string pointers (`movea.l (a2),a0` 02DD38, `move.b (a0)+,(a3)+` 02DD4C, `addq.l #4,a2` 02DD78, `tst.l (a2)` 02DD80); 02B308, 02B3F4, 02B51C pass +4 to `sub_30220` with a format string. +0 (the map's image entry, read at 029A70, 02A5F4 and more) and +2 (a word into FF954E, 029DE4) stay incbin |
+| 048180 (24 records of 40) | 216 | records, +4-+28h | `sub_2DD1E` (called with `pea ($4,a0,d0.l)` at 027902) walks nine string pointers (`movea.l (a2),a0` 02DD38, `move.b (a0)+,(a3)+` 02DD4C, `addq.l #4,a2` 02DD78, `tst.l (a2)` 02DD80); 02B308, 02B3F4, 02B51C pass +4 to `sub_30220` with a format string. +0 (the map's image entry, an index into 048068: `move.b ($0,a0,d1.l),d0` at 02A5F4, then `asl.l #2` and `movea.l #dat_48068,a0` 02A5F8-02A5FA; 024A98 and 26 more, 28 reads of +0 in all, 20 `move.b` and 8 `tst.b`, each after `movea.l #dat_48180,a0`) and +2 (a word into FF954E, 029DE4) stay incbin |
 | 04A954 | 17 | pointers | 0307E0-0307E6 pass one to `sub_23898`, which draws the string (`movea.l ($10,sp),a0` 0238D4) |
 | 04C712 | 182 | pointers | 0311CC-0311D2 into d3, then `movea.l d3,a5`, `movea.l (a5)+,a4` (0311DA-0311DC); 0358B8, 03A0A8 read it too. The run ends at the first long that points nowhere in the data; the 306 bytes after it stay blob |
 | 04D628 | 25 | pointers | indexed by the level word x 4 (0277BE, 0277D8, 0279D0, 0279EA, 02B794), passed to `sub_31ABE`, which stores it into FFDC6C (031B64); `sub_3186A` dereferences that (031872-031878) |
@@ -151,6 +151,12 @@ Every target got a label where it had none (`dat_X`, the slice cut there: 047D46
 records name as empty strings, and more in 04B142-04C70A and 04F104-05BE04). An incbin slice that a
 table split carries its own label (C3). The targets of 048068 are the palettes of section 2
 (`pal_overlay_*`, `dat_45B60` for entry 69), of 047406 the six `pal_level_base_*`.
+
+04CB36 is not 048180's +0, though its bytes are 048068 indices too: `movea.l #dat_4CB36,a0` then
+`move.b (a0,d1.l),d0` at 029A68-029A70, indexed by the word at (a2) unscaled, and at
+029B08-029B10, indexed by the level word minus 1; each byte goes through `asl.l #2` into
+`movea.l #dat_48068,a0` (029A74-029A7C, 029B14-029B1C). It is not a table of this leg and stays
+blob.
 
 **Finding (05C3F6).** The table is six longs, not five: the sixth long (05C40A-05C40D) points at
 05C462 ("Excess Time (1/10th sec)"), and its low byte is the first byte of the classification's
@@ -214,9 +220,25 @@ whose handler calls `sub_30692` and the error screen `sub_30972` with code 2 (`i
 414, the GSP writes of frame 415); the watchdog resets the machine at frame 871. 0319C6 is in the
 code after `sub_3186A`, which walks the list that FFDC6C points at: the entry of 04D628 for the
 level (a label now), whose longs are numeric pointers in blob (04D5EC is the first list) and name
-the reference addresses of records that moved. HYP: A2 is such a stale pointer plus an offset (the
-fault address was not decoded from the frame). Not fixed here: the lists' format (flags in bit 31,
-the list ends, what each record is) is not proven by this leg (section 4.2).
+the reference addresses of records that moved.
+
+The fault's registers, observed (2026-11-17, `make MOVED_FRAMES=430
+build/mame/moved-moved-attract.txt`: `movedcheck.lua`'s read tap on the game's bus and address
+error vectors 020008-02000F writes one `# exception` line at the first fetch of each): vector 3
+in the frame the log numbers 415 (the frame whose GSP writes first differ; the debugger run above
+counted it 414), stacked PC 0319CA, A2 = 073283, FFDC70 = 000C08, FFDC6C = 04D614 (in the moved
+layout: 04D610 in the reference's, inside the first list 04D5EC). A2 is odd and lies outside the
+whole data region 046AEE-05CF86 (in pairs U-W), so it is not a record pointer plus an offset: it
+is the long that `movea.l (a1),a2` at 03198E read through the cursor FFDC70 (`movea.l (a0),a1`,
+`addq.l #4,(a0)` 03198A-03198C), and the cursor itself, 000C08 after that `addq`, points into
+the boot program. FFDC70 is loaded at 031926 (`move.l (a1),$ffdc70.l`, after `movea.l (a2),a1`,
+`addq.l #4,(a2)` 031922-031924) from the stream FFDC6C points at, the 04D628 entry's list. HYP:
+the stream is out of step because the records it names are read at their reference addresses
+(the record's flags, `movea.l ($E,a3),a1` at 0318CC and 0318E2, decide whether the stream jumps,
+`move.l (a0),(a2)` at 0318DE, or loads FFDC70, 031922-031926), so the long loaded at 031926 is
+not a record pointer. Not fixed
+here: the lists' format (flags in bit 31, the list ends, what each record is) is not proven by
+this leg (section 4.2).
 
 **The rest, for the naming legs (a worklist, not evidence).** `tools/m68k moved-candidates
 --listing build/stunrun-68k.lst --binary build/stunrun-68k.out` lists the runs of four or more
@@ -231,19 +253,25 @@ source; until then a moved build diverges, as it does in frame 414.
 - **`tools/m68k check-tree`'s raw-data check** covers 000000-012F06 and 020000-060000 since this
   leg (`RAW_FILES`), `data.asm` included, with the kinds of section 4 (strings and fills as in the
   code files, palette triples inside a palette of `data/palettes`, the statements of a table of
-  `data/68k/tables.json` in its format). `load_tables` refuses a table without its reader, of an
-  unknown format or overlapping another.
-- **The address lint** refuses a label+offset reference into `images.asm`/`image_table.asm`.
+  `data/68k/tables.json` in its format, under the label the registry names at the table's
+  start, which the listing must define there). `load_tables` refuses a table without its reader,
+  of an unknown format or overlapping another.
+- **The address lint** refuses a label+offset reference into `images.asm`/`image_table.asm`
+  through any label the listing defines in 060000-0C0000 (`tbl_BFE00+$64`, `gsp_image_entry_24+4`,
+  `4+gsp_image_entry_24`, `gsp_image_NN-$10`; a difference of two labels is no offset).
 - **The shift test**: 5,101 statements changed, 5,101 expected (4,589 before: the 512 new
   `dc.l` that name a label, the other 146 being 0 or a count; the references renamed to palette
   and entry labels count as before).
 - **CI** (`tools/test_68k_tree.py`, `tools/test_gspimages.py`, `tools/test_build.py`, no ROM): the
   tree assembled against a random blob passes every check (0 label+offset references, 0 raw-data
-  errors, the shift test exact); the palettes are `data/palettes`' bytes and a planted colour
+  errors, the shift test exact); the lint flags `gsp_image_entry_24+4` and `4+gsp_image_entry_24`
+  planted in the code (`test_tree_checks_fail`); the palettes are `data/palettes`' bytes and a planted colour
   changes exactly its byte; the sound equates are `commands.json`'s; `audio_test_list` is
   source; the raw-data check fails on a planted `dc.b` wall in `data.asm` (at 04A88C), a record
   header of 048180 written as `dc.l`, a count in a pointer table, 400h in 047F50 and a registered
-  table left an incbin slice (`test_data_asm_raw_data_check_fails`), and on a broken
+  table left an incbin slice, three numbers `dc.b $01,$02,$03` outside every palette and a
+  registry label the listing does not define at the table's start
+  (`test_data_asm_raw_data_check_fails`), and on a broken
   `audio_test_list` record; the moved tree keeps 000000-020000 and 060000-0C0000 and moves the
   labels between by the pad (`test_moved_build`), and `moved-compare` finds the first differing
   frame on made-up logs.

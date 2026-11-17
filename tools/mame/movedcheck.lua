@@ -16,6 +16,10 @@
 -- <MOVED_NAME>.detail (build output: the values are run-time data). Nothing of the ROM is
 -- recorded. MOVED_PLAY=1 starts a game (coin at 900, start at 960, the trigger every 20 frames
 -- from 1020, as tools/mame/gspimages.lua). A machine reset ends the run ("# reset_at_frame").
+-- A read tap on the game's bus and address error vectors (020008-02000F, VBR 020000 from the
+-- movec at 000294) writes one "# exception" line at the first fetch of each: the frame, the
+-- vector, the stacked PC and SR, A0-A2 and A7, and the level object list cursors FFDC6C and
+-- FFDC70 (sub_3186A, docs/17 section 5): run-time register and RAM values.
 
 if MOVED_DONE then return end
 
@@ -64,6 +68,18 @@ local function tap(stream)
 end
 
 -- Taps stay referenced from globals: a collected tap is removed.
+local seen = {}
+MOVED_FAULT = sp:install_read_tap(0x020008, 0x02000F, "moved_fault", function(offset, data, mask)
+  local v = (offset - 0x020000) >> 2
+  if seen[v] then return end
+  seen[v] = true
+  local function r(n) return cpu.state[n].value end
+  local a7 = r("A7")
+  log:write(string.format("# exception frame %d vector %d stacked_pc %06X stacked_sr %04X "
+    .. "a0 %08X a1 %08X a2 %08X a7 %08X FFDC6C %08X FFDC70 %08X\n", frame + 1, v,
+    sp:read_u32(a7 + 2) & 0xFFFFFF, sp:read_u16(a7), r("A0"), r("A1"), r("A2"), a7,
+    sp:read_u32(0xFFDC6C), sp:read_u32(0xFFDC70)))
+end)
 MOVED_GSP = sp:install_write_tap(0xC00000, 0xC0000F, "moved_gsp", tap("gsp"))
 MOVED_ADSP = sp:install_write_tap(0x800000, 0x83FFFF, "moved_adsp", tap("adsp"))
 MOVED_SND = sp:install_write_tap(0x600000, 0x603FFF, "moved_snd", tap("snd"))

@@ -46,7 +46,7 @@
         4,
         40
       ],
-      "reader": "24 level records of 40 bytes indexed by the level word x 40 (asl.l #3, x5): +0 the map's image table entry (move.b ($0,a0,d1.l),d0 at 029A70, 02A5F4 and 30 more), +2 a word into FF954E (029DE4), both kept incbin slices here; +4-+40 nine longs, string pointers or 0: sub_2DD1E (called with pea ($4,a0,d0.l) at 027902) walks them (movea.l (a2),a0 at 02DD38, move.b (a0)+,(a3)+ at 02DD4C, addq.l #4,a2 at 02DD78, tst.l (a2) at 02DD80), and 02B308, 02B3F4, 02B51C pass +4 to sub_30220 with a format string"
+      "reader": "24 level records of 40 bytes indexed by the level word x 40 (asl.l #3, x5): +0 the map's image table entry, an index into 048068 (move.b ($0,a0,d1.l),d0 at 02A5F4, then asl.l #2 and movea.l #dat_48068,a0 at 02A5F8-02A5FA; 024A98 and 26 more: 28 reads of +0, 20 move.b and 8 tst.b, each after movea.l #dat_48180,a0), +2 a word into FF954E (029DE4), both kept incbin slices here; +4-+40 nine longs, string pointers or 0: sub_2DD1E (called with pea ($4,a0,d0.l) at 027902) walks them (movea.l (a2),a0 at 02DD38, move.b (a0)+,(a3)+ at 02DD4C, addq.l #4,a2 at 02DD78, tst.l (a2) at 02DD80), and 02B308, 02B3F4, 02B51C pass +4 to sub_30220 with a format string"
     },
     {
       "start": "04A954",
