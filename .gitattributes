@@ -4,3 +4,6 @@
 
 # The committed samples (data/oki/*.wav, docs/10-adpcm.md): PCM audio, never diffed as text.
 *.wav binary
+
+# The committed GSP images (data/gsp-images/*.png, docs/15-gsp-images.md): indexed PNGs.
+*.png binary

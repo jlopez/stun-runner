@@ -626,3 +626,81 @@ $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt): $(BUILD)/mame/pccov-%.txt: tools/mame
 pccov: $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt) $(BUILD)/$(SET)-68k.bin
 	$(PYTHON) tools/m68k pccov --image $(BUILD)/$(SET)-68k.bin --classification $(CLASSIFICATION) \
 		--summary artifacts/pccov-summary.json $(PCCOV_RUNS:%=$(BUILD)/mame/pccov-%.txt)
+
+# --- M5i: the packed GSP images and their palettes (docs/15-gsp-images.md) --------------------
+# tools/gspimages is a package run as `uv run python tools/gspimages <command>`; its CI tests are
+# tools/test_gspimages.py. The 68k tree's 060000-0C0000 comes from data/gsp-images alone:
+# tools/gspimages asm re-encodes every stream from the PNGs' pixel indices and writes the
+# includes of asm/68k/images.asm and image_table.asm (and the palettes of data/palettes as dc.b),
+# on every make (a fraction of a second; make 3.81 compares whole-second mtimes), rewriting a file
+# only when it changes. A PNG whose size differs from the manifest's fails the build.
+.PHONY: lint-gspimages images palcheck imgtrace
+lint: lint-gspimages
+lint-gspimages:
+	uv run --frozen mypy -p gspimages
+
+GSP_DIR := $(BUILD)/gsp-images
+GSP_ASM := $(GSP_DIR)/images.asm $(GSP_DIR)/table.asm
+GSP_TOOLS := $(wildcard tools/gspimages/*.py)
+GSP_PAL_BIN := $(GSP_DIR)/palettes.bin
+
+# two targets, one recipe: a pattern rule (stem "images"), as the object pages above
+$(BUILD)/gsp-%/images.asm $(BUILD)/gsp-%/table.asm $(BUILD)/gsp-%/palettes.asm: FORCE
+	$(PYTHON) tools/gspimages asm --data data/gsp-images --palettes data/palettes --out $(GSP_DIR)
+
+.SECONDARY: $(GSP_ASM) $(GSP_DIR)/palettes.asm
+# FORCE: the includes keep their mtime unless their text changes, and make 3.81's whole-second
+# mtimes would otherwise skip an assembly whose include changed in the second of the last one
+# (a stale image or palettes.bin would then pass or fail make check wrongly). Both take < 1 s.
+EXTRA_stunrun-68k += $(GSP_ASM) FORCE
+
+# The palettes as dc.b, assembled alone (no image includes them yet: the data leg embeds them in
+# the tree, docs/15 section 7) and compared with the 68k image at each palette's address. Part of
+# `make check` (a prerequisite); skipped without the reference set, as check is.
+$(GSP_PAL_BIN): $(GSP_DIR)/palettes.asm FORCE
+	$(VASM) $(VASMFLAGS) -o $@ $<
+
+palcheck:
+	@$(PYTHON) tools/check-roms --set $(SET) >/dev/null; rc=$$?; \
+	if [ $$rc -eq 2 ]; then echo "palettes: reference set absent, skipped"; exit 0; fi; \
+	$(MAKE) --no-print-directory $(BUILD)/$(SET)-68k.bin $(GSP_PAL_BIN) || exit 1; \
+	$(PYTHON) tools/gspimages palcheck --palettes data/palettes --bin $(GSP_PAL_BIN) \
+		--image $(BUILD)/$(SET)-68k.bin
+
+check: palcheck
+
+# Re-decode the image into data/gsp-images (docs/15): the manifest and one PNG per distinct
+# image, names and palette specs kept; run after changing the decoder. `make test` fails while
+# the committed data and the image disagree.
+images: $(BUILD)/$(SET)-68k.bin $(GSP_TOOLS)
+	$(PYTHON) tools/gspimages decode --image $< --data data/gsp-images --palettes data/palettes
+
+# The unpackers in MAME (docs/15 section 8): tools/mame/gspimages.lua records every HSTDATA word
+# the 68010's unpackers write (0225E4-022954) with its GSP destination, the stream bytes they
+# read, the image-table reads, the GSP words read back one frame later and MAME's palette every
+# 50 frames (every 20 in the level runs), headless, each run from its own empty NVRAM and cfg: attract mode, a game, and a
+# game per start level 1-23 (objlevels.lua's level select, card A4) to reach every level map.
+# Into build/mame/imgtrace-<run>.{txt,words,vram,pal} (the words and palettes are image data:
+# build output only); then tools/gspimages trace checks every unpacking against the decoder and
+# rewrites artifacts/gspimages-summary.json (entries, frames, destinations, counts; commit it
+# when it changes). `make -j6 imgtrace`. Needs MAME and the ROMs.
+IMG_LEVELS := $(shell seq -w 1 23)
+IMG_RUNS := attract game $(IMG_LEVELS:%=level%)
+$(BUILD)/mame/imgtrace-attract.txt: IMG_ENV = IMG_FRAMES=10800 IMG_PLAY=0 IMG_LEVEL=0 \
+	IMG_PAL=$(shell seq -s, 50 50 10800)
+$(BUILD)/mame/imgtrace-game.txt: IMG_ENV = IMG_FRAMES=7200 IMG_PLAY=1 IMG_LEVEL=0 \
+	IMG_PAL=$(shell seq -s, 50 50 7200)
+$(BUILD)/mame/imgtrace-level%.txt: IMG_ENV = IMG_FRAMES=3000 IMG_PLAY=1 \
+	IMG_LEVEL=$(patsubst 0%,%,$(patsubst level%,%,$*)) IMG_PAL=$(shell seq -s, 20 20 3000)
+
+$(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt): $(BUILD)/mame/imgtrace-%.txt: tools/mame/gspimages.lua
+	$(call TRACE_STATE,imgtrace-$*)
+	rm -f $@
+	IMG_DIR=$(BUILD)/mame/ IMG_NAME=imgtrace-$* $(IMG_ENV) SDL_VIDEODRIVER=dummy \
+		$(MAME) stunrun $(MAME_FLAGS) $(call TRACE_DIRS,imgtrace-$*) \
+		-autoboot_script tools/mame/gspimages.lua
+	@grep -qx '# done' $@ || { echo "imgtrace: the $* run did not finish"; rm -f $@; exit 1; }
+
+imgtrace: $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt) $(BUILD)/$(SET)-68k.bin
+	$(PYTHON) tools/gspimages trace --image $(BUILD)/$(SET)-68k.bin \
+		--summary artifacts/gspimages-summary.json $(IMG_RUNS:%=$(BUILD)/mame/imgtrace-%.txt)

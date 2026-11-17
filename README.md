@@ -28,13 +28,15 @@ board. Four instruction sets, no graphics ROMs. Details with MAME references in
 | [`docs/11-sound-protocol.md`](docs/11-sound-protocol.md) | the 68010-6502 sound protocol and the command set (`data/sound/commands.json`) |
 | [`docs/12-sound-music.md`](docs/12-sound-music.md) | the sequencer, its ops, streams and YM2151 patches as structured source |
 | [`docs/13-68k-source.md`](docs/13-68k-source.md) | the 68k source tree: region files and owners, conventions, the coverage gate and `make labels` |
+| [`docs/15-gsp-images.md`](docs/15-gsp-images.md) | the packed GSP images of pairs U-W: 140 indexed PNGs (`data/gsp-images`) and their palettes (`data/palettes`) as the source, `tools/gspimages` |
 
 Status (2026-11-16): milestones 0-4 are done (`CLAUDE.md` section 4, `docs/03-plan.md`). The
 object ROMs, the 6502 sound program and the OKI samples (from 52 committed PCM WAVs under
 `data/oki`) are built from source and data, and the NVRAM images (all zero) are fills. M5's wave
 0 is done: the 68k tree is nine region files, one per owner, with its zero runs and program table
-as source (docs/13); the rest of the 68k program (with the GSP and ADSP programs inside it) is
-still blob, 45.8% of the set's bytes (691,513). Next: M5's tools leg (M5g) and the conversion
+as source (docs/13); the packed GSP images of pairs U-W are built from 140 committed indexed
+PNGs and their palettes (M5i, docs/15); the rest of the 68k program (with the GSP and ADSP
+programs inside it) is still blob, 23.8% of the set's bytes (359,222). Next: M5's tools leg (M5g) and the conversion
 legs. The listening check of M4 is done: Jesus ran `make listen` on 2026-11-05 and heard the
 sound.
 
@@ -99,6 +101,8 @@ make -j3 okitrace   # which OKI phrase each command plays; rewrites data/oki/sam
 make -j5 sndproto   # both ends of the 68010-6502 latch, checked by tools/test_sound_commands.py
 make musictrace     # every sound command in its own window: statements read, key-ons
 make samples        # no MAME: re-decode the merged OKI image into data/oki (the 52 PCM WAVs)
+make images         # no MAME: re-decode pairs U-W into data/gsp-images (the PNGs and the manifest)
+make -j6 imgtrace   # every image the 68010 unpacks in MAME, checked against data/gsp-images
 make listen         # Jesus's listening check: MAME on the rebuilt set, in a window, with sound
 ```
 

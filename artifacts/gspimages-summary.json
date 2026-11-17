@@ -1,0 +1,2597 @@
+{
+ "comment": "make imgtrace (tools/mame/gspimages.lua, tools/gspimages trace): per stream (keyed by its first table entry) the MAME runs that unpacked it, the GSP destinations, unpackings, complete ones, HSTDATA words checked against the decoder and read back equal one frame later; per run the image-table reads (entry:count); per palette spec of the manifest the most colours it defines that equal MAME's palette at one dump (every 50 frames, 20 in the level runs), with the run and frame. Counts, frames and addresses only.",
+ "entries": {
+  "1": {
+   "entries": [
+    1
+   ],
+   "stream": "060002",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-game": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level01": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level02": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level03": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level04": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level05": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level06": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level07": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level08": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level09": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level10": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level11": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level12": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level13": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level14": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level15": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level16": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level17": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level18": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level19": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level20": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level21": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level22": {
+     "first_frame": 369,
+     "unpackings": 1
+    },
+    "imgtrace-level23": {
+     "first_frame": 369,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFDE0000"
+   ],
+   "unpackings": 25,
+   "complete": 25,
+   "words": 204800,
+   "readback_equal": 204800
+  },
+  "2": {
+   "entries": [
+    2
+   ],
+   "stream": "06118F",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 375,
+     "unpackings": 4
+    },
+    "imgtrace-game": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level01": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level02": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level03": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level04": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level05": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level06": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level07": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level08": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level09": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level10": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level11": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level12": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level13": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level14": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level15": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level16": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level17": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level18": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level19": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level20": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level21": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level22": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level23": {
+     "first_frame": 375,
+     "unpackings": 2
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 52,
+   "complete": 52,
+   "words": 3194880,
+   "readback_equal": 3194880
+  },
+  "4": {
+   "entries": [
+    4,
+    5
+   ],
+   "stream": "068ECC",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 2796,
+     "unpackings": 2
+    },
+    "imgtrace-level01": {
+     "first_frame": 1150,
+     "unpackings": 1
+    },
+    "imgtrace-level07": {
+     "first_frame": 1149,
+     "unpackings": 1
+    },
+    "imgtrace-level13": {
+     "first_frame": 1149,
+     "unpackings": 1
+    },
+    "imgtrace-level19": {
+     "first_frame": 1150,
+     "unpackings": 1
+    },
+    "imgtrace-level22": {
+     "first_frame": 1149,
+     "unpackings": 1
+    },
+    "imgtrace-level23": {
+     "first_frame": 1145,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 8,
+   "complete": 8,
+   "words": 196656,
+   "readback_equal": 196656
+  },
+  "6": {
+   "entries": [
+    6,
+    7
+   ],
+   "stream": "06AAE5",
+   "runs": {
+    "imgtrace-level05": {
+     "first_frame": 1150,
+     "unpackings": 1
+    },
+    "imgtrace-level11": {
+     "first_frame": 1145,
+     "unpackings": 1
+    },
+    "imgtrace-level17": {
+     "first_frame": 1149,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 3,
+   "complete": 3,
+   "words": 73746,
+   "readback_equal": 73746
+  },
+  "8": {
+   "entries": [
+    8,
+    9
+   ],
+   "stream": "06BB58",
+   "runs": {
+    "imgtrace-level03": {
+     "first_frame": 1149,
+     "unpackings": 1
+    },
+    "imgtrace-level09": {
+     "first_frame": 1145,
+     "unpackings": 1
+    },
+    "imgtrace-level15": {
+     "first_frame": 1149,
+     "unpackings": 1
+    },
+    "imgtrace-level21": {
+     "first_frame": 1145,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 4,
+   "complete": 4,
+   "words": 98328,
+   "readback_equal": 98328
+  },
+  "10": {
+   "entries": [
+    10,
+    11
+   ],
+   "stream": "06E01E",
+   "runs": {
+    "imgtrace-level04": {
+     "first_frame": 1145,
+     "unpackings": 1
+    },
+    "imgtrace-level10": {
+     "first_frame": 1150,
+     "unpackings": 1
+    },
+    "imgtrace-level16": {
+     "first_frame": 1149,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 3,
+   "complete": 3,
+   "words": 73746,
+   "readback_equal": 73746
+  },
+  "12": {
+   "entries": [
+    12,
+    13
+   ],
+   "stream": "0703EF",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 4999,
+     "unpackings": 2
+    },
+    "imgtrace-level01": {
+     "first_frame": 2649,
+     "unpackings": 1
+    },
+    "imgtrace-level02": {
+     "first_frame": 1149,
+     "unpackings": 1
+    },
+    "imgtrace-level08": {
+     "first_frame": 1145,
+     "unpackings": 1
+    },
+    "imgtrace-level14": {
+     "first_frame": 1149,
+     "unpackings": 1
+    },
+    "imgtrace-level20": {
+     "first_frame": 1145,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 7,
+   "complete": 7,
+   "words": 172074,
+   "readback_equal": 172074
+  },
+  "14": {
+   "entries": [
+    14,
+    15
+   ],
+   "stream": "0734DE",
+   "runs": {
+    "imgtrace-level06": {
+     "first_frame": 1145,
+     "unpackings": 1
+    },
+    "imgtrace-level12": {
+     "first_frame": 1149,
+     "unpackings": 1
+    },
+    "imgtrace-level18": {
+     "first_frame": 1145,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 3,
+   "complete": 3,
+   "words": 73746,
+   "readback_equal": 73746
+  },
+  "16": {
+   "entries": [
+    16
+   ],
+   "stream": "075455",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 827,
+     "unpackings": 3
+    },
+    "imgtrace-game": {
+     "first_frame": 827,
+     "unpackings": 2
+    },
+    "imgtrace-level01": {
+     "first_frame": 827,
+     "unpackings": 2
+    },
+    "imgtrace-level02": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level03": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level04": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level05": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level06": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level07": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level08": {
+     "first_frame": 827,
+     "unpackings": 2
+    },
+    "imgtrace-level09": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level10": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level11": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level12": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level13": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level14": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level15": {
+     "first_frame": 827,
+     "unpackings": 2
+    },
+    "imgtrace-level16": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level17": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level18": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level19": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level20": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level21": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level22": {
+     "first_frame": 827,
+     "unpackings": 1
+    },
+    "imgtrace-level23": {
+     "first_frame": 827,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 31,
+   "complete": 31,
+   "words": 762228,
+   "readback_equal": 762228
+  },
+  "17": {
+   "entries": [
+    17
+   ],
+   "stream": "0788D0",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 6477,
+     "unpackings": 1
+    },
+    "imgtrace-level02": {
+     "first_frame": 1348,
+     "unpackings": 1
+    },
+    "imgtrace-level09": {
+     "first_frame": 1354,
+     "unpackings": 1
+    },
+    "imgtrace-level16": {
+     "first_frame": 1345,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 4,
+   "complete": 4,
+   "words": 98352,
+   "readback_equal": 98352
+  },
+  "18": {
+   "entries": [
+    18,
+    19
+   ],
+   "stream": "07B697",
+   "runs": {
+    "imgtrace-level06": {
+     "first_frame": 1348,
+     "unpackings": 1
+    },
+    "imgtrace-level11": {
+     "first_frame": 1339,
+     "unpackings": 1
+    },
+    "imgtrace-level13": {
+     "first_frame": 1345,
+     "unpackings": 1
+    },
+    "imgtrace-level18": {
+     "first_frame": 1338,
+     "unpackings": 1
+    },
+    "imgtrace-level20": {
+     "first_frame": 1343,
+     "unpackings": 1
+    },
+    "imgtrace-level22": {
+     "first_frame": 1356,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 6,
+   "complete": 6,
+   "words": 147528,
+   "readback_equal": 147528
+  },
+  "20": {
+   "entries": [
+    20
+   ],
+   "stream": "07CCD1",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 1269,
+     "unpackings": 1
+    },
+    "imgtrace-level07": {
+     "first_frame": 1347,
+     "unpackings": 1
+    },
+    "imgtrace-level14": {
+     "first_frame": 1347,
+     "unpackings": 1
+    },
+    "imgtrace-level21": {
+     "first_frame": 1345,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 4,
+   "complete": 4,
+   "words": 98352,
+   "readback_equal": 98352
+  },
+  "21": {
+   "entries": [
+    21
+   ],
+   "stream": "07D9D0",
+   "runs": {
+    "imgtrace-level03": {
+     "first_frame": 1351,
+     "unpackings": 1
+    },
+    "imgtrace-level10": {
+     "first_frame": 1349,
+     "unpackings": 1
+    },
+    "imgtrace-level17": {
+     "first_frame": 1341,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 3,
+   "complete": 3,
+   "words": 36882,
+   "readback_equal": 36882
+  },
+  "22": {
+   "entries": [
+    22
+   ],
+   "stream": "07F636",
+   "runs": {
+    "imgtrace-level12": {
+     "first_frame": 1344,
+     "unpackings": 1
+    },
+    "imgtrace-level19": {
+     "first_frame": 1345,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 2,
+   "complete": 2,
+   "words": 32780,
+   "readback_equal": 32780
+  },
+  "23": {
+   "entries": [
+    23
+   ],
+   "stream": "0812F1",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 1771,
+     "unpackings": 2
+    },
+    "imgtrace-level05": {
+     "first_frame": 1342,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 3,
+   "complete": 3,
+   "words": 221238,
+   "readback_equal": 221238
+  },
+  "24": {
+   "entries": [
+    24
+   ],
+   "stream": "086B06",
+   "runs": {
+    "imgtrace-level08": {
+     "first_frame": 1341,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 53248,
+   "readback_equal": 53248
+  },
+  "25": {
+   "entries": [
+    25
+   ],
+   "stream": "087517",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 1095,
+     "unpackings": 3
+    },
+    "imgtrace-level01": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level02": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level03": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level04": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level05": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level06": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level07": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level08": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level09": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level10": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level11": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level12": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level13": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level14": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level15": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level16": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level17": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level18": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level19": {
+     "first_frame": 1045,
+     "unpackings": 1
+    },
+    "imgtrace-level20": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level21": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level22": {
+     "first_frame": 1044,
+     "unpackings": 1
+    },
+    "imgtrace-level23": {
+     "first_frame": 1044,
+     "unpackings": 2
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 27,
+   "complete": 27,
+   "words": 1437696,
+   "readback_equal": 1437696
+  },
+  "27": {
+   "entries": [
+    27
+   ],
+   "stream": "08FD1F",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 3969,
+     "unpackings": 2
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 2,
+   "complete": 2,
+   "words": 122880,
+   "readback_equal": 122880
+  },
+  "29": {
+   "entries": [
+    29
+   ],
+   "stream": "09136F",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 1024,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 62352,
+   "readback_equal": 62352
+  },
+  "30": {
+   "entries": [
+    30
+   ],
+   "stream": "094D09",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 373,
+     "unpackings": 1
+    },
+    "imgtrace-game": {
+     "first_frame": 373,
+     "unpackings": 5
+    },
+    "imgtrace-level01": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level02": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level03": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level04": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level05": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level06": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level07": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level08": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level09": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level10": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level11": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level12": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level13": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level14": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level15": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level16": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level17": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level18": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level19": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level20": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level21": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level22": {
+     "first_frame": 373,
+     "unpackings": 2
+    },
+    "imgtrace-level23": {
+     "first_frame": 373,
+     "unpackings": 2
+    }
+   },
+   "destinations": [
+    "FFF23F00"
+   ],
+   "unpackings": 52,
+   "complete": 52,
+   "words": 100152,
+   "readback_equal": 100152
+  },
+  "31": {
+   "entries": [
+    31
+   ],
+   "stream": "0951DF",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 2645,
+     "unpackings": 2
+    }
+   },
+   "destinations": [
+    "FFE00000"
+   ],
+   "unpackings": 2,
+   "complete": 2,
+   "words": 60492,
+   "readback_equal": 60492
+  },
+  "32": {
+   "entries": [
+    32
+   ],
+   "stream": "097F4B",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 374,
+     "unpackings": 1
+    },
+    "imgtrace-game": {
+     "first_frame": 374,
+     "unpackings": 5
+    },
+    "imgtrace-level01": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level02": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level03": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level04": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level05": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level06": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level07": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level08": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level09": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level10": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level11": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level12": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level13": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level14": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level15": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level16": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level17": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level18": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level19": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level20": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level21": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level22": {
+     "first_frame": 374,
+     "unpackings": 2
+    },
+    "imgtrace-level23": {
+     "first_frame": 374,
+     "unpackings": 2
+    }
+   },
+   "destinations": [
+    "FFF2B760"
+   ],
+   "unpackings": 52,
+   "complete": 52,
+   "words": 269360,
+   "readback_equal": 269360
+  },
+  "33": {
+   "entries": [
+    33
+   ],
+   "stream": "09841C",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 375,
+     "unpackings": 1
+    },
+    "imgtrace-game": {
+     "first_frame": 375,
+     "unpackings": 5
+    },
+    "imgtrace-level01": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level02": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level03": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level04": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level05": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level06": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level07": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level08": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level09": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level10": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level11": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level12": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level13": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level14": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level15": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level16": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level17": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level18": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level19": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level20": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level21": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level22": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level23": {
+     "first_frame": 375,
+     "unpackings": 2
+    }
+   },
+   "destinations": [
+    "FFF3FD80"
+   ],
+   "unpackings": 52,
+   "complete": 52,
+   "words": 2080,
+   "readback_equal": 2070
+  },
+  "34": {
+   "entries": [
+    34
+   ],
+   "stream": "098457",
+   "runs": {
+    "imgtrace-attract": {
+     "first_frame": 375,
+     "unpackings": 1
+    },
+    "imgtrace-game": {
+     "first_frame": 375,
+     "unpackings": 5
+    },
+    "imgtrace-level01": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level02": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level03": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level04": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level05": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level06": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level07": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level08": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level09": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level10": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level11": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level12": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level13": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level14": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level15": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level16": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level17": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level18": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level19": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level20": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level21": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level22": {
+     "first_frame": 375,
+     "unpackings": 2
+    },
+    "imgtrace-level23": {
+     "first_frame": 375,
+     "unpackings": 2
+    }
+   },
+   "destinations": [
+    "FFF3FB20"
+   ],
+   "unpackings": 52,
+   "complete": 52,
+   "words": 1976,
+   "readback_equal": 1976
+  },
+  "35": {
+   "entries": [
+    35
+   ],
+   "stream": "098490",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 965,
+     "unpackings": 2
+    },
+    "imgtrace-level01": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level02": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level03": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level04": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level05": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level06": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level07": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level08": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level09": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level10": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level11": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level12": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level13": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level14": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level15": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level16": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level17": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level18": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level19": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level20": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level21": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level22": {
+     "first_frame": 965,
+     "unpackings": 1
+    },
+    "imgtrace-level23": {
+     "first_frame": 965,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE00000",
+    "FFED0000"
+   ],
+   "unpackings": 25,
+   "complete": 25,
+   "words": 595150,
+   "readback_equal": 595150
+  },
+  "36": {
+   "entries": [
+    36
+   ],
+   "stream": "098B5C",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 3273,
+     "unpackings": 1
+    },
+    "imgtrace-level01": {
+     "first_frame": 1073,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 2,
+   "complete": 2,
+   "words": 47612,
+   "readback_equal": 47612
+  },
+  "37": {
+   "entries": [
+    37
+   ],
+   "stream": "099443",
+   "runs": {
+    "imgtrace-level14": {
+     "first_frame": 1073,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "38": {
+   "entries": [
+    38
+   ],
+   "stream": "099C70",
+   "runs": {
+    "imgtrace-level15": {
+     "first_frame": 1073,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "39": {
+   "entries": [
+    39
+   ],
+   "stream": "09A33C",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level01": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level02": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level03": {
+     "first_frame": 970,
+     "unpackings": 1
+    },
+    "imgtrace-level04": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level05": {
+     "first_frame": 969,
+     "unpackings": 2
+    },
+    "imgtrace-level06": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level07": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level08": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level09": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level10": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level11": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level12": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level13": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level14": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level15": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level16": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level17": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level18": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level19": {
+     "first_frame": 970,
+     "unpackings": 1
+    },
+    "imgtrace-level20": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level21": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level22": {
+     "first_frame": 969,
+     "unpackings": 1
+    },
+    "imgtrace-level23": {
+     "first_frame": 969,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFE5CFE0",
+    "FFED0000"
+   ],
+   "unpackings": 25,
+   "complete": 25,
+   "words": 595150,
+   "readback_equal": 595150
+  },
+  "40": {
+   "entries": [
+    40
+   ],
+   "stream": "09ADC1",
+   "runs": {
+    "imgtrace-level12": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "41": {
+   "entries": [
+    41
+   ],
+   "stream": "09B93E",
+   "runs": {
+    "imgtrace-level07": {
+     "first_frame": 1073,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "42": {
+   "entries": [
+    42
+   ],
+   "stream": "09C248",
+   "runs": {
+    "imgtrace-level11": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "43": {
+   "entries": [
+    43
+   ],
+   "stream": "09CDA3",
+   "runs": {
+    "imgtrace-level08": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "44": {
+   "entries": [
+    44
+   ],
+   "stream": "09D4D8",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 6170,
+     "unpackings": 1
+    },
+    "imgtrace-level02": {
+     "first_frame": 1073,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 2,
+   "complete": 2,
+   "words": 47612,
+   "readback_equal": 47612
+  },
+  "45": {
+   "entries": [
+    45
+   ],
+   "stream": "09DB33",
+   "runs": {
+    "imgtrace-level16": {
+     "first_frame": 1073,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "46": {
+   "entries": [
+    46
+   ],
+   "stream": "09E4DF",
+   "runs": {
+    "imgtrace-game": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level01": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level02": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level03": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level04": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level05": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level06": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level07": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level08": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level09": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level10": {
+     "first_frame": 975,
+     "unpackings": 2
+    },
+    "imgtrace-level11": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level12": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level13": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level14": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level15": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level16": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level17": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level18": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level19": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level20": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level21": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level22": {
+     "first_frame": 975,
+     "unpackings": 1
+    },
+    "imgtrace-level23": {
+     "first_frame": 975,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFEB9FC0",
+    "FFED0000"
+   ],
+   "unpackings": 25,
+   "complete": 25,
+   "words": 595150,
+   "readback_equal": 595150
+  },
+  "47": {
+   "entries": [
+    47
+   ],
+   "stream": "09F1C5",
+   "runs": {
+    "imgtrace-level13": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "48": {
+   "entries": [
+    48
+   ],
+   "stream": "09FD4A",
+   "runs": {
+    "imgtrace-level17": {
+     "first_frame": 1073,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "49": {
+   "entries": [
+    49
+   ],
+   "stream": "0A0309",
+   "runs": {
+    "imgtrace-level18": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "50": {
+   "entries": [
+    50
+   ],
+   "stream": "0A0927",
+   "runs": {
+    "imgtrace-level03": {
+     "first_frame": 1073,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "51": {
+   "entries": [
+    51
+   ],
+   "stream": "0A130B",
+   "runs": {
+    "imgtrace-level19": {
+     "first_frame": 1073,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "52": {
+   "entries": [
+    52
+   ],
+   "stream": "0A2088",
+   "runs": {
+    "imgtrace-level06": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "53": {
+   "entries": [
+    53
+   ],
+   "stream": "0A2890",
+   "runs": {
+    "imgtrace-level20": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "54": {
+   "entries": [
+    54
+   ],
+   "stream": "0A312E",
+   "runs": {
+    "imgtrace-level21": {
+     "first_frame": 1072,
+     "unpackings": 1
+    },
+    "imgtrace-level23": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 2,
+   "complete": 2,
+   "words": 47612,
+   "readback_equal": 47612
+  },
+  "55": {
+   "entries": [
+    55
+   ],
+   "stream": "0A394A",
+   "runs": {
+    "imgtrace-level22": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "56": {
+   "entries": [
+    56
+   ],
+   "stream": "0A46F5",
+   "runs": {
+    "imgtrace-level09": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "57": {
+   "entries": [
+    57
+   ],
+   "stream": "0A51B1",
+   "runs": {
+    "imgtrace-level04": {
+     "first_frame": 1072,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 23806,
+   "readback_equal": 23806
+  },
+  "67": {
+   "entries": [
+    67
+   ],
+   "stream": "0AD18E",
+   "runs": {
+    "imgtrace-level23": {
+     "first_frame": 2453,
+     "unpackings": 1
+    }
+   },
+   "destinations": [
+    "FFED0000"
+   ],
+   "unpackings": 1,
+   "complete": 1,
+   "words": 12294,
+   "readback_equal": 12294
+  }
+ },
+ "not_seen": [
+  3,
+  26,
+  28,
+  65,
+  66,
+  68
+ ],
+ "palettes": {
+  "grey + overlay_04@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 2850,
+   "run": "imgtrace-game"
+  },
+  "grey + overlay_05@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1200,
+   "run": "imgtrace-level07"
+  },
+  "grey + overlay_08@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1200,
+   "run": "imgtrace-level03"
+  },
+  "grey + overlay_09@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1200,
+   "run": "imgtrace-level09"
+  },
+  "grey + overlay_10@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1200,
+   "run": "imgtrace-level04"
+  },
+  "grey + overlay_11@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1200,
+   "run": "imgtrace-level10"
+  },
+  "grey + overlay_12@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 5050,
+   "run": "imgtrace-game"
+  },
+  "grey + overlay_13@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1200,
+   "run": "imgtrace-level08"
+  },
+  "grey + overlay_14@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1200,
+   "run": "imgtrace-level06"
+  },
+  "grey + overlay_15@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1200,
+   "run": "imgtrace-level12"
+  },
+  "grey + overlay_17@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 6500,
+   "run": "imgtrace-game"
+  },
+  "grey + overlay_18@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1360,
+   "run": "imgtrace-level11"
+  },
+  "grey + overlay_19@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1360,
+   "run": "imgtrace-level06"
+  },
+  "grey + overlay_20@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1300,
+   "run": "imgtrace-game"
+  },
+  "grey + overlay_21@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1360,
+   "run": "imgtrace-level03"
+  },
+  "grey + overlay_22@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1360,
+   "run": "imgtrace-level12"
+  },
+  "grey + overlay_23@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1800,
+   "run": "imgtrace-attract"
+  },
+  "grey + overlay_25@E0/32": {
+   "defined": 32,
+   "best_equal": 32,
+   "frame": 1000,
+   "run": "imgtrace-game"
+  },
+  "grey + overlay_26@D0/48": {
+   "defined": 48,
+   "best_equal": 48,
+   "frame": 4050,
+   "run": "imgtrace-attract"
+  },
+  "grey + overlay_29@F0/16": {
+   "defined": 16,
+   "best_equal": 16,
+   "frame": 1050,
+   "run": "imgtrace-game"
+  },
+  "grey + overlay_65@F0/16": {
+   "defined": 16,
+   "best_equal": 1,
+   "frame": 1800,
+   "run": "imgtrace-attract"
+  },
+  "level_base_00 + overlay_03@F0/16": {
+   "defined": 256,
+   "best_equal": 240,
+   "frame": 1050,
+   "run": "imgtrace-game"
+  },
+  "level_base_00 + overlay_25@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1000,
+   "run": "imgtrace-game"
+  },
+  "level_base_00 + overlay_26@D0/48": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 4050,
+   "run": "imgtrace-attract"
+  },
+  "level_base_00 + overlay_31@F0/16": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 2950,
+   "run": "imgtrace-attract"
+  },
+  "level_base_01 + overlay_16@F0/16": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 900,
+   "run": "imgtrace-attract"
+  },
+  "level_base_01 + overlay_25@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1120,
+   "run": "imgtrace-level01"
+  },
+  "level_base_01 + overlay_37@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1120,
+   "run": "imgtrace-level22"
+  },
+  "level_base_02 + overlay_25@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1120,
+   "run": "imgtrace-level02"
+  },
+  "level_base_02 + overlay_37@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1120,
+   "run": "imgtrace-level14"
+  },
+  "level_base_03 + overlay_25@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1120,
+   "run": "imgtrace-level03"
+  },
+  "level_base_03 + overlay_37@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1120,
+   "run": "imgtrace-level09"
+  },
+  "level_base_04 + overlay_25@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1120,
+   "run": "imgtrace-level10"
+  },
+  "level_base_04 + overlay_37@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1120,
+   "run": "imgtrace-level04"
+  },
+  "level_base_05 + overlay_25@E0/32": {
+   "defined": 256,
+   "best_equal": 255,
+   "frame": 1120,
+   "run": "imgtrace-level05"
+  },
+  "title": {
+   "defined": 256,
+   "best_equal": 256,
+   "frame": 450,
+   "run": "imgtrace-attract"
+  }
+ },
+ "runs": [
+  {
+   "run": "imgtrace-attract",
+   "frames": 10800,
+   "play": 0,
+   "level": 0,
+   "reset_at_frame": null,
+   "calls": 2251,
+   "words": 665764,
+   "table_reads": "1:2 2:8 16:12 23:8 27:4 30:2 31:4 32:2 33:2 34:2"
+  },
+  {
+   "run": "imgtrace-game",
+   "frames": 7200,
+   "play": 1,
+   "level": 0,
+   "reset_at_frame": null,
+   "calls": 2308,
+   "words": 728604,
+   "table_reads": "1:2 2:4 4:6 12:6 16:8 17:4 20:4 25:6 29:2 30:10 32:10 33:10 34:10 35:4 36:2 39:2 44:2 46:2"
+  },
+  {
+   "run": "imgtrace-level01",
+   "frames": 3000,
+   "play": 1,
+   "level": 1,
+   "reset_at_frame": null,
+   "calls": 1125,
+   "words": 392252,
+   "table_reads": "1:2 2:4 4:2 12:4 16:8 25:2 30:4 32:4 33:4 34:4 35:2 36:2 39:2 46:2"
+  },
+  {
+   "run": "imgtrace-level02",
+   "frames": 3000,
+   "play": 1,
+   "level": 2,
+   "reset_at_frame": null,
+   "calls": 688,
+   "words": 367670,
+   "table_reads": "1:2 2:4 12:2 16:4 17:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 44:2 46:2"
+  },
+  {
+   "run": "imgtrace-level03",
+   "frames": 3000,
+   "play": 1,
+   "level": 3,
+   "reset_at_frame": null,
+   "calls": 507,
+   "words": 355376,
+   "table_reads": "1:2 2:4 8:2 16:4 21:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 50:2"
+  },
+  {
+   "run": "imgtrace-level04",
+   "frames": 3000,
+   "play": 1,
+   "level": 4,
+   "reset_at_frame": null,
+   "calls": 233,
+   "words": 343082,
+   "table_reads": "1:2 2:4 10:2 16:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 57:2"
+  },
+  {
+   "run": "imgtrace-level05",
+   "frames": 3000,
+   "play": 1,
+   "level": 5,
+   "reset_at_frame": null,
+   "calls": 1028,
+   "words": 416828,
+   "table_reads": "1:2 2:4 6:2 16:4 23:4 25:2 30:4 32:4 33:4 34:4 35:2 39:4 46:2"
+  },
+  {
+   "run": "imgtrace-level06",
+   "frames": 3000,
+   "play": 1,
+   "level": 6,
+   "reset_at_frame": null,
+   "calls": 617,
+   "words": 367670,
+   "table_reads": "1:2 2:4 14:2 16:4 19:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 52:2"
+  },
+  {
+   "run": "imgtrace-level07",
+   "frames": 3000,
+   "play": 1,
+   "level": 7,
+   "reset_at_frame": null,
+   "calls": 480,
+   "words": 367670,
+   "table_reads": "1:2 2:4 5:2 16:4 20:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 41:2 46:2"
+  },
+  {
+   "run": "imgtrace-level08",
+   "frames": 3000,
+   "play": 1,
+   "level": 8,
+   "reset_at_frame": null,
+   "calls": 689,
+   "words": 420918,
+   "table_reads": "1:2 2:4 13:2 16:8 24:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 43:2 46:2"
+  },
+  {
+   "run": "imgtrace-level09",
+   "frames": 3000,
+   "play": 1,
+   "level": 9,
+   "reset_at_frame": null,
+   "calls": 688,
+   "words": 367670,
+   "table_reads": "1:2 2:4 9:2 16:4 17:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 56:2"
+  },
+  {
+   "run": "imgtrace-level10",
+   "frames": 3000,
+   "play": 1,
+   "level": 10,
+   "reset_at_frame": null,
+   "calls": 507,
+   "words": 355376,
+   "table_reads": "1:2 2:4 11:2 16:4 21:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:4"
+  },
+  {
+   "run": "imgtrace-level11",
+   "frames": 3000,
+   "play": 1,
+   "level": 11,
+   "reset_at_frame": null,
+   "calls": 617,
+   "words": 367670,
+   "table_reads": "1:2 2:4 7:2 16:4 18:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 42:2 46:2"
+  },
+  {
+   "run": "imgtrace-level12",
+   "frames": 3000,
+   "play": 1,
+   "level": 12,
+   "reset_at_frame": null,
+   "calls": 618,
+   "words": 359472,
+   "table_reads": "1:2 2:4 15:2 16:4 22:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 40:2 46:2"
+  },
+  {
+   "run": "imgtrace-level13",
+   "frames": 3000,
+   "play": 1,
+   "level": 13,
+   "reset_at_frame": null,
+   "calls": 617,
+   "words": 367670,
+   "table_reads": "1:2 2:4 4:2 16:4 19:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 47:2"
+  },
+  {
+   "run": "imgtrace-level14",
+   "frames": 3000,
+   "play": 1,
+   "level": 14,
+   "reset_at_frame": null,
+   "calls": 480,
+   "words": 367670,
+   "table_reads": "1:2 2:4 12:2 16:4 20:4 25:2 30:4 32:4 33:4 34:4 35:2 37:2 39:2 46:2"
+  },
+  {
+   "run": "imgtrace-level15",
+   "frames": 3000,
+   "play": 1,
+   "level": 15,
+   "reset_at_frame": null,
+   "calls": 449,
+   "words": 367670,
+   "table_reads": "1:2 2:4 8:2 16:8 25:2 30:4 32:4 33:4 34:4 35:2 38:2 39:2 46:2"
+  },
+  {
+   "run": "imgtrace-level16",
+   "frames": 3000,
+   "play": 1,
+   "level": 16,
+   "reset_at_frame": null,
+   "calls": 688,
+   "words": 367670,
+   "table_reads": "1:2 2:4 10:2 16:4 17:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 45:2 46:2"
+  },
+  {
+   "run": "imgtrace-level17",
+   "frames": 3000,
+   "play": 1,
+   "level": 17,
+   "reset_at_frame": null,
+   "calls": 507,
+   "words": 355376,
+   "table_reads": "1:2 2:4 6:2 16:4 21:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 48:2"
+  },
+  {
+   "run": "imgtrace-level18",
+   "frames": 3000,
+   "play": 1,
+   "level": 18,
+   "reset_at_frame": null,
+   "calls": 617,
+   "words": 367670,
+   "table_reads": "1:2 2:4 14:2 16:4 18:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 49:2"
+  },
+  {
+   "run": "imgtrace-level19",
+   "frames": 3000,
+   "play": 1,
+   "level": 19,
+   "reset_at_frame": null,
+   "calls": 618,
+   "words": 359472,
+   "table_reads": "1:2 2:4 5:2 16:4 22:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 51:2"
+  },
+  {
+   "run": "imgtrace-level20",
+   "frames": 3000,
+   "play": 1,
+   "level": 20,
+   "reset_at_frame": null,
+   "calls": 617,
+   "words": 367670,
+   "table_reads": "1:2 2:4 13:2 16:4 19:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 53:2"
+  },
+  {
+   "run": "imgtrace-level21",
+   "frames": 3000,
+   "play": 1,
+   "level": 21,
+   "reset_at_frame": null,
+   "calls": 480,
+   "words": 367670,
+   "table_reads": "1:2 2:4 9:2 16:4 20:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 54:2"
+  },
+  {
+   "run": "imgtrace-level22",
+   "frames": 3000,
+   "play": 1,
+   "level": 22,
+   "reset_at_frame": null,
+   "calls": 617,
+   "words": 367670,
+   "table_reads": "1:2 2:4 4:2 16:4 19:4 25:2 30:4 32:4 33:4 34:4 35:2 39:2 46:2 55:2"
+  },
+  {
+   "run": "imgtrace-level23",
+   "frames": 3000,
+   "play": 1,
+   "level": 23,
+   "reset_at_frame": 2709,
+   "calls": 235,
+   "words": 408624,
+   "table_reads": "0:2 1:2 2:4 4:2 16:4 25:4 30:4 32:4 33:4 34:4 35:2 39:2 46:2 54:2 67:2"
+  }
+ ]
+}

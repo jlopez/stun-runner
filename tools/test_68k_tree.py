@@ -21,6 +21,7 @@ import types
 from pathlib import Path
 
 import pytest
+from gspimages import REGION, REGION_END, write_includes
 from listings import vasm_symbols
 from programs import ADSP_START, GSP_END, GSP_START, PROGRAM_TABLE
 
@@ -81,6 +82,7 @@ def assemble_68k(
     (build / "stunrun-68k.bin").write_bytes(image)
     (build / "adsp/program.bin").write_bytes(image[ADSP_START:GSP_START])
     (build / "gsp/program.bin").write_bytes(image[GSP_START:GSP_END])
+    write_includes(build / "gsp-images")  # pairs U-W come from data/gsp-images (docs/15)
     out, lst = build / "68k.out", build / "68k.lst"
     tool = vasm()
     assert tool is not None
@@ -97,13 +99,27 @@ def assemble_68k(
 
 
 def expected_68k(image: bytes) -> bytes:
-    """What the tree contributes over a blob: the fills zero, the table's pointers and text."""
+    """What the tree contributes over a blob: the fills zero, the table's pointers and text, and
+    pairs U-W as data/gsp-images builds them (docs/15)."""
     out = bytearray(image)
+    out[REGION:REGION_END] = gsp_region()
     for start, end in FILLS:
         out[start:end] = bytes(end - start)
     struct.pack_into(">II", out, PROGRAM_TABLE, ADSP_START, GSP_START)
     out[0x017010 : 0x017010 + len(COPYRIGHT)] = COPYRIGHT
     return bytes(out)
+
+
+_GSP_REGION: list[bytes] = []
+
+
+def gsp_region() -> bytes:
+    if not _GSP_REGION:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            _GSP_REGION.append(write_includes(Path(tmp)))
+    return _GSP_REGION[0]
 
 
 def test_regions_tile_the_image_in_address_order() -> None:

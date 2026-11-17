@@ -320,6 +320,8 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     shutil.copytree(TOOLS, work / "tools", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(REPO / "data/objects", work / "data/objects")
     shutil.copytree(REPO / "data/oki", work / "data/oki")
+    shutil.copytree(REPO / "data/gsp-images", work / "data/gsp-images")  # pairs U-W (docs/15)
+    shutil.copytree(REPO / "data/palettes", work / "data/palettes")
     (work / "data/ida").mkdir()
     shutil.copy(REPO / "data/ida/stunrun-68k.json", work / "data/ida")  # for `make labels`
     env = dict(os.environ, STUNRUN_ROMS=str(tmp_path / "archive"))
@@ -339,7 +341,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert r.returncode == 0 and "0 differences" in r.stdout, r.stdout
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 45.8% of 1511424 bytes" in r.stdout
+    assert "blob: 23.8% of 1511424 bytes" in r.stdout
     blobs = {line.split()[0]: line.split() for line in r.stdout.splitlines() if line.strip()}
     assert blobs["adsp_program"][1:4] == ["1702E", "8270", "../../build/adsp/program.bin"]
     assert blobs["gsp_program"][1:4] == ["1907C", "24408", "../../build/gsp/program.bin"]
@@ -353,10 +355,11 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     # nor has the 6502 image a blob: all instructions, data and fills
     assert summary["images"]["stunrun-jsa"]["blob"] == 0
     assert summary["images"]["stunrun-jsa"]["instr"] > 0
-    # the 68k image: the six zero runs are fill, the program table's pointers and text data,
-    # one row per region file; the NVRAM image is two fills
+    # the 68k image: the six zero runs are fill, the program table's pointers and text data, the
+    # packed GSP images and their table data generated from data/gsp-images (docs/15), one row
+    # per region file and per generated include; the NVRAM image is two fills
     assert summary["images"]["stunrun-68k"] == {
-        "instr": 0, "data": 36, "blob": 691513, "fill": 94883}
+        "instr": 0, "data": 36 + 332291, "blob": 359222, "fill": 94883}
     assert summary["images"]["stunrun-nvram"] == {"instr": 0, "data": 0, "blob": 0, "fill": 4096}
     regions = {
         "boot/vectors.asm": 0x212, "boot/boot.asm": 0x12F06 - 0x212,
@@ -365,10 +368,17 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
         "data.asm": 0x60000 - 0x46AEE, "images.asm": 0xBFE00 - 0x60000,
         "image_table.asm": 0x200,
     }
-    assert {
-        f: sum(c.values()) for f, c in summary["files"].items() if f.startswith("asm/68k/")
-    } == {f"asm/68k/{f}": n for f, n in regions.items()}
-    assert summary["blob"] == 691513
+    generated = {"build/gsp-images/images.asm": "asm/68k/images.asm",
+                 "build/gsp-images/table.asm": "asm/68k/image_table.asm"}
+    per_region: dict[str, int] = {}
+    for f, c in summary["files"].items():
+        f = generated.get(f, f)
+        if f.startswith("asm/68k/"):
+            per_region[f] = per_region.get(f, 0) + sum(c.values())
+    assert per_region == {f"asm/68k/{f}": n for f, n in regions.items()}
+    assert summary["files"]["asm/68k/images.asm"]["blob"] == 0
+    assert summary["files"]["asm/68k/image_table.asm"]["blob"] == 0
+    assert summary["blob"] == 359222
     # the per-file blob gate a leg sets on its region file
     r = run(*make, "coverage", "MAX_BLOB=asm/68k/programs.asm=32688 asm/68k/data.asm=0", env=env)
     assert r.returncode != 0
@@ -390,7 +400,7 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
         (work / f"build/{name}.lst").unlink()
     r = run(*make, "coverage", env=env)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "blob: 45.8% of 1511424 bytes" in r.stdout
+    assert "blob: 23.8% of 1511424 bytes" in r.stdout
     assert (work / "build/stunrun-obj.lst").exists() and (work / "build/stunrun-jsa.lst").exists()
     # the object image needs nothing from the set: rebuilt with build/stunrun-obj.bin gone (and
     # its generated sources and output removed), it is still the same and the blob stays absent
@@ -411,9 +421,10 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     assert not (work / "build/stunrun-obj.bin").exists()
     assert not (work / "build/stunrun-oki.bin").exists()
     # a planted difference in a blob reaches the built files and the report names the address
+    # (pair S: pair U is data/gsp-images since M5i, docs/15)
     image = work / "build/stunrun-68k.bin"
     data = bytearray(image.read_bytes())
-    data[0x7FFFF] ^= 0x01
+    data[0x3FFFF] ^= 0x01
     image.write_bytes(bytes(data))
     later = image.stat().st_mtime + 5  # make 3.81 (macOS) compares whole seconds
     os.utime(image, (later, later))
@@ -422,10 +433,10 @@ def test_make_all_on_synthetic_set(tmp_path: Path) -> None:
     r = run(sys.executable, work / "tools/bytecheck", env=env)
     assert r.returncode == 1
     assert (
-        "136070-2107.210u: 1 differing bytes, first at file offset $0FFFF = 68k $07FFFF" in r.stdout
+        "136070-6103.210s: 1 differing bytes, first at file offset $0FFFF = 68k $03FFFF" in r.stdout
     )
     # undo the plant, so that the WAV, mesh and operand edits below are the only differences
-    data[0x7FFFF] ^= 0x01
+    data[0x3FFFF] ^= 0x01
     image.write_bytes(bytes(data))
     later = image.stat().st_mtime + 5
     os.utime(image, (later, later))

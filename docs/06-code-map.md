@@ -251,10 +251,10 @@ tables and of the region files' headers against the snapshot.
 | 0x046A00 | 0x046AEE | 238 | game code | from `sub_46A00` 0x046A00-0x046A20 to the last function, `sub_46AC4` 0x046AC4-0x046AEE |
 | 0x046AEE | 0x05CF86 | 91,288 | game data (68k consumer) | 724 references from code, the first 0x046AEE from 0x046A0C, the last 0x05C63C from 0x043720 |
 | 0x05CF86 | 0x060000 | 12,410 | zero fill | |
-| 0x060000 | 0x09F1C5 | 258,501 | packed GSP images, consumer `unpack_gsp_image` (0x0225E4), which streams them into HSTDATA | the image pointer table at 0x0BFE00: entries 1-46 point into this range (entry 1 = 0x060002); MAME read watch: every read of 0x060002-0x09F1C4 comes from 0x0225BC-0x02270A |
-| 0x09F1C5 | 0x0B10EB | 73,510 | packed GSP images, consumer `unpack_gsp_image` | reached through entries 47-57 and 65-68 of the image pointer table (entry 47 = 0x09F1C5, entry 68 = 0x0ADE80); not read in the watched run |
+| 0x060000 | 0x09F1C5 | 258,501 | packed GSP images, consumer `unpack_gsp_image` (0x0225E4), which streams them into HSTDATA; source `data/gsp-images` since M5i (docs/15) | the image pointer table at 0x0BFE00: entries 1-46 point into this range (entry 1 = 0x060002); MAME read watch: every read of 0x060002-0x09F1C4 comes from 0x0225BC-0x02270A; 0x060000 and 0x09848E are checksum-adjust words (docs/15 section 5) |
+| 0x09F1C5 | 0x0B10EB | 73,510 | packed GSP images, consumer `unpack_gsp_image`; source `data/gsp-images` (docs/15) | reached through entries 47-57 and 65-68 of the image pointer table (entry 47 = 0x09F1C5, entry 68 = 0x0ADE80); not read in the watched run, but `make imgtrace` (M5i) unpacks entries 47-57 and 67 in MAME (docs/15 section 8); 0x0A5B66 is the pair-W checksum-adjust word |
 | 0x0B10EB | 0x0BFE00 | 60,693 | zero fill | |
-| 0x0BFE00 | 0x0BFF18 | 280 | image pointer table, 70 longs: entry 0 = 0, entries 1-68 point into 0x060000-0x0B10EB in non-decreasing order except 58-64 (0x060000), entry 69 = 0 ends it | indexed from its base: `lea $bfe00` at 0x022798 (`movea.l (A0,D0.w),A0`), `addi.l #$bfe00` at 0x024AC4, 0x024F16 (then `jsr unpack_gsp_image`), 0x024F52, 0x024F8E, 0x029960, 0x029C5A, 0x02AFA4, 0x02DA9A, 0x02DC06; entry 1 read at 0x02D7D0; read watch: 0x0227A2, 0x024F20, 0x029C44, 0x02D780-0x02D7F2, 0x02DAA4, 0x040586 |
+| 0x0BFE00 | 0x0BFF18 | 280 | image pointer table, 70 longs: entry 0 = 0, entries 1-68 point into 0x060000-0x0B10EB in non-decreasing order except 58-64 (0x060000), entry 69 = 0 (but `sub_2DB54` unpacks entry 69, docs/15 section 5); generated from `data/gsp-images` since M5i | indexed from its base: `lea $bfe00` at 0x022798 (`movea.l (A0,D0.w),A0`), `addi.l #$bfe00` at 0x024AC4, 0x024F16 (then `jsr unpack_gsp_image`), 0x024F52, 0x024F8E, 0x029960, 0x029C5A, 0x02AFA4, 0x02DA9A, 0x02DC06; entry 1 read at 0x02D7D0; read watch: 0x0227A2, 0x024F20, 0x029C44, 0x02D780-0x02D7F2, 0x02DAA4, 0x040586 |
 | 0x0BFF18 | 0x0C0000 | 232 | zero fill | |
 
 In the game code, 0x026CD2 is the `jmp (0x026CD6,pc,d0.w)` of a switch whose word table
@@ -265,7 +265,7 @@ Code ends at 0x046AEE: the last IDA function ends there, MAME's highest 68k PC i
 (section 7), and the first data reference past it is to 0x046AEE itself. The zero runs inside
 `gsp_program` (0x01D4AC-0x01D80D, 0x01ED4C-0x01EF4C) are program data, not fill. Pair U-V's
 packed images carry a 16-entry table (`unpack_gsp_image` builds it at FF902A through 0x0225B0);
-their format is M5d's.
+their format, the images and their palettes are docs/15-gsp-images.md (M5i).
 
 ### 4.3 Operands outside the docs/01 map (from M1b)
 
@@ -492,7 +492,10 @@ the CPUs (harddriv_m.cpp:595-601).
    answered by docs/08 sections 2 and 3; the header block, the writer of FFF77F50 and the targets
    of codes 6, 8, B and D stay open there (docs/08 section 6, M5d).
 4. The packed image format of pairs U-V, and when the images of 0x09F1C5-0x0B10EB (table entries
-   47-68) are shown (M5d, M5f).
+   47-68) are shown (M5d, M5f). Answered by M5i (docs/15): the format in sections 2-5, entries
+   47-57 are level maps (`make imgtrace`); 65 and 66 are figure animations that 0407A8 and 04080E
+   unpack at FFE30060 together with entry 67 at FFE00000 (02DBB4), loaders found but never run in
+   MAME, so 65, 66 and 68 were not reached there (docs/15 section 9).
 5. The two longs at 0x017008, the word at 0x01702C, ADSP control lines 2 and 4, and 818040.
 6. Pair R against a Hard Drivin' set's 0x000000-0x01FFFF (section 4.4).
 7. What the self-test routines that enter the game through `game_entries` (0x0010D2, 0x0010FE,
