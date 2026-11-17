@@ -84,18 +84,31 @@ LINE = re.compile(r"^f (\d+)((?: \w+ \d+ [0-9A-F]{8})+)$")
 
 
 def load(path: Path) -> Run:
+    """A movedcheck.lua log. Refuses a log the run did not finish (no `# done` line, as an
+    interrupted MAME run leaves), a line that is neither a `# ` header nor a frame line, a frame
+    logged twice and a log of no frame, so that a comparison never rests on an empty or partial
+    log."""
     run = Run()
-    for line in path.read_text().splitlines():
+    done = False
+    for n, line in enumerate(path.read_text().splitlines(), 1):
         if line.startswith("# "):
             k, _, v = line[2:].partition(" ")
             run.header[k] = v
+            done = done or line == "# done"
             continue
         m = LINE.match(line)
         if not m:
-            continue
+            raise ValueError(f"{path}:{n}: not a movedcheck.lua log line")
+        frame = int(m[1])
+        if frame in run.frames:
+            raise ValueError(f"{path}:{n}: frame {frame} logged twice")
         parts = m[2].split()
-        run.frames[int(m[1])] = {parts[k]: (int(parts[k + 1]), int(parts[k + 2], 16))
-                                 for k in range(0, len(parts), 3)}
+        run.frames[frame] = {parts[k]: (int(parts[k + 1]), int(parts[k + 2], 16))
+                             for k in range(0, len(parts), 3)}
+    if not done:
+        raise ValueError(f"{path}: no '# done' line: the run did not finish")
+    if not run.frames:
+        raise ValueError(f"{path}: no frame logged")
     return run
 
 
@@ -104,6 +117,8 @@ def compare(ref: Run, moved: Run) -> dict[str, int | None]:
     frames both runs logged."""
     out: dict[str, int | None] = {}
     common = sorted(set(ref.frames) & set(moved.frames))
+    if not common:
+        raise ValueError("the two logs have no frame in common: nothing compared")
     for s in STREAMS:
         out[s] = next((f for f in common if ref.frames[f].get(s) != moved.frames[f].get(s)), None)
     return out

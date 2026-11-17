@@ -203,7 +203,9 @@ four images into `build/moved/roms/stunrun` (never committed). `tools/mame/moved
 per frame, for the GSP host port (C00000-C0000F), the ADSP (800000-83FFFF) and the sound latch
 (600000-603FFF), the count of the 68010's writes and an FNV-1a hash of their offset, data and mask;
 `MOVED_DETAIL=F1-F2` logs every write of those frames with the PC. `tools/m68k moved-compare`
-reports the first frame per stream that differs. Commands (2026-11-17, MAME 0.289, headless, each
+reports the first frame per stream that differs; it refuses (exit 1) a log without its `# done`
+line, with a line of another form or a frame logged twice, a log of no frame, and two logs with
+no frame in common, so it never reports equality over nothing. Commands (2026-11-17, MAME 0.289, headless, each
 run from its own empty NVRAM and cfg):
 
 ```

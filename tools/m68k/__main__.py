@@ -554,7 +554,11 @@ def cmd_moved_compare(a: argparse.Namespace) -> int:
         return 2
     for k in range(0, len(a.logs), 2):
         ref, mov = a.logs[k], a.logs[k + 1]
-        print(moved.summary(ref.stem.replace("-ref", ""), moved.load(ref), moved.load(mov)))
+        try:
+            print(moved.summary(ref.stem.replace("-ref", ""), moved.load(ref), moved.load(mov)))
+        except ValueError as e:
+            print(f"moved-compare: {e}")
+            return 1
     return 0
 
 

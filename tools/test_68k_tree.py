@@ -968,6 +968,22 @@ def test_moved_compare(tmp_path: Path) -> None:
     assert "moved reset at frame 3" in text and "adsp: equal in every frame" in text
     assert "gsp: first differs at frame 2 (writes, hash: reference 2 0000000A, moved 2 0000000C)" \
         in text
+    # logs that hold nothing to compare are refused, never "equal in every frame" (review of
+    # #38): empty, unfinished (no '# done'), garbage, a frame twice, no frame in common
+    (tmp_path / "e.txt").write_text("")
+    (tmp_path / "u.txt").write_text(f"# frames 3\nf 1 {same}\n")
+    (tmp_path / "g.txt").write_text("garbage\n# done\n")
+    for bad, match in (("e.txt", "done"), ("u.txt", "done"), ("g.txt", "not a movedcheck"),
+                       ("d.txt", "twice"), ("n.txt", "no frame logged")):
+        if bad == "d.txt":
+            log(tmp_path / bad, [f"f 1 {same}", f"f 1 {same}"])
+        if bad == "n.txt":
+            log(tmp_path / bad, [])
+        with pytest.raises(ValueError, match=match):
+            moved.load(tmp_path / bad)
+    other = moved.load(log(tmp_path / "o.txt", [f"f 9 {same}"]))
+    with pytest.raises(ValueError, match="nothing compared"):
+        moved.summary("t", r, other)
 
 
 def test_tables_registry_refuses_unproven_tables(tmp_path: Path) -> None:
