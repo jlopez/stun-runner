@@ -41,8 +41,8 @@ PNGs and their palettes (M5i, docs/15); since M5c all the 68k code (163,638 byte
 is neutral source cut into files of about 16 KB (docs/16); since M5d the palettes, the data's
 text, `audio_test_list` and twelve pointer tables proven by their readers are source too
 (docs/17); the rest of the 68k data, the code files' unknown and unexplained-data slices and the
-GSP and ADSP programs are still blob, 10.9% of the set's bytes (165,345). Next: the naming waves
-N1-N6 (docs/03). The listening check of M4 is done: Jesus ran `make listen` on 2026-11-05 and heard the
+GSP and ADSP programs are still blob, 10.9% of the set's bytes (165,345). Next: the naming phase
+(docs/03, section "M5 naming phase"). The listening check of M4 is done: Jesus ran `make listen` on 2026-11-05 and heard the
 sound.
 
 ## ROMs

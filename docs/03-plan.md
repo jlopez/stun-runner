@@ -55,7 +55,7 @@ Legs, as agreed with Jesus on 2026-11-16 ("mechanical first"; he delegated the o
 1. **Wave 0, M5-0** (issue #28, docs/13-68k-source.md): the partition into region files with guards, the zero fills and the program table as source, `asm/68k/hardware.asm`, the coverage gate, `make labels`. Done 2026-11-16 (below).
 2. **M5g** (issue #29, docs/14): the descent and generator tools (`tools/m68k`, `data/68k`, `asm/68k/macros.asm`) the conversion legs use.
 3. **Conversion legs**, in parallel, each owning region files of docs/13 section 2 and turning them into byte-identical neutral source (IDA's names and neutral labels): **boot code** (`boot/`), **game code** (`game/`), **game data** (`data.asm`), **images** (`images.asm`, `image_table.asm`: the packed GSP images become committed PNGs, docs/15).
-4. **Naming waves** after them, the old sub-milestones 5a-5f, renamed N1-N6 by M5d (issue #37: the leg ids M5c and M5d had collided with "5c" and "5d"): N1 boot, vectors, interrupt handlers, the loaders (already named in M2); N2 the main loop and game state; N3 input, ADC, NVRAM, DUART; N4 the ADSP interface (scene building) and the GSP interface (text, HUD, palette); N5 attract mode, high scores, test mode; N6 the tunnel/course data and tables (data regions as structured source or extracted files, like Spindizzy's `world.asm`).
+4. **The naming phase** after them: the plan agreed with Jesus on 2026-11-19 (card A18) is the section "M5 naming phase" below. It supersedes the topic list 5a-5f (N1-N6 since M5d; the section says where each topic went): the legs follow the program's own modules.
 
 **Check**: per leg `make check`, `make coverage MAX_BLOB="asm/68k/<file>=0"` (the leg's region file reports 0 blob bytes, or only documented residue), `make labels` (every IDA snapshot name in converted source is a label at its address; docs/13 section 7); at the end the 68k image is 100% source and data files. (For the 6502 the same check as `make labels` is `tools/test_ida_sync.py`, which fails in CI when the committed snapshot's names are not the source's, docs/05 section 6.)
 
@@ -66,6 +66,53 @@ Legs, as agreed with Jesus on 2026-11-16 ("mechanical first"; he delegated the o
 **M5c done 2026-11-16** (issue #33, docs/16), measured: all the 68k code is neutral vasm source (44,683 instructions, 163,638 bytes) in `boot/vectors.asm`, six `boot/code_*.asm`, `game/vectors.asm`, nine `game/code_*.asm` and `game/island.asm`, cut at routine starts into files of about 16 KB, with one shared `asm/68k/ram.asm`; `make check` 25 files, 0 differences; the code files' blob is exactly their unknown and unexplained-data slices (61,118 bytes); the 68k blob 517,385 bytes (from 691,513) on wave 0's images, 185,094 with M5i's images as data, the set's blob share 12.2% (34.2% without M5i); `make labels`: 223 snapshot names in ROM, 223 labels, 0 in blob, 0 failures; `make m68k-check` runs the descent check, the address lint, the raw-data check, the shift test and the MAME check on the tree's own listing (0 errors), and CI runs all but the MAME check on the tree assembled against a random blob (the executed-PC rule with made-up run files only); the 32 undecided operands are decided.
 
 **Wave 0 done 2026-11-16** (M5-0, docs/13), measured: `make check` 25 files, 0 differences; `asm/68k` is nine region files with guards at both ends; the six zero runs (94,883 bytes) are fills and the program table's pointers and text (36 bytes) data; the 68k blob is 691,513 bytes (from 786,432); the NVRAM images, both entirely zero, are fills; the set's blob share is 45.8% (691,513 of 1,511,424); `make labels`: 223 snapshot names in ROM, 11 labels in the tree, 212 in blob, 0 failures.
+
+### M5 naming phase (plan agreed 2026-11-19, card A18; to run in its own room)
+
+From a read-only scout on main 4a38a31 (2026-11-16; its module boundaries and subsystem labels are HYP unless marked CODE, and the first leg of each wave verifies them). The game program is two kinds of code: 020430-024306 is hand-written assembly (no `link`), everything from 024306 on is compiled C (`link a6`, `jsr` absolute); the boot program is all hand-written. The modules are recoverable: the data section 046AEE-05CF86 and the RAM statics FFDA86-FFDF50 are laid out in the order of the code that uses them, module by module. The file cuts at 024306, 02C0D2 and 030012 are module starts; those at 028194, 034010, 037C52 and 03FC22 fall inside modules.
+
+**Decisions (Jesus, 2026-11-19, card A18, all the coordinator's defaults):** (1) style: snake_case routines and variables, UPPER for hardware and constants, no module prefixes beyond the existing `boot_` and `h_`, vasm locals `.name`; a prototype line in the header of a C routine. (2) Boot self-test depth: full naming for what MAME runs and for the screen records; one name and one header per test for the ADSP and DSK board tests (009E80-00F130), which no MAME run executes. (3) Unreferenced code that decodes cleanly with a compiler frame becomes source as `unused_*` routines with a reviewed seed and a written argument (as M4d kept `unused_streams`); the rest stays blob. (4) The 68k IDA sync (`ida/jsa_source.py` ported to the vasm listing) is built during the first naming wave, so that every wave ends with a synced database. (5) The phase runs in its own room. Also: bottom-up order, the flow named last; ZRAM equates `io_FF4XXX` become `zram_*`.
+
+**Preparation leg (NW0), alone, first:**
+
+1. Re-cut the code files at module boundaries and name them by subsystem (the address range stays in the header).
+2. Split `asm/68k/ram.asm` into one file per owner (`asm/68k/ram/<leg>.asm`). Ownership rule: a static (FFDA80 and up) belongs to the module whose statics block contains it; FF948F-FFBBFF to the main-loop leg unless only one other leg uses it; FF9000-FF948F to the assembly runtime; the ZRAM layout to the operator-menus leg; boot RAM to the boot legs. Only the owner renames an equate; the globals used by three or more legs (about 68) are named in the first wave by the main-loop leg. (Of 533 RAM equates, 155 to 238 are used by more than one leg, depending on the split; boot and game share 3.)
+3. The rename mechanism: a leg renames only in the files it owns and adds `asm/68k/aliases/<leg>.asm` (`sub_2F88A equ gsp_write_command`; a forward alias assembles in vasm 2.0f); after each wave a scripted sweep replaces the old names everywhere and deletes the alias files.
+4. A convention, with a macro or equates, for the about 140 operands written as sign-extended `$FFFFxxxx` absolute addresses (about 40 addresses): the existing 24-bit equate would assemble to other bytes. The same document covers the 198 `#$FFxxxx` RAM immediates and the absolute-short uses.
+5. Tests tolerant of renames; new checks: no neutral label left in an owned file except an allow-list with reasons; a header block above every global code label; every RAM equate defined in exactly one owner file. `tools/m68k pccov --by-label`, so a header can say which runs executed its routine.
+6. A naming-conventions document and a glossary skeleton.
+
+**Legs** (instructions; the share of each that the five `make pccov` runs execute):
+
+| Leg | Range | Instr | MAME | Content (HYP unless marked) |
+|---|---|---:|---:|---|
+| G1 assembly runtime | 020430-024306 | 1,979 | 70% | CODE: start-up, option records, resets, interrupt handlers, GSP host primitives and `unpack_gsp_image`, fixed-point multiply 0229E4, GSP text 02347E-023898, DUART, ADC, the 32-bit divide 023E22, sound I/O. Holds 5,972 bytes of unreferenced code that decodes cleanly |
+| G2a main loop and global state | 024306-02611E | 1,895 | 25% | `sub_24306` (937 instructions: initialisation and the state switch) |
+| G2b screens and messages | 02611E-0291A2 | 2,953 | 50% | the message routine 02611E, credits, the map and sequence screens |
+| G2c bonus, map, level select | 0291A2-02C0D2 | 3,115 | 49% | palette fades 0296AA/0297A6, level select 02B1CC |
+| G3 coprocessors, scene, GSP | 02C0D2-030012 | 3,336 | 82% | CODE: `init_coprocessors`, frame sync, ADSP load, image loaders, `build_object_list`, the object pool, the GSP command buffer 02F0AE-02FC60 |
+| G4 sound, printf, trig, errors | 030012-030F9C | 1,173 | 53% | CODE: the sound queue, `sprintf` 030220, sine 030C06 and cosine 030C72 (table 04AABA), fatal-error stubs |
+| G5 | 030F9C-033480 | 2,585 | 69% | course progression and frame update |
+| G6 | 033480-03584A | 2,680 | 71% | track segments and scenery placement |
+| G7 entities | 03584A-0387B0 | 3,295 | 63% | CODE: the dispatcher 035CA2, a switch over 12 entity types; two type handlers never run in MAME |
+| G8 | 0387B0-03BC3C | 3,884 | 54% | player craft and controls |
+| G9 | 03BC3C-03CD14 | 1,403 | 80% | collision |
+| G10 | 03CD14-03DD8E | 1,189 | 67% | `game_entry_3`'s target, matrix work |
+| G11 high scores and attract | 03DD8E-040488 | 2,874 | 20% | name entry, the attract screen, the T-shirt offer |
+| G12 | 040488-0418B8 | 1,406 | 40% | figure animations 0407A8/04080E, assembly stubs |
+| G13 operator menus | 0418B8-04397E | 2,603 | 24% | statistics, options, ZRAM accessors, `audio_test` |
+| G14 island | 04397E-046AEE | 81 | 92% | 0445F0 and 046A00-046AEE |
+| B1 | 000212-0065E0 | 3,942 | low | reset, the menu framework and text output, the power-on test, the slapstic test |
+| B2 + B4 | 0065E0-009E80, 00F130-012F06 | 1,836 | mixed | screen records, the SA audio tests, the VRAM tests, the font island |
+| B3 | 009E80-00F130 | 2,445 | 0% | ADSP and DSK board tests (decision 2: one name and header per test) |
+
+**Waves** (NW1 to NW4, so named to keep them apart from the superseded topic list N1-N6): NW1 vocabulary first, in parallel: G1, G3, G4, G2a, B1, B2+B4, and the 68k IDA sync as its own leg. NW2 gameplay: G5 to G10 and G12. NW3 the front end and the top of the flow: G2b, G2c, G11, G13, B3, G14 with the remaining data. NW4: the final glossary and docs/06 pass.
+
+**Acceptance per leg, beyond byte identity:** `make check`, `make m68k-check`, `make labels`, `make coverage` (blob unchanged or lower), `make test`, `make lint`; a header per routine (what, arguments, result, callers, the runs that executed it); no neutral label left but the allow-listed; the leg's RAM equates named and in its own file; its `pea N.w` sound sites written with the `snd_` equates (181 in all); snapshot names it changes go into `ida/code_map.py` in the same PR; a routine table in its docs file; the pointers of docs/17's worklist that lie in its data symbolised with their readers, and `make movedcheck` reported.
+
+**Where the superseded topics N1-N6 went** (the region headers, docs/06 and docs/08 still cite them): N1 boot, vectors, interrupt handlers, loaders = B1 and G1; N2 main loop and game state = G2a; N3 input, ADC, NVRAM, DUART = G1 and G13; N4 the ADSP and GSP interfaces = G3 (and G1's GSP primitives); N5 attract mode, high scores, test mode = G11, G13 and the boot legs; N6 course data and tables = G5, G6 and the data each module reads.
+
+**MAME evidence still to build:** a RAM watch (writer PC and value per frame); a GSP command logger; analog yoke and trigger input from Lua; a ZRAM write tap; menu driving to the operator screens and to the ADSP tests; a way to reach high-score entry. Without them the names of G2a, G11, G13 and most of the boot program stay HYP.
 
 ## M6. GSP and ADSP programs as source
 
